@@ -58,6 +58,13 @@ function PricePage() {
           </button>
         ))}
       </div>
+      {(board.data?.warnings ?? []).length > 0 ? (
+        <div className="rounded-2xl bg-accent/40 px-4 py-3 text-sm font-semibold text-foreground">
+          {(board.data?.warnings ?? []).map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      ) : null}
       <div className="overflow-x-auto rounded-3xl border border-border bg-card">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="text-left text-muted-foreground">

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { formatMaybe } from "@/lib/brand";
-import { downloadExcel, getOrders } from "@/lib/admin.functions";
+import { downloadExcel, getMe, getOrders } from "@/lib/admin.functions";
 import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-hang/")({
@@ -11,18 +11,21 @@ export const Route = createFileRoute("/admin/don-hang/")({
 });
 
 function OrdersPage() {
+  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const orders = useQuery({ queryKey: ["orders"], queryFn: () => getOrders() });
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-extrabold text-primary">Đơn hàng</h1>
-        <div className="flex gap-2">
-          <Button asChild className="min-h-11 bg-accent text-accent-foreground">
-            <Link to="/admin/don-moi">Ghi đơn</Link>
-          </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {me.data?.role === "production" ? null : (
+            <Button asChild className="min-h-12 bg-accent text-accent-foreground">
+              <Link to="/admin/don-moi">Ghi đơn</Link>
+            </Button>
+          )}
           <Button
             variant="outline"
-            className="min-h-11"
+            className="min-h-12"
             onClick={async () => {
               const file = await downloadExcel({ data: { kind: "orders", month: "all" } });
               const blob = new Blob([file.xml], { type: "application/vnd.ms-excel" });
@@ -47,12 +50,12 @@ function OrdersPage() {
                 {STATUS_LABEL[order.status as OrderStatus] ?? order.statusLabel}
               </span>
             </div>
-            <p className="mt-1 text-sm">
+            <p className="mt-1 break-words text-sm">
               {order.customerName} · {order.phone} · {order.channelLabel}
               {order.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
             </p>
             <p className="text-sm text-muted-foreground">{order.itemSummary}</p>
-            <p className="mt-1 text-sm font-semibold">{order.total === null ? `${order.fileCount} ảnh` : `${formatMaybe(order.total)} · ${order.fileCount} ảnh`}</p>
+            <p className="mt-1 break-words text-sm font-semibold">{order.total == null ? `${order.fileCount} ảnh` : `${formatMaybe(order.total)} · ${order.fileCount} ảnh`}</p>
           </Link>
         ))}
         {orders.data && orders.data.orders.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có đơn. Đơn trên web sẽ hiện ở đây sau khi khách gửi ảnh.</p> : null}

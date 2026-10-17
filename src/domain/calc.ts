@@ -290,17 +290,22 @@ export function kpiTarget(openDate: string, month: string, targets: number[]): n
   return targets[3] ?? targets[targets.length - 1] ?? 0;
 }
 
+/**
+ * Số cọc Facebook. `null` = bắt buộc cọc (khổ lớn) nhưng chưa có giá để tính 50%.
+ * `0` = không cần cọc.
+ */
 export function depositFor(order: {
   channel: Channel;
   total: number | null;
   items: { size: string | null }[];
   settings: Settings;
-}): number {
+}): number | null {
   if (order.channel !== "facebook") return 0;
   const large = order.items.some((i) => needsLargeDeposit(i.size));
-  const bigMoney = (order.total ?? 0) >= order.settings.depositMinTotal;
+  if (order.total === null) return large ? null : 0;
+  const bigMoney = order.total >= order.settings.depositMinTotal;
   if (!large && !bigMoney) return 0;
-  return money(((order.total ?? 0) * order.settings.depositPercent) / 100);
+  return money((order.total * order.settings.depositPercent) / 100);
 }
 
 const PROGRESS: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
@@ -309,9 +314,58 @@ export function statusRank(status: OrderStatus): number {
   return PROGRESS.indexOf(status);
 }
 
-export function depositBlocks(status: OrderStatus, depositRequired: number, depositPaid: number): boolean {
-  if (depositRequired <= 0 || depositPaid + 0.5 >= depositRequired) return false;
-  return status !== "nhan_don" && status !== "huy" && status !== "draft_upload" && status !== "upload_error";
+const DEPOSIT_GATE: OrderStatus[] = ["thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
+
+export function depositBlocks(status: OrderStatus, depositRequired: number | null, depositPaid: number): boolean {
+  if (!DEPOSIT_GATE.includes(status)) return false;
+  if (depositRequired === null) return true;
+  if (depositRequired <= 0) return false;
+  return depositPaid + 0.5 < depositRequired;
+}
+
+export function statusChangeError(input: {
+  role: "owner" | "sale" | "production";
+  ownerOverride: boolean;
+  next: OrderStatus;
+  depositRequired: number | null;
+  depositPaid: number;
+}): string | null {
+  if (input.role === "production" && !["in", "dong_goi", "giao"].includes(input.next)) {
+    return "Sản xuất chỉ chuyển các bước in, đóng gói và giao.";
+  }
+  if (depositBlocks(input.next, input.depositRequired, input.depositPaid) && !(input.role === "owner" && input.ownerOverride)) {
+    if (input.depositRequired === null) {
+      return "Đơn Facebook có khổ từ 40×60 cần cọc 50%, nhưng chưa có giá bán để tính số cọc.";
+    }
+    return "Đơn Facebook chưa ghi đủ cọc 50%. Chưa chuyển sang thiết kế hoặc in.";
+  }
+  return null;
+}
+
+export function comboWarnings(
+  skus: { id: string; groupId: string; size: string | null; sheets: number; code: string }[],
+  prices: { skuId: string; channel: Channel; price: number | null }[],
+  channel: Channel,
+): string[] {
+  const warnings: string[] = [];
+  const groups = new Map<string, typeof skus>();
+  for (const sku of skus) {
+    if (!sku.size || sku.code.endsWith("-GOI")) continue;
+    const key = `${sku.groupId}:${sku.size}`;
+    const list = groups.get(key) ?? [];
+    list.push(sku);
+    groups.set(key, list);
+  }
+  for (const list of groups.values()) {
+    const error = comboPriceError(
+      list.map((sku) => ({
+        sheets: sku.sheets,
+        price: prices.find((row) => row.skuId === sku.id && row.channel === channel)?.price ?? null,
+      })),
+    );
+    if (error) warnings.push(`${list[0]!.size} · ${error}`);
+  }
+  return warnings;
 }
 
 export type StockNeed = { materialId: string; qty: number; phase: "print" | "pack" };

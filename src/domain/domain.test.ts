@@ -111,11 +111,14 @@ test("seed chỉ chứa số có trong đặc tả", async () => {
   assert.equal(state.settings.lateDeductionPerMinute, null);
   assert.equal(state.settings.showAnhThe, false);
   assert.equal(state.settings.showAlbum, false);
+  assert.equal(state.settings.showZalo, true);
+  assert.equal(state.settings.fileRetentionDays, 180);
   assert.equal(state.settings.saleBase, 8000000);
   assert.equal(state.settings.productionBase, 11000000);
   const fixed = state.settings.fixedCosts.reduce((sum, row) => sum + row.amount, 0);
   assert.equal(fixed, 29375000);
-  const car = state.boms.find((row) => row.skuId === "NX-10x25-C1");
+  assert.equal(state.skus.some((row) => row.code.includes("10x25")), false);
+  const car = state.boms.find((row) => row.skuId === "NX-9x19-C1");
   assert.equal(car?.qty, null);
   const bag = formulaQty("bag", state.skus[0]!, state.settings);
   assert.equal(bag, 1);

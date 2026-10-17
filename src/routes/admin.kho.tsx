@@ -94,7 +94,7 @@ function MaterialForms({
   canIn,
   onDone,
 }: {
-  material: { id: string; packPrice: number | null; packSize: number | null; minStock: number | null; supplier: string };
+  material: { id: string; packPrice?: number | null; packSize?: number | null; minStock: number | null; supplier: string };
   owner: boolean;
   canIn: boolean;
   onDone: () => Promise<void>;
@@ -104,15 +104,15 @@ function MaterialForms({
   const [supplier, setSupplier] = useState(material.supplier);
   const [actual, setActual] = useState("");
   const [minStock, setMinStock] = useState(material.minStock === null ? "" : String(material.minStock));
-  const [packPrice, setPackPrice] = useState(material.packPrice === null ? "" : String(material.packPrice));
+  const [packPrice, setPackPrice] = useState(material.packPrice == null ? "" : String(material.packPrice));
 
   return (
     <div className="mt-3 grid gap-2 md:grid-cols-2">
       {canIn ? (
-        <div className="flex flex-wrap gap-2">
-          <Input className="h-11 w-20" value={packs} onChange={(e) => setPacks(e.target.value)} />
-          <Input className="h-11 w-28" placeholder="Giá mua" value={price} onChange={(e) => setPrice(e.target.value)} />
-          <Input className="h-11 w-32" placeholder="Nơi mua" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <Input className="h-12 w-full sm:w-20" value={packs} onChange={(e) => setPacks(e.target.value)} />
+          <Input className="h-12 w-full sm:w-28" placeholder="Giá mua" value={price} onChange={(e) => setPrice(e.target.value)} />
+          <Input className="col-span-2 h-12 w-full sm:col-span-1 sm:w-32" placeholder="Nơi mua" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
           <Button
             className="min-h-11"
             onClick={async () => {

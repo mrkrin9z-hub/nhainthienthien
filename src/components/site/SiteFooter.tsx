@@ -8,8 +8,9 @@ import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 
 export function SiteFooter() {
   const config = useQuery(publicConfigQueryOptions);
-  const phone = config.data?.phone ?? BRAND.phone;
-  const zalo = config.data?.zalo ?? BRAND.zalo;
+  const showZalo = config.data ? config.data.showZalo : true;
+  const phone = showZalo ? (config.data?.phone || BRAND.phone) : "";
+  const zalo = showZalo ? (config.data?.zalo || BRAND.zalo) : "";
   return (
     <footer className="mt-16 border-t border-border bg-card/60">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-3 md:px-6">
@@ -21,12 +22,14 @@ export function SiteFooter() {
         </div>
         <div className="space-y-2 text-sm">
           <h3 className="text-base font-bold text-primary">Liên hệ</h3>
-          <p className="flex items-center gap-2">
-            <MessageCircle className="size-4 text-accent" />
-            <a href={zalo} className="font-semibold hover:text-primary">
-              Zalo {phone}
-            </a>
-          </p>
+          {showZalo ? (
+            <p className="flex items-center gap-2">
+              <MessageCircle className="size-4 text-accent" />
+              <a href={zalo} className="font-semibold hover:text-primary">
+                Zalo {phone}
+              </a>
+            </p>
+          ) : null}
           <p className="flex items-center gap-2">
             <MapPin className="size-4 text-accent" /> {BRAND.region}
           </p>

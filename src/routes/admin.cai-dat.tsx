@@ -90,6 +90,9 @@ function SettingsPage() {
           Zalo
           <Input className="mt-1 min-h-11" defaultValue={data.settings.zaloPhone} id="zalo" />
         </label>
+        <label className="flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" id="showZalo" defaultChecked={data.settings.showZalo !== false} /> Hiện số Zalo trên web
+        </label>
         <label className="block text-sm font-semibold">
           Giờ mở cửa (hiện trên web)
           <Input className="mt-1 min-h-11" defaultValue={data.settings.publicHours} id="hours" />
@@ -131,6 +134,7 @@ function SettingsPage() {
             const read = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
             const checked = (id: string) => (document.getElementById(id) as HTMLInputElement).checked;
             patch.zaloPhone = read("zalo");
+            patch.showZalo = checked("showZalo");
             patch.publicHours = read("hours");
             patch.workStart = read("workStart");
             patch.workEnd = read("workEnd");

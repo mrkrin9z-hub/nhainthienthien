@@ -66,6 +66,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fileRetentionDays: 180,
   videoRetentionDays: 30,
   zaloPhone: "0778662227",
+  showZalo: true,
   publicHours: "08:00 – 20:00",
   showAnhThe: false,
   showAlbum: false,
@@ -180,7 +181,7 @@ function groups(): Group[] {
       name: "Ảnh nam châm dán xe",
       slug: "nam-cham-xe",
       category: "Nam châm",
-      description: "Ảnh ép lụa nam châm dán xe. Size 9×19, 10×25 và 17×22.",
+      description: "Ảnh ép lụa nam châm dán xe. Size 9×19 và 17×22.",
       turnaround: "1–2 ngày",
       sort: 4,
       gate: null,
@@ -272,7 +273,6 @@ const SPECS: Spec[] = [
     prefix: "NX",
     sizes: [
       { code: "9x19", w: 9, h: 19 },
-      { code: "10x25", w: 10, h: 25 },
       { code: "17x22", w: 17, h: 22 },
     ],
     combos: [1],
@@ -394,11 +394,20 @@ function materials(): Material[] {
   return list;
 }
 
+/**
+ * Giá bán có số trong đặc tả giai đoạn 1.
+ * File BANG-GIA-THEO-KENH-v2 được nhắc tới nhưng không kèm bảng giá.
+ * Số duy nhất ghi ra là combo 4 tấm 13×18 kênh TikTok. Không sao sang kênh khác.
+ */
+export const SPEC_SELLING_PRICES: { code: string; channel: Channel; price: number }[] = [
+  { code: "TG-13x18-C4", channel: "tiktok", price: 249000 },
+];
+
 function prices(skus: Sku[]): ChannelPrice[] {
   const rows: ChannelPrice[] = [];
   for (const sku of skus) {
     for (const channel of CHANNELS) {
-      const known = sku.code === "TG-13x18-C4" && channel === "tiktok" ? 249000 : null;
+      const known = SPEC_SELLING_PRICES.find((row) => row.code === sku.code && row.channel === channel)?.price ?? null;
       rows.push({
         skuId: sku.id,
         channel: channel as Channel,

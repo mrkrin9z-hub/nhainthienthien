@@ -72,7 +72,7 @@ const REASONS = [
   "Xem trước giá từng kích thước, không cần hỏi tới lui.",
   "Kỹ thuật viên kiểm tra độ phân giải và báo lại nếu ảnh chưa đủ nét.",
   "In sai màu, sai kích thước — xưởng in lại miễn phí.",
-  "Ảnh gốc của bạn được lưu riêng tư và tự xoá sau khi hoàn tất.",
+  "Ảnh gốc của bạn được lưu riêng tư, lưu 6 tháng rồi xoá.",
 ];
 
 const FAQS = [
@@ -93,8 +93,9 @@ const FAQS = [
 function HomePage() {
   const { data: products } = useSuspenseQuery(catalogQueryOptions);
   const config = useQuery(publicConfigQueryOptions);
-  const zalo = config.data?.zalo ?? BRAND.zalo;
-  const phone = config.data?.phone ?? BRAND.phone;
+  const showZalo = config.data ? config.data.showZalo : true;
+  const zalo = showZalo ? (config.data?.zalo || BRAND.zalo) : "";
+  const phone = showZalo ? (config.data?.phone || BRAND.phone) : "";
   const featured = products.slice(0, 6);
 
   return (
@@ -130,12 +131,14 @@ function HomePage() {
               </Button>
             </div>
 
-            <a
-              href={zalo}
-              className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary"
-            >
-              <MessageCircle className="size-4 shrink-0 text-accent" /> Zalo tư vấn {phone}
-            </a>
+            {showZalo ? (
+              <a
+                href={zalo}
+                className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary"
+              >
+                <MessageCircle className="size-4 shrink-0 text-accent" /> Zalo tư vấn {phone}
+              </a>
+            ) : null}
 
           </div>
 
@@ -285,11 +288,13 @@ function HomePage() {
                   Gửi ảnh đặt in <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="min-h-12 w-full sm:w-auto">
-                <a href={zalo}>
-                  <MessageCircle className="size-4" /> Nhắn Zalo
-                </a>
-              </Button>
+              {showZalo ? (
+                <Button asChild size="lg" variant="outline" className="min-h-12 w-full sm:w-auto">
+                  <a href={zalo}>
+                    <MessageCircle className="size-4" /> Nhắn Zalo
+                  </a>
+                </Button>
+              ) : null}
             </div>
           </div>
         </section>
@@ -298,11 +303,13 @@ function HomePage() {
       {/* Thanh CTA cố định trên mobile */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-4 py-2.5 backdrop-blur md:hidden">
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline" className="min-h-12 flex-1">
-            <a href={zalo}>
-              <MessageCircle className="size-4" /> Zalo
-            </a>
-          </Button>
+          {showZalo ? (
+            <Button asChild variant="outline" className="min-h-12 flex-1">
+              <a href={zalo}>
+                <MessageCircle className="size-4" /> Zalo
+              </a>
+            </Button>
+          ) : null}
           <Button
             asChild
             className="min-h-12 flex-[1.6] bg-accent text-accent-foreground hover:bg-accent/90"

@@ -9,3 +9,6 @@ create table if not exists public.shop_state (
 alter table public.shop_state enable row level security;
 revoke all on public.shop_state from public, anon, authenticated;
 grant all on public.shop_state to service_role;
+
+comment on column public.shop_state.version is
+  'Khóa lạc quan. App chỉ update khi version còn đúng, rồi tăng 1. Hai request cùng lúc không ghi đè nhau.';
