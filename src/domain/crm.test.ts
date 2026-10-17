@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { moneyLeaks } from "./access.ts";
-import { customerCards, customerReminders, DEFAULT_REMIND_MESSAGE } from "./crm.ts";
+import { applyMarketplaceProfile, customerCards, customerReminders, DEFAULT_REMIND_MESSAGE, findCustomer } from "./crm.ts";
 import type { Customer, Order, ShopState } from "./types.ts";
 
 function customer(partial: Partial<Customer> & Pick<Customer, "id" | "phoneNormalized">): Customer {
@@ -92,4 +92,67 @@ test("nhắc khách theo ngày đơn cuối và ngày giỗ", () => {
   assert.match(gio?.reasons.join(" ") ?? "", /Ngày giỗ/);
   assert.match(gio?.message ?? "", /20\/10/);
   assert.equal(reminders.some((item) => item.id === "new"), false);
+});
+
+test("số che không gộp hai người, trừ khi cùng tài khoản hoặc trùng tên và địa chỉ", () => {
+  const mask = "masked:(+84)90*****12";
+  const g = customer({
+    id: "g",
+    name: "Đỗ Văn G",
+    phone: "(+84)90*****12",
+    phoneNormalized: mask,
+    address: "7 Nguyễn Huệ, Xã Xuân Hiệp",
+    platformBuyer: "do_g",
+  });
+  const h = customer({
+    id: "h",
+    name: "Bùi Thị H",
+    phone: "(+84)90*****12",
+    phoneNormalized: mask,
+    address: "9 Lý Thường Kiệt, Xã Xuân Hiệp",
+    platformBuyer: "bui_h",
+  });
+  const cards = customerCards(
+    shop(
+      [g, h],
+      [
+        order({ id: "o1", customerId: "g", channel: "tiktok", total: 330000, createdAt: "2026-10-17T13:15:03.000Z" }),
+        order({ id: "o2", customerId: "h", channel: "tiktok", total: 330000, createdAt: "2026-10-17T13:15:03.000Z" }),
+      ],
+    ),
+  );
+  assert.equal(cards.length, 2);
+  assert.equal(cards.every((card) => card.repeat === false), true);
+  assert.equal(
+    findCustomer([g], { phoneNormalized: mask, name: "Bùi Thị H", address: h.address, platformBuyer: "bui_h" }),
+    undefined,
+  );
+  assert.equal(
+    findCustomer([g], { phoneNormalized: mask, name: "Đỗ Văn G khác", address: "địa chỉ khác", platformBuyer: "do_g" })?.id,
+    "g",
+  );
+  const named = customer({ id: "n1", name: "Lan", phoneNormalized: mask, phone: "(+84)90*****12", address: "12 Hùng Vương" });
+  assert.equal(
+    findCustomer([named], { phoneNormalized: mask, name: "Lan", address: "12 Hùng Vương" })?.id,
+    "n1",
+  );
+  assert.equal(findCustomer([named], { phoneNormalized: mask, name: "Lan", address: "99 khác" }), undefined);
+  const kept = applyMarketplaceProfile(
+    { ...named, name: "Cô Lan", address: "Tại tiệm", addresses: ["Tại tiệm"] },
+    { name: "Lan sàn", address: "12 Hùng Vương", platformBuyer: "lan_1", masked: true },
+  );
+  assert.equal(kept.name, "Cô Lan");
+  assert.equal(kept.address, "Tại tiệm");
+  assert.deepEqual(kept.addresses, ["Tại tiệm", "12 Hùng Vương"]);
+  assert.equal(kept.platformBuyer, "lan_1");
+});
+
+test("khách chỉ có đơn hủy bị đánh dấu để ẩn", () => {
+  const person = customer({ id: "huy", name: "Hủy", phoneNormalized: "0901111222", phone: "0901111222" });
+  const cards = customerCards(
+    shop([person], [order({ id: "o1", customerId: "huy", channel: "tiktok", total: 10000, createdAt: "2026-10-01T00:00:00.000Z", status: "huy" })]),
+  );
+  assert.equal(cards[0]?.onlyCancelled, true);
+  assert.equal(cards[0]?.orderCount, 0);
+  assert.equal(cards[0]?.repeat, false);
 });

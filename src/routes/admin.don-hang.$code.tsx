@@ -47,6 +47,7 @@ function OrderDetailPage() {
       </div>
       <p className="text-sm">
         {data.customerName} · {data.phone} · {data.channelLabel} · {data.statusLabel}
+        {data.recipientName && data.recipientName !== data.customerName ? ` · Người nhận: ${data.recipientName}` : ""}
         {data.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
       </p>
       {data.address ? <p className="text-sm">Địa chỉ: {data.address}</p> : null}

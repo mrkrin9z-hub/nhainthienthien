@@ -23,6 +23,7 @@ const FIELD_ALIASES = {
   variation: ["variation name", "ten phan loai hang", "phan loai hang", "variation"],
   qty: ["quantity", "so luong", "qty"],
   buyer: ["ten nguoi nhan", "recipient name", "customer name", "nguoi nhan", "recipient"],
+  platformBuyer: ["buyer username", "nguoi mua"],
   phone: ["phone number", "recipient phone", "so dien thoai", "phone", "sdt"],
   detailAddress: ["detail address", "dia chi chi tiet"],
   additionalAddress: ["additional address information", "additional address"],
@@ -60,6 +61,7 @@ export const EXPECTED_COLUMNS = [
   "Tên sản phẩm và phân loại (Variation)",
   "Số lượng",
   "Người nhận (Recipient / Tên Người nhận). Không lấy Buyer Username",
+  "Tài khoản mua (Buyer Username / Người Mua) chỉ để nhận khách khi số bị che",
   "Số điện thoại, kể cả số bị che",
   "Địa chỉ: cột Địa chỉ nhận hàng nếu có; không thì Detail Address, phường/xã, quận, tỉnh. Quốc gia để cuối",
   "Đơn vị vận chuyển (Shipping Provider Name / Đơn Vị Vận Chuyển)",
@@ -98,6 +100,7 @@ export type ParsedLine = {
   variation: string;
   qty: number;
   buyer: string;
+  platformBuyer: string;
   phone: string;
   address: string;
   tracking: string;
@@ -130,6 +133,7 @@ export type PlannedItem = {
 export type PlannedOrder = {
   platformOrderId: string;
   buyer: string;
+  platformBuyer: string;
   phone: string;
   address: string;
   carrier: string;
@@ -319,6 +323,7 @@ export function parseMarketplaceTable(table: string[][]): ParsedLine[] {
       variation: cell(row, columns.variation),
       qty: quantity,
       buyer: cell(row, columns.buyer),
+      platformBuyer: cell(row, columns.platformBuyer),
       phone: cell(row, columns.phone),
       address: joinedAddress(row, columns),
       tracking: cell(row, columns.tracking),
@@ -417,6 +422,7 @@ export function planMarketplaceImport(input: {
     orders.push({
       platformOrderId: orderId,
       buyer: lines.map((line) => line.buyer).find((value) => value.trim()) || "Khách sàn",
+      platformBuyer: lines.map((line) => line.platformBuyer).find((value) => value.trim()) ?? "",
       phone: phone.phone,
       address: lines.map((line) => line.address).find((value) => value.trim()) ?? "",
       carrier: lines.map((line) => line.carrier).find((value) => value.trim()) ?? "",

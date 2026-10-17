@@ -102,7 +102,7 @@ export const DEFAULT_SETTINGS: Settings = {
     { key: "khau_hao", name: "Khấu hao máy", amount: 125000, note: "30 triệu ÷ 240 tháng" },
     { key: "marketing", name: "Marketing", amount: 3000000, note: "" },
     { key: "phan_mem", name: "Phần mềm", amount: 100000, note: "" },
-    { key: "khac", name: "Khác", amount: 50000, note: "" },
+    { key: "khac", name: "Khác", amount: 75000, note: "Cộng các khoản mặc định là 29.400.000đ/tháng." },
     { key: "vat_tu_phu", name: "Vật tư phụ khoán", amount: 500000, note: "" },
   ],
 };

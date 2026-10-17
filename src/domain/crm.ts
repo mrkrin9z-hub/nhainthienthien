@@ -1,5 +1,5 @@
 import { vnParts } from "./calc.ts";
-import type { Customer, Order, OrderStatus, ShopState } from "./types.ts";
+import type { Customer, Order, ShopState } from "./types.ts";
 import { CHANNEL_LABEL } from "./types.ts";
 
 export const DEFAULT_REPEAT_ORDERS = 2;
@@ -27,14 +27,16 @@ export type CustomerCard = {
   repeat: boolean;
   lastOrderAt: string | null;
   daysSinceOrder: number | null;
+  addresses: string[];
+  platformBuyers: string[];
+  /** Mọi đơn thật đều đã hủy. Danh sách mặc định ẩn các khách này. */
+  onlyCancelled: boolean;
 };
 
 export type CustomerReminder = CustomerCard & {
   reasons: string[];
   message: string;
 };
-
-const SKIPPED: OrderStatus[] = ["draft_upload", "upload_error", "huy"];
 
 export function renderRemindMessage(
   template: string,
@@ -50,17 +52,12 @@ export function renderRemindMessage(
 
 export function customerCards(state: ShopState, now = new Date()): CustomerCard[] {
   const repeatAt = state.settings.repeatCustomerOrders ?? DEFAULT_REPEAT_ORDERS;
-  const groups = new Map<string, Customer[]>();
-  for (const customer of state.customers) {
-    const key = groupKey(customer);
-    const list = groups.get(key) ?? [];
-    list.push(customer);
-    groups.set(key, list);
-  }
   const cards: CustomerCard[] = [];
-  for (const people of groups.values()) {
+  for (const people of groupCustomers(state.customers)) {
     const ids = new Set(people.map((person) => person.id));
-    const orders = state.orders.filter((order) => ids.has(order.customerId) && !SKIPPED.includes(order.status));
+    const linked = state.orders.filter((order) => ids.has(order.customerId));
+    const real = linked.filter((order) => order.status !== "draft_upload" && order.status !== "upload_error");
+    const orders = real.filter((order) => order.status !== "huy");
     const primary = [...people].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0]!;
     const latest = [...orders].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     const latestPerson = latest ? people.find((person) => person.id === latest.customerId) : undefined;
@@ -86,6 +83,9 @@ export function customerCards(state: ShopState, now = new Date()): CustomerCard[
       repeat: orders.length >= repeatAt,
       lastOrderAt,
       daysSinceOrder,
+      addresses: unique(people.flatMap((person) => [person.address, ...(person.addresses ?? [])])),
+      platformBuyers: unique(people.map((person) => person.platformBuyer ?? "")),
+      onlyCancelled: real.length > 0 && real.every((order) => order.status === "huy"),
     });
   }
   return cards.sort((a, b) => a.name.localeCompare(b.name, "vi"));
@@ -101,6 +101,7 @@ export function customerReminders(state: ShopState, now = new Date()): CustomerR
   const today = vnParts(now).ymd;
   const reminders: CustomerReminder[] = [];
   for (const card of customerCards(state, now)) {
+    if (card.onlyCancelled) continue;
     const reasons: string[] = [];
     const dips: string[] = [];
     if (card.daysSinceOrder !== null && card.daysSinceOrder >= after) {
@@ -129,10 +130,96 @@ export function customerReminders(state: ShopState, now = new Date()): CustomerR
   return reminders;
 }
 
-function groupKey(customer: Customer): string {
+/**
+ * Khóa được phép gộp. Số bị che không bao giờ là khóa.
+ * Khách số che chỉ gộp khi cùng tài khoản sàn, hoặc trùng cả tên và địa chỉ.
+ * Không có khóa nào thì mỗi khách một nhóm.
+ */
+export function groupKey(customer: Customer): string[] {
   const phone = customer.phoneNormalized.trim();
-  if (!phone || phone === "masked:") return `id:${customer.id}`;
-  return phone;
+  if (phone && !phone.startsWith("masked:")) return [`phone:${phone}`];
+  const keys: string[] = [];
+  const buyer = (customer.platformBuyer ?? "").trim().toLowerCase();
+  if (buyer) keys.push(`buyer:${buyer}`);
+  const name = customer.name.trim();
+  for (const place of unique([customer.address, ...(customer.addresses ?? [])])) {
+    if (name) keys.push(`na:${name}\n${place}`);
+  }
+  return keys.length ? keys : [`id:${customer.id}`];
+}
+
+export function findCustomer(
+  customers: Customer[],
+  input: { phoneNormalized: string; name: string; address: string; platformBuyer?: string },
+): Customer | undefined {
+  const probe: Customer = {
+    id: "probe",
+    name: input.name,
+    phone: "",
+    phoneNormalized: input.phoneNormalized,
+    address: input.address,
+    note: "",
+    createdAt: "",
+    platformBuyer: input.platformBuyer?.trim() || undefined,
+  };
+  const keys = new Set(groupKey(probe).filter((key) => !key.startsWith("id:")));
+  if (!keys.size) return undefined;
+  return customers
+    .filter((customer) => groupKey(customer).some((key) => keys.has(key)))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0];
+}
+
+/** File sàn không ghi đè tên và địa chỉ đã có. Địa chỉ mới được thêm vào danh sách. */
+export function applyMarketplaceProfile(
+  customer: Customer,
+  input: { name: string; address: string; platformBuyer: string; masked: boolean },
+): Customer {
+  const addresses = unique([customer.address, ...(customer.addresses ?? []), input.address]);
+  const note =
+    input.masked && !customer.note.includes("SĐT bị ẩn")
+      ? [customer.note, "SĐT bị ẩn"].filter(Boolean).join(". ")
+      : customer.note;
+  return {
+    ...customer,
+    name: customer.name.trim() ? customer.name : input.name.trim(),
+    address: customer.address.trim() ? customer.address.trim() : input.address.trim(),
+    addresses,
+    platformBuyer: customer.platformBuyer?.trim() || input.platformBuyer.trim() || undefined,
+    note,
+  };
+}
+
+function groupCustomers(customers: Customer[]): Customer[][] {
+  const parent = new Map<string, string>();
+  const find = (id: string): string => {
+    const next = parent.get(id) ?? id;
+    if (next === id) return id;
+    const root = find(next);
+    parent.set(id, root);
+    return root;
+  };
+  const union = (left: string, right: string) => {
+    const a = find(left);
+    const b = find(right);
+    if (a !== b) parent.set(a, b);
+  };
+  const seen = new Map<string, string>();
+  for (const customer of customers) {
+    parent.set(customer.id, customer.id);
+    for (const key of groupKey(customer)) {
+      const hit = seen.get(key);
+      if (hit) union(hit, customer.id);
+      else seen.set(key, customer.id);
+    }
+  }
+  const groups = new Map<string, Customer[]>();
+  for (const customer of customers) {
+    const root = find(customer.id);
+    const list = groups.get(root) ?? [];
+    list.push(customer);
+    groups.set(root, list);
+  }
+  return [...groups.values()];
 }
 
 function unique(values: string[]): string[] {
@@ -183,6 +270,6 @@ export function ordersForCustomer(state: ShopState, id: string): Order[] {
   if (!card) return [];
   const ids = new Set(card.ids);
   return state.orders
-    .filter((order) => ids.has(order.customerId) && !SKIPPED.includes(order.status))
+    .filter((order) => ids.has(order.customerId) && order.status !== "draft_upload" && order.status !== "upload_error")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

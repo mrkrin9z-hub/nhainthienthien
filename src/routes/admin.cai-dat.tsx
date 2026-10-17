@@ -90,7 +90,7 @@ function SettingsBody() {
       <h1 className="text-2xl font-extrabold text-primary">Cài đặt</h1>
       <section className="glass-card space-y-3 rounded-3xl p-4">
         <h2 className="font-bold text-primary">Số liệu</h2>
-        <p className="text-sm text-muted-foreground">Để trống ô nào được phép trống thì hệ thống không tự bịa số.</p>
+        <p className="text-sm text-muted-foreground">Để trống ô nào được phép trống thì hệ thống không tự bịa số. Chi phí cố định mặc định 29.400.000đ/tháng; số từng tháng sửa ở Báo cáo.</p>
         <div className="grid gap-3 md:grid-cols-2">
           {NUMBER_FIELDS.map((field) => (
             <label key={field.key} className="text-sm font-semibold">

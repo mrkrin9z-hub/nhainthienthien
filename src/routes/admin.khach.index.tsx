@@ -21,14 +21,29 @@ function CustomersPage() {
 
 function CustomersBody() {
   const [q, setQ] = useState("");
-  const customers = useQuery({ queryKey: ["customers", q], queryFn: () => getCustomers({ data: { q } }) });
+  const [includeCancelled, setIncludeCancelled] = useState(false);
+  const customers = useQuery({
+    queryKey: ["customers", q, includeCancelled],
+    queryFn: () => getCustomers({ data: { q, includeCancelled } }),
+  });
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Khách hàng</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Cùng một số điện thoại, dù đặt TikTok, Shopee hay tại tiệm, là một khách. Số bị che giữ riêng.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Cùng một số điện thoại thật là một khách. Số bị che chỉ gộp khi cùng tài khoản sàn, hoặc trùng cả tên và địa chỉ. Khách chỉ còn đơn hủy được ẩn.
+        </p>
       </div>
-      <Input className="min-h-12" placeholder="Tên, số điện thoại hoặc thẻ" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="flex flex-wrap gap-2">
+        <Input className="min-h-12 min-w-0 flex-1" placeholder="Tên, số điện thoại hoặc thẻ" value={q} onChange={(e) => setQ(e.target.value)} />
+        <button
+          type="button"
+          className="inline-flex min-h-12 items-center rounded-xl bg-card px-4 text-sm font-semibold"
+          onClick={() => setIncludeCancelled((value) => !value)}
+        >
+          {includeCancelled ? "Ẩn đơn hủy" : "Hiện khách chỉ có đơn hủy"}
+        </button>
+      </div>
       <ul className="space-y-2">
         {(customers.data ?? []).map((customer) => (
           <li key={customer.id}>

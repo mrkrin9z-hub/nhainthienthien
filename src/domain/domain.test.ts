@@ -176,7 +176,7 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(state.settings.saleBase, 8000000);
   assert.equal(state.settings.productionBase, 11000000);
   const fixed = state.settings.fixedCosts.reduce((sum, row) => sum + row.amount, 0);
-  assert.equal(fixed, 29375000);
+  assert.equal(fixed, 29400000);
   assert.equal(state.skus.some((row) => row.code.includes("10x25")), false);
   const car = state.boms.find((row) => row.skuId === "NX-9x19-C1");
   assert.equal(car?.qty, null);

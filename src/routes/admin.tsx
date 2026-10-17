@@ -34,6 +34,8 @@ const NAV: { to: string; label: string; roles: Role[] }[] = [
   { to: "/admin/cham-cong", label: "Chấm công", roles: ["owner", "sale", "production"] },
   { to: "/admin/luong", label: "Lương", roles: ["owner", "sale", "production"] },
   { to: "/admin/loi-nhuan", label: "Lãi lỗ", roles: ["owner"] },
+  { to: "/admin/bao-cao", label: "Báo cáo", roles: ["owner"] },
+  { to: "/admin/kpi", label: "KPI", roles: ["owner", "sale"] },
   { to: "/admin/nhat-ky", label: "Nhật ký", roles: ["owner"] },
   { to: "/admin/sao-luu", label: "Sao lưu", roles: ["owner"] },
   { to: "/admin/ket-noi", label: "Kết nối", roles: ["owner"] },
@@ -177,6 +179,7 @@ function AdminLogin({ onDone }: { onDone: () => void }) {
         <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="mx-auto h-12 w-auto" />
         <h1 className="mt-4 text-center text-2xl font-extrabold text-primary">Đăng nhập nội bộ</h1>
         <p className="mt-1 text-center text-sm text-muted-foreground">Chủ, sale và sản xuất — mỗi người một tài khoản.</p>
+        <p className="mt-1 text-center text-sm text-muted-foreground">Trên iPhone: chia sẻ rồi chọn Thêm vào Màn hình chính.</p>
         <div className="mt-6 space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>

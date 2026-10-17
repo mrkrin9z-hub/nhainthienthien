@@ -5,6 +5,7 @@ import {
   quoteSku,
   vnParts,
 } from "./calc.ts";
+import { materialForecast } from "./forecast.ts";
 import { orderShipping } from "./shipping.ts";
 import type { Order, OrderStatus, Role, ShopState } from "./types.ts";
 import { CHANNEL_LABEL, STATUS_LABEL, STATUS_REPLY } from "./types.ts";
@@ -37,6 +38,7 @@ export function orderSummary(state: ShopState, order: Order, role: Role) {
     channelLabel: CHANNEL_LABEL[order.channel],
     source: order.source,
     customerName: customer.name,
+    recipientName: order.recipientName ?? "",
     phone: customer.phone,
     address: order.address,
     itemSummary: order.items.map((item) => `${item.quantity}× ${item.name}`).join(", "),
@@ -163,6 +165,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
 
 export function inventoryView(state: ShopState, role: Role) {
   const showCost = role === "owner";
+  const forecast = new Map(materialForecast(state).map((row) => [row.materialId, row]));
   return {
     materials: state.materials.map((material) => ({
       id: material.id,
@@ -172,6 +175,10 @@ export function inventoryView(state: ShopState, role: Role) {
       stock: material.stock,
       minStock: material.minStock,
       supplier: material.supplier,
+      avgDaily: forecast.get(material.id)?.avgDaily ?? 0,
+      daysLeft: forecast.get(material.id)?.daysLeft ?? null,
+      leadTimeDays: forecast.get(material.id)?.leadTimeDays ?? 7,
+      reorder: forecast.get(material.id)?.reorder ?? false,
       ...(showCost
         ? { packSize: material.packSize, packPrice: material.packPrice, pendingPrice: material.pendingPrice }
         : {}),

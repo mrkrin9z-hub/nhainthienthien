@@ -60,6 +60,13 @@ function StockPage() {
                 {material.stock} {material.unit}
               </p>
             </div>
+            <p className="mt-1 text-sm">
+              30 ngày qua dùng {material.avgDaily} {material.unit}/ngày
+              {material.daysLeft === null ? " · chưa đủ nhịp để tính số ngày còn." : ` · còn khoảng ${material.daysLeft} ngày.`}
+            </p>
+            {material.reorder ? (
+              <p className="mt-1 text-sm font-semibold text-destructive">Nên đặt hàng: còn dưới {material.leadTimeDays} ngày chờ hàng.</p>
+            ) : null}
             {owner ? (
               <p className="mt-1 text-sm">
                 Giá mua: {material.packPrice === null ? "chưa có" : formatMaybe(material.packPrice)}
@@ -96,7 +103,14 @@ function MaterialForms({
   canIn,
   onDone,
 }: {
-  material: { id: string; packPrice?: number | null; packSize?: number | null; minStock: number | null; supplier: string };
+  material: {
+    id: string;
+    packPrice?: number | null;
+    packSize?: number | null;
+    minStock: number | null;
+    supplier: string;
+    leadTimeDays: number;
+  };
   owner: boolean;
   canIn: boolean;
   onDone: () => Promise<void>;
@@ -107,6 +121,7 @@ function MaterialForms({
   const [actual, setActual] = useState("");
   const [minStock, setMinStock] = useState(material.minStock === null ? "" : String(material.minStock));
   const [packPrice, setPackPrice] = useState(material.packPrice == null ? "" : String(material.packPrice));
+  const [leadTime, setLeadTime] = useState(String(material.leadTimeDays));
 
   return (
     <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -153,6 +168,7 @@ function MaterialForms({
         <div className="flex flex-wrap gap-2 md:col-span-2">
           <Input className="h-11 w-32" placeholder="Giá / lần mua" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
           <Input className="h-11 w-28" placeholder="Tồn tối thiểu" value={minStock} onChange={(e) => setMinStock(e.target.value)} />
+          <Input className="h-11 w-28" placeholder="Ngày chờ hàng" value={leadTime} onChange={(e) => setLeadTime(e.target.value)} />
           <Button
             variant="outline"
             className="min-h-11"
@@ -164,6 +180,7 @@ function MaterialForms({
                   packSize: material.packSize,
                   minStock: minStock.trim() === "" ? null : Number(minStock),
                   supplier,
+                  leadTimeDays: leadTime.trim() === "" ? null : Number(leadTime),
                 },
               });
               toast.success("Đã lưu vật tư");

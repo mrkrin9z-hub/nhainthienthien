@@ -22,7 +22,7 @@ import {
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
-import { customerCard, customerCards, customerReminders, ordersForCustomer, type SpecialDate } from "@/domain/crm";
+import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
 import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type PlannedItem } from "@/domain/marketplace";
 import { applyRestore, restoreSummary } from "@/domain/restore";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
@@ -41,6 +41,8 @@ import type {
   Staff,
 } from "@/domain/types";
 import { CHANNEL_LABEL, STATUS_LABEL } from "@/domain/types";
+import { saleKpi } from "@/domain/kpi";
+import { businessReport } from "@/domain/report";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
 import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
 import { listBackups, readBackup, writeManualBackup } from "@/server/store";
@@ -216,26 +218,54 @@ export async function publicCatalog() {
     .filter((group) => group.variants.length > 0);
 }
 
-function upsertCustomer(state: ShopState, input: { name: string; phone: string; address?: string }) {
+function upsertCustomer(
+  state: ShopState,
+  input: { name: string; phone: string; address?: string; platformBuyer?: string; fromMarketplace?: boolean },
+) {
   const parsed = normalizeMarketplacePhone(input.phone);
   const phoneNormalized = parsed.masked ? `masked:${parsed.phone}` : parsed.phone;
   if (!parsed.masked && phoneNormalized.length < 8) throw new Error("Số điện thoại chưa đúng.");
-  let customer = state.customers.find((c) => c.phoneNormalized === phoneNormalized);
+  const name = input.name.trim();
+  const address = input.address?.trim() ?? "";
+  let customer = findCustomer(state.customers, {
+    phoneNormalized,
+    name,
+    address,
+    platformBuyer: input.platformBuyer,
+  });
   if (!customer) {
     customer = {
       id: nid(),
-      name: input.name.trim(),
+      name,
       phone: parsed.masked ? parsed.phone : input.phone.trim(),
       phoneNormalized,
-      address: input.address?.trim() ?? "",
+      address,
+      addresses: address ? [address] : [],
+      platformBuyer: input.platformBuyer?.trim() || undefined,
       note: parsed.masked ? "SĐT bị ẩn" : "",
       createdAt: nowIso(),
     };
     state.customers.push(customer);
-  } else {
-    if (input.name.trim()) customer.name = input.name.trim();
-    if (input.address?.trim()) customer.address = input.address.trim();
-    if (parsed.masked && !customer.note.includes("SĐT bị ẩn")) customer.note = [customer.note, "SĐT bị ẩn"].filter(Boolean).join(". ");
+    return customer;
+  }
+  if (input.fromMarketplace) {
+    const next = applyMarketplaceProfile(customer, {
+      name,
+      address,
+      platformBuyer: input.platformBuyer ?? "",
+      masked: parsed.masked,
+    });
+    customer.name = next.name;
+    customer.address = next.address;
+    customer.addresses = next.addresses;
+    customer.platformBuyer = next.platformBuyer;
+    customer.note = next.note;
+    return customer;
+  }
+  if (name) customer.name = name;
+  if (address) customer.address = address;
+  if (parsed.masked && !customer.note.includes("SĐT bị ẩn")) {
+    customer.note = [customer.note, "SĐT bị ẩn"].filter(Boolean).join(". ");
   }
   return customer;
 }
@@ -894,16 +924,27 @@ export async function approveMaterialPrice(actor: Actor, materialId: string) {
   });
 }
 
-export async function updateMaterial(actor: Actor, input: { materialId: string; packPrice: number | null; packSize: number | null; minStock: number | null; supplier: string }) {
+export async function updateMaterial(
+  actor: Actor,
+  input: {
+    materialId: string;
+    packPrice: number | null;
+    packSize: number | null;
+    minStock: number | null;
+    supplier: string;
+    leadTimeDays?: number | null;
+  },
+) {
   assertRole(actor, ["owner"]);
   await mutate(async (state) => {
     const material = state.materials.find((item) => item.id === input.materialId);
     if (!material) throw new Error("Không thấy vật tư.");
-    const before = { packPrice: material.packPrice, packSize: material.packSize, minStock: material.minStock };
+    const before = { packPrice: material.packPrice, packSize: material.packSize, minStock: material.minStock, leadTimeDays: material.leadTimeDays ?? null };
     material.packPrice = input.packPrice;
     material.packSize = input.packSize;
     material.minStock = input.minStock;
     material.supplier = input.supplier;
+    if (input.leadTimeDays !== undefined) material.leadTimeDays = input.leadTimeDays;
     audit(state, actor.id, "material.update", material.id, before, input);
   });
 }
@@ -973,11 +1014,12 @@ export async function bomOf(actor: Actor, skuId: string) {
     }));
 }
 
-export async function customerList(actor: Actor, q: string) {
+export async function customerList(actor: Actor, q: string, includeCancelled = false) {
   assertRole(actor, ["owner", "sale"]);
   const state = await readState();
   const query = q.trim().toLowerCase();
   return customerCards(state).filter((customer) => {
+    if (!includeCancelled && customer.onlyCancelled) return false;
     if (!query) return true;
     const digits = query.replace(/\D/g, "");
     return (
@@ -1241,6 +1283,18 @@ export async function profitReport(actor: Actor, month: string) {
     reprintRate: orders.length ? Math.round((reprints.length / orders.length) * 1000) / 10 : 0,
     openDate: state.settings.shopOpenDate,
   };
+}
+
+export async function ownerReport(actor: Actor, month: string, grain: "day" | "week" | "month") {
+  assertRole(actor, ["owner"]);
+  return businessReport(await readState(), month, grain);
+}
+
+export async function kpiReport(actor: Actor, month: string) {
+  assertRole(actor, ["owner", "sale"]);
+  const rows = saleKpi(await readState(), month);
+  if (actor.role === "owner") return rows;
+  return rows.filter((row) => row.staffId === actor.id);
 }
 
 export async function saveMonthlyFixed(actor: Actor, month: string, rows: { key: string; amount: number }[]) {
@@ -1807,6 +1861,8 @@ export async function importMarketplaceFile(
         name: planned.buyer,
         phone: planned.phone,
         address: planned.address,
+        platformBuyer: planned.platformBuyer,
+        fromMarketplace: true,
       });
       const items = marketplaceItems(state, input.channel, planned.items);
       const totals = sumItems(items);
@@ -1824,6 +1880,7 @@ export async function importMarketplaceFile(
         internalNote: notes.join(". "),
         dueDate: null,
         marketplaceCode: planned.platformOrderId,
+        recipientName: planned.buyer,
         shipping: {
           carrier: planned.carrier,
           tracking: planned.tracking,
@@ -1949,6 +2006,7 @@ export async function deliveryBoard(actor: Actor) {
       channel: order.channel,
       channelLabel: CHANNEL_LABEL[order.channel],
       customerName: customer.name,
+      recipientName: order.recipientName ?? "",
       phone: customer.phone,
       address: order.address,
       itemSummary: order.items.map((item) => `${item.quantity}× ${item.name}`).join(", "),

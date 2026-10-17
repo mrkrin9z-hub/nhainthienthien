@@ -28,7 +28,8 @@ function DeliveryPage() {
               </Link>
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{order.statusLabel}</span>
             </div>
-            <p>{order.customerName} · {order.phone}</p>
+            <p>{order.recipientName || order.customerName} · {order.phone}</p>
+            {order.recipientName && order.recipientName !== order.customerName ? <p>Khách trong sổ: {order.customerName}</p> : null}
             {order.address ? <p>{order.address}</p> : null}
             <p className="text-muted-foreground">{order.channelLabel} · {order.itemSummary}</p>
             <p>Hãng: {order.carrier || "chưa ghi"} · Vận đơn: {order.tracking || "chưa có"}</p>

@@ -43,6 +43,8 @@ function CustomerBody() {
         {data.phone}
         {data.address ? ` · ${data.address}` : ""}
       </p>
+      {data.addresses.length > 1 ? <p className="text-sm">Địa chỉ khác: {data.addresses.filter((item) => item !== data.address).join(" · ")}</p> : null}
+      {data.platformBuyers.length ? <p className="text-sm">Tài khoản sàn: {data.platformBuyers.join(", ")}</p> : null}
       <p className="text-sm">
         {data.orderCount} đơn · {data.channels.join(", ") || "Chưa có kênh"} · Đã chi {data.totalSpent === null ? "chưa có" : formatMaybe(data.totalSpent)}
         {data.spentIncomplete ? " (một số đơn chưa có giá)" : ""}

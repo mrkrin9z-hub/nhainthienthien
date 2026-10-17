@@ -132,9 +132,13 @@ Sao lưu hằng ngày dùng khóa cố định `shop_backup:YYYY-MM-DD` theo gi�
 
 Ảnh bìa có số Zalo in sẵn đã bỏ. Ảnh sản phẩm trên web là ảnh mẫu cho đến khi chủ hoặc sale tải ảnh thật ở **Ảnh web** (lưu KV, tối đa 2MB).
 
-Đơn TikTok/Shopee nhập từ file CSV hoặc XLSX ở **Nhập đơn sàn**. Tiêu đề khớp gần đúng. Dòng mô tả TikTok bị bỏ. Địa chỉ Shopee lấy nguyên cột Địa chỉ nhận hàng, quốc gia để cuối. TikTok ghép cả phường/xã. Số bị che vẫn nhập. COD khi giao hoặc khi nhận bằng số tiền người mua trả, gồm phí ship. Tiền dòng là tiền sàn. Đơn Đã hủy không vào sổ.
+Đơn TikTok/Shopee nhập từ file CSV hoặc XLSX ở **Nhập đơn sàn**. Tiêu đề khớp gần đúng. Dòng mô tả TikTok bị bỏ. Địa chỉ Shopee lấy nguyên cột Địa chỉ nhận hàng, quốc gia để cuối. TikTok ghép cả phường/xã. Số bị che vẫn nhập. Hai người cùng một số che không gộp, trừ khi cùng tài khoản sàn hoặc trùng cả tên và địa chỉ. File sàn không ghi đè tên và địa chỉ đã nhập tại tiệm; địa chỉ mới được thêm vào danh sách. COD khi giao hoặc khi nhận bằng số tiền người mua trả, gồm phí ship. Tiền dòng là tiền sàn. Đơn Đã hủy không vào sổ.
 
-**Khách** gộp theo số điện thoại đã chuẩn hóa, kể cả khác kênh. Số bị che không gộp với số thật. Có thẻ, ghi chú, tổng đã chi, cờ khách quay lại (mặc định từ 2 đơn). **Nhắc khách** liệt kê đơn cuối cách đây ít nhất 60 ngày và ngày giỗ trong 7 ngày tới. Tin nhắn chép tay, không tự gửi. Sale xem khách, không xem giá vốn.
+**Khách** gộp theo số điện thoại thật, kể cả khác kênh. Số bị che giữ riêng theo tài khoản sàn. Khách chỉ còn đơn hủy được ẩn, bật lại được. Có thẻ, ghi chú, tổng đã chi, cờ khách quay lại (mặc định từ 2 đơn). **Nhắc khách** liệt kê đơn cuối cách đây ít nhất 60 ngày và ngày giỗ trong 7 ngày tới. Tin nhắn chép tay, không tự gửi. Sale xem khách, không xem giá vốn.
+
+**Báo cáo** (chủ): doanh thu, lãi gộp, lãi ròng sau chi phí cố định (mặc định 29.400.000đ/tháng), hòa vốn, theo ngày/tuần/tháng, kênh, khổ và hàng bán nhiều. **Kho** ước mức dùng 30 ngày và báo đặt hàng khi số ngày tồn dưới ngưỡng từng vật tư (mặc định 7). **KPI** của sale: đơn đã xử lý, doanh thu để tính hoa hồng, thời gian xử lý nếu có mốc đổi trạng thái. Sale chỉ thấy KPI của mình.
+
+Có thể thêm trang quản trị vào Màn hình chính trên iPhone. Khi mất mạng, máy hiện trang nhắc mở lại.
 
 **Giao hàng** ghi hãng, mã vận đơn, phí ship và COD. **Đối soát COD** cộng theo hãng trong tháng. Tem 100×150mm in từ trình duyệt cho đơn tại tiệm và Facebook. Sản xuất không xuất Excel đơn hoặc tồn kho.
 

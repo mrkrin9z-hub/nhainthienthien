@@ -422,11 +422,27 @@ test("file mẫu TikTok có phường xã và số che", () => {
   assert.equal(order?.address, "1** H*** V*****, Xã Xuân Hiệp, Huyện Xuân Lộc, Đồng Nai, Việt Nam");
   assert.equal(order?.createdAt, "2026-10-17T13:15:03.000Z");
   assert.equal(plan.orders.some((item) => item.buyer === "khachhang_a"), false);
+  assert.equal(order?.platformBuyer, "khachhang_a");
   const card = plan.orders.find((item) => item.platformOrderId === "578123456789099999");
   assert.equal(card?.codAmount, null);
   assert.equal(card?.orderAmount, 330000);
   assert.equal(card?.address.startsWith("45 Trần Phú, Xã Xuân Hiệp"), true);
   assert.equal(sharedPlan.orders.find((item) => item.platformOrderId === order?.platformOrderId)?.address, order?.address);
+});
+
+test("hai khách TikTok cùng số che không gộp nếu khác tài khoản", () => {
+  const table = rowsFromUpload("tiktok-masked-collision.csv", readFileSync(new URL("./fixtures/tiktok-masked-collision.csv", import.meta.url)));
+  const plan = tiktokPlan(table);
+  assert.equal(plan.orders.length, 2);
+  const first = plan.orders.find((item) => item.platformBuyer === "do_g");
+  const second = plan.orders.find((item) => item.platformBuyer === "bui_h");
+  assert.equal(first?.buyer, "Đỗ Văn G");
+  assert.equal(second?.buyer, "Bùi Thị H");
+  assert.equal(first?.phone, "(+84)90*****12");
+  assert.equal(second?.phone, "(+84)90*****12");
+  assert.notEqual(first?.address, second?.address);
+  assert.match(first?.address ?? "", /Nguyễn Huệ/);
+  assert.match(second?.address ?? "", /Lý Thường Kiệt/);
 });
 
 test("csv TikTok v2 chuẩn hóa số và bỏ đơn đã hủy", () => {

@@ -236,6 +236,7 @@ export const saveMaterial = createServerFn({ method: "POST" })
         packSize: z.number().positive().nullable(),
         minStock: z.number().min(0).nullable(),
         supplier: z.string(),
+        leadTimeDays: z.number().int().min(0).nullable().optional(),
       })
       .parse(data),
   )
@@ -275,10 +276,12 @@ export const getBom = createServerFn({ method: "GET" })
   });
 
 export const getCustomers = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => z.object({ q: z.string().optional().default("") }).parse(data ?? {}))
+  .inputValidator((data: unknown) =>
+    z.object({ q: z.string().optional().default(""), includeCancelled: z.boolean().optional().default(false) }).parse(data ?? {}),
+  )
   .handler(async ({ data }) => {
     const { customerList } = await import("@/server/service");
-    return customerList(await actor(), data.q);
+    return customerList(await actor(), data.q, data.includeCancelled);
   });
 
 export const getCustomer = createServerFn({ method: "GET" })
@@ -363,6 +366,20 @@ export const getProfit = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { profitReport } = await import("@/server/service");
     return profitReport(await actor(), data.month);
+  });
+
+export const getReport = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ month: z.string(), grain: z.enum(["day", "week", "month"]) }).parse(data))
+  .handler(async ({ data }) => {
+    const { ownerReport } = await import("@/server/service");
+    return ownerReport(await actor(), data.month, data.grain);
+  });
+
+export const getKpi = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { kpiReport } = await import("@/server/service");
+    return kpiReport(await actor(), data.month);
   });
 
 export const saveFixedMonth = createServerFn({ method: "POST" })

@@ -197,6 +197,8 @@ export type Material = {
   packPrice: number | null;
   stock: number;
   minStock: number | null;
+  /** Ngày chờ hàng. Dưới số ngày tồn này thì báo đặt lại. Thiếu thì 7. */
+  leadTimeDays?: number | null;
   supplier: string;
   pendingPrice: number | null;
 };
@@ -225,6 +227,10 @@ export type Customer = {
   tags?: string[];
   /** Ngày lặp lại mỗi năm, ví dụ ngày giỗ. */
   specialDates?: { label: string; month: number; day: number }[];
+  /** Địa chỉ đã gặp. Địa chỉ nhập tại tiệm nằm ở `address` và không bị file sàn ghi đè. */
+  addresses?: string[];
+  /** TikTok Buyer Username hoặc Shopee Người Mua. Chỉ để nhận khách khi số bị che. */
+  platformBuyer?: string;
 };
 
 export type OrderFile = {
@@ -280,6 +286,8 @@ export type Order = {
   internalNote: string;
   dueDate: string | null;
   marketplaceCode: string;
+  /** Tên người nhận trên sàn. Không ghi đè tên khách đã nhập tại tiệm. */
+  recipientName?: string;
   shipping?: OrderShipping;
   items: OrderItem[];
   subtotal: number | null;
