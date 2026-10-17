@@ -10,11 +10,13 @@ export const Route = createFileRoute("/api/staff/file/$id")({
         if (!person) return new Response("Chưa đăng nhập", { status: 401 });
         const file = await fileForStaff(person, params.id);
         if (file.redirect) return Response.redirect(file.redirect, 302);
+        const { contentDisposition, servedMime } = await import("@/domain/images");
         const bytes = file.bytes ?? new Uint8Array();
         return new Response(Buffer.from(bytes), {
           headers: {
-            "content-type": file.mime || "application/octet-stream",
-            "content-disposition": `inline; filename="${encodeURIComponent(file.name)}"`,
+            "content-type": servedMime(file.mime || ""),
+            "content-disposition": contentDisposition(file.name),
+            "x-content-type-options": "nosniff",
           },
         });
       },

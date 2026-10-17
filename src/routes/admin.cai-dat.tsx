@@ -6,7 +6,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RoleGate } from "@/components/role-gate";
 import { dueFiles, loadSettings, removeFile, runRecalc, storeSettings, storeStaff } from "@/lib/admin.functions";
+import { DEFAULT_REMIND_DAYS, DEFAULT_REMIND_MESSAGE, DEFAULT_REPEAT_ORDERS } from "@/domain/crm";
 import { ROLE_LABEL, type Role } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/cai-dat")({
@@ -52,9 +54,19 @@ const NUMBER_FIELDS: { key: string; label: string; nullable?: boolean }[] = [
   { key: "fileRetentionDays", label: "Giữ ảnh khách (ngày)" },
   { key: "videoRetentionDays", label: "Giữ video đóng gói (ngày)" },
   { key: "rentFromJune2027", label: "Mặt bằng từ T6/2027" },
+  { key: "repeatCustomerOrders", label: "Khách quay lại từ số đơn" },
+  { key: "remindAfterDays", label: "Nhắc khi đơn cuối cách đây (ngày)" },
 ];
 
 function SettingsPage() {
+  return (
+    <RoleGate allow={["owner"]} deny="Chỉ chủ xem.">
+      <SettingsBody />
+    </RoleGate>
+  );
+}
+
+function SettingsBody() {
   const queryClient = useQueryClient();
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => loadSettings() });
   const files = useQuery({ queryKey: ["due-files"], queryFn: () => dueFiles() });
@@ -62,9 +74,15 @@ function SettingsPage() {
   const data = settings.data;
   const values = draft ?? (data ? Object.fromEntries(NUMBER_FIELDS.map((field) => {
     const raw = (data.settings as Record<string, unknown>)[field.key];
-    return [field.key, raw === null || raw === undefined ? "" : String(raw)];
+    if (raw === null || raw === undefined) {
+      if (field.key === "repeatCustomerOrders") return [field.key, String(DEFAULT_REPEAT_ORDERS)];
+      if (field.key === "remindAfterDays") return [field.key, String(DEFAULT_REMIND_DAYS)];
+      return [field.key, ""];
+    }
+    return [field.key, String(raw)];
   })) : null);
 
+  if (settings.isError) return <p className="font-semibold text-destructive">{(settings.error as Error).message}</p>;
   if (!data || !values) return <p className="text-muted-foreground">Đang tải cài đặt…</p>;
 
   return (
@@ -72,7 +90,7 @@ function SettingsPage() {
       <h1 className="text-2xl font-extrabold text-primary">Cài đặt</h1>
       <section className="glass-card space-y-3 rounded-3xl p-4">
         <h2 className="font-bold text-primary">Số liệu</h2>
-        <p className="text-sm text-muted-foreground">Để trống ô nào được phép trống thì hệ thống không tự bịa số.</p>
+        <p className="text-sm text-muted-foreground">Để trống ô nào được phép trống thì hệ thống không tự bịa số. Chi phí cố định mặc định 29.400.000đ/tháng; số từng tháng sửa ở Báo cáo.</p>
         <div className="grid gap-3 md:grid-cols-2">
           {NUMBER_FIELDS.map((field) => (
             <label key={field.key} className="text-sm font-semibold">
@@ -89,6 +107,9 @@ function SettingsPage() {
         <label className="block text-sm font-semibold">
           Zalo
           <Input className="mt-1 min-h-11" defaultValue={data.settings.zaloPhone} id="zalo" />
+        </label>
+        <label className="flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" id="showZalo" defaultChecked={data.settings.showZalo !== false} /> Hiện số Zalo trên web
         </label>
         <label className="block text-sm font-semibold">
           Giờ mở cửa (hiện trên web)
@@ -120,6 +141,20 @@ function SettingsPage() {
             </label>
           ))}
         </div>
+        <label className="block text-sm font-semibold">
+          Cách tính hoa hồng
+          <select id="commissionBasis" className="mt-1 min-h-12 w-full rounded-xl border bg-card px-3" defaultValue={data.settings.commissionBasis ?? "shop"}>
+            <option value="shop">Toàn tiệm — một sale làm hết</option>
+            <option value="handled">Theo đơn người đó xử lý — từ hai sale</option>
+          </select>
+          <span className="mt-1 block font-normal text-muted-foreground">
+            Hoa hồng bậc 3% / 5% / 7% tính một lần trên doanh thu đã thu trong tháng. Đang một sale thì để Toàn tiệm. Nếu hai người cùng xử lý một đơn, chế độ theo đơn tính đơn đó cho cả hai.
+          </span>
+        </label>
+        <label className="block text-sm font-semibold">
+          Mẫu tin nhắc khách. Chỗ trống: {"{ten}"} {"{so_don}"} {"{ngay}"} {"{dip}"} {"{so_dt}"}. Không tự gửi.
+          <textarea id="remindMessage" className="mt-1 min-h-24 w-full rounded-xl border bg-card px-3 py-2" defaultValue={data.settings.remindMessage || DEFAULT_REMIND_MESSAGE} />
+        </label>
         <Button
           className="min-h-12 bg-accent text-accent-foreground"
           onClick={async () => {
@@ -131,6 +166,7 @@ function SettingsPage() {
             const read = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
             const checked = (id: string) => (document.getElementById(id) as HTMLInputElement).checked;
             patch.zaloPhone = read("zalo");
+            patch.showZalo = checked("showZalo");
             patch.publicHours = read("hours");
             patch.workStart = read("workStart");
             patch.workEnd = read("workEnd");
@@ -142,6 +178,8 @@ function SettingsPage() {
             patch.showAnhThe = checked("anhThe");
             patch.showAlbum = checked("album");
             patch.groupListed = Object.fromEntries(data.groups.map((group) => [group.id, checked(`g-${group.id}`)]));
+            patch.remindMessage = (document.getElementById("remindMessage") as HTMLTextAreaElement).value;
+            patch.commissionBasis = (document.getElementById("commissionBasis") as HTMLSelectElement).value;
             await storeSettings({ data: patch });
             await runRecalc();
             toast.success("Đã lưu cài đặt và tính lại định mức");
@@ -197,7 +235,7 @@ function SettingsPage() {
         <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
           {data.audits.map((item) => (
             <li key={item.id}>
-              {new Date(item.at).toLocaleString("vi-VN")} · {item.actorName || "Hệ thống"} · {item.action}
+              {new Date(item.at).toLocaleString("vi-VN")} · {item.sentence}
             </li>
           ))}
         </ul>

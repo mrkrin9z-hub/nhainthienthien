@@ -35,11 +35,11 @@ function DashboardPage() {
           <h1 className="text-2xl font-extrabold text-primary md:text-3xl">Xin chào, {data.name}</h1>
           <p className="text-sm text-muted-foreground">Giờ làm 8:00–18:00. Chấm công trên điện thoại, không cần vị trí hay ảnh.</p>
         </div>
-        <div className="flex gap-2">
-          <Button className="min-h-12 bg-accent text-accent-foreground" onClick={() => clock("in")} disabled={data.clockedIn}>
+        <div className="flex w-full gap-2 sm:w-auto">
+          <Button className="min-h-14 flex-1 bg-accent text-accent-foreground text-base" onClick={() => clock("in")} disabled={data.clockedIn}>
             Vào ca
           </Button>
-          <Button className="min-h-12" variant="outline" onClick={() => clock("out")} disabled={!data.clockedIn}>
+          <Button className="min-h-14 flex-1 text-base" variant="outline" onClick={() => clock("out")} disabled={!data.clockedIn}>
             Ra ca
           </Button>
         </div>
@@ -59,7 +59,11 @@ function DashboardPage() {
       {"kpiPercent" in data ? (
         <section className="glass-card rounded-3xl p-5">
           <h2 className="text-lg font-bold text-primary">KPI và hoa hồng của bạn</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Không hiện doanh thu tiệm, giá vốn hay lãi.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {data.commissionBasis === "handled"
+              ? "Hoa hồng theo doanh thu đơn bạn xử lý. Không hiện giá vốn hay lãi."
+              : "Hoa hồng theo doanh thu toàn tiệm. Không hiện số doanh thu, giá vốn hay lãi."}
+          </p>
           <p className="mt-3 text-3xl font-extrabold text-accent">{data.kpiPercent === null ? "—" : `${data.kpiPercent}% KPI`}</p>
           <p className="mt-1 text-base font-semibold">Hoa hồng tạm tính: {formatMaybe(data.commission)}</p>
         </section>

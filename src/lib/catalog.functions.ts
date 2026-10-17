@@ -29,11 +29,14 @@ export type CatalogProduct = {
 
 export type PublicConfig = {
   name: string;
+  showZalo: boolean;
   phone: string;
   phoneRaw: string;
   zalo: string;
   hours: string;
   region: string;
+  /** null khi có R2, Drive hoặc Supabase. 10485760 khi ảnh vào KV hoặc đĩa. */
+  maxPhotoBytes: number | null;
 };
 
 export const getCatalog = createServerFn({ method: "GET" }).handler(async (): Promise<CatalogProduct[]> => {

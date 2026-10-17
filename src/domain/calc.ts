@@ -290,17 +290,22 @@ export function kpiTarget(openDate: string, month: string, targets: number[]): n
   return targets[3] ?? targets[targets.length - 1] ?? 0;
 }
 
+/**
+ * Số cọc Facebook. `null` = bắt buộc cọc (khổ lớn) nhưng chưa có giá để tính 50%.
+ * `0` = không cần cọc.
+ */
 export function depositFor(order: {
   channel: Channel;
   total: number | null;
   items: { size: string | null }[];
   settings: Settings;
-}): number {
+}): number | null {
   if (order.channel !== "facebook") return 0;
   const large = order.items.some((i) => needsLargeDeposit(i.size));
-  const bigMoney = (order.total ?? 0) >= order.settings.depositMinTotal;
+  if (order.total === null) return large ? null : 0;
+  const bigMoney = order.total >= order.settings.depositMinTotal;
   if (!large && !bigMoney) return 0;
-  return money(((order.total ?? 0) * order.settings.depositPercent) / 100);
+  return money((order.total * order.settings.depositPercent) / 100);
 }
 
 const PROGRESS: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
@@ -309,9 +314,72 @@ export function statusRank(status: OrderStatus): number {
   return PROGRESS.indexOf(status);
 }
 
-export function depositBlocks(status: OrderStatus, depositRequired: number, depositPaid: number): boolean {
-  if (depositRequired <= 0 || depositPaid + 0.5 >= depositRequired) return false;
-  return status !== "nhan_don" && status !== "huy" && status !== "draft_upload" && status !== "upload_error";
+const DEPOSIT_GATE: OrderStatus[] = ["thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
+
+/** Sản xuất chỉ thấy và chỉ chuyển giữa ba bước này. */
+export const PRODUCTION_STEPS = ["in", "dong_goi", "giao"] as const;
+
+export function isProductionStep(status: string): boolean {
+  return (PRODUCTION_STEPS as readonly string[]).includes(status);
+}
+
+export function depositBlocks(status: OrderStatus, depositRequired: number | null, depositPaid: number): boolean {
+  if (!DEPOSIT_GATE.includes(status)) return false;
+  if (depositRequired === null) return true;
+  if (depositRequired <= 0) return false;
+  return depositPaid + 0.5 < depositRequired;
+}
+
+export function statusChangeError(input: {
+  role: "owner" | "sale" | "production";
+  ownerOverride: boolean;
+  current: OrderStatus;
+  next: OrderStatus;
+  reason?: string;
+  depositRequired: number | null;
+  depositPaid: number;
+}): string | null {
+  const reopening = (input.current === "huy" || input.current === "xong") && input.next !== input.current;
+  if (reopening) {
+    if (input.role !== "owner") return "Chỉ chủ mở lại đơn đã hủy hoặc đã xong.";
+    if (!input.reason?.trim()) return "Mở lại đơn đã hủy hoặc đã xong cần ghi lý do.";
+  }
+  if (input.role === "production" && (!isProductionStep(input.current) || !isProductionStep(input.next))) {
+    return "Sản xuất chỉ chuyển đơn đang in, đóng gói hoặc giao giữa ba bước đó.";
+  }
+  if (depositBlocks(input.next, input.depositRequired, input.depositPaid) && !(input.role === "owner" && input.ownerOverride)) {
+    if (input.depositRequired === null) {
+      return "Đơn Facebook có khổ từ 40×60 cần cọc 50%, nhưng chưa có giá bán để tính số cọc.";
+    }
+    return "Đơn Facebook chưa ghi đủ cọc 50%. Chưa chuyển sang thiết kế hoặc in.";
+  }
+  return null;
+}
+
+export function comboWarnings(
+  skus: { id: string; groupId: string; size: string | null; sheets: number; code: string }[],
+  prices: { skuId: string; channel: Channel; price: number | null }[],
+  channel: Channel,
+): string[] {
+  const warnings: string[] = [];
+  const groups = new Map<string, typeof skus>();
+  for (const sku of skus) {
+    if (!sku.size || sku.code.endsWith("-GOI")) continue;
+    const key = `${sku.groupId}:${sku.size}`;
+    const list = groups.get(key) ?? [];
+    list.push(sku);
+    groups.set(key, list);
+  }
+  for (const list of groups.values()) {
+    const error = comboPriceError(
+      list.map((sku) => ({
+        sheets: sku.sheets,
+        price: prices.find((row) => row.skuId === sku.id && row.channel === channel)?.price ?? null,
+      })),
+    );
+    if (error) warnings.push(`${list[0]!.size} · ${error}`);
+  }
+  return warnings;
 }
 
 export type StockNeed = { materialId: string; qty: number; phase: "print" | "pack" };
@@ -375,7 +443,11 @@ export function stockNeeds(
   return { needs, missing };
 }
 
-export function vnParts(date = new Date()): { iso: string; hm: string; ymd: string; month: string } {
+/** Một chỗ đổi mốc giờ Việt Nam. Tháng lương, hoa hồng, KPI, báo cáo, COD và sao lưu đều đi qua đây. */
+export function vnStamp(input: Date | string | null | undefined = new Date()): { ymd: string; month: string; hm: string } {
+  if (input == null || input === "") return { ymd: "", month: "", hm: "" };
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return { ymd: "", month: "", hm: "" };
   const fmt = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Ho_Chi_Minh",
     year: "numeric",
@@ -387,7 +459,20 @@ export function vnParts(date = new Date()): { iso: string; hm: string; ymd: stri
   });
   const parts = Object.fromEntries(fmt.formatToParts(date).map((p) => [p.type, p.value]));
   const ymd = `${parts.year}-${parts.month}-${parts.day}`;
-  return { iso: date.toISOString(), hm: `${parts.hour}:${parts.minute}`, ymd, month: ymd.slice(0, 7) };
+  return { ymd, month: ymd.slice(0, 7), hm: `${parts.hour}:${parts.minute}` };
+}
+
+export function vnMonth(input: Date | string | null | undefined = new Date()): string {
+  return vnStamp(input).month;
+}
+
+export function vnYmd(input: Date | string | null | undefined = new Date()): string {
+  return vnStamp(input).ymd;
+}
+
+export function vnParts(date = new Date()): { iso: string; hm: string; ymd: string; month: string } {
+  const stamp = vnStamp(date);
+  return { iso: date.toISOString(), hm: stamp.hm, ymd: stamp.ymd, month: stamp.month };
 }
 
 export function minutesLate(hm: string, start: string, grace: number): number {
@@ -414,7 +499,10 @@ export function isWeeklyOff(ymd: string, weeklyOff: number[]): boolean {
 
 export function collectedRevenue(orders: Order[], month: string): number {
   return orders
-    .filter((o) => o.status === "xong" && (o.completedAt ?? o.updatedAt).slice(0, 7) === month)
+    .filter((o) => {
+      const stamp = o.completedAt ?? o.updatedAt;
+      return o.status === "xong" && stamp != null && vnMonth(stamp) === month;
+    })
     .reduce((s, o) => s + (o.total ?? 0), 0);
 }
 
@@ -441,16 +529,44 @@ export function formulaQty(formula: string, sku: Sku, settings: Settings): numbe
     return rollMeters(w, h, settings.filmRollWidthCm, settings.wasteRate);
   }
   if (formula === "pp-pack" || formula === "silk-pack" || formula === "film-pack") {
-    if (!sku.piecesPerPack || !w || !h) return null;
+    if (!w || !h) return null;
     const width = formula === "film-pack" ? settings.filmRollWidthCm : settings.ppRollWidthCm;
-    const one = rollMeters(w, h, width, settings.wasteRate);
-    return one === null ? null : round4(one * sku.piecesPerPack);
+    return rollMeters(w, h, width, settings.wasteRate);
   }
   if (formula === "magnet-6x9") {
-    if (!sku.piecesPerPack || !settings.magnetPiecesPerSheet) return null;
-    return round4(sku.piecesPerPack / settings.magnetPiecesPerSheet);
+    if (!settings.magnetPiecesPerSheet) return null;
+    return round4(1 / settings.magnetPiecesPerSheet);
   }
   return null;
+}
+
+export function groupIsListed(
+  settings: Settings,
+  group: { id: string; gate: "anh_the" | "album" | null },
+): boolean {
+  if (group.gate === "anh_the" && !settings.showAnhThe) return false;
+  if (group.gate === "album" && !settings.showAlbum) return false;
+  return settings.groupListed[group.id] !== false;
+}
+
+/** Catalog khách: nhóm đang hiện, biến thể tại tiệm đang bán. Giá null thì requires_quote (chữ Liên hệ). */
+export function walkInPublicOffers(state: {
+  settings: Settings;
+  groups: { id: string; gate: "anh_the" | "album" | null }[];
+  skus: { id: string; code: string; groupId: string }[];
+  prices: ChannelPrice[];
+}): { code: string; groupId: string; price: number | null; requires_quote: boolean }[] {
+  return state.groups
+    .filter((group) => groupIsListed(state.settings, group))
+    .flatMap((group) =>
+      state.skus
+        .filter((sku) => sku.groupId === group.id)
+        .filter((sku) => walkInListed(priceOf(state.prices, sku.id, "tai_tiem")?.status))
+        .map((sku) => {
+          const price = priceOf(state.prices, sku.id, "tai_tiem")?.price ?? null;
+          return { code: sku.code, groupId: group.id, price, requires_quote: price === null };
+        }),
+    );
 }
 
 export function walkInListed(status: ChannelPrice["status"] | undefined): boolean {

@@ -103,7 +103,7 @@ export type Settings = {
   breakevenDay: number;
   workStart: string;
   workEnd: string;
-  /** 0 = Chủ nhật … 6 = Thứ bảy. Trống = làm cả tuần (JD ghi 8:00–18:00 hằng ngày). */
+  /** 0 = Chủ nhật … 6 = Thứ bảy. Trống = làm cả tuần (hợp đồng ghi 8:00–18:00 hằng ngày). */
   weeklyOff: number[];
   lateGraceMinutes: number;
   lateDeductionPerMinute: number | null;
@@ -113,16 +113,28 @@ export type Settings = {
   productionBase: number;
   kpiTargets: number[];
   commissionTiers: { upto: number | null; percent: number }[];
+  /** shop = doanh thu cả tiệm. handled = đơn người đó xử lý. Thiếu thì toàn tiệm. */
+  commissionBasis?: "shop" | "handled";
   shopOpenDate: string;
   fileRetentionDays: number;
   videoRetentionDays: number;
   zaloPhone: string;
+  /** false = ẩn số Zalo trên web. Thiếu field (sổ cũ) thì vẫn hiện. */
+  showZalo?: boolean;
   publicHours: string;
   showAnhThe: boolean;
   showAlbum: boolean;
   groupListed: Record<string, boolean>;
+  /** slug → mime khi đã tải ảnh thật lên KV. Thiếu thì web dùng ảnh mẫu. */
+  productPhotos?: Record<string, string>;
   marketplaceCutoff: string;
   marketplaceHandover: string;
+  /** Số đơn để gắn khách quay lại. Thiếu thì 2. */
+  repeatCustomerOrders?: number;
+  /** Nhắc khi đơn cuối cách đây ít nhất bấy nhiêu ngày. Thiếu thì 60. */
+  remindAfterDays?: number;
+  /** Mẫu tin nhắn chép tay. {ten} {so_don} {ngay} {dip} {so_dt}. */
+  remindMessage?: string;
   fixedCosts: { key: string; name: string; amount: number; note: string }[];
   rentFromJune2027: number;
 };
@@ -137,6 +149,10 @@ export type Staff = {
   mustChangePassword: boolean;
   probation: boolean;
   hiredAt: string | null;
+  /** Bật thì lần đăng nhập sau bắt mã 6 số. Chủ cũng vậy, không ngoại lệ. */
+  totpEnabled?: boolean;
+  totpSecret?: string | null;
+  totpPendingSecret?: string | null;
 };
 
 export type Group = {
@@ -183,6 +199,8 @@ export type Material = {
   packPrice: number | null;
   stock: number;
   minStock: number | null;
+  /** Ngày chờ hàng. Dưới số ngày tồn này thì báo đặt lại. Thiếu thì 7. */
+  leadTimeDays?: number | null;
   supplier: string;
   pendingPrice: number | null;
 };
@@ -208,6 +226,13 @@ export type Customer = {
   address: string;
   note: string;
   createdAt: string;
+  tags?: string[];
+  /** Ngày lặp lại mỗi năm, ví dụ ngày giỗ. */
+  specialDates?: { label: string; month: number; day: number }[];
+  /** Địa chỉ đã gặp. Địa chỉ nhập tại tiệm nằm ở `address` và không bị file sàn ghi đè. */
+  addresses?: string[];
+  /** TikTok Buyer Username hoặc Shopee Người Mua. Chỉ để nhận khách khi số bị che. */
+  platformBuyer?: string;
 };
 
 export type OrderFile = {
@@ -217,11 +242,25 @@ export type OrderFile = {
   size: number;
   status: "uploading" | "complete" | "error";
   kind: "original" | "design" | "approval" | "packing_video";
-  storage: "supabase" | "drive" | "local";
+  storage: "supabase" | "drive" | "local" | "r2" | "kv";
   path: string;
   driveFileId: string | null;
   createdAt: string;
   deletedAt: string | null;
+};
+
+export type OrderShipping = {
+  carrier: string;
+  tracking: string;
+  shipFee: number | null;
+  codAmount: number | null;
+  codReceivedAt: string | null;
+};
+
+export type SkuMap = {
+  channel: "tiktok" | "shopee";
+  externalSku: string;
+  skuId: string;
 };
 
 export type OrderItem = {
@@ -232,6 +271,8 @@ export type OrderItem = {
   quantity: number;
   unitPrice: number | null;
   lineTotal: number | null;
+  /** Giá niêm yết của tiệm lúc nhập đơn sàn. Giá bán trên đơn là tiền sàn. */
+  listUnitPrice?: number | null;
 };
 
 export type Order = {
@@ -247,10 +288,13 @@ export type Order = {
   internalNote: string;
   dueDate: string | null;
   marketplaceCode: string;
+  /** Tên người nhận trên sàn. Không ghi đè tên khách đã nhập tại tiệm. */
+  recipientName?: string;
+  shipping?: OrderShipping;
   items: OrderItem[];
   subtotal: number | null;
   total: number | null;
-  depositRequired: number;
+  depositRequired: number | null;
   depositPaid: number;
   depositMethod: string;
   depositBy: string | null;
@@ -362,4 +406,5 @@ export type ShopState = {
   monthlyFixed: { month: string; key: string; amount: number }[];
   payrollLocks: PayrollLock[];
   audits: Audit[];
+  skuMaps?: SkuMap[];
 };

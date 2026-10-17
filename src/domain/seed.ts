@@ -1,3 +1,5 @@
+import { APPROVED_PRICES } from "./approved-prices.ts";
+import { DEFAULT_REMIND_MESSAGE } from "./crm.ts";
 import { formulaQty } from "./calc.ts";
 import type {
   BomLine,
@@ -62,10 +64,12 @@ export const DEFAULT_SETTINGS: Settings = {
     { upto: 200000000, percent: 5 },
     { upto: null, percent: 7 },
   ],
+  commissionBasis: "shop",
   shopOpenDate: "2026-12-01",
   fileRetentionDays: 180,
   videoRetentionDays: 30,
   zaloPhone: "0778662227",
+  showZalo: true,
   publicHours: "08:00 – 20:00",
   showAnhThe: false,
   showAlbum: false,
@@ -75,7 +79,7 @@ export const DEFAULT_SETTINGS: Settings = {
     giay_khen: true,
     nam_cham_xe: true,
     nam_cham_tu: true,
-    trang_guong: false,
+    trang_guong: true,
     tkb: false,
     lua: false,
     anh_the: false,
@@ -83,6 +87,9 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   marketplaceCutoff: "14:00",
   marketplaceHandover: "18:00",
+  repeatCustomerOrders: 2,
+  remindAfterDays: 60,
+  remindMessage: DEFAULT_REMIND_MESSAGE,
   rentFromJune2027: 4000000,
   fixedCosts: [
     { key: "mat_bang", name: "Mặt bằng", amount: 3500000, note: "T12/2026–T5/2027. Từ T6/2027 dùng mức trong cài đặt." },
@@ -96,7 +103,7 @@ export const DEFAULT_SETTINGS: Settings = {
     { key: "khau_hao", name: "Khấu hao máy", amount: 125000, note: "30 triệu ÷ 240 tháng" },
     { key: "marketing", name: "Marketing", amount: 3000000, note: "" },
     { key: "phan_mem", name: "Phần mềm", amount: 100000, note: "" },
-    { key: "khac", name: "Khác", amount: 50000, note: "" },
+    { key: "khac", name: "Khác", amount: 75000, note: "Cộng các khoản mặc định là 29.400.000đ/tháng." },
     { key: "vat_tu_phu", name: "Vật tư phụ khoán", amount: 500000, note: "" },
   ],
 };
@@ -150,7 +157,7 @@ function groups(): Group[] {
       name: "Ảnh ép gỗ tráng gương",
       slug: "anh-ep-go",
       category: "Ảnh gỗ",
-      description: "Ảnh ép gỗ tráng gương. Khổ từ 13×18 đến 60×90, bán lẻ và combo 2, 3, 4, 5 tấm.",
+      description: "Ảnh ép gỗ tráng gương khổ 40×60, 50×75 và 60×90, bán lẻ và combo. Khổ nhỏ hơn nằm ở ảnh tráng gương.",
       turnaround: "1–2 ngày",
       sort: 1,
       gate: null,
@@ -170,7 +177,7 @@ function groups(): Group[] {
       name: "Giấy khen ép gỗ",
       slug: "giay-khen",
       category: "Ảnh gỗ",
-      description: "Giấy khen ép gỗ tráng gương.",
+      description: "Giấy khen ép gỗ tráng gương, khổ A5 (15×21), A4 (20×30) và A3 (30×45).",
       turnaround: "1–2 ngày",
       sort: 3,
       gate: null,
@@ -180,7 +187,7 @@ function groups(): Group[] {
       name: "Ảnh nam châm dán xe",
       slug: "nam-cham-xe",
       category: "Nam châm",
-      description: "Ảnh ép lụa nam châm dán xe. Size 9×19, 10×25 và 17×22.",
+      description: "Ảnh ép lụa nam châm dán xe. Size 9×19 và 17×22.",
       turnaround: "1–2 ngày",
       sort: 4,
       gate: null,
@@ -190,7 +197,7 @@ function groups(): Group[] {
       name: "Nam châm tủ lạnh 6×9 Bản Đặc Biệt",
       slug: "nam-cham-tu-lanh",
       category: "Nam châm",
-      description: "Nam châm tủ lạnh tráng gương 6×9, Bản Đặc Biệt. Chỉ bán theo gói.",
+      description: "Nam châm tủ lạnh tráng gương 6×9, Bản Đặc Biệt. Tại xưởng có bán lẻ một tấm. Kênh khác chỉ bán theo gói.",
       turnaround: "1–2 ngày",
       sort: 5,
       gate: null,
@@ -253,7 +260,8 @@ type Spec = {
   prefix: string;
   sizes: { code: string; w: number; h: number }[];
   combos: number[];
-  pack?: boolean;
+  /** Gói bán theo số tấm. Mã là prefix-size-số, ví dụ NCT-6x9-10. */
+  packs?: number[];
   kind: "wood" | "gloss" | "car" | "fridge" | "silk" | "none";
 };
 
@@ -272,16 +280,29 @@ const SPECS: Spec[] = [
     prefix: "NX",
     sizes: [
       { code: "9x19", w: 9, h: 19 },
-      { code: "10x25", w: 10, h: 25 },
       { code: "17x22", w: 17, h: 22 },
     ],
     combos: [1],
     kind: "car",
   },
-  { groupId: "nam_cham_tu", prefix: "NC", sizes: [{ code: "6x9", w: 6, h: 9 }], combos: [1], pack: true, kind: "fridge" },
+  {
+    groupId: "nam_cham_tu",
+    prefix: "NCT",
+    sizes: [{ code: "6x9", w: 6, h: 9 }],
+    combos: [],
+    packs: [1, 5, 10, 20, 50],
+    kind: "fridge",
+  },
   { groupId: "trang_guong", prefix: "TG", sizes: SIZES, combos: [1, 2, 3, 4, 5], kind: "gloss" },
   { groupId: "tkb", prefix: "TKB", sizes: [{ code: "20x30", w: 20, h: 30 }], combos: [1, 2, 3, 4, 5], kind: "wood" },
-  { groupId: "lua", prefix: "AL", sizes: [{ code: "6x9", w: 6, h: 9 }], combos: [1], pack: true, kind: "silk" },
+  {
+    groupId: "lua",
+    prefix: "LUA",
+    sizes: [{ code: "6x9", w: 6, h: 9 }],
+    combos: [],
+    packs: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 240],
+    kind: "silk",
+  },
   { groupId: "anh_the", prefix: "ATHE", sizes: [{ code: "4x6", w: 4, h: 6 }], combos: [1], kind: "none" },
   { groupId: "album", prefix: "ALBUM", sizes: [], combos: [], kind: "none" },
 ];
@@ -318,14 +339,18 @@ function buildCatalog(settings: Settings): { skus: Sku[]; boms: BomLine[] } {
       skus.push(sku);
       continue;
     }
+    const units = spec.packs?.length ? spec.packs : spec.combos;
     for (const size of spec.sizes) {
-      for (const sheets of spec.combos) {
-        const code = spec.pack ? `${spec.prefix}-${size.code}-GOI` : `${spec.prefix}-${size.code}-C${sheets}`;
-        const name = spec.pack
-          ? `Gói 6×9`
-          : sheets === 1
+      for (const count of units) {
+        const packed = Boolean(spec.packs?.length);
+        const code = packed ? `${spec.prefix}-${size.code}-${count}` : `${spec.prefix}-${size.code}-C${count}`;
+        const name = packed
+          ? count === 1
+            ? `1 tấm ${size.w}×${size.h}`
+            : `Gói ${count} tấm ${size.w}×${size.h}`
+          : count === 1
             ? `${size.w}×${size.h} cm`
-            : `${size.w}×${size.h} cm · ${sheets} tấm`;
+            : `${size.w}×${size.h} cm · ${count} tấm`;
         const sku: Sku = {
           id: code,
           code,
@@ -334,8 +359,8 @@ function buildCatalog(settings: Settings): { skus: Sku[]; boms: BomLine[] } {
           size: size.code,
           widthCm: size.w,
           heightCm: size.h,
-          sheets: spec.pack ? 1 : sheets,
-          piecesPerPack: null,
+          sheets: count,
+          piecesPerPack: packed ? count : null,
           sort: ++sort,
         };
         skus.push(sku);
@@ -394,40 +419,72 @@ function materials(): Material[] {
   return list;
 }
 
+const APPROVED_PRICE = new Map(APPROVED_PRICES.map((row) => [`${row.code}|${row.channel}`, row.price]));
+
 function prices(skus: Sku[]): ChannelPrice[] {
   const rows: ChannelPrice[] = [];
   for (const sku of skus) {
     for (const channel of CHANNELS) {
-      const known = sku.code === "TG-13x18-C4" && channel === "tiktok" ? 249000 : null;
+      const known = APPROVED_PRICE.get(`${sku.code}|${channel}`) ?? null;
       rows.push({
         skuId: sku.id,
         channel: channel as Channel,
         price: known,
-        status: "dang_ban",
-        note: known ? "Số từ file hệ thống, combo 4 tấm 13×18 TikTok." : "",
+        status: known === null ? "nhap" : "dang_ban",
+        note:
+          known === null
+            ? ""
+            : channel === "shopee"
+              ? "Shopee chưa có giá riêng — tạm bằng TikTok (BANG-GIA-THEO-KENH-v2)."
+              : "Bảng giá chủ duyệt 17/10/2026.",
       });
     }
   }
   return rows;
 }
 
-export async function hashPassword(password: string, salt = crypto.randomUUID()): Promise<string> {
+/** Workers từ chối PBKDF2 trên 100000 vòng. Hash mới ghi số vòng vào giữa. */
+export const PBKDF2_ITERATIONS = 100000;
+
+async function derivePbkdf2(password: string, salt: string, iterations: number): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: enc.encode(salt), iterations: 120000, hash: "SHA-256" },
+    { name: "PBKDF2", salt: enc.encode(salt), iterations, hash: "SHA-256" },
     key,
     256,
   );
-  const hex = [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `pbkdf2$${salt}$${hex}`;
+  return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function hashPassword(password: string, salt = crypto.randomUUID()): Promise<string> {
+  const hex = await derivePbkdf2(password, salt, PBKDF2_ITERATIONS);
+  return `pbkdf2$${PBKDF2_ITERATIONS}$${salt}$${hex}`;
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const parts = stored.split("$");
-  if (parts.length !== 3 || !parts[1] || !parts[2]) return false;
-  const next = await hashPassword(password, parts[1]);
-  return next === stored;
+  let iterations = PBKDF2_ITERATIONS;
+  let salt = "";
+  let hex = "";
+  if (parts.length === 4 && parts[0] === "pbkdf2") {
+    iterations = Number(parts[1]);
+    salt = parts[2] ?? "";
+    hex = parts[3] ?? "";
+  } else if (parts.length === 3 && parts[0] === "pbkdf2") {
+    iterations = 120000;
+    salt = parts[1] ?? "";
+    hex = parts[2] ?? "";
+  } else {
+    return false;
+  }
+  if (!salt || !hex || !Number.isInteger(iterations) || iterations < 1) return false;
+  try {
+    const next = await derivePbkdf2(password, salt, iterations);
+    return next === hex;
+  } catch {
+    return false;
+  }
 }
 
 export async function buildSeed(): Promise<ShopState> {
@@ -440,6 +497,9 @@ export async function buildSeed(): Promise<ShopState> {
     mustChangePassword: true,
     probation: false,
     hiredAt: null,
+    totpEnabled: false,
+    totpSecret: null,
+    totpPendingSecret: null,
   };
   return {
     version: 1,

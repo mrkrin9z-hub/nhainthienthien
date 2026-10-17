@@ -1,0 +1,19 @@
+{
+  // Nitro gộp file này vào .output/server/wrangler.json khi build.
+  // Id dưới đây là chỗ giữ chỗ. Thay bằng id thật trước khi deploy (xem README).
+  "name": "nhainthienthien",
+  "kv_namespaces": [
+    {
+      "binding": "SHOP_KV",
+      "id": "00000000000000000000000000000000",
+      "preview_id": "00000000000000000000000000000000"
+    },
+    {
+      "binding": "ASSETS_KV",
+      "id": "11111111111111111111111111111111",
+      "preview_id": "11111111111111111111111111111111"
+    }
+  ]
+  // R2 chưa bật trên tài khoản. Khi tạo được bucket, thêm vào file này rồi build lại:
+  // "r2_buckets": [{ "binding": "ORDER_FILES", "bucket_name": "nhainthienthien-files" }]
+}

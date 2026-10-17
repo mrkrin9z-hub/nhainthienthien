@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
-import { catalogQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
+import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
 import { createOrder, createUploadTicket, markFileStatus, submitOrder } from "@/lib/orders.functions";
 import { formatVnd } from "@/lib/brand";
 
@@ -23,7 +22,11 @@ export const Route = createFileRoute("/dat-in")({
   },
 
 
-  loader: ({ context }) => context.queryClient.ensureQueryData(catalogQueryOptions),
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(catalogQueryOptions),
+      context.queryClient.ensureQueryData(publicConfigQueryOptions),
+    ]),
   head: () => ({
     meta: [
       { title: "Đặt in online — gửi ảnh 3 bước | Nhà In Thiên Thiên" },
@@ -67,6 +70,8 @@ function parseItems(raw?: string): Record<string, number> {
 function OrderPage() {
   const { product: presetSlug, items: presetItems } = Route.useSearch();
   const { data: products } = useSuspenseQuery(catalogQueryOptions);
+  const { data: config } = useSuspenseQuery(publicConfigQueryOptions);
+  const maxPhotoBytes = config.maxPhotoBytes;
 
   const initialQuantities = useMemo(() => parseItems(presetItems), [presetItems]);
   const [step, setStep] = useState(Object.keys(initialQuantities).length ? 2 : 1);
@@ -115,10 +120,19 @@ function OrderPage() {
 
   function addFiles(list: FileList | null) {
     if (!list) return;
+    const limit = maxPhotoBytes ?? MAX_FILE_BYTES;
+    const limitMb = Math.round(limit / (1024 * 1024));
     const next: FileState[] = [];
+    const rejected: string[] = [];
     for (const file of Array.from(list)) {
-      if (file.size > MAX_FILE_BYTES) continue;
+      if (file.size > limit) {
+        rejected.push(file.name);
+        continue;
+      }
       next.push({ key: crypto.randomUUID(), file, status: "pending" });
+    }
+    if (rejected.length) {
+      setError(`${rejected.join(", ")} lớn hơn ${limitMb}MB. Mỗi ảnh tối đa ${limitMb}MB.`);
     }
     setFiles((prev) => [...prev, ...next].slice(0, MAX_FILES));
   }
@@ -143,6 +157,7 @@ function OrderPage() {
         },
       });
 
+      let uploadError: string | null = null;
       for (const item of files) {
         if (item.status === "complete") continue;
         setFiles((prev) =>
@@ -158,20 +173,13 @@ function OrderPage() {
               sizeBytes: item.file.size,
             },
           });
-          if (ticket.mode === "supabase") {
-            const { error: uploadError } = await supabase.storage
-              .from("order-originals")
-              .uploadToSignedUrl(ticket.path, ticket.token, item.file);
-            if (uploadError) throw new Error(uploadError.message);
-          } else {
-            const body = new FormData();
-            body.set("orderId", order.orderId);
-            body.set("accessToken", order.accessToken);
-            body.set("fileId", ticket.fileId);
-            body.set("file", item.file);
-            const uploaded = await fetch("/api/public/upload", { method: "POST", body });
-            if (!uploaded.ok) throw new Error(await uploaded.text());
-          }
+          const body = new FormData();
+          body.set("orderId", order.orderId);
+          body.set("accessToken", order.accessToken);
+          body.set("fileId", ticket.fileId);
+          body.set("file", item.file);
+          const uploaded = await fetch("/api/public/upload", { method: "POST", body });
+          if (!uploaded.ok) throw new Error(await uploaded.text());
 
           await markFileStatus({
             data: {
@@ -187,10 +195,12 @@ function OrderPage() {
             ),
           );
         } catch (err) {
+          const message = err instanceof Error ? err.message : "Không tải được ảnh.";
+          uploadError = uploadError ?? message;
           setFiles((prev) =>
             prev.map((f) =>
               f.key === item.key
-                ? { ...f, status: "error", message: (err as Error).message }
+                ? { ...f, status: "error", message }
                 : f,
             ),
           );
@@ -201,7 +211,7 @@ function OrderPage() {
         data: { orderId: order.orderId, accessToken: order.accessToken },
       });
       if (!result.allDone) {
-        setError("Một số ảnh chưa tải lên được. Vui lòng bấm gửi lại để thử tiếp.");
+        setError(uploadError ?? "Một số ảnh chưa tải lên được. Vui lòng bấm gửi lại để thử tiếp.");
       } else {
         setDoneCode(order.code);
       }
@@ -388,8 +398,15 @@ function OrderPage() {
                   <UploadCloud className="size-8 text-accent" />
                   <span className="mt-2 font-semibold text-foreground">Chọn ảnh gốc</span>
                   <span className="mt-1 text-xs text-muted-foreground">
-                    JPG, PNG, WEBP, HEIC — tối đa 50MB mỗi ảnh, {MAX_FILES} ảnh mỗi đơn
+                    JPG, PNG, WEBP, HEIC —{" "}
+                    {maxPhotoBytes
+                      ? `mỗi ảnh tối đa ${Math.round(maxPhotoBytes / (1024 * 1024))}MB`
+                      : "tối đa 50MB mỗi ảnh"}
+                    , {MAX_FILES} ảnh mỗi đơn
                   </span>
+                  {maxPhotoBytes ? (
+                    <span className="mt-2 text-sm font-semibold text-foreground">Mỗi ảnh tối đa 10MB.</span>
+                  ) : null}
                   <input
                     type="file"
                     multiple
@@ -405,7 +422,10 @@ function OrderPage() {
                       key={f.key}
                       className="flex items-center justify-between gap-3 rounded-2xl bg-muted/60 px-3 py-2 text-sm"
                     >
-                      <span className="truncate">{f.file.name}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate">{f.file.name}</span>
+                        {f.message ? <span className="block text-xs text-destructive">{f.message}</span> : null}
+                      </span>
                       <span className="flex shrink-0 items-center gap-2">
                         {f.status === "uploading" ? (
                           <Loader2 className="size-4 animate-spin text-primary" />

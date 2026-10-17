@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
-import { changeStatus, getMe, getOrderDetail, recordDeposit, saveNote, saveReprint } from "@/lib/admin.functions";
+import { changeStatus, getMe, getOrderDetail, recordDeposit, saveNote, saveReprint, storeShipping } from "@/lib/admin.functions";
+import { isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
 import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-hang/$code")({
@@ -15,6 +16,12 @@ export const Route = createFileRoute("/admin/don-hang/$code")({
 });
 
 const NEXT: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"];
+const FILE_KIND: Record<string, string> = {
+  original: "Ảnh gốc",
+  design: "Thiết kế",
+  approval: "Duyệt",
+  packing_video: "Video đóng gói",
+};
 
 function OrderDetailPage() {
   const { code } = Route.useParams();
@@ -26,8 +33,11 @@ function OrderDetailPage() {
   const [method, setMethod] = useState("chuyển khoản");
   const [override, setOverride] = useState(false);
   const [reason, setReason] = useState("");
+  const [reopenReason, setReopenReason] = useState("");
   const data = order.data;
   const role = me.data?.role;
+  const closed = data?.status === "huy" || data?.status === "xong";
+  const productionCanMove = Boolean(data && role === "production" && isProductionStep(data.status));
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["order", code] });
@@ -37,31 +47,29 @@ function OrderDetailPage() {
 
   return (
     <div className="space-y-4">
-      <style>{`@media print { body * { visibility: hidden } .label-print, .label-print * { visibility: visible } .label-print { position: absolute; left: 0; top: 0; width: 80mm; } }`}</style>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
-        <Button variant="outline" className="min-h-11" onClick={() => window.print()}>
-          In tem
-        </Button>
+        {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
+          <Button asChild variant="outline" className="min-h-11">
+            <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
+          </Button>
+        ) : null}
       </div>
-      <p className="text-sm">
+      <p className="break-words text-sm">
         {data.customerName} · {data.phone} · {data.channelLabel} · {data.statusLabel}
+        {data.recipientName && data.recipientName !== data.customerName ? ` · Người nhận: ${data.recipientName}` : ""}
         {data.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
       </p>
-      {data.address ? <p className="text-sm">Địa chỉ: {data.address}</p> : null}
+      {data.address ? <p className="break-words text-sm">Địa chỉ: {data.address}</p> : null}
       {data.marketplaceCode ? <p className="text-sm">Mã sàn: {data.marketplaceCode}</p> : null}
       {data.stockWarning ? <p className="rounded-2xl bg-accent/30 px-3 py-2 text-sm font-semibold">{data.stockWarning}</p> : null}
       <p className="text-xs text-muted-foreground">
         Kho in: {data.printDeducted ? "đã trừ" : "chưa trừ"} · Kho đóng gói: {data.packDeducted ? "đã trừ" : "chưa trừ"}
       </p>
 
-      <section className="label-print glass-card rounded-3xl p-4">
-        <p className="text-lg font-extrabold">{data.code}</p>
-        <p>{data.customerName}</p>
-        <p>{data.phone}</p>
-        <p>{data.address}</p>
-        <p className="text-sm">{data.itemSummary}</p>
-      </section>
+      {role !== "production" ? <ShippingForm orderId={data.id} shipping={data.shipping} onDone={refresh} /> : (
+        <p className="text-sm">Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}</p>
+      )}
 
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Sản phẩm</h2>
@@ -72,7 +80,14 @@ function OrderDetailPage() {
                 {item.quantity}× {item.name}
               </span>
               {role === "production" ? null : (
-                <span>{item.lineTotal === null ? "Chưa có giá" : formatMaybe(item.lineTotal)}</span>
+                <span className="text-right">
+                  {item.lineTotal === null ? "Chưa có giá" : formatMaybe(item.lineTotal)}
+                  {item.listUnitPrice != null && item.lineTotal != null ? (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Niêm yết {formatMaybe(item.listUnitPrice * item.quantity)} · Lệch {formatMaybe(item.lineTotal - item.listUnitPrice * item.quantity)}
+                    </span>
+                  ) : null}
+                </span>
               )}
             </li>
           ))}
@@ -88,11 +103,13 @@ function OrderDetailPage() {
         <section className="glass-card rounded-3xl p-4">
           <h2 className="font-bold text-primary">Cọc</h2>
           <p className="text-sm">
-            Cần cọc {formatMaybe(data.depositRequired)} · Đã ghi {formatMaybe(data.depositPaid)} {data.depositMethod}
+            {data.depositRequired === null
+              ? "Cần cọc 50% nhưng chưa có giá bán để tính số tiền."
+              : `Cần cọc ${formatMaybe(data.depositRequired)} · Đã ghi ${formatMaybe(data.depositPaid)} ${data.depositMethod}`}
           </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Input className="min-h-12 w-36" inputMode="numeric" placeholder="Số tiền" value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/\D/g, ""))} />
-            <Input className="min-h-12 w-40" value={method} onChange={(e) => setMethod(e.target.value)} />
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+            <Input className="min-h-12 w-full sm:w-36" inputMode="numeric" placeholder="Số tiền" value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/\D/g, ""))} />
+            <Input className="min-h-12 w-full sm:w-40" value={method} onChange={(e) => setMethod(e.target.value)} />
             <Button
               className="min-h-12"
               onClick={async () => {
@@ -114,23 +131,44 @@ function OrderDetailPage() {
 
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Chuyển bước</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {role === "production"
+            ? productionCanMove
+              ? "Sản xuất chỉ chuyển đơn đang In, Đóng gói hoặc Giao giữa ba bước đó. Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."
+              : "Đơn này không nằm ở In, Đóng gói hoặc Giao. Sản xuất không chuyển bước."
+            : closed && role === "owner"
+              ? "Mở lại đơn đã hủy hoặc đã xong cần ghi lý do. Lý do được lưu vào lịch sử."
+              : closed
+                ? "Đơn đã hủy hoặc đã xong. Chỉ chủ mở lại, và phải ghi lý do."
+                : "Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."}
+        </p>
         {role === "owner" ? (
           <label className="mt-2 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
             Chủ bỏ qua điều kiện cọc
           </label>
         ) : null}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {NEXT.map((status) => (
+        {role === "owner" && closed ? (
+          <Textarea className="mt-2" placeholder="Lý do mở lại" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} />
+        ) : null}
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          {(role === "production" ? (productionCanMove ? [...PRODUCTION_STEPS] : []) : closed && role !== "owner" ? [] : NEXT).map((status) => (
             <Button
               key={status}
               variant={data.status === status ? "default" : "outline"}
-              className="min-h-11"
+              className="min-h-12 w-full sm:w-auto"
               onClick={async () => {
+                const reopening = closed && status !== data.status;
+                if (reopening && !reopenReason.trim()) {
+                  toast.error("Mở lại đơn đã hủy hoặc đã xong cần ghi lý do.");
+                  return;
+                }
                 try {
-                  await changeStatus({ data: { orderId: data.id, status, note: "", ownerOverride: override } });
+                  await changeStatus({
+                    data: { orderId: data.id, status, note: reopening ? reopenReason.trim() : "", ownerOverride: override },
+                  });
                   toast.success(STATUS_LABEL[status]);
+                  if (reopening) setReopenReason("");
                   await refresh();
                 } catch (error) {
                   toast.error((error as Error).message);
@@ -181,7 +219,7 @@ function OrderDetailPage() {
               <a className="font-semibold text-primary" href={`/api/staff/file/${file.id}`}>
                 {file.name}
               </a>
-              <span className="text-muted-foreground"> · {file.kind} · {file.storage}</span>
+              <span className="text-muted-foreground"> · {FILE_KIND[file.kind] ?? file.kind}</span>
             </li>
           ))}
           {data.files.length === 0 ? <li className="text-muted-foreground">Chưa có file.</li> : null}
@@ -261,5 +299,47 @@ function OrderDetailPage() {
         </Link>
       ) : null}
     </div>
+  );
+}
+
+function ShippingForm({
+  orderId,
+  shipping,
+  onDone,
+}: {
+  orderId: string;
+  shipping?: { carrier: string; tracking: string; shipFee: number | null; codAmount: number | null };
+  onDone: () => Promise<void>;
+}) {
+  const [carrier, setCarrier] = useState(shipping?.carrier ?? "");
+  const [tracking, setTracking] = useState(shipping?.tracking ?? "");
+  const [shipFee, setShipFee] = useState(shipping?.shipFee === null || shipping?.shipFee === undefined ? "" : String(shipping.shipFee));
+  const [codAmount, setCodAmount] = useState(shipping?.codAmount === null || shipping?.codAmount === undefined ? "" : String(shipping.codAmount));
+  return (
+    <section className="glass-card space-y-2 rounded-3xl p-4">
+      <h2 className="font-bold text-primary">Giao hàng</h2>
+      <Input className="min-h-12" placeholder="Hãng vận chuyển" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
+      <Input className="min-h-12" placeholder="Mã vận đơn" value={tracking} onChange={(e) => setTracking(e.target.value)} />
+      <Input className="min-h-12" inputMode="numeric" placeholder="Phí ship" value={shipFee} onChange={(e) => setShipFee(e.target.value.replace(/[^\d]/g, ""))} />
+      <Input className="min-h-12" inputMode="numeric" placeholder="Tiền thu hộ COD" value={codAmount} onChange={(e) => setCodAmount(e.target.value.replace(/[^\d]/g, ""))} />
+      <Button
+        className="min-h-11"
+        onClick={async () => {
+          await storeShipping({
+            data: {
+              orderId,
+              carrier,
+              tracking,
+              shipFee: shipFee === "" ? null : Number(shipFee),
+              codAmount: codAmount === "" ? null : Number(codAmount),
+            },
+          });
+          toast.success("Đã lưu giao hàng");
+          await onDone();
+        }}
+      >
+        Lưu giao hàng
+      </Button>
+    </section>
   );
 }

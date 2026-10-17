@@ -20,11 +20,15 @@ function PricePage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const [groupId, setGroupId] = useState("ep_go");
   const [channel, setChannel] = useState<Channel>("tai_tiem");
+  const allowed = me.data?.role === "owner" || me.data?.role === "sale";
   const board = useQuery({
     queryKey: ["prices", groupId],
     queryFn: () => getPriceBoard({ data: { groupId } }),
+    enabled: allowed,
   });
   const owner = me.data?.role === "owner";
+  if (me.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
+  if (me.data?.role === "production") return <p className="text-lg font-semibold text-primary">Chỉ chủ và sale xem bảng giá.</p>;
 
   return (
     <div className="space-y-6">
@@ -58,6 +62,13 @@ function PricePage() {
           </button>
         ))}
       </div>
+      {(board.data?.warnings ?? []).length > 0 ? (
+        <div className="rounded-2xl bg-accent/40 px-4 py-3 text-sm font-semibold text-foreground">
+          {(board.data?.warnings ?? []).map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      ) : null}
       <div className="overflow-x-auto rounded-3xl border border-border bg-card">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="text-left text-muted-foreground">

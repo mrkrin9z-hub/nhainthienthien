@@ -1,6 +1,9 @@
 {
   "name": "tanstack_start_ts",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "sideEffects": false,
   "type": "module",
   "scripts": {
@@ -9,7 +12,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types --test src/domain/domain.test.ts",
+    "test": "node --experimental-strip-types --test src/domain/domain.test.ts src/domain/audit.test.ts src/domain/phase2.test.ts src/domain/phase3.test.ts src/domain/crm.test.ts src/domain/phase8.test.ts",
     "format": "prettier --write ."
   },
   "overrides": {
@@ -54,6 +57,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "fflate": "^0.8.2",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",

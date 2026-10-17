@@ -3,11 +3,17 @@ import { z } from "zod";
 
 import type { Actor } from "@/server/service";
 
-async function actor(): Promise<Actor> {
+async function session(): Promise<Actor> {
   const { readStaffId } = await import("@/server/session");
   const { currentActor } = await import("@/server/service");
   const person = await currentActor(await readStaffId());
   if (!person) throw new Error("Chưa đăng nhập.");
+  return person;
+}
+
+async function actor(): Promise<Actor> {
+  const person = await session();
+  if (person.mustChangePassword) throw new Error("Đổi mật khẩu trước khi dùng.");
   return person;
 }
 
@@ -18,11 +24,14 @@ export const getMe = createServerFn({ method: "GET" }).handler(async () => {
 });
 
 export const loginStaff = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ email: z.string().email(), password: z.string().min(4) }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ email: z.string().email(), password: z.string().min(4), code: z.string().optional() }).parse(data),
+  )
   .handler(async ({ data }) => {
     const { login } = await import("@/server/service");
     const { writeStaffId } = await import("@/server/session");
-    const person = await login(data.email, data.password);
+    const person = await login(data.email, data.password, data.code);
+    if ("needsTotp" in person) return person;
     await writeStaffId(person.id);
     return person;
   });
@@ -37,7 +46,7 @@ export const changeOwnPassword = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ current: z.string().min(4), next: z.string().min(8) }).parse(data))
   .handler(async ({ data }) => {
     const { changePassword } = await import("@/server/service");
-    await changePassword(await actor(), data.current, data.next);
+    await changePassword(await session(), data.current, data.next);
     return { ok: true };
   });
 
@@ -227,6 +236,7 @@ export const saveMaterial = createServerFn({ method: "POST" })
         packSize: z.number().positive().nullable(),
         minStock: z.number().min(0).nullable(),
         supplier: z.string(),
+        leadTimeDays: z.number().int().min(0).nullable().optional(),
       })
       .parse(data),
   )
@@ -266,10 +276,12 @@ export const getBom = createServerFn({ method: "GET" })
   });
 
 export const getCustomers = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => z.object({ q: z.string().optional().default("") }).parse(data ?? {}))
+  .inputValidator((data: unknown) =>
+    z.object({ q: z.string().optional().default(""), includeCancelled: z.boolean().optional().default(false) }).parse(data ?? {}),
+  )
   .handler(async ({ data }) => {
     const { customerList } = await import("@/server/service");
-    return customerList(await actor(), data.q);
+    return customerList(await actor(), data.q, data.includeCancelled);
   });
 
 export const getCustomer = createServerFn({ method: "GET" })
@@ -280,12 +292,26 @@ export const getCustomer = createServerFn({ method: "GET" })
   });
 
 export const saveCustomer = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ id: z.string(), note: z.string() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string(),
+        note: z.string(),
+        tags: z.array(z.string()).optional(),
+        specialDates: z.array(z.object({ label: z.string(), month: z.number().int(), day: z.number().int() })).optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
     const { saveCustomerNote } = await import("@/server/service");
-    await saveCustomerNote(await actor(), data.id, data.note);
+    await saveCustomerNote(await actor(), data.id, data.note, data.tags, data.specialDates);
     return { ok: true };
   });
+
+export const getReminders = createServerFn({ method: "GET" }).handler(async () => {
+  const { reminderList } = await import("@/server/service");
+  return reminderList(await actor());
+});
 
 export const punchClock = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ action: z.enum(["in", "out"]) }).parse(data))
@@ -340,6 +366,20 @@ export const getProfit = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { profitReport } = await import("@/server/service");
     return profitReport(await actor(), data.month);
+  });
+
+export const getReport = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ month: z.string(), grain: z.enum(["day", "week", "month"]) }).parse(data))
+  .handler(async ({ data }) => {
+    const { ownerReport } = await import("@/server/service");
+    return ownerReport(await actor(), data.month, data.grain);
+  });
+
+export const getKpi = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { kpiReport } = await import("@/server/service");
+    return kpiReport(await actor(), data.month);
   });
 
 export const saveFixedMonth = createServerFn({ method: "POST" })
@@ -416,6 +456,173 @@ export const dueFiles = createServerFn({ method: "GET" }).handler(async () => {
   const { filesDue } = await import("@/server/service");
   return filesDue(await actor());
 });
+
+export const getAudits = createServerFn({ method: "GET" }).handler(async () => {
+  const { listAudits } = await import("@/server/service");
+  return listAudits(await actor());
+});
+
+export const startTotp = createServerFn({ method: "POST" }).handler(async () => {
+  const { beginTotp } = await import("@/server/service");
+  return beginTotp(await actor());
+});
+
+export const finishTotp = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ code: z.string().min(6).max(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { confirmTotp } = await import("@/server/service");
+    await confirmTotp(await actor(), data.code);
+    return { ok: true };
+  });
+
+export const stopTotp = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ password: z.string().min(4), code: z.string().min(6).max(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { disableTotp } = await import("@/server/service");
+    await disableTotp(await actor(), data.password, data.code);
+    return { ok: true };
+  });
+
+export const getBackups = createServerFn({ method: "GET" }).handler(async () => {
+  const { backups } = await import("@/server/service");
+  return backups(await actor());
+});
+
+export const fetchBackup = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ key: z.string().min(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { downloadBackupFile } = await import("@/server/service");
+    return downloadBackupFile(await actor(), data.key);
+  });
+
+export const restoreBackup = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ key: z.string().min(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { restoreFromBackup } = await import("@/server/service");
+    await restoreFromBackup(await actor(), data.key);
+    return { ok: true };
+  });
+
+export const getIntegrations = createServerFn({ method: "GET" }).handler(async () => {
+  const { integrations } = await import("@/server/service");
+  return integrations(await actor());
+});
+
+export const saveIntegration = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ provider: z.string(), value: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { setIntegration } = await import("@/server/service");
+    await setIntegration(await actor(), data.provider, data.value);
+    return { ok: true };
+  });
+
+export const previewRestore = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ key: z.string().min(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { restorePreview } = await import("@/server/service");
+    return restorePreview(await actor(), data.key);
+  });
+
+export const createBackupNow = createServerFn({ method: "POST" }).handler(async () => {
+  const { backupNow } = await import("@/server/service");
+  return backupNow(await actor());
+});
+
+const channelFile = z.object({
+  channel: z.enum(["tiktok", "shopee"]),
+  filename: z.string().min(1),
+  base64: z.string().min(8),
+});
+
+export const previewMarketplace = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => channelFile.parse(data))
+  .handler(async ({ data }) => {
+    const { previewMarketplaceFile } = await import("@/server/service");
+    return previewMarketplaceFile(await actor(), data);
+  });
+
+export const importMarketplace = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => channelFile.parse(data))
+  .handler(async ({ data }) => {
+    const { importMarketplaceFile } = await import("@/server/service");
+    return importMarketplaceFile(await actor(), data);
+  });
+
+export const getSkuMaps = createServerFn({ method: "GET" }).handler(async () => {
+  const { listSkuMaps } = await import("@/server/service");
+  return listSkuMaps(await actor());
+});
+
+export const storeSkuMap = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ channel: z.enum(["tiktok", "shopee"]), externalSku: z.string().min(1), skuId: z.string().min(1) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveSkuMap } = await import("@/server/service");
+    await saveSkuMap(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteSkuMap = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ channel: z.enum(["tiktok", "shopee"]), externalSku: z.string().min(1) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { removeSkuMap } = await import("@/server/service");
+    await removeSkuMap(await actor(), data);
+    return { ok: true };
+  });
+
+export const storeShipping = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        orderId: z.string(),
+        carrier: z.string(),
+        tracking: z.string(),
+        shipFee: z.number().nullable(),
+        codAmount: z.number().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveOrderShipping } = await import("@/server/service");
+    await saveOrderShipping(await actor(), data);
+    return { ok: true };
+  });
+
+export const setCodReceived = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string(), received: z.boolean() }).parse(data))
+  .handler(async ({ data }) => {
+    const { markCodReceived } = await import("@/server/service");
+    await markCodReceived(await actor(), data.orderId, data.received);
+    return { ok: true };
+  });
+
+export const getDeliveries = createServerFn({ method: "GET" }).handler(async () => {
+  const { deliveryBoard } = await import("@/server/service");
+  return deliveryBoard(await actor());
+});
+
+export const getCod = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { codBoard } = await import("@/server/service");
+    return codBoard(await actor(), data.month);
+  });
+
+export const getGroupPhotos = createServerFn({ method: "GET" }).handler(async () => {
+  const { listGroupPhotos } = await import("@/server/service");
+  return listGroupPhotos(await actor());
+});
+
+export const clearGroupPhoto = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ slug: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeGroupPhoto } = await import("@/server/service");
+    await removeGroupPhoto(await actor(), data.slug);
+    return { ok: true };
+  });
 
 export const removeFile = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ fileId: z.string() }).parse(data))
