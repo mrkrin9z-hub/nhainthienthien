@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, Minus, Plus, UploadCloud, X } from "lucide-react";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/dat-in")({
       {
         name: "description",
         content:
-          "Chọn quy cách, điền thông tin nhận hàng và gửi ảnh gốc để đặt in tại Nhà In Thiên Thiên. Nhận mã đơn ngay sau khi gửi.",
+          "Chọn sản phẩm, gửi ảnh gốc, rồi nhập số điện thoại và địa chỉ để đặt in tại Nhà In Thiên Thiên.",
       },
       { property: "og:title", content: "Đặt in online — Nhà In Thiên Thiên" },
       { property: "og:description", content: "Gửi ảnh đặt in chỉ với 3 bước, nhận mã đơn ngay." },
@@ -94,6 +94,11 @@ function OrderPage() {
   const activeProduct: CatalogProduct | undefined =
     products.find((p) => p.slug === activeSlug) ?? products[0];
 
+  useEffect(() => {
+    if (!presetSlug) return;
+    document.getElementById(`sp-${presetSlug}`)?.scrollIntoView({ block: "center" });
+  }, [presetSlug]);
+
   const selected = useMemo(() => {
     const rows: { id: string; label: string; unitPrice: number; quantity: number }[] = [];
     for (const product of products) {
@@ -137,10 +142,20 @@ function OrderPage() {
     setFiles((prev) => [...prev, ...next].slice(0, MAX_FILES));
   }
 
+  const phoneDigits = phone.replace(/\D/g, "");
+  const contactOk = fullName.trim().length > 1 && phoneDigits.length >= 8 && (fulfillment !== "delivery" || address.trim().length >= 8);
+  const canNext = step === 1 ? selected.length > 0 : step === 2 ? files.length > 0 : contactOk;
+  const stepHint =
+    step === 1 ? "Chọn ít nhất một khổ." : step === 2 ? "Thêm ít nhất một ảnh." : fulfillment === "delivery" && address.trim().length < 8 ? "Nhập địa chỉ nhận hàng." : "Nhập họ tên và số điện thoại.";
+
   async function handleSubmit() {
     setError(null);
     if (!files.length) {
       setError("Vui lòng chọn ít nhất một ảnh gốc.");
+      return;
+    }
+    if (!contactOk) {
+      setError(fulfillment === "delivery" && address.trim().length < 8 ? "Nhập địa chỉ nhận hàng." : "Nhập họ tên và số điện thoại đúng.");
       return;
     }
     setBusy(true);
@@ -248,16 +263,16 @@ function OrderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-28 lg:pb-0">
+    <div className="min-h-screen bg-background pb-40 lg:pb-0">
       <SiteHeader />
       <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <h1 className="text-3xl font-extrabold text-primary md:text-4xl">Đặt in online</h1>
 
         <ol className="mt-4 flex gap-2">
-          {["Chọn sản phẩm", "Thông tin", "Gửi ảnh"].map((label, i) => (
+          {["Sản phẩm", "Gửi ảnh", "SĐT, địa chỉ"].map((label, i) => (
             <li
               key={label}
-              className={`flex-1 rounded-2xl px-3 py-2 text-center text-xs font-bold sm:text-sm ${
+              className={`flex min-h-12 flex-1 items-center justify-center rounded-2xl px-2 py-2 text-center text-xs font-bold leading-tight sm:text-sm ${
                 step === i + 1
                   ? "bg-primary text-primary-foreground"
                   : "bg-card text-muted-foreground"
@@ -270,68 +285,94 @@ function OrderPage() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
           <div>
+            {step > 1 && selected.length > 0 ? (
+              <ul className="mb-4 space-y-1 rounded-3xl bg-card px-4 py-3 text-sm lg:hidden">
+                {selected.map((row) => (
+                  <li key={row.id} className="flex justify-between gap-3">
+                    <span className="min-w-0 text-foreground/80">{row.label} × {row.quantity}</span>
+                    <span className="shrink-0 font-semibold text-primary">{row.unitPrice ? formatVnd(row.unitPrice * row.quantity) : "Liên hệ"}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {step === 1 ? (
-              <section className="glass-card rounded-3xl p-5">
-                <div className="flex flex-wrap gap-2">
-                  {products.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setActiveSlug(p.slug)}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                        activeProduct?.slug === p.slug
-                          ? "bg-accent text-accent-foreground"
-                          : "bg-muted text-foreground/80"
-                      }`}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-
-                <p className="mt-4 text-sm text-muted-foreground">{activeProduct?.description}</p>
-
-                <ul className="mt-4 divide-y divide-border">
-                  {activeProduct?.variants.map((variant) => {
-                    const qty = quantities[variant.id] ?? 0;
-                    return (
-                      <li key={variant.id} className="flex items-center justify-between gap-3 py-3">
-                        <div>
-                          <p className="font-semibold text-foreground">{variant.name}</p>
-                          <p className="text-sm text-accent">
-                            {variant.requires_quote || variant.price === null
-                              ? "Liên hệ báo giá"
-                              : formatVnd(variant.sale_price ?? variant.price)}
-                          </p>
+              <section className="space-y-3">
+                {products.map((product) => {
+                  const open = product.slug === activeProduct?.slug;
+                  const from = product.variants
+                    .map((variant) => (variant.requires_quote ? null : (variant.sale_price ?? variant.price)))
+                    .filter((price): price is number => price !== null);
+                  return (
+                    <div key={product.id} id={`sp-${product.slug}`} className="glass-card scroll-mt-24 overflow-hidden rounded-3xl">
+                      <button
+                        type="button"
+                        onClick={() => setActiveSlug(product.slug)}
+                        className="flex min-h-16 w-full items-center gap-3 p-3 text-left"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[11px] font-bold uppercase tracking-wide text-accent">{product.category}</span>
+                          <span className="block font-extrabold leading-tight text-foreground">{product.name}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {from.length ? `Từ ${formatVnd(Math.min(...from))}` : "Liên hệ"} · {product.variants.length} quy cách
+                          </span>
+                        </span>
+                        <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${open ? "bg-accent text-accent-foreground" : "bg-muted text-foreground/70"}`}>
+                          {open ? "Đang chọn" : "Chọn"}
+                        </span>
+                      </button>
+                      {open ? (
+                        <div className="border-t border-border px-3 pb-3">
+                          <p className="py-3 text-sm text-muted-foreground">{product.description}</p>
+                          <ul className="divide-y divide-border">
+                            {product.variants.map((variant) => {
+                              const qty = quantities[variant.id] ?? 0;
+                              return (
+                                <li key={variant.id} className="flex items-center gap-3 py-3">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-semibold leading-tight text-foreground">{variant.name}</p>
+                                    <p className="text-sm text-accent">
+                                      {variant.requires_quote || variant.price === null
+                                        ? "Liên hệ báo giá"
+                                        : formatVnd(variant.sale_price ?? variant.price)}
+                                    </p>
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <button
+                                      type="button"
+                                      aria-label="Giảm"
+                                      onClick={() => setQty(variant.id, qty - 1)}
+                                      className="flex size-11 items-center justify-center rounded-xl bg-muted"
+                                    >
+                                      <Minus className="size-4" />
+                                    </button>
+                                    <span className="w-8 text-center font-bold">{qty}</span>
+                                    <button
+                                      type="button"
+                                      aria-label="Tăng"
+                                      onClick={() => setQty(variant.id, qty + 1)}
+                                      className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"
+                                    >
+                                      <Plus className="size-4" />
+                                    </button>
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            aria-label="Giảm"
-                            onClick={() => setQty(variant.id, qty - 1)}
-                            className="flex size-11 items-center justify-center rounded-xl bg-muted"
-                          >
-                            <Minus className="size-4" />
-                          </button>
-                          <span className="w-8 text-center font-bold">{qty}</span>
-                          <button
-                            type="button"
-                            aria-label="Tăng"
-                            onClick={() => setQty(variant.id, qty + 1)}
-                            className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"
-                          >
-                            <Plus className="size-4" />
-                          </button>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </section>
             ) : null}
 
-            {step === 2 ? (
+            {step === 3 ? (
               <section className="glass-card space-y-4 rounded-3xl p-5">
+                <div>
+                  <h2 className="text-lg font-extrabold text-primary">Số điện thoại và địa chỉ</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Ảnh đã chọn. Nhập thông tin để nhận mã đơn.</p>
+                </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="name">Họ và tên</Label>
                   <Input
@@ -389,12 +430,15 @@ function OrderPage() {
                   <Label htmlFor="note">Ghi chú</Label>
                   <Textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} />
                 </div>
+                {error ? <p className="text-sm font-semibold text-destructive">{error}</p> : null}
               </section>
             ) : null}
 
-            {step === 3 ? (
+            {step === 2 ? (
               <section className="glass-card rounded-3xl p-5">
-                <label className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-10 text-center">
+                <h2 className="text-lg font-extrabold text-primary">Gửi ảnh gốc</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Số điện thoại và địa chỉ sẽ nhập ở bước sau.</p>
+                <label className="mt-4 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-10 text-center">
                   <UploadCloud className="size-8 text-accent" />
                   <span className="mt-2 font-semibold text-foreground">Chọn ảnh gốc</span>
                   <span className="mt-1 text-xs text-muted-foreground">
@@ -464,7 +508,8 @@ function OrderPage() {
               onBack={() => setStep((s) => Math.max(1, s - 1))}
               onNext={() => setStep((s) => Math.min(3, s + 1))}
               onSubmit={handleSubmit}
-              canNext={step === 1 ? selected.length > 0 : fullName.length > 1 && phone.length > 8}
+              canNext={canNext}
+              hint={canNext ? "" : stepHint}
             />
           </aside>
         </div>
@@ -480,7 +525,8 @@ function OrderPage() {
           onBack={() => setStep((s) => Math.max(1, s - 1))}
           onNext={() => setStep((s) => Math.min(3, s + 1))}
           onSubmit={handleSubmit}
-          canNext={step === 1 ? selected.length > 0 : fullName.length > 1 && phone.length > 8}
+          canNext={canNext}
+          hint={canNext ? "" : stepHint}
         />
       </div>
 
@@ -498,6 +544,7 @@ function Summary({
   busy,
   compact,
   canNext,
+  hint,
   onBack,
   onNext,
   onSubmit,
@@ -508,6 +555,7 @@ function Summary({
   busy: boolean;
   compact?: boolean;
   canNext: boolean;
+  hint?: string;
   onBack: () => void;
   onNext: () => void;
   onSubmit: () => void;
@@ -541,9 +589,10 @@ function Summary({
         <span className="text-accent">{formatVnd(subtotal)}</span>
       </div>
 
+      {hint ? <p className="mt-2 text-center text-xs text-muted-foreground">{hint}</p> : null}
       <div className="mt-3 flex gap-2">
         {step > 1 ? (
-          <Button variant="outline" size="lg" onClick={onBack} className="flex-1">
+          <Button variant="outline" size="lg" onClick={onBack} className="min-h-12 flex-1">
             Quay lại
           </Button>
         ) : null}
@@ -552,16 +601,16 @@ function Summary({
             size="lg"
             onClick={onNext}
             disabled={!canNext}
-            className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
+            className="min-h-12 flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
           >
-            Tiếp tục
+            {step === 1 ? "Gửi ảnh" : "Nhập SĐT"}
           </Button>
         ) : (
           <Button
             size="lg"
             onClick={onSubmit}
-            disabled={busy}
-            className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
+            disabled={busy || !canNext}
+            className="min-h-12 flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
             Gửi đơn

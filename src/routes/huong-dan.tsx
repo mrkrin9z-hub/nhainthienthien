@@ -30,23 +30,23 @@ const GUIDE = [
   {
     title: "Bước 1 — Chọn sản phẩm và quy cách",
     points: [
-      "Chọn ảnh ép gỗ, ảnh thờ, giấy khen ép gỗ hoặc nam châm. Giá lấy từ bảng giá tại tiệm.",
+      "Chọn ảnh ép gỗ, ảnh thờ, giấy khen ép gỗ, ảnh tráng gương hoặc nam châm. Giá lấy từ bảng giá tại tiệm.",
       "Chọn kích thước và số lượng cho từng quy cách.",
     ],
   },
   {
-    title: "Bước 2 — Điền thông tin nhận hàng",
-    points: [
-      "Ghi đúng họ tên và số điện thoại: đây cũng là thông tin dùng để tra cứu đơn.",
-      "Chọn nhận tại xưởng hoặc giao tận nơi kèm địa chỉ chi tiết.",
-    ],
-  },
-  {
-    title: "Bước 3 — Gửi ảnh gốc",
+    title: "Bước 2 — Gửi ảnh gốc",
     points: [
       "Gửi file gốc từ máy ảnh hoặc điện thoại, không chụp lại màn hình.",
       "Định dạng JPG, PNG, WEBP hoặc HEIC. Mỗi ảnh tối đa 10MB khi tiệm chưa kết nối Google Drive.",
       "Ảnh càng lớn (cạnh dài trên 2000px) thì bản in càng sắc nét.",
+    ],
+  },
+  {
+    title: "Bước 3 — Số điện thoại và địa chỉ",
+    points: [
+      "Gửi ảnh xong mới nhập họ tên và số điện thoại. Số này dùng để tra cứu đơn.",
+      "Chọn nhận tại xưởng hoặc giao tận nơi kèm địa chỉ chi tiết.",
     ],
   },
 ];

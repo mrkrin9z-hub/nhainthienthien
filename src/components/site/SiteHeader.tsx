@@ -51,10 +51,10 @@ export function SiteHeader() {
               Tra cứu đơn
             </Link>
           </Button>
-          <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+          <Button asChild className="min-h-11 bg-accent px-3 text-accent-foreground hover:bg-accent/90">
             <Link to="/dat-in">
               <UploadCloud className="size-4" />
-              <span className="hidden sm:inline">Gửi ảnh đặt in</span>
+              Đặt in
             </Link>
           </Button>
         </div>

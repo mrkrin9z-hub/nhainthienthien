@@ -63,3 +63,24 @@ export function minPrice(product: CatalogProduct): number | null {
   const prices = product.variants.map((variant) => variant.price).filter((price): price is number => typeof price === "number");
   return prices.length ? Math.min(...prices) : null;
 }
+
+function variantAmount(variant: CatalogVariant): number | null {
+  if (variant.requires_quote) return null;
+  return variant.sale_price ?? variant.price;
+}
+
+/** Một dòng cho mỗi khổ. Nam châm tủ (một khổ, nhiều gói) thì liệt kê từng gói. */
+export function offerLines(product: CatalogProduct): { label: string; price: number | null; from: boolean }[] {
+  const sized = product.variants.filter((variant) => variant.width && variant.height);
+  const sizes = [...new Set(sized.map((variant) => `${variant.width}×${variant.height}`))];
+  if (sizes.length > 1) {
+    return sizes.map((label) => {
+      const prices = sized
+        .filter((variant) => `${variant.width}×${variant.height}` === label)
+        .map(variantAmount)
+        .filter((price): price is number => price !== null);
+      return { label, price: prices.length ? Math.min(...prices) : null, from: prices.length > 1 };
+    });
+  }
+  return product.variants.map((variant) => ({ label: variant.name, price: variantAmount(variant), from: false }));
+}
