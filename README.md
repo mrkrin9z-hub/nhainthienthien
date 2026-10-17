@@ -132,7 +132,7 @@ Sao lưu hằng ngày dùng khóa cố định `shop_backup:YYYY-MM-DD` theo gi�
 
 Ảnh bìa có số Zalo in sẵn đã bỏ. Ảnh sản phẩm trên web là ảnh mẫu cho đến khi chủ hoặc sale tải ảnh thật ở **Ảnh web** (lưu KV, tối đa 2MB).
 
-Đơn TikTok/Shopee nhập từ file CSV hoặc XLSX ở **Nhập đơn sàn**. Cột nhận: mã đơn, SKU người bán, tên, số lượng, người nhận, điện thoại, địa chỉ, hãng, mã vận đơn, phí ship, COD. SKU sàn map sang mã tiệm; dòng chưa map không tạo đơn. Đơn vào trạng thái Nhận đơn, kho trừ khi chuyển In và Giao. API sau này dùng cùng cổng `MarketplaceOrderAdapter`, chưa gọi.
+Đơn TikTok/Shopee nhập từ file CSV hoặc XLSX ở **Nhập đơn sàn**. Tiêu đề khớp gần đúng (không phân biệt hoa thường, dấu, khoảng trắng). Dòng mô tả dưới tiêu đề TikTok bị bỏ. Số bị che vẫn nhập và ghi SĐT bị ẩn. Đơn Đã hủy / Cancelled không vào sổ. Nhiều dòng cùng mã đơn thành một đơn. Tiền đơn là Order Amount và SKU Subtotal After Discount của sàn; giá niêm yết chỉ để xem lệch. COD khi thanh toán khi giao hàng bằng tổng đơn. SKU sàn map sang mã tiệm; dòng chưa map không tạo đơn. Đơn vào trạng thái Nhận đơn, kho trừ khi chuyển In và Giao. API sau này dùng cùng cổng `MarketplaceOrderAdapter`, chưa gọi.
 
 **Giao hàng** ghi hãng, mã vận đơn, phí ship và COD. **Đối soát COD** cộng theo hãng trong tháng. Tem 100×150mm in từ trình duyệt cho đơn tại tiệm và Facebook. Sản xuất không xuất Excel đơn hoặc tồn kho.
 

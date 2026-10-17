@@ -45,6 +45,7 @@ const PRODUCTION_EXTRA = [
   "kpiBonus",
   "shipFee",
   "codAmount",
+  "listUnitPrice",
 ] as const;
 
 function hiddenFor(role: Role): Set<string> {

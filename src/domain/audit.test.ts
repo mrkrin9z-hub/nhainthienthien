@@ -82,6 +82,7 @@ test("sale và sản xuất không nhận giá vốn, lãi, doanh thu", async ()
   assert.deepEqual(moneyLeaks("production", detail), []);
   assert.equal("total" in detail, false);
   assert.equal("unitPrice" in detail.items[0]!, false);
+  assert.equal("listUnitPrice" in detail.items[0]!, false);
   assert.equal("depositRequired" in detail, false);
   assert.equal("depositPaid" in detail, false);
   const stock = visibleToRole("sale", inventoryView(state, "sale"));

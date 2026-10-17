@@ -69,7 +69,14 @@ function OrderDetailPage() {
                 {item.quantity}× {item.name}
               </span>
               {role === "production" ? null : (
-                <span>{item.lineTotal === null ? "Chưa có giá" : formatMaybe(item.lineTotal)}</span>
+                <span className="text-right">
+                  {item.lineTotal === null ? "Chưa có giá" : formatMaybe(item.lineTotal)}
+                  {item.listUnitPrice != null && item.lineTotal != null ? (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Niêm yết {formatMaybe(item.listUnitPrice * item.quantity)} · Lệch {formatMaybe(item.lineTotal - item.listUnitPrice * item.quantity)}
+                    </span>
+                  ) : null}
+                </span>
               )}
             </li>
           ))}

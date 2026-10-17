@@ -22,7 +22,7 @@ import {
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
-import { EXPECTED_COLUMNS, fileOrderAdapter, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel } from "@/domain/marketplace";
+import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type PlannedItem } from "@/domain/marketplace";
 import { applyRestore, restoreSummary } from "@/domain/restore";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
@@ -216,23 +216,25 @@ export async function publicCatalog() {
 }
 
 function upsertCustomer(state: ShopState, input: { name: string; phone: string; address?: string }) {
-  const phoneNormalized = normalizePhone(input.phone);
-  if (phoneNormalized.length < 8) throw new Error("Số điện thoại chưa đúng.");
+  const parsed = normalizeMarketplacePhone(input.phone);
+  const phoneNormalized = parsed.masked ? `masked:${parsed.phone}` : parsed.phone;
+  if (!parsed.masked && phoneNormalized.length < 8) throw new Error("Số điện thoại chưa đúng.");
   let customer = state.customers.find((c) => c.phoneNormalized === phoneNormalized);
   if (!customer) {
     customer = {
       id: nid(),
       name: input.name.trim(),
-      phone: input.phone.trim(),
+      phone: parsed.masked ? parsed.phone : input.phone.trim(),
       phoneNormalized,
       address: input.address?.trim() ?? "",
-      note: "",
+      note: parsed.masked ? "SĐT bị ẩn" : "",
       createdAt: nowIso(),
     };
     state.customers.push(customer);
   } else {
     if (input.name.trim()) customer.name = input.name.trim();
     if (input.address?.trim()) customer.address = input.address.trim();
+    if (parsed.masked && !customer.note.includes("SĐT bị ẩn")) customer.note = [customer.note, "SĐT bị ẩn"].filter(Boolean).join(". ");
   }
   return customer;
 }
@@ -267,6 +269,25 @@ function buildItems(
       quantity: item.quantity,
       unitPrice,
       lineTotal: unitPrice === null ? null : unitPrice * item.quantity,
+    };
+  });
+}
+
+function marketplaceItems(state: ShopState, channel: Channel, items: PlannedItem[]) {
+  return items.map((item) => {
+    const sku = skuOrThrow(state, item.skuId);
+    const group = state.groups.find((row) => row.id === sku.groupId);
+    const listed = priceOf(state.prices, sku.id, channel)?.price ?? null;
+    const lineTotal = item.platformLineTotal;
+    return {
+      id: nid(),
+      skuId: sku.id,
+      name: item.name || `${group?.name ?? "Sản phẩm"} — ${sku.name}`,
+      skuCode: sku.code,
+      quantity: item.quantity,
+      unitPrice: lineTotal === null || item.quantity <= 0 ? null : Math.round(lineTotal / item.quantity),
+      lineTotal,
+      listUnitPrice: listed,
     };
   });
 }
@@ -1722,7 +1743,17 @@ async function marketplacePlan(state: ShopState, channel: MarketplaceChannel, fi
   const existingIds = state.orders
     .filter((order) => order.channel === channel && order.marketplaceCode)
     .map((order) => order.marketplaceCode);
-  return planMarketplaceImport({ lines, maps, existingIds });
+  const plan = planMarketplaceImport({ lines, maps, existingIds });
+  return {
+    ...plan,
+    orders: plan.orders.map((order) => ({
+      ...order,
+      items: order.items.map((item) => {
+        const listUnitPrice = priceOf(state.prices, item.skuId, channel)?.price ?? null;
+        return { ...item, listUnitPrice, difference: listDifference(item.platformLineTotal, listUnitPrice, item.quantity) };
+      }),
+    })),
+  };
 }
 
 export function marketplaceColumns() {
@@ -1756,13 +1787,9 @@ export async function importMarketplaceFile(
         phone: planned.phone,
         address: planned.address,
       });
-      const items = buildItems(
-        state,
-        input.channel,
-        actor.role,
-        planned.items.map((item) => ({ skuId: item.skuId, quantity: item.quantity })),
-      );
+      const items = marketplaceItems(state, input.channel, planned.items);
       const totals = sumItems(items);
+      const notes = [`Nhập từ file ${input.channel}`, ...planned.flags];
       const order: Order = {
         id: nid(),
         code: nextCode(state),
@@ -1773,7 +1800,7 @@ export async function importMarketplaceFile(
         fulfillment: "delivery",
         address: planned.address,
         customerNote: "",
-        internalNote: `Nhập từ file ${input.channel}`,
+        internalNote: notes.join(". "),
         dueDate: null,
         marketplaceCode: planned.platformOrderId,
         shipping: {
@@ -1785,7 +1812,7 @@ export async function importMarketplaceFile(
         },
         items,
         subtotal: totals.subtotal,
-        total: totals.total,
+        total: planned.orderAmount ?? totals.total,
         depositRequired: 0,
         depositPaid: 0,
         depositMethod: "",
@@ -1796,7 +1823,7 @@ export async function importMarketplaceFile(
         accessTokenHash: "",
         accessToken: "",
         idempotencyKey: `${input.channel}:${planned.platformOrderId}`,
-        createdAt: nowIso(),
+        createdAt: planned.createdAt ?? nowIso(),
         updatedAt: nowIso(),
         completedAt: null,
         files: [],
@@ -1813,7 +1840,7 @@ export async function importMarketplaceFile(
     }
     return made;
   });
-  return { codes, issues: preview.issues, duplicates: preview.duplicates };
+  return { codes, issues: preview.issues, duplicates: preview.duplicates, cancelled: preview.cancelled };
 }
 
 export async function listSkuMaps(actor: Actor) {

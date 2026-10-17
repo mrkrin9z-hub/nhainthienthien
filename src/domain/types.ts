@@ -254,6 +254,8 @@ export type OrderItem = {
   quantity: number;
   unitPrice: number | null;
   lineTotal: number | null;
+  /** Giá niêm yết của tiệm lúc nhập đơn sàn. Giá bán trên đơn là tiền sàn. */
+  listUnitPrice?: number | null;
 };
 
 export type Order = {

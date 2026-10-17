@@ -233,6 +233,7 @@ export function orderDetail(state: ShopState, order: Order, role: Role) {
       ...item,
       unitPrice: showMoney ? item.unitPrice : null,
       lineTotal: showMoney ? item.lineTotal : null,
+      listUnitPrice: showMoney ? (item.listUnitPrice ?? null) : null,
     })),
     subtotal: showMoney ? order.subtotal : null,
     reply: STATUS_REPLY[order.status],

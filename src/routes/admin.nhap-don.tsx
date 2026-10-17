@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteSkuMap, getSkuMaps, importMarketplace, previewMarketplace, storeSkuMap } from "@/lib/admin.functions";
 import { EXPECTED_COLUMNS } from "@/domain/marketplace";
+import { formatMaybe } from "@/lib/brand";
 
 export const Route = createFileRoute("/admin/nhap-don")({
   component: ImportPage,
@@ -48,7 +49,7 @@ function ImportBody() {
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Nhập đơn sàn</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Tải file xuất từ TikTok Shop hoặc Shopee Seller Center (CSV hoặc XLSX). Đơn vào sổ ở trạng thái Nhận đơn, kho trừ khi chuyển sang In và Giao như đơn thường. API sẽ dùng cùng một cổng này khi có khóa ở Kết nối.
+          Tải file xuất từ TikTok Shop hoặc Shopee Seller Center (CSV hoặc XLSX). Dòng mô tả dưới tiêu đề bị bỏ. Số điện thoại bị che vẫn nhập, ghi SĐT bị ẩn. Đơn Đã hủy không vào sổ. Tiền trên đơn là tiền sàn; giá niêm yết chỉ để đối chiếu. Đơn vào trạng thái Nhận đơn, kho trừ khi chuyển sang In và Giao như đơn thường.
         </p>
       </div>
       <section className="glass-card space-y-2 rounded-3xl p-4 text-sm">
@@ -93,7 +94,25 @@ function ImportBody() {
         </Button>
         {plan ? (
           <div className="space-y-2 text-sm">
-            <p>{plan.orders.length} đơn sẽ nhập. {plan.duplicates.length} đơn đã có, bỏ qua. {plan.issues.length} dòng chưa nhập được.</p>
+            <p>
+              {plan.orders.length} đơn sẽ nhập. {plan.duplicates.length} đơn đã có, bỏ qua. {plan.cancelled} đơn đã hủy, bỏ qua. {plan.issues.length} dòng chưa nhập được.
+            </p>
+            {plan.orders.slice(0, 20).map((order) => (
+              <div key={order.platformOrderId} className="rounded-2xl bg-background px-3 py-2">
+                <p className="font-semibold">
+                  {order.platformOrderId} · {order.buyer}
+                  {order.codAmount != null ? ` · COD ${formatMaybe(order.codAmount)}` : ""}
+                  {order.flags.length ? ` · ${order.flags.join(", ")}` : ""}
+                </p>
+                {order.items.map((item, index) => (
+                  <p key={`${order.platformOrderId}-${item.externalSku}-${index}`} className="text-muted-foreground">
+                    {item.quantity}× {item.name || item.externalSku} · Sàn {formatMaybe(item.platformLineTotal)} · Niêm yết{" "}
+                    {item.listUnitPrice === null ? "chưa có" : formatMaybe(item.listUnitPrice * item.quantity)}
+                    {item.difference === null ? "" : ` · Lệch ${formatMaybe(item.difference)}`}
+                  </p>
+                ))}
+              </div>
+            ))}
             {plan.issues.slice(0, 30).map((issue, index) => (
               <p key={`${issue.orderId}-${issue.sku}-${index}`} className="text-destructive">
                 {issue.orderId || "Không mã"} · {issue.sku || "—"} · {issue.reason}
