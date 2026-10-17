@@ -69,13 +69,27 @@ function DashboardPage() {
         </section>
       ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {data.byStatus.map((row) => (
-          <div key={row.status} className="glass-panel rounded-2xl px-4 py-3">
-            <p className="text-xs font-semibold text-muted-foreground">{row.label}</p>
-            <p className="text-2xl font-extrabold text-primary">{row.count}</p>
-          </div>
-        ))}
+      <section>
+        <h2 className="text-lg font-bold text-primary">Quy trình đơn</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Nhận đơn, thiết kế, chờ khách duyệt, in, đóng gói, giao, rồi xong. Đơn hủy không tự mở lại.</p>
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {data.byStatus
+            .filter((row) => row.status !== "huy")
+            .map((row) => (
+              <div key={row.status} className="glass-panel min-w-28 shrink-0 rounded-2xl px-4 py-3">
+                <p className="text-xs font-semibold text-muted-foreground">{row.label}</p>
+                <p className="text-2xl font-extrabold text-primary">{row.count}</p>
+              </div>
+            ))}
+          {data.byStatus
+            .filter((row) => row.status === "huy")
+            .map((row) => (
+              <div key={row.status} className="min-w-28 shrink-0 rounded-2xl bg-destructive/10 px-4 py-3">
+                <p className="text-xs font-semibold text-destructive">{row.label}</p>
+                <p className="text-2xl font-extrabold text-destructive">{row.count}</p>
+              </div>
+            ))}
+        </div>
       </section>
 
       {"queue" in data ? (

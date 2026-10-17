@@ -130,6 +130,24 @@ function OrderDetailPage() {
       ) : null}
 
       <section className="glass-card rounded-3xl p-4">
+        <h2 className="font-bold text-primary">Quy trình</h2>
+        {data.status === "huy" ? (
+          <p className="mt-2 text-sm font-semibold text-destructive">Đơn đang Hủy. Chỉ chủ mở lại, và phải ghi lý do.</p>
+        ) : (
+          <ol className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            {(["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"] as OrderStatus[]).map((status, index) => (
+              <li
+                key={status}
+                className={`min-w-24 shrink-0 rounded-2xl px-3 py-2 text-center text-xs font-bold ${data.status === status ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}
+              >
+                {index + 1}. {STATUS_LABEL[status]}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
+      <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Chuyển bước</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {role === "production"

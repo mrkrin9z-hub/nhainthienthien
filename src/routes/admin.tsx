@@ -20,78 +20,126 @@ export const Route = createFileRoute("/admin")({
   component: AdminLayout,
 });
 
-const NAV: { to: string; label: string; roles: Role[] }[] = [
-  { to: "/admin", label: "Tổng quan", roles: ["owner", "sale", "production"] },
-  { to: "/admin/gia", label: "Bảng giá", roles: ["owner", "sale"] },
-  { to: "/admin/don-hang", label: "Đơn hàng", roles: ["owner", "sale", "production"] },
-  { to: "/admin/khach", label: "Khách", roles: ["owner", "sale"] },
-  { to: "/admin/nhac-khach", label: "Nhắc khách", roles: ["owner", "sale"] },
-  { to: "/admin/kho", label: "Kho", roles: ["owner", "sale", "production"] },
-  { to: "/admin/giao-hang", label: "Giao hàng", roles: ["owner", "sale", "production"] },
-  { to: "/admin/cod", label: "Đối soát COD", roles: ["owner", "sale"] },
-  { to: "/admin/nhap-don", label: "Nhập đơn sàn", roles: ["owner", "sale"] },
-  { to: "/admin/anh", label: "Ảnh web", roles: ["owner", "sale"] },
-  { to: "/admin/cham-cong", label: "Chấm công", roles: ["owner", "sale", "production"] },
-  { to: "/admin/luong", label: "Lương", roles: ["owner", "sale", "production"] },
-  { to: "/admin/loi-nhuan", label: "Lãi lỗ", roles: ["owner"] },
-  { to: "/admin/bao-cao", label: "Báo cáo", roles: ["owner"] },
-  { to: "/admin/kpi", label: "KPI", roles: ["owner", "sale"] },
-  { to: "/admin/nhat-ky", label: "Nhật ký", roles: ["owner"] },
-  { to: "/admin/sao-luu", label: "Sao lưu", roles: ["owner"] },
-  { to: "/admin/ket-noi", label: "Kết nối", roles: ["owner"] },
-  { to: "/admin/tai-khoan", label: "Tài khoản", roles: ["owner", "sale", "production"] },
-  { to: "/admin/cai-dat", label: "Cài đặt", roles: ["owner"] },
+const GROUPS: { title: string; items: { to: string; label: string; roles: Role[] }[] }[] = [
+  {
+    title: "Vận hành",
+    items: [
+      { to: "/admin", label: "Tổng quan", roles: ["owner", "sale", "production"] },
+      { to: "/admin/don-hang", label: "Đơn hàng", roles: ["owner", "sale", "production"] },
+      { to: "/admin/giao-hang", label: "Giao hàng", roles: ["owner", "sale", "production"] },
+      { to: "/admin/cod", label: "Đối soát COD", roles: ["owner", "sale"] },
+      { to: "/admin/nhap-don", label: "Nhập đơn sàn", roles: ["owner", "sale"] },
+    ],
+  },
+  {
+    title: "Khách và hàng",
+    items: [
+      { to: "/admin/khach", label: "Khách hàng", roles: ["owner", "sale"] },
+      { to: "/admin/nhac-khach", label: "Nhắc khách", roles: ["owner", "sale"] },
+      { to: "/admin/gia", label: "Bảng giá", roles: ["owner", "sale"] },
+      { to: "/admin/kho", label: "Kho", roles: ["owner", "sale", "production"] },
+      { to: "/admin/anh", label: "Ảnh web", roles: ["owner", "sale"] },
+    ],
+  },
+  {
+    title: "Nhân sự",
+    items: [
+      { to: "/admin/cham-cong", label: "Chấm công", roles: ["owner", "sale", "production"] },
+      { to: "/admin/luong", label: "Lương", roles: ["owner", "sale", "production"] },
+      { to: "/admin/tai-khoan", label: "Tài khoản", roles: ["owner", "sale", "production"] },
+    ],
+  },
+  {
+    title: "Tài chính",
+    items: [
+      { to: "/admin/loi-nhuan", label: "Thu chi", roles: ["owner"] },
+      { to: "/admin/bao-cao", label: "Báo cáo", roles: ["owner"] },
+      { to: "/admin/kpi", label: "KPI", roles: ["owner", "sale"] },
+    ],
+  },
+  {
+    title: "Hệ thống",
+    items: [
+      { to: "/admin/nhat-ky", label: "Nhật ký", roles: ["owner"] },
+      { to: "/admin/sao-luu", label: "Sao lưu", roles: ["owner"] },
+      { to: "/admin/ket-noi", label: "Kết nối", roles: ["owner"] },
+      { to: "/admin/cai-dat", label: "Cài đặt", roles: ["owner"] },
+    ],
+  },
 ];
 
 function AdminLayout() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
+  const [menuOpen, setMenuOpen] = useState(false);
 
   if (me.isLoading) return <div className="p-10 text-center text-muted-foreground">Đang tải…</div>;
   if (!me.data) return <AdminLogin onDone={() => queryClient.invalidateQueries({ queryKey: ["me"] })} />;
 
   const role = me.data.role;
+  async function logout() {
+    await logoutStaff();
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "me" });
+    await queryClient.invalidateQueries({ queryKey: ["me"] });
+    toast.success("Đã đăng xuất");
+    setMenuOpen(false);
+    router.navigate({ to: "/admin" });
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="glass-panel sticky top-0 z-40">
-        <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center gap-3 px-4 py-2 md:px-6">
-          <Link to="/" className="min-w-0">
-            <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="h-9 w-auto max-w-[150px] object-contain" />
-          </Link>
-          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-            {me.data.name}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="ml-auto min-h-11"
-            onClick={async () => {
-              await logoutStaff();
-              queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "me" });
-              await queryClient.invalidateQueries({ queryKey: ["me"] });
-              toast.success("Đã đăng xuất");
-              router.navigate({ to: "/admin" });
-            }}
-          >
+    <div className="min-h-screen bg-background md:pl-64">
+      {menuOpen ? (
+        <button type="button" className="fixed inset-0 z-40 bg-black/50 md:hidden" aria-label="Đóng menu" onClick={() => setMenuOpen(false)} />
+      ) : null}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[#12182b] text-white transition-transform md:w-64 md:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
+      >
+        <div className="border-b border-white/10 px-4 py-4">
+          <div className="rounded-xl bg-white px-3 py-2">
+            <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="h-8 w-auto max-w-full object-contain" />
+          </div>
+          <p className="mt-3 text-sm font-semibold">{me.data.name}</p>
+          <p className="text-xs text-white/60">Nhận đơn → Thiết kế → In → Giao → Xong</p>
+        </div>
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+          {GROUPS.map((group) => {
+            const items = group.items.filter((item) => item.roles.includes(role));
+            if (items.length === 0) return null;
+            return (
+              <div key={group.title}>
+                <p className="px-3 text-[11px] font-bold tracking-wide text-white/40 uppercase">{group.title}</p>
+                <div className="mt-1 space-y-1">
+                  {items.map((item) => (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      activeOptions={{ exact: item.to === "/admin" }}
+                      activeProps={{ className: "bg-white/15 text-white" }}
+                      className="flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-white/75"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {item.to === "/admin/luong" && role !== "owner" ? "Lương của tôi" : item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </nav>
+        <div className="border-t border-white/10 p-3">
+          <Button variant="outline" className="min-h-11 w-full border-white/20 bg-transparent text-white" onClick={() => void logout()}>
             Đăng xuất
           </Button>
         </div>
-        <nav className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 pb-3 md:px-6">
-          {NAV.filter((item) => item.roles.includes(role)).map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              activeOptions={{ exact: item.to === "/admin" }}
-              activeProps={{ className: "bg-primary text-primary-foreground" }}
-              className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-card px-4 text-sm font-semibold text-foreground/80"
-            >
-              {item.to === "/admin/luong" && role !== "owner" ? "Lương của tôi" : item.label}
-            </Link>
-          ))}
-        </nav>
+      </aside>
+      <header className="sticky top-0 z-30 flex items-center gap-3 border-b bg-background/95 px-4 py-3 md:hidden">
+        <button type="button" className="min-h-11 min-w-11 rounded-xl border text-lg font-bold" aria-label="Mở menu" onClick={() => setMenuOpen(true)}>
+          ☰
+        </button>
+        <p className="min-w-0 truncate text-sm font-bold text-primary">{me.data.name}</p>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+      <main className="mx-auto max-w-6xl px-4 py-6 md:px-8">
         {me.data.mustChangePassword ? (
           <ForcePasswordChange
             onDone={() => {
@@ -153,7 +201,21 @@ function AdminLogin({ onDone }: { onDone: () => void }) {
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="grid min-h-screen md:grid-cols-2">
+      <section className="hidden flex-col justify-between bg-[#12182b] p-10 text-white md:flex">
+        <p className="text-sm font-bold tracking-[0.2em]">NHÀ IN THIÊN THIÊN</p>
+        <div>
+          <h2 className="text-3xl font-extrabold leading-tight">Một sổ cho cả quy trình in.</h2>
+          <ol className="mt-6 space-y-3 text-sm text-white/80">
+            <li>1. Nhận đơn tại quầy, trên web hoặc từ file sàn.</li>
+            <li>2. Thiết kế, gửi khách duyệt.</li>
+            <li>3. In, đóng gói, rồi giao.</li>
+            <li>4. Xong. Chủ xem lãi. Sale xem hoa hồng của mình.</li>
+          </ol>
+        </div>
+        <p className="text-xs text-white/50">Chủ, sale và sản xuất — mỗi người một tài khoản.</p>
+      </section>
+      <div className="flex items-center justify-center bg-background px-4 py-10">
       <form
         className="glass-card w-full max-w-md rounded-3xl p-6"
         onSubmit={async (event) => {
@@ -200,6 +262,7 @@ function AdminLogin({ onDone }: { onDone: () => void }) {
           </Button>
         </div>
       </form>
+      </div>
     </div>
   );
 }
