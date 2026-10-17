@@ -26,6 +26,16 @@ Tài khoản mẫu, mật khẩu chung `ThienThien#2026` (bắt buộc đổi tr
 
 Sale và sản xuất không thấy giá vốn, lãi, lợi nhuận hay tổng doanh thu. Chỉ chủ thấy.
 
+## Hướng dẫn dùng cho anh
+
+1. Mở `/admin`. Lần đầu đăng nhập bằng tài khoản mẫu ở bảng trên. Trang sẽ bắt đặt mật khẩu mới (ít nhất 8 ký tự) trước khi vào sổ.
+2. Vào **Tài khoản**, bật mã 6 số (2 lớp). Lần sau đăng nhập nhập thêm mã trong app xác thực.
+3. Vào **Cài đặt → Tài khoản** để thêm nhân viên. Chọn vai trò chủ, sale hoặc sản xuất. Đưa mật khẩu tạm và bảo họ đổi ở lần đăng nhập đầu.
+4. Vào **Bảng giá** để nhập giá bán còn trống. Vào **Kho** để nhập giá mua vật tư. Vào **Báo cáo** để sửa chi phí cố định từng tháng. Chi phí phát sinh (điện, sửa máy,…) ghi ở **Chi phí và lợi nhuận**. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh.
+5. Đang một người sale thì để **Cài đặt → Cách tính hoa hồng** là **Toàn tiệm**. Khi có từ hai sale, chuyển sang **Theo đơn người đó xử lý**. Hoa hồng tính theo tháng: đến 100 triệu lấy 3%, phần 100–200 triệu lấy 5%, phần trên 200 triệu lấy 7%. Ví dụ 49,1 triệu thì hoa hồng 1.473.000đ.
+6. Đơn TikTok: vào **Nhập đơn sàn**, chọn TikTok, tải file CSV hoặc Excel từ Seller Center. Lần đầu gắn mã SKU trên sàn với mã trong tiệm, rồi nhập. Đơn Shopee làm tương tự.
+7. In tem 100×150: mở đơn tại tiệm hoặc Facebook, bấm **In tem 100×150**, rồi in từ trình duyệt. Đơn TikTok và Shopee dùng tem của sàn, không in tem này.
+
 ## Chỗ ghi sổ và ảnh
 
 Thứ tự sổ đơn:
@@ -114,7 +124,7 @@ Giá túi bọc ảnh, carton, tem nhiệt, phí ship Facebook thật và địn
 
 Ảnh tráng gương hiện trên web. Ép gỗ chỉ có giá từ 40×60. Ảnh thờ và giấy khen chỉ có giá tấm lẻ (ảnh thờ từ 20×30; giấy khen A5, A4, A3). Thời khóa biểu và ảnh lụa có giá trong sổ nhưng nhóm đang ẩn. Nam châm xe chỉ còn 9×19 và 17×22. Gói lụa một vài mức không giảm giá mỗi tấm — sổ giữ đúng số trong file và cảnh báo combo.
 
-Lương sale phương án A: 8.000.000đ (thử việc 85%). Sản xuất: 11.000.000đ. Giờ ca 8:00–18:00. Ngày nghỉ trong tuần để trống vì JD ghi làm hằng ngày; chủ chọn ngày nghỉ trong Cài đặt. Mức trừ đi trễ và vắng để trống cho đến khi chủ nhập.
+Lương sale phương án A: 8.000.000đ (thử việc 85%). Sản xuất: 11.000.000đ. Giờ ca 8:00–18:00. Ngày nghỉ trong tuần để trống vì hợp đồng ghi làm hằng ngày; chủ chọn ngày nghỉ trong Cài đặt. Mức trừ đi trễ và vắng để trống cho đến khi chủ nhập. Hoa hồng sale mặc định tính trên doanh thu đã thu của cả tiệm. Chủ đổi sang theo đơn từng người trong Cài đặt khi có từ hai sale.
 
 Ảnh thẻ và album tắt. Bật trong Cài đặt khi tiệm nhận làm. Số Zalo `0778662227` hiện trên web; tắt ở ô **Hiện số Zalo trên web** trong Cài đặt.
 
@@ -136,7 +146,7 @@ Sao lưu hằng ngày dùng khóa cố định `shop_backup:YYYY-MM-DD` theo gi�
 
 **Khách** gộp theo số điện thoại thật, kể cả khác kênh. Số bị che giữ riêng theo tài khoản sàn. Khách chỉ còn đơn hủy được ẩn, bật lại được. Có thẻ, ghi chú, tổng đã chi, cờ khách quay lại (mặc định từ 2 đơn). **Nhắc khách** liệt kê đơn cuối cách đây ít nhất 60 ngày và ngày giỗ trong 7 ngày tới. Tin nhắn chép tay, không tự gửi. Sale xem khách, không xem giá vốn.
 
-**Báo cáo** (chủ): doanh thu, lãi gộp, lãi ròng sau chi phí cố định (mặc định 29.400.000đ/tháng), hòa vốn, theo ngày/tuần/tháng, kênh, khổ và hàng bán nhiều. **Kho** ước mức dùng 30 ngày và báo đặt hàng khi số ngày tồn dưới ngưỡng từng vật tư (mặc định 7). **KPI** của sale: đơn đã xử lý, doanh thu để tính hoa hồng, thời gian xử lý nếu có mốc đổi trạng thái. Sale chỉ thấy KPI của mình.
+**Báo cáo** (chủ): doanh thu, lãi gộp, chi phí cố định (mặc định 29.400.000đ/tháng), chi phí phát sinh ghi riêng, lãi ròng = lãi gộp − cố định − phát sinh, hòa vốn, theo ngày/tuần/tháng, kênh, khổ và hàng bán nhiều. **Kho** ước mức dùng 30 ngày và báo đặt hàng khi số ngày tồn dưới ngưỡng từng vật tư (mặc định 7). **KPI**, **Tổng quan**, **Lương** và file Excel lương dùng cùng một cách tính hoa hồng. Sale chỉ thấy KPI của mình.
 
 Có thể thêm trang quản trị vào Màn hình chính trên iPhone. Khi mất mạng, máy hiện trang nhắc mở lại.
 

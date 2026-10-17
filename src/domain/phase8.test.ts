@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { moneyLeaks } from "./access.ts";
 import { materialForecast } from "./forecast.ts";
-import { saleKpi } from "./kpi.ts";
+import { kpiForActor, saleKpi } from "./kpi.ts";
 import { businessReport, weekStart } from "./report.ts";
 import { DEFAULT_SETTINGS } from "./seed.ts";
 import type { Material, Movement, Order, ShopState, Sku, Staff } from "./types.ts";
@@ -42,7 +43,24 @@ test("báo cáo: lãi ròng trừ chi phí cố định và tỉ lệ hủy", ()
   assert.equal(report.averageOrder, 100000);
   assert.equal(report.gross, 92600);
   assert.equal(report.fixedSum, 29400000);
+  assert.equal(report.extraSum, 0);
+  assert.deepEqual(report.extras, []);
   assert.equal(report.net, 92600 - 29400000);
+  const withExtra = businessReport(
+    shop({
+      skus: [sku],
+      orders: [done],
+      expenses: [
+        { id: "e1", month: "2026-10", name: "Điện phát sinh", amount: 50000, note: "hóa đơn", at: "", by: null },
+        { id: "e2", month: "2026-09", name: "Tháng trước", amount: 999000, note: "", at: "", by: null },
+      ],
+    }),
+    "2026-10",
+  );
+  assert.equal(withExtra.extraSum, 50000);
+  assert.equal(withExtra.extras[0]?.name, "Điện phát sinh");
+  assert.equal(withExtra.net, 92600 - 29400000 - 50000);
+  assert.equal(withExtra.breakEvenPercent, report.breakEvenPercent);
   assert.equal(report.breakEvenPercent, Math.round((92600 / 29400000) * 1000) / 10);
   assert.equal(report.cancelled, 1);
   assert.equal(report.placed, 2);
@@ -71,38 +89,76 @@ test("dự báo vật tư theo 30 ngày trừ kho", () => {
   assert.equal(row?.reorder, true);
 });
 
-test("KPI sale chỉ tính đơn chính mình xử lý", () => {
-  const state = shop({
-    staff: [
-      { id: "sale-1", name: "Sale A", role: "sale", active: true },
-      { id: "sale-2", name: "Sale B", role: "sale", active: true },
-    ] as Staff[],
-    orders: [
-      {
-        id: "o1",
-        status: "xong",
-        total: 200000,
-        createdAt: "2026-10-05T01:00:00.000Z",
-        history: [
-          { at: "2026-10-05T01:00:00.000Z", from: null, to: "nhan_don", by: "sale-1", note: "" },
-          { at: "2026-10-05T01:30:00.000Z", from: "nhan_don", to: "thiet_ke", by: "sale-1", note: "" },
-        ],
-      } as Order,
-      {
-        id: "o2",
-        status: "xong",
-        total: 900000,
-        createdAt: "2026-10-06T01:00:00.000Z",
-        history: [{ at: "2026-10-06T02:00:00.000Z", from: "nhan_don", to: "in", by: "sale-2", note: "" }],
-      } as Order,
-    ],
-  });
-  const rows = saleKpi(state, "2026-10");
+test("KPI sale: mặc định hoa hồng toàn tiệm, chuyển được theo đơn", () => {
+  const staff = [
+    { id: "sale-1", name: "Sale A", role: "sale", active: true },
+    { id: "sale-2", name: "Sale B", role: "sale", active: true },
+  ] as Staff[];
+  const orders = [
+    {
+      id: "o1",
+      status: "xong",
+      total: 200000,
+      createdAt: "2026-10-05T01:00:00.000Z",
+      updatedAt: "2026-10-05T01:30:00.000Z",
+      completedAt: "2026-10-05T01:30:00.000Z",
+      history: [
+        { at: "2026-10-05T01:00:00.000Z", from: null, to: "nhan_don", by: "sale-1", note: "" },
+        { at: "2026-10-05T01:30:00.000Z", from: "nhan_don", to: "thiet_ke", by: "sale-1", note: "" },
+      ],
+    } as Order,
+    {
+      id: "o2",
+      status: "xong",
+      total: 900000,
+      createdAt: "2026-10-06T01:00:00.000Z",
+      updatedAt: "2026-10-06T02:00:00.000Z",
+      completedAt: "2026-10-06T02:00:00.000Z",
+      history: [{ at: "2026-10-06T02:00:00.000Z", from: "nhan_don", to: "in", by: "sale-2", note: "" }],
+    } as Order,
+  ];
+  const rows = saleKpi(shop({ staff, orders }), "2026-10");
   const mine = rows.find((row) => row.staffId === "sale-1");
   assert.equal(mine?.orders, 1);
-  assert.equal(mine?.commissionRevenue, 200000);
-  assert.equal(mine?.commission, 6000);
+  assert.equal(mine?.basis, "shop");
+  assert.equal(mine?.commissionRevenue, 1100000);
+  assert.equal(mine?.commission, 33000);
   assert.equal(mine?.avgReplyMinutes, 30);
-  assert.equal(rows.find((row) => row.staffId === "sale-2")?.commissionRevenue, 900000);
+  assert.equal(rows.find((row) => row.staffId === "sale-2")?.commissionRevenue, 1100000);
   assert.deepEqual(moneyLeaks("sale", rows), []);
+  const handled = saleKpi(shop({ staff, orders, settings: { ...DEFAULT_SETTINGS, commissionBasis: "handled" } }), "2026-10");
+  assert.equal(handled.find((row) => row.staffId === "sale-1")?.basis, "handled");
+  assert.equal(handled.find((row) => row.staffId === "sale-1")?.commissionRevenue, 200000);
+  assert.equal(handled.find((row) => row.staffId === "sale-1")?.commission, 6000);
+  assert.equal(handled.find((row) => row.staffId === "sale-2")?.commissionRevenue, 900000);
+  assert.equal(handled.find((row) => row.staffId === "sale-2")?.commission, 27000);
+  const own = kpiForActor("sale", "sale-1", rows);
+  assert.equal(own.length, 1);
+  assert.equal(own[0]?.commissionRevenue, null);
+  assert.equal(own[0]?.commission, 33000);
+  assert.equal(kpiForActor("owner", "staff-owner", rows)[0]?.commissionRevenue, 1100000);
+  const ownHandled = kpiForActor("sale", "sale-1", handled);
+  assert.equal(ownHandled[0]?.commissionRevenue, 200000);
+});
+
+test("KPI, tổng quan, lương và Excel gọi cùng commissionForSale", () => {
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  const kpi = read("./kpi.ts");
+  const views = read("./views.ts");
+  const service = read("../server/service.ts");
+  const session = read("../server/session.ts");
+  for (const source of [kpi, views, service]) assert.match(source, /commissionForSale\(/);
+  assert.match(service, /kpiForActor\(/);
+  assert.doesNotMatch(kpi, /commissionOf\(/);
+  assert.doesNotMatch(views, /commissionOf\(/);
+  assert.doesNotMatch(service, /commissionOf\(/);
+  const payroll = service.slice(service.indexOf("function payrollRow"), service.indexOf("export async function payroll"));
+  assert.match(payroll, /commissionForSale\(/);
+  const excel = service.slice(service.indexOf('kind === "payroll"'), service.indexOf('kind === "profit"'));
+  assert.match(excel, /payrollRow\(/);
+  assert.doesNotMatch(excel, /commissionOf\(/);
+  assert.match(service, /loginLocked\(/);
+  assert.match(service, /auth\.fail/);
+  assert.match(service, /imageBytesMatch\(/);
+  assert.match(session, /NODE_ENV !== "development"/);
 });

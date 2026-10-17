@@ -142,6 +142,16 @@ function SettingsBody() {
           ))}
         </div>
         <label className="block text-sm font-semibold">
+          Cách tính hoa hồng
+          <select id="commissionBasis" className="mt-1 min-h-12 w-full rounded-xl border bg-card px-3" defaultValue={data.settings.commissionBasis ?? "shop"}>
+            <option value="shop">Toàn tiệm — một sale làm hết</option>
+            <option value="handled">Theo đơn người đó xử lý — từ hai sale</option>
+          </select>
+          <span className="mt-1 block font-normal text-muted-foreground">
+            Hoa hồng bậc 3% / 5% / 7% tính một lần trên doanh thu đã thu trong tháng. Đang một sale thì để Toàn tiệm. Nếu hai người cùng xử lý một đơn, chế độ theo đơn tính đơn đó cho cả hai.
+          </span>
+        </label>
+        <label className="block text-sm font-semibold">
           Mẫu tin nhắc khách. Chỗ trống: {"{ten}"} {"{so_don}"} {"{ngay}"} {"{dip}"} {"{so_dt}"}. Không tự gửi.
           <textarea id="remindMessage" className="mt-1 min-h-24 w-full rounded-xl border bg-card px-3 py-2" defaultValue={data.settings.remindMessage || DEFAULT_REMIND_MESSAGE} />
         </label>
@@ -169,6 +179,7 @@ function SettingsBody() {
             patch.showAlbum = checked("album");
             patch.groupListed = Object.fromEntries(data.groups.map((group) => [group.id, checked(`g-${group.id}`)]));
             patch.remindMessage = (document.getElementById("remindMessage") as HTMLTextAreaElement).value;
+            patch.commissionBasis = (document.getElementById("commissionBasis") as HTMLSelectElement).value;
             await storeSettings({ data: patch });
             await runRecalc();
             toast.success("Đã lưu cài đặt và tính lại định mức");

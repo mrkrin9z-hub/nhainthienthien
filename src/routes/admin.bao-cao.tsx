@@ -38,7 +38,7 @@ function ReportBody() {
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Báo cáo</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Doanh thu và lãi gộp lấy đơn đã xong. Lãi ròng = lãi gộp − chi phí cố định. Mặc định chi phí cố định 29.400.000đ/tháng.
+          Doanh thu và lãi gộp lấy đơn đã xong. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh. Mặc định chi phí cố định 29.400.000đ/tháng. Chi phí phát sinh ghi ở trang Chi phí và lợi nhuận.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -57,6 +57,7 @@ function ReportBody() {
             <Stat label="Doanh thu" value={formatMaybe(data.revenue)} />
             <Stat label="Lãi gộp" value={data.incomplete ? "Chưa đủ giá vốn" : formatMaybe(data.gross)} />
             <Stat label="Chi phí cố định" value={formatMaybe(data.fixedSum)} />
+            <Stat label="Chi phí phát sinh" value={formatMaybe(data.extraSum)} />
             <Stat label="Lãi ròng" value={data.net === null ? "Chưa đủ số" : formatMaybe(data.net)} />
             <Stat label="Giá trị đơn trung bình" value={data.averageOrder === null ? "—" : formatMaybe(data.averageOrder)} />
             <Stat label="Tỉ lệ hủy" value={data.cancelRate === null ? "—" : `${data.cancelRate}% (${data.cancelled}/${data.placed})`} />
@@ -68,6 +69,20 @@ function ReportBody() {
               <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
             </div>
             <p className="mt-2 text-sm font-semibold">{data.breakEvenPercent === null ? "Chưa đủ lãi gộp để tính." : `${data.breakEvenPercent}%`}</p>
+          </section>
+          <section className="glass-card rounded-3xl p-4">
+            <h2 className="font-bold text-primary">Chi phí phát sinh tháng {month}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Khoản này trừ riêng, không gộp vào chi phí cố định. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh.</p>
+            <ul className="mt-2 space-y-1 text-sm">
+              {data.extras.map((row) => (
+                <li key={`${row.name}-${row.amount}-${row.note}`}>
+                  {row.name}: {formatMaybe(row.amount)}
+                  {row.note ? ` · ${row.note}` : ""}
+                </li>
+              ))}
+              {data.extras.length === 0 ? <li>Tháng này chưa ghi chi phí phát sinh (0đ).</li> : null}
+            </ul>
+            <p className="mt-2 font-semibold">Cộng chi phí phát sinh: {formatMaybe(data.extraSum)}</p>
           </section>
           <section className="glass-card rounded-3xl p-4">
             <h2 className="font-bold text-primary">Theo {grain === "day" ? "ngày" : grain === "week" ? "tuần" : "tháng"}</h2>

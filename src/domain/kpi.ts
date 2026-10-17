@@ -1,12 +1,14 @@
-import { commissionOf, vnParts } from "./calc.ts";
-import type { Order, ShopState } from "./types.ts";
+import { vnParts } from "./calc.ts";
+import { commissionForSale, type CommissionBasis } from "./commission.ts";
+import type { Order, Role, ShopState } from "./types.ts";
 
 export type SaleKpi = {
   staffId: string;
   name: string;
   orders: number;
-  commissionRevenue: number;
+  commissionRevenue: number | null;
   commission: number;
+  basis: CommissionBasis;
   /** Phút từ lúc tạo đơn đến lần sale đổi trạng thái. Null khi chưa có mốc. */
   avgReplyMinutes: number | null;
   timedOrders: number;
@@ -38,17 +40,24 @@ export function saleKpi(state: ShopState, month: string): SaleKpi[] {
         if (order.status === "draft_upload" || order.status === "upload_error") return false;
         return (order.history ?? []).some((entry) => entry.by === person.id && monthOf(entry.at) === month);
       });
-      const paid = handled.filter((order) => order.status === "xong");
-      const commissionRevenue = paid.reduce((sum, order) => sum + (order.total ?? 0), 0);
+      const pay = commissionForSale(state, person.id, month);
       const times = handled.map((order) => replyMinutes(order, person.id)).filter((value): value is number => value !== null);
       return {
         staffId: person.id,
         name: person.name,
         orders: handled.length,
-        commissionRevenue,
-        commission: commissionOf(commissionRevenue, state.settings.commissionTiers),
+        commissionRevenue: pay.revenue,
+        commission: pay.commission,
+        basis: pay.basis,
         avgReplyMinutes: times.length ? Math.round(times.reduce((sum, value) => sum + value, 0) / times.length) : null,
         timedOrders: times.length,
       };
     });
+}
+
+/** Sale không nhận doanh thu cả tiệm. Chế độ theo đơn thì thấy doanh thu đơn mình xử lý. */
+export function kpiForActor(role: Role, staffId: string, rows: SaleKpi[]): SaleKpi[] {
+  const visible = role === "owner" ? rows : rows.filter((row) => row.staffId === staffId);
+  if (role !== "sale") return visible;
+  return visible.map((row) => (row.basis === "shop" ? { ...row, commissionRevenue: null } : row));
 }

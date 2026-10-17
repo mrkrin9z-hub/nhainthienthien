@@ -13,12 +13,75 @@ import {
   stockNeeds,
   walkInPublicOffers,
 } from "./calc.ts";
+import { commissionBasisOf, commissionForSale } from "./commission.ts";
+import { contentDisposition, imageBytesMatch, imageMimeAllowed, servedMime } from "./images.ts";
+import { LOGIN_FAIL_LIMIT, LOGIN_LOCK_MS, loginLocked } from "./login-limit.ts";
 import { buildSeed, DEFAULT_SETTINGS, hashPassword, PBKDF2_ITERATIONS, verifyPassword } from "./seed.ts";
-import type { BomLine, Material, Settings, Sku } from "./types.ts";
+import type { BomLine, Material, Order, Settings, Sku } from "./types.ts";
 
 test("hoa hồng 49.100.000đ là 1.473.000đ", () => {
   const amount = commissionOf(49100000, DEFAULT_SETTINGS.commissionTiers);
   assert.equal(amount, 1473000);
+});
+
+test("hoa hồng bậc tháng: 0, 100tr, 150tr, 200tr, 250tr", () => {
+  const tiers = DEFAULT_SETTINGS.commissionTiers;
+  assert.equal(commissionOf(0, tiers), 0);
+  assert.equal(commissionOf(100_000_000, tiers), 3_000_000);
+  assert.equal(commissionOf(150_000_000, tiers), 5_500_000);
+  assert.equal(commissionOf(200_000_000, tiers), 8_000_000);
+  assert.equal(commissionOf(250_000_000, tiers), 11_500_000);
+});
+
+test("hoa hồng một lần trên cả tháng, toàn tiệm hoặc theo đơn", () => {
+  const orders = [60_000_000, 60_000_000].map((total, index) => ({
+    id: `o${index}`,
+    status: "xong",
+    total,
+    completedAt: "2026-10-10T04:00:00.000Z",
+    updatedAt: "2026-10-10T04:00:00.000Z",
+    history: [{ at: "2026-10-10T04:00:00.000Z", from: null, to: "xong", by: index === 0 ? "sale-1" : "sale-2", note: "" }],
+  })) as Order[];
+  const shopMode = commissionForSale({ orders, settings: DEFAULT_SETTINGS }, "sale-1", "2026-10");
+  assert.equal(commissionBasisOf({}), "shop");
+  assert.equal(shopMode.basis, "shop");
+  assert.equal(shopMode.revenue, 120_000_000);
+  assert.equal(shopMode.commission, 4_000_000);
+  assert.equal(commissionForSale({ orders, settings: DEFAULT_SETTINGS }, "sale-2", "2026-10").revenue, 120_000_000);
+  const handled = { ...DEFAULT_SETTINGS, commissionBasis: "handled" as const };
+  assert.equal(commissionForSale({ orders, settings: handled }, "sale-1", "2026-10").revenue, 60_000_000);
+  assert.equal(commissionForSale({ orders, settings: handled }, "sale-1", "2026-10").commission, 1_800_000);
+  assert.equal(commissionForSale({ orders, settings: handled }, "sale-2", "2026-10").revenue, 60_000_000);
+  const september = [{ ...orders[0]!, completedAt: "2026-09-30T04:00:00.000Z", updatedAt: "2026-09-30T04:00:00.000Z" }];
+  assert.equal(commissionForSale({ orders: september, settings: handled }, "sale-1", "2026-10").revenue, 0);
+});
+
+test("đăng nhập khóa sau 8 lần trong 15 phút", () => {
+  const now = Date.parse("2026-10-17T10:00:00.000Z");
+  const fails = Array.from({ length: LOGIN_FAIL_LIMIT - 1 }, (_, index) => ({ at: new Date(now - index * 1000).toISOString() }));
+  assert.equal(loginLocked(fails, now), false);
+  fails.push({ at: new Date(now).toISOString() });
+  assert.equal(loginLocked(fails, now), true);
+  const stale = fails.map((row, index) => ({ at: new Date(now - LOGIN_LOCK_MS - 1000 - index).toISOString() }));
+  assert.equal(loginLocked(stale, now), false);
+});
+
+test("ảnh tải lên phải đúng loại và tên file không phá header", () => {
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const html = new TextEncoder().encode("<html>");
+  assert.equal(imageMimeAllowed("image/jpeg"), true);
+  assert.equal(imageMimeAllowed("image/svg+xml"), false);
+  assert.equal(imageBytesMatch("image/jpeg", jpeg), true);
+  assert.equal(imageBytesMatch("image/jpeg", html), false);
+  assert.equal(imageBytesMatch("image/png", png), true);
+  assert.equal(imageBytesMatch("image/png", jpeg), false);
+  assert.equal(servedMime("text/html"), "application/octet-stream");
+  assert.equal(servedMime("image/png"), "image/png");
+  const header = contentDisposition('anh"\r\n<script>.jpg');
+  assert.equal(header.includes("\r"), false);
+  assert.equal(header.includes("\n"), false);
+  assert.equal(header.split('"').length, 3);
 });
 
 test("combo sau không được đắt hơn trên mỗi tấm", () => {

@@ -139,8 +139,8 @@ function ImportBody() {
         ) : null}
       </section>
       <section className="glass-card space-y-3 rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Bảng map SKU</h2>
-        <p className="text-sm text-muted-foreground">SKU trên sàn trỏ tới mã của tiệm. Dòng chưa map bị đánh dấu, không tạo đơn.</p>
+        <h2 className="font-bold text-primary">Bảng gắn mã SKU</h2>
+        <p className="text-sm text-muted-foreground">Mã trên sàn trỏ tới mã của tiệm. Dòng chưa gắn mã bị đánh dấu, không tạo đơn.</p>
         <div className="grid gap-2 md:grid-cols-3">
           <Input className="min-h-12" placeholder="SKU trên sàn" value={externalSku} onChange={(e) => setExternalSku(e.target.value)} />
           <select className="min-h-12 rounded-xl border bg-card px-3" value={skuId} onChange={(e) => setSkuId(e.target.value)}>

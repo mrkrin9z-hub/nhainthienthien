@@ -4,12 +4,10 @@ import { visibleToRole } from "@/domain/access";
 import {
   comboPriceError,
   comboWarnings,
-  commissionOf,
   depositFor,
   formulaQty,
   isWeeklyOff,
   kpiTarget,
-  collectedRevenue,
   minutesEarly,
   minutesLate,
   groupIsListed,
@@ -19,7 +17,10 @@ import {
   vnParts,
   walkInListed,
 } from "@/domain/calc";
+import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { workbookXml, type Sheet } from "@/domain/excel";
+import { imageBytesMatch, imageMimeAllowed } from "@/domain/images";
+import { LOGIN_LOCK_MS, loginLocked } from "@/domain/login-limit";
 import { filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
@@ -41,7 +42,7 @@ import type {
   Staff,
 } from "@/domain/types";
 import { CHANNEL_LABEL, STATUS_LABEL } from "@/domain/types";
-import { saleKpi } from "@/domain/kpi";
+import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
 import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
@@ -98,6 +99,24 @@ function audit(state: ShopState, actorId: string | null, action: string, entity:
   if (state.audits.length > 2000) state.audits.length = 2000;
 }
 
+/** Bộ đếm trong một isolate, chặn dồn request trước khi sổ kịp ghi. Không chia sẻ giữa các isolate. */
+const loginFailMemory = new Map<string, string[]>();
+
+function rememberedFails(email: string, now: number): { at: string }[] {
+  const kept = (loginFailMemory.get(email) ?? []).filter((at) => {
+    const stamp = Date.parse(at);
+    return Number.isFinite(stamp) && stamp >= now - LOGIN_LOCK_MS;
+  });
+  loginFailMemory.set(email, kept);
+  return kept.map((at) => ({ at }));
+}
+
+function rememberLoginFail(email: string, at: string) {
+  const kept = rememberedFails(email, Date.parse(at)).map((row) => row.at);
+  kept.push(at);
+  loginFailMemory.set(email, kept);
+}
+
 function assertRole(actor: Actor, roles: Role[]) {
   if (!roles.includes(actor.role)) throw new Error("Không có quyền làm việc này.");
 }
@@ -117,15 +136,37 @@ export async function currentActor(staffId: string | null): Promise<Actor | null
 }
 
 export async function login(email: string, password: string, code?: string): Promise<LoginResult> {
+  const emailKey = email.trim().toLowerCase();
+  const now = Date.now();
   const state = await readState();
-  const staff = state.staff.find((s) => s.email.toLowerCase() === email.trim().toLowerCase() && s.active);
-  if (!staff || !(await verifyPassword(password, staff.passwordHash))) {
+  const persisted = state.audits
+    .filter((item) => item.action === "auth.fail" && item.entity === emailKey)
+    .map((item) => ({ at: item.at }));
+  if (loginLocked(rememberedFails(emailKey, now), now) || loginLocked(persisted, now)) {
+    throw new Error("Đăng nhập sai quá nhiều. Thử lại sau 15 phút.");
+  }
+  const staff = state.staff.find((s) => s.email.toLowerCase() === emailKey && s.active);
+  const passwordOk = Boolean(staff) && (await verifyPassword(password, staff?.passwordHash ?? ""));
+  if (!staff || !passwordOk) {
+    const at = new Date(now).toISOString();
+    rememberLoginFail(emailKey, at);
+    await mutate(async (draft) => {
+      audit(draft, null, "auth.fail", emailKey, null, null);
+    });
     throw new Error("Email hoặc mật khẩu không đúng.");
   }
   if (staff.totpEnabled && staff.totpSecret) {
     if (!code?.trim()) return { needsTotp: true };
-    if (!(await verifyTotp(staff.totpSecret, code))) throw new Error("Mã xác thực không đúng.");
+    if (!(await verifyTotp(staff.totpSecret, code))) {
+      const at = new Date(now).toISOString();
+      rememberLoginFail(emailKey, at);
+      await mutate(async (draft) => {
+        audit(draft, null, "auth.fail", emailKey, null, null);
+      });
+      throw new Error("Mã xác thực không đúng.");
+    }
   }
+  loginFailMemory.delete(emailKey);
   await mutate(async (draft) => {
     audit(draft, staff.id, "auth.login", staff.id, null, { email: staff.email });
   });
@@ -433,8 +474,7 @@ export async function createUploadTicket(input: {
   mimeType: string;
   sizeBytes: number;
 }) {
-  const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"];
-  if (!allowed.includes(input.mimeType.toLowerCase())) throw new Error("Định dạng ảnh không được hỗ trợ.");
+  if (!imageMimeAllowed(input.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
   const limit = await photoByteLimit();
   if (limit !== null && input.sizeBytes > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
   const fileId = nid();
@@ -540,6 +580,9 @@ export async function saveDirectUpload(input: {
 }) {
   const limit = await photoByteLimit();
   if (limit !== null && input.bytes.byteLength > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (!imageMimeAllowed(input.mime) || !imageBytesMatch(input.mime, input.bytes)) {
+    throw new Error("Định dạng ảnh không được hỗ trợ.");
+  }
   await mutate(async (state) => {
     const order = await orderByToken(state, input.orderId, input.accessToken);
     const file = order.files.find((item) => item.id === input.fileId);
@@ -1162,8 +1205,9 @@ function payrollRow(state: ShopState, person: Staff, month: string) {
     if (state.leaves.some((leave) => leave.staffId === person.id && leave.date === day)) return false;
     return !punches.some((punch) => punch.inAt.slice(0, 10) === day);
   }).length;
-  const revenue = person.role === "sale" ? collectedRevenue(state.orders, month) : 0;
-  const commission = person.role === "sale" ? commissionOf(revenue, settings.commissionTiers) : 0;
+  const pay = person.role === "sale" ? commissionForSale(state, person.id, month) : null;
+  const revenue = pay?.revenue ?? 0;
+  const commission = pay?.commission ?? 0;
   const target = kpiTarget(settings.shopOpenDate, month, settings.kpiTargets);
   let deduction: number | null = 0;
   if (lateMinutes > 0) {
@@ -1188,6 +1232,7 @@ function payrollRow(state: ShopState, person: Staff, month: string) {
     absentDays,
     kpiPercent: person.role === "sale" && target > 0 ? Math.round((revenue / target) * 1000) / 10 : null,
     revenue,
+    commissionBasis: pay?.basis ?? null,
   };
 }
 
@@ -1292,9 +1337,7 @@ export async function ownerReport(actor: Actor, month: string, grain: "day" | "w
 
 export async function kpiReport(actor: Actor, month: string) {
   assertRole(actor, ["owner", "sale"]);
-  const rows = saleKpi(await readState(), month);
-  if (actor.role === "owner") return rows;
-  return rows.filter((row) => row.staffId === actor.id);
+  return kpiForActor(actor.role, actor.id, saleKpi(await readState(), month));
 }
 
 export async function saveMonthlyFixed(actor: Actor, month: string, rows: { key: string; amount: number }[]) {
@@ -1425,6 +1468,9 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
     if (typeof patch.marketplaceCutoff === "string") state.settings.marketplaceCutoff = patch.marketplaceCutoff;
     if (typeof patch.marketplaceHandover === "string") state.settings.marketplaceHandover = patch.marketplaceHandover;
     if (typeof patch.remindMessage === "string") state.settings.remindMessage = patch.remindMessage.trim();
+    if (patch.commissionBasis === "shop" || patch.commissionBasis === "handled") {
+      state.settings.commissionBasis = patch.commissionBasis;
+    }
     if (typeof patch.showAnhThe === "boolean") state.settings.showAnhThe = patch.showAnhThe;
     if (typeof patch.showAlbum === "boolean") state.settings.showAlbum = patch.showAlbum;
     if (Array.isArray(patch.weeklyOff)) {
@@ -1637,8 +1683,18 @@ export async function exportWorkbook(actor: Actor, kind: "orders" | "stock" | "m
     sheets.push({
       name: "Luong",
       rows: [
-        ["Nhân viên", "Lương cứng", "Thưởng KPI", "Hoa hồng", "Khấu trừ", "Thực nhận", "Phút trễ", "Ngày vắng"],
-        ...rows.map((row) => [row.name, row.base, row.kpiBonus, row.commission, row.deduction, row.net, row.lateMinutes, row.absentDays]),
+        ["Nhân viên", "Lương cứng", "Thưởng KPI", "Hoa hồng", "Cách tính hoa hồng", "Khấu trừ", "Thực nhận", "Phút trễ", "Ngày vắng"],
+        ...rows.map((row) => [
+          row.name,
+          row.base,
+          row.kpiBonus,
+          row.commission,
+          row.commissionBasis ? commissionBasisLabel(row.commissionBasis) : "",
+          row.deduction,
+          row.net,
+          row.lateMinutes,
+          row.absentDays,
+        ]),
       ],
     });
   }

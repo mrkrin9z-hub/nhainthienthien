@@ -27,6 +27,7 @@ export type PayLine = {
   absentDays: number;
   kpiPercent: number | null;
   revenue?: number;
+  commissionBasis?: "shop" | "handled" | null;
 };
 
 /** Chủ thấy cả bảng. Người khác chỉ thấy dòng của mình, không kèm doanh thu quán. */

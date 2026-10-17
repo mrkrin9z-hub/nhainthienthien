@@ -1,5 +1,14 @@
-const CACHE = "thien-thien-shell-1";
-const SHELL = ["/offline.html", "/manifest.webmanifest", "/brand/icon-192.png", "/brand/icon-512.png", "/brand/apple-touch-icon.png", "/favicon.png"];
+const CACHE = "thien-thien-shell-2";
+const SHELL = [
+  "/offline.html",
+  "/manifest.webmanifest",
+  "/brand/icon-192.png",
+  "/brand/icon-512.png",
+  "/brand/icon-maskable-192.png",
+  "/brand/icon-maskable-512.png",
+  "/brand/apple-touch-icon.png",
+  "/favicon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));

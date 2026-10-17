@@ -64,6 +64,7 @@ export const DEFAULT_SETTINGS: Settings = {
     { upto: 200000000, percent: 5 },
     { upto: null, percent: 7 },
   ],
+  commissionBasis: "shop",
   shopOpenDate: "2026-12-01",
   fileRetentionDays: 180,
   videoRetentionDays: 30,

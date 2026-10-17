@@ -56,7 +56,7 @@ function OrdersPage() {
               {order.customerName} · {order.phone} · {order.channelLabel}
               {order.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
             </p>
-            <p className="text-sm text-muted-foreground">{order.itemSummary}</p>
+            <p className="break-words text-sm text-muted-foreground">{order.itemSummary}</p>
             <p className="mt-1 break-words text-sm font-semibold">{order.total == null ? `${order.fileCount} ảnh` : `${formatMaybe(order.total)} · ${order.fileCount} ảnh`}</p>
           </Link>
         ))}

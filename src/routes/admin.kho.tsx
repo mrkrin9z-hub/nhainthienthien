@@ -31,13 +31,13 @@ function StockPage() {
           <p className="text-sm text-muted-foreground">Tồn đầu kỳ đang là 0. Đếm thực tế rồi nhập. Giá túi, carton, tem để trống.</p>
         </div>
         <div className="flex gap-2">
-          <Button className="min-h-11" variant="outline" onClick={() => markInkOpened().then(() => refresh()).then(() => toast.success("Đã trừ 1 lọ mực"))}>
+          <Button className="min-h-12" variant="outline" onClick={() => markInkOpened().then(() => refresh()).then(() => toast.success("Đã trừ 1 lọ mực"))}>
             Mở lọ mực mới
           </Button>
           {me.data && me.data.role !== "production" ? (
           <Button
             variant="outline"
-            className="min-h-11"
+            className="min-h-12"
             onClick={async () => {
               const file = await downloadExcel({ data: { kind: "stock", month: "all" } });
               download(file.filename, file.xml);
@@ -74,7 +74,7 @@ function StockPage() {
               </p>
             ) : null}
             {owner && material.pendingPrice !== null ? (
-              <Button className="mt-2 min-h-11" onClick={() => approvePrice({ data: { materialId: material.id } }).then(refresh)}>
+              <Button className="mt-2 min-h-12" onClick={() => approvePrice({ data: { materialId: material.id } }).then(refresh)}>
                 Duyệt giá mua
               </Button>
             ) : null}
@@ -131,7 +131,7 @@ function MaterialForms({
           <Input className="h-12 w-full sm:w-28" placeholder="Giá mua" value={price} onChange={(e) => setPrice(e.target.value)} />
           <Input className="col-span-2 h-12 w-full sm:col-span-1 sm:w-32" placeholder="Nơi mua" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
           <Button
-            className="min-h-11"
+            className="min-h-12"
             onClick={async () => {
               await receiveStock({
                 data: {
@@ -154,7 +154,7 @@ function MaterialForms({
         <Input className="h-11 w-28" placeholder="Tồn đếm" value={actual} onChange={(e) => setActual(e.target.value)} />
         <Button
           variant="outline"
-          className="min-h-11"
+          className="min-h-12"
           onClick={async () => {
             await countStock({ data: { materialId: material.id, actual: Number(actual), note: "Kiểm kho" } });
             toast.success("Đã ghi kiểm kho");
@@ -171,7 +171,7 @@ function MaterialForms({
           <Input className="h-11 w-28" placeholder="Ngày chờ hàng" value={leadTime} onChange={(e) => setLeadTime(e.target.value)} />
           <Button
             variant="outline"
-            className="min-h-11"
+            className="min-h-12"
             onClick={async () => {
               await saveMaterial({
                 data: {

@@ -103,7 +103,7 @@ export type Settings = {
   breakevenDay: number;
   workStart: string;
   workEnd: string;
-  /** 0 = Chủ nhật … 6 = Thứ bảy. Trống = làm cả tuần (JD ghi 8:00–18:00 hằng ngày). */
+  /** 0 = Chủ nhật … 6 = Thứ bảy. Trống = làm cả tuần (hợp đồng ghi 8:00–18:00 hằng ngày). */
   weeklyOff: number[];
   lateGraceMinutes: number;
   lateDeductionPerMinute: number | null;
@@ -113,6 +113,8 @@ export type Settings = {
   productionBase: number;
   kpiTargets: number[];
   commissionTiers: { upto: number | null; percent: number }[];
+  /** shop = doanh thu cả tiệm. handled = đơn người đó xử lý. Thiếu thì toàn tiệm. */
+  commissionBasis?: "shop" | "handled";
   shopOpenDate: string;
   fileRetentionDays: number;
   videoRetentionDays: number;

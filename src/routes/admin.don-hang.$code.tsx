@@ -15,6 +15,13 @@ export const Route = createFileRoute("/admin/don-hang/$code")({
 });
 
 const NEXT: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"];
+const PRODUCTION_NEXT: OrderStatus[] = ["in", "dong_goi", "giao"];
+const FILE_KIND: Record<string, string> = {
+  original: "Ảnh gốc",
+  design: "Thiết kế",
+  approval: "Duyệt",
+  packing_video: "Video đóng gói",
+};
 
 function OrderDetailPage() {
   const { code } = Route.useParams();
@@ -45,12 +52,12 @@ function OrderDetailPage() {
           </Button>
         ) : null}
       </div>
-      <p className="text-sm">
+      <p className="break-words text-sm">
         {data.customerName} · {data.phone} · {data.channelLabel} · {data.statusLabel}
         {data.recipientName && data.recipientName !== data.customerName ? ` · Người nhận: ${data.recipientName}` : ""}
         {data.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
       </p>
-      {data.address ? <p className="text-sm">Địa chỉ: {data.address}</p> : null}
+      {data.address ? <p className="break-words text-sm">Địa chỉ: {data.address}</p> : null}
       {data.marketplaceCode ? <p className="text-sm">Mã sàn: {data.marketplaceCode}</p> : null}
       {data.stockWarning ? <p className="rounded-2xl bg-accent/30 px-3 py-2 text-sm font-semibold">{data.stockWarning}</p> : null}
       <p className="text-xs text-muted-foreground">
@@ -121,7 +128,11 @@ function OrderDetailPage() {
 
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Chuyển bước</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {role === "production"
+            ? "Sản xuất chỉ chuyển In, Đóng gói và Giao. Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."
+            : "Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."}
+        </p>
         {role === "owner" ? (
           <label className="mt-2 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
@@ -129,7 +140,7 @@ function OrderDetailPage() {
           </label>
         ) : null}
         <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          {NEXT.map((status) => (
+          {(role === "production" ? PRODUCTION_NEXT : NEXT).map((status) => (
             <Button
               key={status}
               variant={data.status === status ? "default" : "outline"}
@@ -188,7 +199,7 @@ function OrderDetailPage() {
               <a className="font-semibold text-primary" href={`/api/staff/file/${file.id}`}>
                 {file.name}
               </a>
-              <span className="text-muted-foreground"> · {file.kind} · {file.storage}</span>
+              <span className="text-muted-foreground"> · {FILE_KIND[file.kind] ?? file.kind}</span>
             </li>
           ))}
           {data.files.length === 0 ? <li className="text-muted-foreground">Chưa có file.</li> : null}

@@ -32,7 +32,7 @@ function KpiBody() {
       <div>
         <h1 className="text-2xl font-extrabold text-primary">KPI sale</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {me.data?.role === "sale" ? "Chỉ số của bạn." : "Mỗi sale chỉ thấy số của mình. Chủ thấy cả nhóm."} Doanh thu là đơn đã xong mà sale đã xử lý, dùng để tính hoa hồng. Không hiện giá vốn.
+          {me.data?.role === "sale" ? "Chỉ số của bạn." : "Mỗi sale chỉ thấy số của mình. Chủ thấy cả nhóm."} Hoa hồng tính một lần trên doanh thu đã thu trong tháng, bậc 3% đến 100 triệu, 5% từ 100 đến 200 triệu, 7% phần trên 200 triệu. Cách tính do chủ chọn ở Cài đặt. Không hiện giá vốn.
         </p>
       </div>
       <Input className="min-h-12 max-w-xs" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
@@ -42,8 +42,13 @@ function KpiBody() {
         {(kpi.data ?? []).map((row) => (
           <article key={row.staffId} className="glass-card space-y-1 rounded-3xl p-4">
             <h2 className="text-lg font-extrabold text-primary">{row.name}</h2>
-            <p>Đơn đã xử lý: {row.orders}</p>
-            <p>Doanh thu tính hoa hồng: {formatMaybe(row.commissionRevenue)}</p>
+            <p>Đơn đã xử lý trong tháng: {row.orders}</p>
+            <p>Cách tính hoa hồng: {row.basis === "handled" ? "Theo đơn người đó xử lý" : "Toàn tiệm"}</p>
+            {row.commissionRevenue === null ? (
+              <p>Doanh thu toàn tiệm không hiện ở tài khoản sale. Hoa hồng bên dưới đã tính trên số đó.</p>
+            ) : (
+              <p>{row.basis === "handled" ? "Doanh thu đơn người đó xử lý" : "Doanh thu toàn tiệm"}: {formatMaybe(row.commissionRevenue)}</p>
+            )}
             <p>Hoa hồng: {formatMaybe(row.commission)}</p>
             <p>
               Thời gian xử lý:{" "}

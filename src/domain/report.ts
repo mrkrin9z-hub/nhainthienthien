@@ -24,6 +24,8 @@ export type BusinessReport = {
   incomplete: boolean;
   fixedSum: number;
   fixed: { key: string; name: string; amount: number; note: string }[];
+  extraSum: number;
+  extras: { name: string; amount: number; note: string }[];
   net: number | null;
   breakEvenPercent: number | null;
   cancelRate: number | null;
@@ -93,6 +95,10 @@ export function businessReport(state: ShopState, month: string, grain: ReportGra
   const done = state.orders.filter((order) => order.status === "xong" && monthOf(doneStamp(order)) === month);
   const fixed = fixedRows(state, month);
   const fixedSum = fixed.reduce((sum, row) => sum + row.amount, 0);
+  const extras = (state.expenses ?? [])
+    .filter((row) => row.month === month)
+    .map((row) => ({ name: row.name, amount: row.amount, note: row.note }));
+  const extraSum = extras.reduce((sum, row) => sum + row.amount, 0);
 
   let revenue = 0;
   let gross = 0;
@@ -147,7 +153,9 @@ export function businessReport(state: ShopState, month: string, grain: ReportGra
     incomplete,
     fixedSum,
     fixed,
-    net: knownGross === null ? null : knownGross - fixedSum,
+    extraSum,
+    extras,
+    net: knownGross === null ? null : knownGross - fixedSum - extraSum,
     breakEvenPercent: knownGross === null || fixedSum <= 0 ? null : Math.round((knownGross / fixedSum) * 1000) / 10,
     cancelRate: placedOrders.length ? Math.round((cancelled / placedOrders.length) * 1000) / 10 : null,
     cancelled,

@@ -27,7 +27,7 @@ function ClockPage() {
       <h1 className="text-2xl font-extrabold text-primary">Chấm công</h1>
       <p className="text-sm text-muted-foreground">
         Ca {sheet.data?.workStart ?? "08:00"}–{sheet.data?.workEnd ?? "18:00"}. Ngày nghỉ tuần:{" "}
-        {(sheet.data?.weeklyOff ?? []).length === 0 ? "chưa đặt (JD ghi làm hằng ngày, chủ sửa trong Cài đặt)." : sheet.data?.weeklyOff.join(", ")}
+        {(sheet.data?.weeklyOff ?? []).length === 0 ? "chưa đặt (hợp đồng ghi làm hằng ngày, chủ sửa trong Cài đặt)." : sheet.data?.weeklyOff.join(", ")}
       </p>
       <div className="grid grid-cols-2 gap-2">
         <Button

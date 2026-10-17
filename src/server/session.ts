@@ -10,7 +10,7 @@ export function sessionConfig() {
       httpOnly: true,
       path: "/",
       sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV !== "development",
     },
   };
 }

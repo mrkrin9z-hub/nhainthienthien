@@ -61,7 +61,7 @@ function ProfitBody() {
             <Stat label="Doanh thu đơn xong" value={formatMaybe(data.revenue)} />
             <Stat label="Lãi gộp" value={data.incomplete ? "Chưa đủ giá vốn" : formatMaybe(data.gross)} />
             <Stat label="Chi phí cố định" value={formatMaybe(data.fixedSum)} />
-            <Stat label="Phát sinh" value={formatMaybe(data.extraSum)} />
+            <Stat label="Chi phí phát sinh" value={formatMaybe(data.extraSum)} />
             <Stat label="Lợi nhuận" value={data.profit === null ? "Chưa đủ số" : formatMaybe(data.profit)} />
             <Stat label="Hòa vốn" value={data.breakevenPercent === null ? "—" : `${data.breakevenPercent}%`} />
           </section>

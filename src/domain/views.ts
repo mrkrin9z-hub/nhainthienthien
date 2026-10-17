@@ -1,10 +1,5 @@
-import {
-  collectedRevenue,
-  commissionOf,
-  kpiTarget,
-  quoteSku,
-  vnParts,
-} from "./calc.ts";
+import { kpiTarget, quoteSku, vnParts } from "./calc.ts";
+import { commissionForSale } from "./commission.ts";
 import { materialForecast } from "./forecast.ts";
 import { orderShipping } from "./shipping.ts";
 import type { Order, OrderStatus, Role, ShopState } from "./types.ts";
@@ -65,7 +60,7 @@ export function fixedTotal(state: ShopState, month: string): number {
 }
 
 export function extraTotal(state: ShopState, month: string): number {
-  return state.expenses.filter((row) => row.month === month).reduce((sum, row) => sum + row.amount, 0);
+  return (state.expenses ?? []).filter((row) => row.month === month).reduce((sum, row) => sum + row.amount, 0);
 }
 
 export function buildDashboard(state: ShopState, actor: Viewer) {
@@ -99,7 +94,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     };
   }
   if (actor.role === "sale") {
-    const revenue = collectedRevenue(state.orders, clock.month);
+    const pay = commissionForSale(state, actor.id, clock.month);
     const target = kpiTarget(state.settings.shopOpenDate, clock.month, state.settings.kpiTargets);
     return {
       role: actor.role,
@@ -110,9 +105,9 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
       onShift,
       clockedIn: Boolean(mineOpen),
       orders: visible.slice(0, 12).map((order) => orderSummary(state, order, actor.role)),
-      kpiPercent: target > 0 ? Math.round((revenue / target) * 1000) / 10 : null,
-      commission: commissionOf(revenue, state.settings.commissionTiers),
-      kpiMonthLabel: `Mốc hòa vốn tháng ${clock.month} không hiện doanh thu.`,
+      kpiPercent: target > 0 ? Math.round((pay.revenue / target) * 1000) / 10 : null,
+      commission: pay.commission,
+      commissionBasis: pay.basis,
     };
   }
   const doneMonth = state.orders.filter((order) => order.status === "xong" && (order.completedAt ?? "").slice(0, 7) === clock.month);

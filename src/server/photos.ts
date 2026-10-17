@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { imageBytesMatch } from "@/domain/images";
 import { onWorkers, shopKv } from "@/server/bindings";
 
 const PREFIX = "product_photo:";
@@ -13,6 +14,7 @@ export function photoSlug(slug: string): string {
 export async function writeProductPhoto(slug: string, bytes: Uint8Array, mime: string): Promise<void> {
   photoSlug(slug);
   if (!["image/jpeg", "image/png", "image/webp"].includes(mime)) throw new Error("Chỉ nhận JPG, PNG hoặc WEBP.");
+  if (!imageBytesMatch(mime, bytes)) throw new Error("Nội dung file không khớp định dạng ảnh.");
   if (bytes.byteLength > MAX_BYTES) throw new Error("Ảnh sản phẩm tối đa 2MB.");
   const kv = await shopKv();
   if (kv) {
