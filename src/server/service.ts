@@ -15,6 +15,7 @@ import {
   groupIsListed,
   priceOf,
   quoteSku,
+  isProductionStep,
   statusChangeError,
   vnParts,
   walkInListed,
@@ -22,7 +23,7 @@ import {
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed } from "@/domain/images";
-import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_LOCK_MS, loginFailKey, loginLocked } from "@/domain/login-limit";
+import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
 import { filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
@@ -47,6 +48,8 @@ import { CHANNEL_LABEL, STATUS_LABEL } from "@/domain/types";
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
+import { getRequest } from "@tanstack/react-start/server";
+
 import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
 import { listBackups, readBackup, writeManualBackup } from "@/server/store";
 import { clearProductPhoto, readProductPhoto, writeProductPhoto } from "@/server/photos";
@@ -96,52 +99,96 @@ export function prettyPhone(digits: string): string {
   return d;
 }
 
+const LOCKTEST_EMAIL = "khongtontai-locktest@example.invalid";
+
 function audit(state: ShopState, actorId: string | null, action: string, entity: string, before: unknown, after: unknown) {
+  if (state.audits.some((item) => item.action === "auth.fail" && item.entity === LOCKTEST_EMAIL)) {
+    state.audits = state.audits.filter((item) => !(item.action === "auth.fail" && item.entity === LOCKTEST_EMAIL));
+  }
   state.audits.unshift({ id: nid(), at: nowIso(), actorId, action, entity, before, after });
   if (state.audits.length > 2000) state.audits.length = 2000;
 }
 
-/** Đếm trong isolate này để chặn dồn request. Khi có SHOP_KV, khóa login_fail mới là bộ đếm dùng chung. */
+/** Đếm trong isolate này khi chưa có SHOP_KV, và chặn dồn request trước khi KV kịp thấy bản ghi. */
 const loginFailMemory = new Map<string, string[]>();
 
-function rememberedFails(email: string, now: number): { at: string }[] {
-  const kept = (loginFailMemory.get(email) ?? []).filter((at) => {
+function memoryFailCount(key: string, now: number): number {
+  const kept = (loginFailMemory.get(key) ?? []).filter((at) => {
     const stamp = Date.parse(at);
-    return Number.isFinite(stamp) && stamp >= now - LOGIN_LOCK_MS;
+    return Number.isFinite(stamp) && stamp >= now - LOGIN_LOCK_MS && stamp <= now;
   });
-  loginFailMemory.set(email, kept);
-  return kept.map((at) => ({ at }));
+  loginFailMemory.set(key, kept);
+  return kept.length;
 }
 
-function rememberLoginFail(email: string, at: string) {
-  const kept = rememberedFails(email, Date.parse(at)).map((row) => row.at);
+function rememberFail(key: string, at: string) {
+  const now = Date.parse(at);
+  const kept = (loginFailMemory.get(key) ?? []).filter((stamp) => {
+    const parsed = Date.parse(stamp);
+    return Number.isFinite(parsed) && parsed >= now - LOGIN_LOCK_MS && parsed <= now;
+  });
   kept.push(at);
-  loginFailMemory.set(email, kept);
+  loginFailMemory.set(key, kept);
 }
 
-/** Khi có SHOP_KV, số lần sai nằm ở khóa login_fail:<email>, hết hạn sau 15 phút, dùng chung mọi isolate. */
-async function kvLoginFailCount(email: string): Promise<number> {
+async function kvFailCount(key: string): Promise<number> {
   const kv = await shopKv();
   if (!kv) return 0;
-  const raw = await kv.get(loginFailKey(email), "text");
+  const raw = await kv.get(key, "text");
   const count = Number(raw ?? "0");
   return Number.isInteger(count) && count > 0 ? count : 0;
 }
 
-async function bumpLoginFail(email: string, at: string) {
-  rememberLoginFail(email, at);
+async function failCount(key: string, now: number): Promise<number> {
+  return Math.max(memoryFailCount(key, now), await kvFailCount(key));
+}
+
+/** Ghi bộ đếm. Không ghi lại khi đã khóa, để khóa KV tự hết hạn 15 phút sau lần khóa. */
+async function bumpFail(key: string, at: string, limit: number): Promise<{ count: number; crossed: boolean }> {
+  const now = Date.parse(at);
+  const before = await failCount(key, now);
+  if (before >= limit) return { count: before, crossed: false };
+  rememberFail(key, at);
+  const stored = await kvFailCount(key);
+  if (stored >= limit) return { count: stored, crossed: false };
+  const next = Math.max(stored + 1, memoryFailCount(key, now));
   const kv = await shopKv();
-  if (!kv) return;
-  const count = await kvLoginFailCount(email);
-  const memory = rememberedFails(email, Date.parse(at)).length;
-  const next = Math.max(count + 1, memory);
-  await kv.put(loginFailKey(email), String(next), { expirationTtl: LOGIN_FAIL_TTL_SECONDS });
+  if (kv) await kv.put(key, String(next), { expirationTtl: LOGIN_FAIL_TTL_SECONDS });
+  return { count: next, crossed: next >= limit };
 }
 
 async function clearLoginFail(email: string) {
-  loginFailMemory.delete(email);
+  loginFailMemory.delete(loginFailKey(email));
   const kv = await shopKv();
   if (kv) await kv.delete(loginFailKey(email));
+}
+
+function clientIp(): string {
+  try {
+    const headers = getRequest()?.headers;
+    if (!headers) return "unknown";
+    const cf = headers.get("cf-connecting-ip");
+    if (cf?.trim()) return loginIp(cf);
+    const forwarded = headers.get("x-forwarded-for")?.split(",")[0];
+    if (forwarded?.trim()) return loginIp(forwarded);
+  } catch {
+    // Ngoài một request HTTP.
+  }
+  return "unknown";
+}
+
+/** Mỗi lần sai chỉ tăng khóa KV. shop_state chỉ bị ghi khi lần này chạm ngưỡng khóa. */
+async function noteLoginFailure(email: string, ip: string): Promise<void> {
+  const at = new Date().toISOString();
+  const emailFail = await bumpFail(loginFailKey(email), at, LOGIN_FAIL_LIMIT);
+  const ipFail = await bumpFail(loginFailIpKey(ip), at, LOGIN_IP_FAIL_LIMIT);
+  const emailLocked = emailFail.crossed;
+  const ipLocked = ipFail.crossed;
+  if (!emailLocked && !ipLocked) return;
+  const scope = emailLocked && ipLocked ? "both" : emailLocked ? "email" : "ip";
+  await mutate(async (draft) => {
+    audit(draft, null, "auth.lock", email, null, { ip, scope });
+  });
 }
 
 function assertRole(actor: Actor, roles: Role[]) {
@@ -164,33 +211,22 @@ export async function currentActor(staffId: string | null): Promise<Actor | null
 
 export async function login(email: string, password: string, code?: string): Promise<LoginResult> {
   const emailKey = email.trim().toLowerCase();
+  const ip = clientIp();
   const now = Date.now();
-  const state = await readState();
-  const persisted = state.audits
-    .filter((item) => item.action === "auth.fail" && item.entity === emailKey)
-    .map((item) => ({ at: item.at }));
-  const kvFails = await kvLoginFailCount(emailKey);
-  if (loginLocked(rememberedFails(emailKey, now), now) || kvFails >= LOGIN_FAIL_LIMIT || loginLocked(persisted, now)) {
+  if ((await failCount(loginFailKey(emailKey), now)) >= LOGIN_FAIL_LIMIT || (await failCount(loginFailIpKey(ip), now)) >= LOGIN_IP_FAIL_LIMIT) {
     throw new Error("Đăng nhập sai quá nhiều. Thử lại sau 15 phút.");
   }
+  const state = await readState();
   const staff = state.staff.find((s) => s.email.toLowerCase() === emailKey && s.active);
   const passwordOk = Boolean(staff) && (await verifyPassword(password, staff?.passwordHash ?? ""));
   if (!staff || !passwordOk) {
-    const at = new Date(now).toISOString();
-    await bumpLoginFail(emailKey, at);
-    await mutate(async (draft) => {
-      audit(draft, null, "auth.fail", emailKey, null, null);
-    });
+    await noteLoginFailure(emailKey, ip);
     throw new Error("Email hoặc mật khẩu không đúng.");
   }
   if (staff.totpEnabled && staff.totpSecret) {
     if (!code?.trim()) return { needsTotp: true };
     if (!(await verifyTotp(staff.totpSecret, code))) {
-      const at = new Date(now).toISOString();
-      await bumpLoginFail(emailKey, at);
-      await mutate(async (draft) => {
-        audit(draft, null, "auth.fail", emailKey, null, null);
-      });
+      await noteLoginFailure(emailKey, ip);
       throw new Error("Mã xác thực không đúng.");
     }
   }
@@ -696,7 +732,7 @@ export async function listOrders(actor: Actor) {
   const state = await readState();
   return visibleToRole(actor.role, {
     orders: state.orders
-      .filter((order) => order.status !== "draft_upload")
+      .filter((order) => order.status !== "draft_upload" && (actor.role !== "production" || isProductionStep(order.status)))
       .map((order) => orderSummary(state, order, actor.role)),
   });
 }
@@ -775,10 +811,13 @@ export async function setOrderStatus(
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
     refreshDeposit(state, order);
+    const reason = input.note.trim();
     const blocked = statusChangeError({
       role: actor.role,
       ownerOverride: Boolean(input.ownerOverride),
+      current: order.status,
       next: input.status,
+      reason,
       depositRequired: order.depositRequired,
       depositPaid: order.depositPaid,
     });
@@ -789,8 +828,9 @@ export async function setOrderStatus(
     order.updatedAt = nowIso();
     if (input.status === "xong") order.completedAt = nowIso();
     else if (from === "xong") order.completedAt = null;
-    order.history.push({ at: nowIso(), from, to: input.status, by: actor.id, note: input.note.trim() });
-    audit(state, actor.id, "order.status", order.id, { status: from }, { status: input.status });
+    order.history.push({ at: nowIso(), from, to: input.status, by: actor.id, note: reason });
+    const reopening = (from === "huy" || from === "xong") && input.status !== from;
+    audit(state, actor.id, "order.status", order.id, { status: from }, reopening ? { status: input.status, reason } : { status: input.status });
   });
 }
 

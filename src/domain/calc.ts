@@ -316,6 +316,13 @@ export function statusRank(status: OrderStatus): number {
 
 const DEPOSIT_GATE: OrderStatus[] = ["thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
 
+/** Sản xuất chỉ thấy và chỉ chuyển giữa ba bước này. */
+export const PRODUCTION_STEPS = ["in", "dong_goi", "giao"] as const;
+
+export function isProductionStep(status: string): boolean {
+  return (PRODUCTION_STEPS as readonly string[]).includes(status);
+}
+
 export function depositBlocks(status: OrderStatus, depositRequired: number | null, depositPaid: number): boolean {
   if (!DEPOSIT_GATE.includes(status)) return false;
   if (depositRequired === null) return true;
@@ -326,12 +333,19 @@ export function depositBlocks(status: OrderStatus, depositRequired: number | nul
 export function statusChangeError(input: {
   role: "owner" | "sale" | "production";
   ownerOverride: boolean;
+  current: OrderStatus;
   next: OrderStatus;
+  reason?: string;
   depositRequired: number | null;
   depositPaid: number;
 }): string | null {
-  if (input.role === "production" && !["in", "dong_goi", "giao"].includes(input.next)) {
-    return "Sản xuất chỉ chuyển các bước in, đóng gói và giao.";
+  const reopening = (input.current === "huy" || input.current === "xong") && input.next !== input.current;
+  if (reopening) {
+    if (input.role !== "owner") return "Chỉ chủ mở lại đơn đã hủy hoặc đã xong.";
+    if (!input.reason?.trim()) return "Mở lại đơn đã hủy hoặc đã xong cần ghi lý do.";
+  }
+  if (input.role === "production" && (!isProductionStep(input.current) || !isProductionStep(input.next))) {
+    return "Sản xuất chỉ chuyển đơn đang in, đóng gói hoặc giao giữa ba bước đó.";
   }
   if (depositBlocks(input.next, input.depositRequired, input.depositPaid) && !(input.role === "owner" && input.ownerOverride)) {
     if (input.depositRequired === null) {

@@ -43,6 +43,9 @@ function OrdersPage() {
           ) : null}
         </div>
       </div>
+      {me.data?.role === "production" ? (
+        <p className="text-sm text-muted-foreground">Chỉ hiện đơn đang In, Đóng gói hoặc Giao.</p>
+      ) : null}
       <div className="grid gap-3">
         {(orders.data?.orders ?? []).map((order) => (
           <Link key={order.id} to="/admin/don-hang/$code" params={{ code: order.code }} className="glass-card block rounded-3xl p-4">
@@ -60,7 +63,13 @@ function OrdersPage() {
             <p className="mt-1 break-words text-sm font-semibold">{order.total == null ? `${order.fileCount} ảnh` : `${formatMaybe(order.total)} · ${order.fileCount} ảnh`}</p>
           </Link>
         ))}
-        {orders.data && orders.data.orders.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có đơn. Đơn trên web sẽ hiện ở đây sau khi khách gửi ảnh.</p> : null}
+        {orders.data && orders.data.orders.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {me.data?.role === "production"
+              ? "Không có đơn đang In, Đóng gói hoặc Giao."
+              : "Chưa có đơn. Đơn trên web sẽ hiện ở đây sau khi khách gửi ảnh."}
+          </p>
+        ) : null}
       </div>
     </div>
   );

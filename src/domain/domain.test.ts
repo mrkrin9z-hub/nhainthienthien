@@ -18,7 +18,7 @@ import {
 } from "./calc.ts";
 import { commissionBasisOf, commissionForSale } from "./commission.ts";
 import { contentDisposition, imageBytesMatch, imageMimeAllowed, servedMime } from "./images.ts";
-import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_LOCK_MS, loginFailKey, loginLocked } from "./login-limit.ts";
+import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginLocked } from "./login-limit.ts";
 import { vnBackupDay } from "./guard.ts";
 import { buildSeed, DEFAULT_SETTINGS, hashPassword, PBKDF2_ITERATIONS, verifyPassword } from "./seed.ts";
 import type { BomLine, Material, Order, Settings, Sku } from "./types.ts";
@@ -84,6 +84,10 @@ test("đăng nhập khóa sau 8 lần trong 15 phút", () => {
   assert.equal(loginLocked(stale, now), false);
   assert.equal(loginFailKey("Sale@NhaIn.local"), "login_fail:sale@nhain.local");
   assert.equal(LOGIN_FAIL_TTL_SECONDS, 15 * 60);
+  assert.equal(LOGIN_IP_FAIL_LIMIT, 30);
+  assert.equal(loginFailIpKey(" 203.0.113.8 "), "login_fail_ip:203.0.113.8");
+  assert.equal(loginFailIpKey("bad\rip"), "login_fail_ip:badip");
+  assert.equal(loginFailIpKey("   "), "login_fail_ip:unknown");
 });
 
 test("ảnh tải lên phải đúng loại và tên file không phá header", () => {

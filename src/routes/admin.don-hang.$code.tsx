@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
 import { changeStatus, getMe, getOrderDetail, recordDeposit, saveNote, saveReprint, storeShipping } from "@/lib/admin.functions";
+import { isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
 import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-hang/$code")({
@@ -15,7 +16,6 @@ export const Route = createFileRoute("/admin/don-hang/$code")({
 });
 
 const NEXT: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"];
-const PRODUCTION_NEXT: OrderStatus[] = ["in", "dong_goi", "giao"];
 const FILE_KIND: Record<string, string> = {
   original: "Ảnh gốc",
   design: "Thiết kế",
@@ -33,8 +33,11 @@ function OrderDetailPage() {
   const [method, setMethod] = useState("chuyển khoản");
   const [override, setOverride] = useState(false);
   const [reason, setReason] = useState("");
+  const [reopenReason, setReopenReason] = useState("");
   const data = order.data;
   const role = me.data?.role;
+  const closed = data?.status === "huy" || data?.status === "xong";
+  const productionCanMove = Boolean(data && role === "production" && isProductionStep(data.status));
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["order", code] });
@@ -130,8 +133,14 @@ function OrderDetailPage() {
         <h2 className="font-bold text-primary">Chuyển bước</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {role === "production"
-            ? "Sản xuất chỉ chuyển In, Đóng gói và Giao. Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."
-            : "Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."}
+            ? productionCanMove
+              ? "Sản xuất chỉ chuyển đơn đang In, Đóng gói hoặc Giao giữa ba bước đó. Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."
+              : "Đơn này không nằm ở In, Đóng gói hoặc Giao. Sản xuất không chuyển bước."
+            : closed && role === "owner"
+              ? "Mở lại đơn đã hủy hoặc đã xong cần ghi lý do. Lý do được lưu vào lịch sử."
+              : closed
+                ? "Đơn đã hủy hoặc đã xong. Chỉ chủ mở lại, và phải ghi lý do."
+                : "Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."}
         </p>
         {role === "owner" ? (
           <label className="mt-2 flex items-center gap-2 text-sm">
@@ -139,16 +148,27 @@ function OrderDetailPage() {
             Chủ bỏ qua điều kiện cọc
           </label>
         ) : null}
+        {role === "owner" && closed ? (
+          <Textarea className="mt-2" placeholder="Lý do mở lại" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} />
+        ) : null}
         <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          {(role === "production" ? PRODUCTION_NEXT : NEXT).map((status) => (
+          {(role === "production" ? (productionCanMove ? [...PRODUCTION_STEPS] : []) : closed && role !== "owner" ? [] : NEXT).map((status) => (
             <Button
               key={status}
               variant={data.status === status ? "default" : "outline"}
               className="min-h-12 w-full sm:w-auto"
               onClick={async () => {
+                const reopening = closed && status !== data.status;
+                if (reopening && !reopenReason.trim()) {
+                  toast.error("Mở lại đơn đã hủy hoặc đã xong cần ghi lý do.");
+                  return;
+                }
                 try {
-                  await changeStatus({ data: { orderId: data.id, status, note: "", ownerOverride: override } });
+                  await changeStatus({
+                    data: { orderId: data.id, status, note: reopening ? reopenReason.trim() : "", ownerOverride: override },
+                  });
                   toast.success(STATUS_LABEL[status]);
+                  if (reopening) setReopenReason("");
                   await refresh();
                 } catch (error) {
                   toast.error((error as Error).message);
