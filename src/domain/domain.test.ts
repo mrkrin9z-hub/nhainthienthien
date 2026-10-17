@@ -4,8 +4,11 @@ import test from "node:test";
 import {
   comboPriceError,
   comboWarnings,
+  collectedRevenue,
   commissionOf,
   depositFor,
+  vnMonth,
+  vnYmd,
   formulaQty,
   quoteSku,
   rollMeters,
@@ -15,7 +18,8 @@ import {
 } from "./calc.ts";
 import { commissionBasisOf, commissionForSale } from "./commission.ts";
 import { contentDisposition, imageBytesMatch, imageMimeAllowed, servedMime } from "./images.ts";
-import { LOGIN_FAIL_LIMIT, LOGIN_LOCK_MS, loginLocked } from "./login-limit.ts";
+import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_LOCK_MS, loginFailKey, loginLocked } from "./login-limit.ts";
+import { vnBackupDay } from "./guard.ts";
 import { buildSeed, DEFAULT_SETTINGS, hashPassword, PBKDF2_ITERATIONS, verifyPassword } from "./seed.ts";
 import type { BomLine, Material, Order, Settings, Sku } from "./types.ts";
 
@@ -56,6 +60,20 @@ test("hoa hồng một lần trên cả tháng, toàn tiệm hoặc theo đơn",
   assert.equal(commissionForSale({ orders: september, settings: handled }, "sale-1", "2026-10").revenue, 0);
 });
 
+test("đơn xong 23:30 ngày 31/10 giờ Việt Nam thuộc tháng 10", () => {
+  const at = "2026-10-31T16:30:00.000Z";
+  assert.equal(vnMonth(at), "2026-10");
+  assert.equal(vnYmd(at), "2026-10-31");
+  assert.equal(vnBackupDay(new Date(at)), "2026-10-31");
+  const order = { status: "xong", total: 50000, completedAt: at, updatedAt: at } as Order;
+  assert.equal(collectedRevenue([order], "2026-10"), 50000);
+  assert.equal(collectedRevenue([order], "2026-11"), 0);
+  const nextMorningUtc = "2026-10-31T17:30:00.000Z";
+  assert.equal(vnMonth(nextMorningUtc), "2026-11");
+  assert.equal(collectedRevenue([{ ...order, completedAt: nextMorningUtc, updatedAt: nextMorningUtc }], "2026-10"), 0);
+  assert.equal(collectedRevenue([{ ...order, completedAt: nextMorningUtc, updatedAt: nextMorningUtc }], "2026-11"), 50000);
+});
+
 test("đăng nhập khóa sau 8 lần trong 15 phút", () => {
   const now = Date.parse("2026-10-17T10:00:00.000Z");
   const fails = Array.from({ length: LOGIN_FAIL_LIMIT - 1 }, (_, index) => ({ at: new Date(now - index * 1000).toISOString() }));
@@ -64,6 +82,8 @@ test("đăng nhập khóa sau 8 lần trong 15 phút", () => {
   assert.equal(loginLocked(fails, now), true);
   const stale = fails.map((row, index) => ({ at: new Date(now - LOGIN_LOCK_MS - 1000 - index).toISOString() }));
   assert.equal(loginLocked(stale, now), false);
+  assert.equal(loginFailKey("Sale@NhaIn.local"), "login_fail:sale@nhain.local");
+  assert.equal(LOGIN_FAIL_TTL_SECONDS, 15 * 60);
 });
 
 test("ảnh tải lên phải đúng loại và tên file không phá header", () => {

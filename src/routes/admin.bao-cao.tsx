@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { vnMonth } from "@/domain/calc";
 import { formatMaybe } from "@/lib/brand";
 import { getReport, saveFixedMonth } from "@/lib/admin.functions";
 
@@ -14,7 +15,7 @@ export const Route = createFileRoute("/admin/bao-cao")({
 });
 
 function monthNow() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+  return vnMonth();
 }
 
 function ReportPage() {

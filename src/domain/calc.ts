@@ -429,7 +429,11 @@ export function stockNeeds(
   return { needs, missing };
 }
 
-export function vnParts(date = new Date()): { iso: string; hm: string; ymd: string; month: string } {
+/** Một chỗ đổi mốc giờ Việt Nam. Tháng lương, hoa hồng, KPI, báo cáo, COD và sao lưu đều đi qua đây. */
+export function vnStamp(input: Date | string | null | undefined = new Date()): { ymd: string; month: string; hm: string } {
+  if (input == null || input === "") return { ymd: "", month: "", hm: "" };
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return { ymd: "", month: "", hm: "" };
   const fmt = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Ho_Chi_Minh",
     year: "numeric",
@@ -441,7 +445,20 @@ export function vnParts(date = new Date()): { iso: string; hm: string; ymd: stri
   });
   const parts = Object.fromEntries(fmt.formatToParts(date).map((p) => [p.type, p.value]));
   const ymd = `${parts.year}-${parts.month}-${parts.day}`;
-  return { iso: date.toISOString(), hm: `${parts.hour}:${parts.minute}`, ymd, month: ymd.slice(0, 7) };
+  return { ymd, month: ymd.slice(0, 7), hm: `${parts.hour}:${parts.minute}` };
+}
+
+export function vnMonth(input: Date | string | null | undefined = new Date()): string {
+  return vnStamp(input).month;
+}
+
+export function vnYmd(input: Date | string | null | undefined = new Date()): string {
+  return vnStamp(input).ymd;
+}
+
+export function vnParts(date = new Date()): { iso: string; hm: string; ymd: string; month: string } {
+  const stamp = vnStamp(date);
+  return { iso: date.toISOString(), hm: stamp.hm, ymd: stamp.ymd, month: stamp.month };
 }
 
 export function minutesLate(hm: string, start: string, grace: number): number {
@@ -468,7 +485,10 @@ export function isWeeklyOff(ymd: string, weeklyOff: number[]): boolean {
 
 export function collectedRevenue(orders: Order[], month: string): number {
   return orders
-    .filter((o) => o.status === "xong" && (o.completedAt ?? o.updatedAt).slice(0, 7) === month)
+    .filter((o) => {
+      const stamp = o.completedAt ?? o.updatedAt;
+      return o.status === "xong" && stamp != null && vnMonth(stamp) === month;
+    })
     .reduce((s, o) => s + (o.total ?? 0), 0);
 }
 

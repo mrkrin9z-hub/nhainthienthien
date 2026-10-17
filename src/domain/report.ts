@@ -1,4 +1,4 @@
-import { quoteSku, vnParts } from "./calc.ts";
+import { quoteSku, vnMonth, vnYmd } from "./calc.ts";
 import { fixedRows } from "./views.ts";
 import type { Channel, Order, ShopState } from "./types.ts";
 import { CHANNEL_LABEL } from "./types.ts";
@@ -40,11 +40,11 @@ export type BusinessReport = {
 const OPEN = new Set(["draft_upload", "upload_error"]);
 
 function monthOf(iso: string): string {
-  return vnParts(new Date(iso)).month;
+  return vnMonth(iso);
 }
 
 function ymdOf(iso: string): string {
-  return vnParts(new Date(iso)).ymd;
+  return vnYmd(iso);
 }
 
 /** Thứ hai đầu tuần, lịch Việt Nam. */

@@ -6,6 +6,7 @@ import { moneyLeaks } from "./access.ts";
 import { materialForecast } from "./forecast.ts";
 import { kpiForActor, saleKpi } from "./kpi.ts";
 import { businessReport, weekStart } from "./report.ts";
+import { vnMonth } from "./calc.ts";
 import { DEFAULT_SETTINGS } from "./seed.ts";
 import type { Material, Movement, Order, ShopState, Sku, Staff } from "./types.ts";
 
@@ -157,8 +158,36 @@ test("KPI, tổng quan, lương và Excel gọi cùng commissionForSale", () => 
   const excel = service.slice(service.indexOf('kind === "payroll"'), service.indexOf('kind === "profit"'));
   assert.match(excel, /payrollRow\(/);
   assert.doesNotMatch(excel, /commissionOf\(/);
+  const limit = read("./login-limit.ts");
   assert.match(service, /loginLocked\(/);
   assert.match(service, /auth\.fail/);
+  assert.match(limit, /login_fail:/);
+  assert.match(service, /loginFailKey\(/);
+  assert.match(service, /expirationTtl: LOGIN_FAIL_TTL_SECONDS/);
+  assert.match(service, /vnMonth\(/);
+  assert.doesNotMatch(service, /inAt\.slice\(0, 7\)/);
+  assert.doesNotMatch(service, /completedAt \?\? ""\)\.startsWith/);
   assert.match(service, /imageBytesMatch\(/);
+  const octoberNight = "2026-10-31T16:30:00.000Z";
+  assert.equal(vnMonth(octoberNight), "2026-10");
+  const edge = businessReport(
+    shop({
+      orders: [
+        {
+          id: "edge",
+          status: "xong",
+          channel: "tai_tiem",
+          createdAt: octoberNight,
+          completedAt: octoberNight,
+          updatedAt: octoberNight,
+          total: 40000,
+          items: [],
+        } as Order,
+      ],
+    }),
+    "2026-10",
+  );
+  assert.equal(edge.revenue, 40000);
+  assert.equal(edge.orderCount, 1);
   assert.match(session, /NODE_ENV !== "development"/);
 });

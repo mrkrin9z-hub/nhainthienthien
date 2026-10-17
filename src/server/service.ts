@@ -9,6 +9,8 @@ import {
   isWeeklyOff,
   kpiTarget,
   minutesEarly,
+  vnMonth,
+  vnYmd,
   minutesLate,
   groupIsListed,
   priceOf,
@@ -20,7 +22,7 @@ import {
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed } from "@/domain/images";
-import { LOGIN_LOCK_MS, loginLocked } from "@/domain/login-limit";
+import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_LOCK_MS, loginFailKey, loginLocked } from "@/domain/login-limit";
 import { filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
@@ -99,7 +101,7 @@ function audit(state: ShopState, actorId: string | null, action: string, entity:
   if (state.audits.length > 2000) state.audits.length = 2000;
 }
 
-/** Bộ đếm trong một isolate, chặn dồn request trước khi sổ kịp ghi. Không chia sẻ giữa các isolate. */
+/** Đếm trong isolate này để chặn dồn request. Khi có SHOP_KV, khóa login_fail mới là bộ đếm dùng chung. */
 const loginFailMemory = new Map<string, string[]>();
 
 function rememberedFails(email: string, now: number): { at: string }[] {
@@ -115,6 +117,31 @@ function rememberLoginFail(email: string, at: string) {
   const kept = rememberedFails(email, Date.parse(at)).map((row) => row.at);
   kept.push(at);
   loginFailMemory.set(email, kept);
+}
+
+/** Khi có SHOP_KV, số lần sai nằm ở khóa login_fail:<email>, hết hạn sau 15 phút, dùng chung mọi isolate. */
+async function kvLoginFailCount(email: string): Promise<number> {
+  const kv = await shopKv();
+  if (!kv) return 0;
+  const raw = await kv.get(loginFailKey(email), "text");
+  const count = Number(raw ?? "0");
+  return Number.isInteger(count) && count > 0 ? count : 0;
+}
+
+async function bumpLoginFail(email: string, at: string) {
+  rememberLoginFail(email, at);
+  const kv = await shopKv();
+  if (!kv) return;
+  const count = await kvLoginFailCount(email);
+  const memory = rememberedFails(email, Date.parse(at)).length;
+  const next = Math.max(count + 1, memory);
+  await kv.put(loginFailKey(email), String(next), { expirationTtl: LOGIN_FAIL_TTL_SECONDS });
+}
+
+async function clearLoginFail(email: string) {
+  loginFailMemory.delete(email);
+  const kv = await shopKv();
+  if (kv) await kv.delete(loginFailKey(email));
 }
 
 function assertRole(actor: Actor, roles: Role[]) {
@@ -142,14 +169,15 @@ export async function login(email: string, password: string, code?: string): Pro
   const persisted = state.audits
     .filter((item) => item.action === "auth.fail" && item.entity === emailKey)
     .map((item) => ({ at: item.at }));
-  if (loginLocked(rememberedFails(emailKey, now), now) || loginLocked(persisted, now)) {
+  const kvFails = await kvLoginFailCount(emailKey);
+  if (loginLocked(rememberedFails(emailKey, now), now) || kvFails >= LOGIN_FAIL_LIMIT || loginLocked(persisted, now)) {
     throw new Error("Đăng nhập sai quá nhiều. Thử lại sau 15 phút.");
   }
   const staff = state.staff.find((s) => s.email.toLowerCase() === emailKey && s.active);
   const passwordOk = Boolean(staff) && (await verifyPassword(password, staff?.passwordHash ?? ""));
   if (!staff || !passwordOk) {
     const at = new Date(now).toISOString();
-    rememberLoginFail(emailKey, at);
+    await bumpLoginFail(emailKey, at);
     await mutate(async (draft) => {
       audit(draft, null, "auth.fail", emailKey, null, null);
     });
@@ -159,14 +187,14 @@ export async function login(email: string, password: string, code?: string): Pro
     if (!code?.trim()) return { needsTotp: true };
     if (!(await verifyTotp(staff.totpSecret, code))) {
       const at = new Date(now).toISOString();
-      rememberLoginFail(emailKey, at);
+      await bumpLoginFail(emailKey, at);
       await mutate(async (draft) => {
         audit(draft, null, "auth.fail", emailKey, null, null);
       });
       throw new Error("Mã xác thực không đúng.");
     }
   }
-  loginFailMemory.delete(emailKey);
+  await clearLoginFail(emailKey);
   await mutate(async (draft) => {
     audit(draft, staff.id, "auth.login", staff.id, null, { email: staff.email });
   });
@@ -1157,7 +1185,7 @@ export async function attendance(actor: Actor, month: string) {
       id: person.id,
       name: person.name,
       role: person.role,
-      punches: state.punches.filter((punch) => punch.staffId === person.id && punch.inAt.slice(0, 7) === month),
+      punches: state.punches.filter((punch) => punch.staffId === person.id && vnMonth(punch.inAt) === month),
     })),
     leaves: state.leaves.filter((leave) => leave.date.startsWith(month) && (actor.role === "owner" || leave.staffId === actor.id)),
   };
@@ -1196,14 +1224,14 @@ function payrollRow(state: ShopState, person: Staff, month: string) {
       : person.probation
         ? Math.round((settings.saleBase * settings.saleProbationPercent) / 100)
         : settings.saleBase;
-  const punches = state.punches.filter((punch) => punch.staffId === person.id && punch.inAt.slice(0, 7) === month);
+  const punches = state.punches.filter((punch) => punch.staffId === person.id && vnMonth(punch.inAt) === month);
   const lateMinutes = punches.reduce((sum, punch) => sum + punch.lateMinutes, 0);
   const days = ymdList(month).filter((day) => day <= today && day >= settings.shopOpenDate);
   const absentDays = days.filter((day) => {
     if (isWeeklyOff(day, settings.weeklyOff)) return false;
     if (person.hiredAt && day < person.hiredAt) return false;
     if (state.leaves.some((leave) => leave.staffId === person.id && leave.date === day)) return false;
-    return !punches.some((punch) => punch.inAt.slice(0, 10) === day);
+    return !punches.some((punch) => vnYmd(punch.inAt) === day);
   }).length;
   const pay = person.role === "sale" ? commissionForSale(state, person.id, month) : null;
   const revenue = pay?.revenue ?? 0;
@@ -1260,7 +1288,7 @@ export async function lockPayroll(actor: Actor, month: string) {
 export async function profitReport(actor: Actor, month: string) {
   assertRole(actor, ["owner"]);
   const state = await readState();
-  const orders = state.orders.filter((order) => order.status === "xong" && (order.completedAt ?? "").startsWith(month));
+  const orders = state.orders.filter((order) => order.status === "xong" && vnMonth(order.completedAt) === month);
   const revenue = orders.reduce((sum, order) => sum + (order.total ?? 0), 0);
   let gross = 0;
   let incomplete = false;
@@ -1301,10 +1329,10 @@ export async function profitReport(actor: Actor, month: string) {
   const extras = state.expenses.filter((row) => row.month === month);
   const fixedSum = fixed.reduce((sum, row) => sum + row.amount, 0);
   const extraSum = extras.reduce((sum, row) => sum + row.amount, 0);
-  const reprints = state.reprints.filter((row) => row.reportedAt.startsWith(month));
+  const reprints = state.reprints.filter((row) => vnMonth(row.reportedAt) === month);
   const today = vnParts();
   const todayRevenue = orders
-    .filter((order) => (order.completedAt ?? "").slice(0, 10) === today.ymd)
+    .filter((order) => vnYmd(order.completedAt) === today.ymd)
     .reduce((sum, order) => sum + (order.total ?? 0), 0);
   return {
     month,
@@ -2080,7 +2108,7 @@ export async function codBoard(actor: Actor, month: string) {
   assertRole(actor, ["owner", "sale"]);
   const state = await readState();
   const rows = state.orders
-    .filter((order) => vnParts(new Date(order.createdAt)).month === month)
+    .filter((order) => vnMonth(order.createdAt) === month)
     .map((order) => ({ order, ship: orderShipping(order) }))
     .filter((row) => (row.ship.codAmount ?? 0) > 0);
   const byCarrier = new Map<string, { carrier: string; orders: number; expected: number; received: number }>();

@@ -1,4 +1,4 @@
-import { vnParts } from "./calc.ts";
+import { vnMonth } from "./calc.ts";
 import { commissionForSale, type CommissionBasis } from "./commission.ts";
 import type { Order, Role, ShopState } from "./types.ts";
 
@@ -13,12 +13,6 @@ export type SaleKpi = {
   avgReplyMinutes: number | null;
   timedOrders: number;
 };
-
-function monthOf(iso: string): string {
-  const at = Date.parse(iso);
-  if (!Number.isFinite(at)) return "";
-  return vnParts(new Date(at)).month;
-}
 
 function replyMinutes(order: Order, staffId: string): number | null {
   const start = Date.parse(order.createdAt);
@@ -38,7 +32,7 @@ export function saleKpi(state: ShopState, month: string): SaleKpi[] {
     .map((person) => {
       const handled = state.orders.filter((order) => {
         if (order.status === "draft_upload" || order.status === "upload_error") return false;
-        return (order.history ?? []).some((entry) => entry.by === person.id && monthOf(entry.at) === month);
+        return (order.history ?? []).some((entry) => entry.by === person.id && vnMonth(entry.at) === month);
       });
       const pay = commissionForSale(state, person.id, month);
       const times = handled.map((order) => replyMinutes(order, person.id)).filter((value): value is number => value !== null);

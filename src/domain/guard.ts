@@ -1,3 +1,4 @@
+import { vnYmd } from "./calc.ts";
 import type { Role } from "./types.ts";
 
 export function canViewProfit(role: Role): boolean {
@@ -42,12 +43,7 @@ const DAILY_BACKUP = /^shop_backup:\d{4}-\d{2}-\d{2}$/;
 
 /** Ngày lịch Việt Nam, dùng làm khóa sao lưu hằng ngày. */
 export function vnBackupDay(date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  return vnYmd(date);
 }
 
 export function dailyBackupKey(date = new Date()): string {

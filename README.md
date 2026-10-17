@@ -146,7 +146,7 @@ Sao lưu hằng ngày dùng khóa cố định `shop_backup:YYYY-MM-DD` theo gi�
 
 **Khách** gộp theo số điện thoại thật, kể cả khác kênh. Số bị che giữ riêng theo tài khoản sàn. Khách chỉ còn đơn hủy được ẩn, bật lại được. Có thẻ, ghi chú, tổng đã chi, cờ khách quay lại (mặc định từ 2 đơn). **Nhắc khách** liệt kê đơn cuối cách đây ít nhất 60 ngày và ngày giỗ trong 7 ngày tới. Tin nhắn chép tay, không tự gửi. Sale xem khách, không xem giá vốn.
 
-**Báo cáo** (chủ): doanh thu, lãi gộp, chi phí cố định (mặc định 29.400.000đ/tháng), chi phí phát sinh ghi riêng, lãi ròng = lãi gộp − cố định − phát sinh, hòa vốn, theo ngày/tuần/tháng, kênh, khổ và hàng bán nhiều. **Kho** ước mức dùng 30 ngày và báo đặt hàng khi số ngày tồn dưới ngưỡng từng vật tư (mặc định 7). **KPI**, **Tổng quan**, **Lương** và file Excel lương dùng cùng một cách tính hoa hồng. Sale chỉ thấy KPI của mình.
+**Báo cáo** (chủ): doanh thu, lãi gộp, chi phí cố định (mặc định 29.400.000đ/tháng), chi phí phát sinh ghi riêng, lãi ròng = lãi gộp − cố định − phát sinh, hòa vốn, theo ngày/tuần/tháng, kênh, khổ và hàng bán nhiều. **Kho** ước mức dùng 30 ngày và báo đặt hàng khi số ngày tồn dưới ngưỡng từng vật tư (mặc định 7). **KPI**, **Tổng quan**, **Lương** và file Excel lương dùng cùng một cách tính hoa hồng. Tháng của lương, hoa hồng, KPI, báo cáo, đối soát COD và sao lưu lấy theo giờ Việt Nam. Sale chỉ thấy KPI của mình.
 
 Có thể thêm trang quản trị vào Màn hình chính trên iPhone. Khi mất mạng, máy hiện trang nhắc mở lại.
 

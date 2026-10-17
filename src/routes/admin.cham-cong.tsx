@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { vnMonth } from "@/domain/calc";
 import { getAttendance, getMe, grantLeave, punchClock } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/cham-cong")({
@@ -12,7 +13,7 @@ export const Route = createFileRoute("/admin/cham-cong")({
 });
 
 function monthNow() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+  return vnMonth();
 }
 
 function ClockPage() {

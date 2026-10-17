@@ -7,7 +7,11 @@ export type KvBinding = {
   get(key: string, type: "json"): Promise<unknown>;
   get(key: string, type: "arrayBuffer"): Promise<ArrayBuffer | null>;
   get(key: string, type: "text"): Promise<string | null>;
-  put(key: string, value: string | ArrayBuffer | ArrayBufferView): Promise<void>;
+  put(
+    key: string,
+    value: string | ArrayBuffer | ArrayBufferView,
+    options?: { expirationTtl?: number },
+  ): Promise<void>;
   delete(key: string): Promise<void>;
   list?(options: { prefix?: string }): Promise<{ keys: { name: string }[] }>;
 };

@@ -1,4 +1,4 @@
-import { kpiTarget, quoteSku, vnParts } from "./calc.ts";
+import { kpiTarget, quoteSku, vnParts, vnYmd, vnMonth } from "./calc.ts";
 import { commissionForSale } from "./commission.ts";
 import { materialForecast } from "./forecast.ts";
 import { orderShipping } from "./shipping.ts";
@@ -75,7 +75,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     .map((material) => ({ id: material.id, name: material.name, stock: material.stock, unit: material.unit, min: material.minStock }));
   const onShift = state.staff
     .filter((person) =>
-      state.punches.some((punch) => punch.staffId === person.id && !punch.outAt && punch.inAt.slice(0, 10) === clock.ymd),
+      state.punches.some((punch) => punch.staffId === person.id && !punch.outAt && vnYmd(punch.inAt) === clock.ymd),
     )
     .map((person) => ({ id: person.id, name: person.name, role: person.role }));
   const mineOpen = state.punches.find((punch) => punch.staffId === actor.id && !punch.outAt) ?? null;
@@ -110,10 +110,10 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
       commissionBasis: pay.basis,
     };
   }
-  const doneMonth = state.orders.filter((order) => order.status === "xong" && (order.completedAt ?? "").slice(0, 7) === clock.month);
+  const doneMonth = state.orders.filter((order) => order.status === "xong" && vnMonth(order.completedAt ?? "") === clock.month);
   const revenueMonth = doneMonth.reduce((sum, order) => sum + (order.total ?? 0), 0);
   const revenueToday = doneMonth
-    .filter((order) => (order.completedAt ?? "").slice(0, 10) === clock.ymd)
+    .filter((order) => vnYmd(order.completedAt ?? "") === clock.ymd)
     .reduce((sum, order) => sum + (order.total ?? 0), 0);
   let gross = 0;
   let grossIncomplete = false;
