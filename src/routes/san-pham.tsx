@@ -24,7 +24,7 @@ export const Route = createFileRoute("/san-pham")({
       {
         name: "description",
         content:
-          "Xem ảnh mẫu và giá từng kích thước: in ảnh gỗ lụa, tráng gương, ảnh thẻ, ảnh nam châm, album và phục hồi ảnh cũ. Chọn size, chọn số lượng và đặt mua ngay.",
+          "Xem ảnh mẫu và giá từng kích thước: ảnh ép gỗ, ảnh ép gỗ tráng gương bo viền, ảnh thờ, giấy khen và nam châm. Chọn size, chọn số lượng và đặt mua ngay.",
       },
       { property: "og:title", content: "Sản phẩm & bảng giá in ảnh — Nhà In Thiên Thiên" },
       {

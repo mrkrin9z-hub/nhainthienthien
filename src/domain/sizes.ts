@@ -1,4 +1,4 @@
-/** Ảnh in (ép gỗ, giấy khen, tráng gương). */
+/** Ảnh in (ép gỗ, giấy khen, ép gỗ tráng gương bo viền). */
 export const PHOTO_PRINT_SIZES = ["13x18", "15x21", "20x30", "30x45", "40x60", "50x75", "60x90"] as const;
 
 /** Nam châm tủ lạnh (ảnh). */

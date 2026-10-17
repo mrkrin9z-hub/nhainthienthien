@@ -156,7 +156,7 @@ function groups(): Group[] {
       name: "Ảnh ép gỗ tráng gương",
       slug: "anh-ep-go",
       category: "Ảnh gỗ",
-      description: "Ảnh ép gỗ tráng gương khổ 40×60, 50×75 và 60×90, bán lẻ và combo. Khổ nhỏ hơn nằm ở ảnh tráng gương.",
+      description: "Ảnh ép gỗ tráng gương khổ 40×60, 50×75 và 60×90, bán lẻ và combo. Khổ nhỏ hơn nằm ở ảnh ép gỗ tráng gương bo viền.",
       turnaround: "1–2 ngày",
       sort: 1,
       gate: null,
@@ -203,7 +203,7 @@ function groups(): Group[] {
     },
     {
       id: "trang_guong",
-      name: "Ảnh tráng gương bo viền",
+      name: "Ảnh ép gỗ tráng gương bo viền",
       slug: "trang-guong",
       category: "Ảnh trang trí",
       description: "Để bàn với khổ từ 20×30 trở xuống có chân dựng. Từ 30×45 có móc treo tường.",

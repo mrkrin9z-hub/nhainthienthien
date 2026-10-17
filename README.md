@@ -122,7 +122,7 @@ Giá bán lấy từ bảng chủ duyệt ngày 17/10/2026 (sheet Gia của bả
 
 Giá túi bọc ảnh, carton, tem nhiệt, phí ship Facebook thật và định mức nam châm xe để trống. Chính sách ship khách ghi trong file Facebook (25.000 / 40.000) không ghi vào cài đặt. Chủ sửa trong Quản trị → Cài đặt / Kho / Bảng giá.
 
-Ảnh tráng gương hiện trên web. Ép gỗ chỉ có giá từ 40×60. Ảnh thờ và giấy khen chỉ có giá tấm lẻ (ảnh thờ từ 20×30; giấy khen A5, A4, A3). Thời khóa biểu và ảnh lụa có giá trong sổ nhưng nhóm đang ẩn. Nam châm xe chỉ còn 9×19 và 17×22. Gói lụa một vài mức không giảm giá mỗi tấm — sổ giữ đúng số trong file và cảnh báo combo.
+Ảnh ép gỗ tráng gương bo viền hiện trên web. Ảnh ép gỗ là sản phẩm riêng và chỉ có giá từ 40×60. Ảnh thờ và giấy khen chỉ có giá tấm lẻ (ảnh thờ từ 20×30; giấy khen A5, A4, A3). Thời khóa biểu và ảnh lụa có giá trong sổ nhưng nhóm đang ẩn. Nam châm xe chỉ còn 9×19 và 17×22. Gói lụa một vài mức không giảm giá mỗi tấm — sổ giữ đúng số trong file và cảnh báo combo.
 
 Lương sale phương án A: 8.000.000đ (thử việc 85%). Sản xuất: 11.000.000đ. Giờ ca 8:00–18:00. Ngày nghỉ trong tuần để trống vì hợp đồng ghi làm hằng ngày; chủ chọn ngày nghỉ trong Cài đặt. Mức trừ đi trễ và vắng để trống cho đến khi chủ nhập. Hoa hồng sale mặc định tính trên doanh thu đã thu của cả tiệm. Chủ đổi sang theo đơn từng người trong Cài đặt khi có từ hai sale.
 

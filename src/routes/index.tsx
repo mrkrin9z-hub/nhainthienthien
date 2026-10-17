@@ -188,7 +188,8 @@ function HomePage() {
             <img src={LOGO_SQUARE} alt="Logo Nhà In Thiên Thiên" className="mx-auto h-24 w-24 object-contain" />
             <p className="mt-4 text-center text-sm font-bold uppercase tracking-wide text-accent">In tại xưởng</p>
             <ul className="mt-4 space-y-2 text-sm text-foreground">
-              <li>Ảnh tráng gương, ảnh ép gỗ</li>
+              <li>Ảnh ép gỗ</li>
+              <li>Ảnh ép gỗ tráng gương bo viền</li>
               <li>Ảnh thờ và giấy khen</li>
               <li>Nam châm dán xe, nam châm tủ lạnh</li>
             </ul>

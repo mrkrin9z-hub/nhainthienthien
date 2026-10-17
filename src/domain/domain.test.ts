@@ -375,3 +375,68 @@ test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của 
     assert.doesNotMatch(source, /miễn phí|Miễn phí|24–48|ít phút|Có liền|\btặng\b/i, file);
   }
 });
+
+test("ảnh tráng gương đổi tên thành ảnh ép gỗ tráng gương bo viền, ảnh ép gỗ giữ riêng", async () => {
+  const seeded = await buildSeed();
+  const gloss = seeded.groups.find((group) => group.id === "trang_guong");
+  const wood = seeded.groups.find((group) => group.id === "ep_go");
+  assert.equal(gloss?.name, "Ảnh ép gỗ tráng gương bo viền");
+  assert.equal(gloss?.slug, "trang-guong");
+  assert.equal(wood?.name, "Ảnh ép gỗ tráng gương");
+  assert.equal(wood?.id, "ep_go");
+  assert.match(wood?.description ?? "", /ảnh ép gỗ tráng gương bo viền/);
+
+  const legacy = {
+    settings: { showZalo: false, zaloDefaultMigrated: true },
+    groups: [
+      {
+        id: "trang_guong",
+        name: "Ảnh tráng gương bo viền",
+        description: "Để bàn.",
+        turnaround: "1–2 ngày",
+      },
+      {
+        id: "ep_go",
+        name: "Ảnh ép gỗ tráng gương",
+        description: "Khổ nhỏ hơn nằm ở ảnh tráng gương.",
+        turnaround: "1–2 ngày",
+      },
+    ],
+    orders: [
+      {
+        items: [
+          { name: "Ảnh tráng gương bo viền — 13×18 cm" },
+          { name: "Ảnh tráng gương - 20×30 cm" },
+          { name: "Ảnh ép gỗ tráng gương — 40×60 cm" },
+        ],
+      },
+    ],
+  };
+  assert.equal(applyStoreMigrations(legacy), true);
+  assert.equal(legacy.groups[0]?.name, "Ảnh ép gỗ tráng gương bo viền");
+  assert.equal(legacy.groups[1]?.name, "Ảnh ép gỗ tráng gương");
+  assert.equal(legacy.groups[1]?.description, "Khổ nhỏ hơn nằm ở ảnh ép gỗ tráng gương bo viền.");
+  assert.equal(legacy.orders[0]?.items[0]?.name, "Ảnh ép gỗ tráng gương bo viền — 13×18 cm");
+  assert.equal(legacy.orders[0]?.items[1]?.name, "Ảnh ép gỗ tráng gương bo viền - 20×30 cm");
+  assert.equal(legacy.orders[0]?.items[2]?.name, "Ảnh ép gỗ tráng gương — 40×60 cm");
+  assert.equal(applyStoreMigrations(legacy), false);
+
+  const shortName = {
+    settings: { zaloDefaultMigrated: true },
+    groups: [{ id: "trang_guong", name: "Ảnh tráng gương", description: "x", turnaround: "1–2 ngày" }],
+  };
+  assert.equal(applyStoreMigrations(shortName), true);
+  assert.equal(shortName.groups[0]?.name, "Ảnh ép gỗ tráng gương bo viền");
+
+  const renamedByOwner = {
+    settings: { zaloDefaultMigrated: true },
+    groups: [{ id: "trang_guong", name: "Tên chủ đã sửa", description: "x", turnaround: "1–2 ngày" }],
+  };
+  assert.equal(applyStoreMigrations(renamedByOwner), false);
+  assert.equal(renamedByOwner.groups[0]?.name, "Tên chủ đã sửa");
+
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  for (const file of ["../routes/index.tsx", "../routes/huong-dan.tsx", "../routes/san-pham.tsx", "./seed.ts", "../../README.md"]) {
+    assert.doesNotMatch(read(file), /Ảnh tráng gương|ảnh tráng gương/, file);
+  }
+});
