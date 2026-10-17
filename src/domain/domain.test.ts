@@ -22,6 +22,7 @@ import { contentDisposition, imageBytesMatch, imageMimeAllowed, servedMime } fro
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginLocked } from "./login-limit.ts";
 import { vnBackupDay } from "./guard.ts";
 import { publicContact } from "./public-contact.ts";
+import { applyStoreMigrations } from "./migrate-shop.ts";
 import { buildSeed, DEFAULT_SETTINGS, hashPassword, PBKDF2_ITERATIONS, verifyPassword } from "./seed.ts";
 import type { BomLine, Material, Order, Settings, Sku } from "./types.ts";
 
@@ -344,4 +345,33 @@ test("web ẩn số Zalo khi tắt hoặc sổ cũ chưa ghi", () => {
   const body = config.slice(config.indexOf("export async function publicConfig"), config.indexOf("let lastFileSweep"));
   assert.match(body, /publicContact\(/);
   assert.doesNotMatch(body, /!== false/);
+});
+
+test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của chủ", () => {
+  assert.equal(DEFAULT_SETTINGS.zaloDefaultMigrated, true);
+  assert.equal(DEFAULT_SETTINGS.showZalo, false);
+  const state = {
+    settings: { showZalo: true, zaloPhone: "0778662227" },
+    groups: [
+      {
+        id: "anh_tho",
+        description: "Ảnh thờ. Miễn phí khôi phục, thay áo, đổi nền. Không giới hạn số lần sửa.",
+        turnaround: "Có liền",
+      },
+    ],
+  };
+  assert.equal(applyStoreMigrations(state), true);
+  assert.equal(state.settings.showZalo, false);
+  assert.equal(state.settings.zaloDefaultMigrated, true);
+  assert.equal(state.groups[0]?.description, "Ảnh thờ. Hỗ trợ chỉnh sửa ảnh cơ bản.");
+  assert.equal(state.groups[0]?.turnaround, "Theo đơn");
+  state.settings.showZalo = true;
+  assert.equal(applyStoreMigrations(state), false);
+  assert.equal(state.settings.showZalo, true);
+
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  for (const file of ["../routes/index.tsx", "../routes/huong-dan.tsx", "./seed.ts"]) {
+    const source = read(file);
+    assert.doesNotMatch(source, /miễn phí|Miễn phí|24–48|ít phút|Có liền|\btặng\b/i, file);
+  }
 });

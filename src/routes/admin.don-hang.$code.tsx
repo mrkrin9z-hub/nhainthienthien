@@ -257,7 +257,7 @@ function OrderDetailPage() {
       {role !== "production" ? (
         <section className="glass-card rounded-3xl p-4">
           <h2 className="font-bold text-primary">In lại</h2>
-          <p className="text-sm text-muted-foreground">Trong 3 ngày sau khi giao, lỗi xưởng thì in lại miễn phí. Quá hạn web sẽ cảnh báo.</p>
+          <p className="text-sm text-muted-foreground">Trong 3 ngày sau khi giao, in lại nếu lỗi do xưởng. Quá hạn web sẽ cảnh báo.</p>
           <Textarea className="mt-2" placeholder="Lý do khách báo" value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="mt-2 flex gap-2">
             <Button

@@ -121,6 +121,8 @@ export type Settings = {
   zaloPhone: string;
   /** Chỉ `true` mới hiện số trên web. Thiếu field hoặc false thì ẩn. */
   showZalo?: boolean;
+  /** Đã tắt Zalo một lần trên sổ seed cũ. Sau mốc này, ô trong Cài đặt được giữ nguyên. */
+  zaloDefaultMigrated?: boolean;
   publicHours: string;
   showAnhThe: boolean;
   showAlbum: boolean;

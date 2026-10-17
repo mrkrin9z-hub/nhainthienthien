@@ -63,7 +63,7 @@ const STEPS = [
 
 const BENEFITS = [
   { icon: ShieldCheck, title: "Giá xưởng", desc: "Bảng giá công khai, không phát sinh." },
-  { icon: Clock, title: "Trả nhanh 24–48h", desc: "Đơn gấp hỗ trợ ưu tiên trong ngày." },
+  { icon: Clock, title: "Xưởng nhận in", desc: "Lịch trả hàng được báo khi nhận đơn." },
   { icon: Truck, title: "Giao tận nơi", desc: "Nhận tại xưởng hoặc giao toàn quốc." },
   { icon: Heart, title: "Kiểm ảnh thủ công", desc: "Chỉnh sáng, canh nét trước khi in." },
 ];
@@ -71,7 +71,7 @@ const BENEFITS = [
 const REASONS = [
   "Xem trước giá từng kích thước, không cần hỏi tới lui.",
   "Kỹ thuật viên kiểm tra độ phân giải và báo lại nếu ảnh chưa đủ nét.",
-  "In sai màu, sai kích thước — xưởng in lại miễn phí.",
+  "In lại nếu lỗi do xưởng.",
   "Ảnh gốc của bạn được lưu riêng tư, lưu 6 tháng rồi xoá.",
 ];
 
@@ -86,7 +86,7 @@ const FAQS = [
   },
   {
     q: "Bao lâu thì nhận được hàng?",
-    a: "Phần lớn đơn hoàn tất trong 24–48 giờ. Ảnh thờ làm nhanh, không giới hạn số lần sửa. Đơn số lượng lớn sẽ được báo lịch cụ thể.",
+    a: "Xưởng báo lịch khi nhận đơn. Ảnh thờ có hỗ trợ chỉnh sửa ảnh cơ bản. Đơn số lượng lớn được hẹn lịch riêng.",
   },
 ];
 
@@ -297,7 +297,7 @@ function HomePage() {
               Sẵn sàng in kỷ niệm của bạn?
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground md:text-base">
-              Gửi ảnh ngay hôm nay, xưởng báo lại trong ít phút và giao hàng chỉ sau 24–48 giờ.
+              Gửi ảnh khi sẵn sàng. Xưởng xem ảnh và báo lại.
             </p>
             <div className="mx-auto mt-6 flex max-w-md flex-col gap-3 sm:flex-row sm:justify-center">
               <Button

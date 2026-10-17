@@ -58,7 +58,7 @@ function GuidePage() {
       <main className="mx-auto max-w-3xl px-4 py-10 md:px-6">
         <h1 className="text-3xl font-extrabold text-primary md:text-4xl">Hướng dẫn đặt in</h1>
         <p className="mt-2 text-muted-foreground">
-          Chỉ mất vài phút để gửi ảnh và nhận mã đơn theo dõi.
+          Gửi ảnh xong là có mã đơn để theo dõi.
         </p>
 
         <div className="mt-8 space-y-5">
