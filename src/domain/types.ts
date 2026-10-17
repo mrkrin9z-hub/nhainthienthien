@@ -119,7 +119,7 @@ export type Settings = {
   fileRetentionDays: number;
   videoRetentionDays: number;
   zaloPhone: string;
-  /** false = ẩn số Zalo trên web. Thiếu field (sổ cũ) thì vẫn hiện. */
+  /** Chỉ `true` mới hiện số trên web. Thiếu field hoặc false thì ẩn. */
   showZalo?: boolean;
   publicHours: string;
   showAnhThe: boolean;

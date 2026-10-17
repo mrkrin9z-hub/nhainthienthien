@@ -8,9 +8,9 @@ import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 
 export function SiteFooter() {
   const config = useQuery(publicConfigQueryOptions);
-  const showZalo = config.data ? config.data.showZalo : true;
-  const phone = showZalo ? (config.data?.phone || BRAND.phone) : "";
-  const zalo = showZalo ? (config.data?.zalo || BRAND.zalo) : "";
+  const showZalo = config.data?.showZalo === true && Boolean(config.data.zalo);
+  const phone = showZalo ? config.data?.phone ?? "" : "";
+  const zalo = showZalo ? config.data?.zalo ?? "" : "";
   return (
     <footer className="mt-16 border-t border-border bg-card/60">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-3 md:px-6">

@@ -31,6 +31,7 @@ import { applyMarketplaceProfile, customerCard, customerCards, customerReminders
 import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type PlannedItem } from "@/domain/marketplace";
 import { applyRestore, restoreSummary } from "@/domain/restore";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
+import { publicContact } from "@/domain/public-contact";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
@@ -92,12 +93,6 @@ export function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   if (digits.startsWith("84") && digits.length >= 10) return `0${digits.slice(2)}`;
   return digits;
-}
-
-export function prettyPhone(digits: string): string {
-  const d = digits.replace(/\D/g, "");
-  if (d.length === 10) return `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7)}`;
-  return d;
 }
 
 const LOCKTEST_EMAIL = "khongtontai-locktest@example.invalid";
@@ -257,15 +252,13 @@ function groupListed(state: ShopState, groupId: string): boolean {
 
 export async function publicConfig() {
   const state = await readState();
-  const phone = state.settings.zaloPhone || "0778662227";
-  const digits = phone.replace(/\D/g, "");
-  const showZalo = state.settings.showZalo !== false;
+  const contact = publicContact(state.settings);
   return {
     name: "NHÀ IN THIÊN THIÊN",
-    showZalo,
-    phone: showZalo ? prettyPhone(phone) : "",
-    phoneRaw: showZalo ? digits : "",
-    zalo: showZalo ? `https://zalo.me/${digits}` : "",
+    showZalo: contact.showZalo,
+    phone: contact.phone,
+    phoneRaw: contact.phoneRaw,
+    zalo: contact.zalo,
     hours: state.settings.publicHours,
     region: "Xuân Lộc, Đồng Nai",
     maxPhotoBytes: await photoByteLimit(),

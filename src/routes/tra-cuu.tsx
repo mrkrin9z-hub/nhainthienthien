@@ -86,7 +86,7 @@ function LookupPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               inputMode="tel"
-              placeholder="0778 662 227"
+              placeholder="Số đã dùng khi đặt"
               className="h-12"
               required
             />

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -20,6 +21,7 @@ import { commissionBasisOf, commissionForSale } from "./commission.ts";
 import { contentDisposition, imageBytesMatch, imageMimeAllowed, servedMime } from "./images.ts";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginLocked } from "./login-limit.ts";
 import { vnBackupDay } from "./guard.ts";
+import { publicContact } from "./public-contact.ts";
 import { buildSeed, DEFAULT_SETTINGS, hashPassword, PBKDF2_ITERATIONS, verifyPassword } from "./seed.ts";
 import type { BomLine, Material, Order, Settings, Sku } from "./types.ts";
 
@@ -258,7 +260,8 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(state.settings.lateDeductionPerMinute, null);
   assert.equal(state.settings.showAnhThe, false);
   assert.equal(state.settings.showAlbum, false);
-  assert.equal(state.settings.showZalo, true);
+  assert.equal(state.settings.showZalo, false);
+  assert.equal(state.settings.zaloPhone, "");
   assert.equal(state.settings.fileRetentionDays, 180);
   assert.equal(state.settings.saleBase, 8000000);
   assert.equal(state.settings.productionBase, 11000000);
@@ -301,4 +304,44 @@ test("mật khẩu ghi số vòng PBKDF2 và vẫn đọc hash cũ", async () =>
   assert.equal(await verifyPassword("sai", legacy), false);
   assert.equal(await verifyPassword("ThienThien#2026", "pbkdf2$120001$salt-cu$00"), false);
   assert.equal(await verifyPassword("ThienThien#2026", "khong-phai-hash"), false);
+});
+
+test("web ẩn số Zalo khi tắt hoặc sổ cũ chưa ghi", () => {
+  const hidden = { phone: "", phoneRaw: "", zalo: "", showZalo: false };
+  assert.deepEqual(publicContact({}), hidden);
+  assert.deepEqual(publicContact({ zaloPhone: "0778662227" }), hidden);
+  assert.deepEqual(publicContact({ showZalo: false, zaloPhone: "0778662227" }), hidden);
+  const on = publicContact({ showZalo: true, zaloPhone: "0901111222" });
+  assert.equal(on.showZalo, true);
+  assert.equal(on.phone, "0901 111 222");
+  assert.equal(on.phoneRaw, "0901111222");
+  assert.equal(on.zalo, "https://zalo.me/0901111222");
+  assert.equal(publicContact({ showZalo: true, zaloPhone: "" }).showZalo, false);
+
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  const pages = [
+    "../routes/index.tsx",
+    "../routes/lien-he.tsx",
+    "../routes/tra-cuu.tsx",
+    "../routes/dat-in.tsx",
+    "../routes/huong-dan.tsx",
+    "../routes/san-pham.tsx",
+    "../components/site/SiteFooter.tsx",
+    "../components/site/SiteHeader.tsx",
+    "../lib/brand.ts",
+    "./seed.ts",
+    "../server/service.ts",
+  ];
+  for (const file of pages) {
+    const source = read(file);
+    assert.doesNotMatch(source, /0778662227|0778\s*662\s*227/, file);
+  }
+  const contact = read("../routes/lien-he.tsx");
+  assert.match(contact, /Đặt in online/);
+  assert.match(contact, /Tra cứu đơn/);
+  assert.doesNotMatch(contact, /MapPin|BRAND\.region/);
+  const config = read("../server/service.ts");
+  const body = config.slice(config.indexOf("export async function publicConfig"), config.indexOf("let lastFileSweep"));
+  assert.match(body, /publicContact\(/);
+  assert.doesNotMatch(body, /!== false/);
 });

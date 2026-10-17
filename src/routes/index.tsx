@@ -82,7 +82,7 @@ const FAQS = [
   },
   {
     q: "Thanh toán như thế nào?",
-    a: "Bạn đặt đơn trước, xưởng xác nhận qua Zalo rồi mới thanh toán. Nhận tại xưởng hoặc chuyển khoản trước khi giao.",
+    a: "Bạn đặt đơn trước, xưởng xác nhận rồi mới thanh toán. Nhận tại xưởng hoặc chuyển khoản trước khi giao.",
   },
   {
     q: "Bao lâu thì nhận được hàng?",
@@ -93,9 +93,9 @@ const FAQS = [
 function HomePage() {
   const { data: products } = useSuspenseQuery(catalogQueryOptions);
   const config = useQuery(publicConfigQueryOptions);
-  const showZalo = config.data ? config.data.showZalo : true;
-  const zalo = showZalo ? (config.data?.zalo || BRAND.zalo) : "";
-  const phone = showZalo ? (config.data?.phone || BRAND.phone) : "";
+  const showZalo = config.data?.showZalo === true && Boolean(config.data.zalo);
+  const zalo = showZalo ? config.data?.zalo ?? "" : "";
+  const phone = showZalo ? config.data?.phone ?? "" : "";
   const featured = products.slice(0, 6);
 
   return (
