@@ -34,6 +34,7 @@ function StockPage() {
           <Button className="min-h-11" variant="outline" onClick={() => markInkOpened().then(() => refresh()).then(() => toast.success("Đã trừ 1 lọ mực"))}>
             Mở lọ mực mới
           </Button>
+          {me.data && me.data.role !== "production" ? (
           <Button
             variant="outline"
             className="min-h-11"
@@ -44,6 +45,7 @@ function StockPage() {
           >
             Xuất tồn
           </Button>
+          ) : null}
         </div>
       </div>
       <div className="space-y-3">

@@ -26,7 +26,10 @@ test("quyền trang chủ, bảng giá, xuất file", () => {
   assert.equal(canExport("sale", "profit"), false);
   assert.equal(canExport("sale", "payroll"), false);
   assert.equal(canExport("owner", "profit"), true);
-  assert.equal(canExport("production", "orders"), true);
+  assert.equal(canExport("production", "orders"), false);
+  assert.equal(canExport("production", "stock"), false);
+  assert.equal(canExport("sale", "orders"), true);
+  assert.equal(canExport("sale", "stock"), true);
 });
 
 test("lương người khác không lọt, và không kèm doanh thu", () => {
@@ -71,12 +74,17 @@ test("lương người khác không lọt, và không kèm doanh thu", () => {
   assert.equal(payrollForActor("owner", "staff-owner", rows).length, 2);
 });
 
-test("sao lưu giữ 30 khóa mới nhất", () => {
-  const keys = Array.from({ length: 32 }, (_, i) => `shop_backup:2026-01-${String(i + 1).padStart(2, "0")}T00-00-00Z`);
-  const drop = backupKeysToDrop(keys, 30);
-  assert.equal(drop.length, 2);
-  assert.equal(drop[0], keys[0]);
-  assert.equal(backupKeysToDrop(["shop_backup:a", "other"], 30).length, 0);
+test("sao lưu ngày và bản tay tách nhau", () => {
+  const daily = Array.from({ length: 32 }, (_, i) => `shop_backup:2026-01-${String(i + 1).padStart(2, "0")}`);
+  const manual = Array.from({ length: 12 }, (_, i) => `shop_backup:manual:2026-02-${String(i + 1).padStart(2, "0")}T00-00-00-000Z`);
+  const legacy = ["shop_backup:2026-10-17T15-49-24-005Z"];
+  const drop = backupKeysToDrop([...daily, ...manual, ...legacy, "other"]);
+  assert.equal(drop.filter((key) => key.startsWith("shop_backup:2026-01")).length, 2);
+  assert.equal(drop.includes(daily[0]!), true);
+  assert.equal(drop.includes(daily[31]!), false);
+  assert.equal(drop.filter((key) => key.includes(":manual:")).length, 2);
+  assert.equal(drop.includes(legacy[0]!), true);
+  assert.equal(drop.includes("other"), false);
 });
 
 test("file tĩnh KV không thay trang chủ", () => {

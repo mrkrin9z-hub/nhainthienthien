@@ -22,6 +22,9 @@ import {
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
+import { EXPECTED_COLUMNS, fileOrderAdapter, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel } from "@/domain/marketplace";
+import { applyRestore, restoreSummary } from "@/domain/restore";
+import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
@@ -33,12 +36,14 @@ import type {
   Role,
   ShopState,
   Sku,
+  SkuMap,
   Staff,
 } from "@/domain/types";
 import { CHANNEL_LABEL, STATUS_LABEL } from "@/domain/types";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
 import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
-import { listBackups, readBackup } from "@/server/store";
+import { listBackups, readBackup, writeManualBackup } from "@/server/store";
+import { clearProductPhoto, readProductPhoto, writeProductPhoto } from "@/server/photos";
 import { integrationStatus, saveIntegrationSecret } from "@/server/secrets";
 import { deleteFromDrive, downloadFromDrive, driveConfigured, uploadToDrive } from "@/server/drive";
 import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
@@ -181,7 +186,9 @@ export async function publicCatalog() {
       slug: group.slug,
       category: group.category,
       description: group.description,
-      cover_path: null as string | null,
+      cover_path: state.settings.productPhotos?.[group.slug]
+        ? `/api/public/product-photo/${group.slug}`
+        : null,
       turnaround_text: group.turnaround,
       sort_order: group.sort,
       variants: state.skus
@@ -325,6 +332,7 @@ export async function createWebOrder(input: {
       internalNote: "",
       dueDate: null,
       marketplaceCode: "",
+      shipping: blankShipping(),
       items,
       subtotal: totals.subtotal,
       total: totals.total,
@@ -609,6 +617,7 @@ export async function createManualOrder(
       internalNote: "",
       dueDate: input.dueDate,
       marketplaceCode: input.marketplaceCode.trim(),
+      shipping: blankShipping(),
       items,
       subtotal: totals.subtotal,
       total: totals.total,
@@ -1642,14 +1651,17 @@ export async function downloadBackupFile(actor: Actor, key: string) {
   };
 }
 
+export async function restorePreview(actor: Actor, key: string) {
+  assertRole(actor, ["owner"]);
+  const doc = await readBackup(key);
+  return { key, ...restoreSummary(await readState(), doc) };
+}
+
 export async function restoreFromBackup(actor: Actor, key: string) {
   assertRole(actor, ["owner"]);
   const doc = await readBackup(key);
   await mutate(async (state) => {
-    const version = state.version;
-    const previous = state.audits;
-    const next = structuredClone(doc);
-    next.version = version;
+    const next = applyRestore(state, doc);
     next.audits = [
       {
         id: nid(),
@@ -1658,14 +1670,23 @@ export async function restoreFromBackup(actor: Actor, key: string) {
         action: "backup.restore",
         entity: key,
         before: null,
-        after: { version: doc.version },
+        after: { version: doc.version, kept: "staff" },
       },
-      ...previous,
+      ...(next.audits ?? []),
     ].slice(0, 2000);
     const draft = state as unknown as Record<string, unknown>;
     for (const field of Object.keys(draft)) delete draft[field];
     Object.assign(draft, next);
   });
+}
+
+export async function backupNow(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const key = await writeManualBackup(await readState());
+  await mutate(async (state) => {
+    audit(state, actor.id, "backup.manual", key, null, { key });
+  });
+  return { key };
 }
 
 export async function integrations(actor: Actor) {
@@ -1679,4 +1700,294 @@ export async function setIntegration(actor: Actor, provider: string, value: stri
   await mutate(async (state) => {
     audit(state, actor.id, "secret.update", provider, null, { set: value.trim().length > 0 });
   });
+}
+
+function mapsOf(state: ShopState): SkuMap[] {
+  if (!state.skuMaps) state.skuMaps = [];
+  return state.skuMaps;
+}
+
+function bytesFromBase64(value: string): Uint8Array {
+  if (value.length > 6_000_000) throw new Error("File tối đa khoảng 4MB.");
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function marketplacePlan(state: ShopState, channel: MarketplaceChannel, filename: string, base64: string) {
+  const table = await fileOrderAdapter(channel).loadTable({ filename, bytes: bytesFromBase64(base64) });
+  const lines = parseMarketplaceTable(table);
+  const maps = (state.skuMaps ?? []).filter((row) => row.channel === channel);
+  const existingIds = state.orders
+    .filter((order) => order.channel === channel && order.marketplaceCode)
+    .map((order) => order.marketplaceCode);
+  return planMarketplaceImport({ lines, maps, existingIds });
+}
+
+export function marketplaceColumns() {
+  return EXPECTED_COLUMNS;
+}
+
+export async function previewMarketplaceFile(
+  actor: Actor,
+  input: { channel: MarketplaceChannel; filename: string; base64: string },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const plan = await marketplacePlan(await readState(), input.channel, input.filename, input.base64);
+  return { columns: EXPECTED_COLUMNS, ...plan };
+}
+
+export async function importMarketplaceFile(
+  actor: Actor,
+  input: { channel: MarketplaceChannel; filename: string; base64: string },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const preview = await marketplacePlan(await readState(), input.channel, input.filename, input.base64);
+  const codes = await mutate(async (state) => {
+    const made: string[] = [];
+    for (const planned of preview.orders) {
+      const taken = state.orders.some(
+        (order) => order.channel === input.channel && order.marketplaceCode === planned.platformOrderId,
+      );
+      if (taken) continue;
+      const customer = upsertCustomer(state, {
+        name: planned.buyer,
+        phone: planned.phone,
+        address: planned.address,
+      });
+      const items = buildItems(
+        state,
+        input.channel,
+        actor.role,
+        planned.items.map((item) => ({ skuId: item.skuId, quantity: item.quantity })),
+      );
+      const totals = sumItems(items);
+      const order: Order = {
+        id: nid(),
+        code: nextCode(state),
+        channel: input.channel,
+        source: "manual",
+        customerId: customer.id,
+        status: planned.status,
+        fulfillment: "delivery",
+        address: planned.address,
+        customerNote: "",
+        internalNote: `Nhập từ file ${input.channel}`,
+        dueDate: null,
+        marketplaceCode: planned.platformOrderId,
+        shipping: {
+          carrier: planned.carrier,
+          tracking: planned.tracking,
+          shipFee: planned.shipFee,
+          codAmount: planned.codAmount,
+          codReceivedAt: null,
+        },
+        items,
+        subtotal: totals.subtotal,
+        total: totals.total,
+        depositRequired: 0,
+        depositPaid: 0,
+        depositMethod: "",
+        depositBy: null,
+        printDeducted: false,
+        packDeducted: false,
+        stockWarning: "",
+        accessTokenHash: "",
+        accessToken: "",
+        idempotencyKey: `${input.channel}:${planned.platformOrderId}`,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        completedAt: null,
+        files: [],
+        history: [{ at: nowIso(), from: null, to: "nhan_don", by: actor.id, note: "Nhập từ file sàn" }],
+      };
+      refreshDeposit(state, order);
+      state.orders.unshift(order);
+      audit(state, actor.id, "order.import", order.id, null, {
+        code: order.code,
+        platform: planned.platformOrderId,
+        channel: input.channel,
+      });
+      made.push(order.code);
+    }
+    return made;
+  });
+  return { codes, issues: preview.issues, duplicates: preview.duplicates };
+}
+
+export async function listSkuMaps(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  return {
+    maps: (state.skuMaps ?? []).map((row) => ({
+      ...row,
+      skuCode: state.skus.find((sku) => sku.id === row.skuId)?.code ?? "",
+    })),
+    skus: state.skus.map((sku) => ({
+      id: sku.id,
+      label: `${sku.code} · ${state.groups.find((group) => group.id === sku.groupId)?.name ?? ""} · ${sku.name}`,
+    })),
+  };
+}
+
+export async function saveSkuMap(actor: Actor, input: { channel: MarketplaceChannel; externalSku: string; skuId: string }) {
+  assertRole(actor, ["owner", "sale"]);
+  const externalSku = input.externalSku.trim();
+  if (!externalSku) throw new Error("Thiếu SKU sàn.");
+  await mutate(async (state) => {
+    skuOrThrow(state, input.skuId);
+    const maps = mapsOf(state);
+    const found = maps.find(
+      (row) => row.channel === input.channel && row.externalSku.toLowerCase() === externalSku.toLowerCase(),
+    );
+    if (found) found.skuId = input.skuId;
+    else maps.push({ channel: input.channel, externalSku, skuId: input.skuId });
+    audit(state, actor.id, "sku.map", externalSku, null, { channel: input.channel, skuId: input.skuId });
+  });
+}
+
+export async function removeSkuMap(actor: Actor, input: { channel: MarketplaceChannel; externalSku: string }) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    state.skuMaps = (state.skuMaps ?? []).filter(
+      (row) => !(row.channel === input.channel && row.externalSku.toLowerCase() === input.externalSku.trim().toLowerCase()),
+    );
+  });
+}
+
+export async function saveOrderShipping(
+  actor: Actor,
+  input: { orderId: string; carrier: string; tracking: string; shipFee: number | null; codAmount: number | null },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === input.orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    const previous = orderShipping(order);
+    order.shipping = {
+      carrier: input.carrier.trim(),
+      tracking: input.tracking.trim(),
+      shipFee: input.shipFee,
+      codAmount: input.codAmount,
+      codReceivedAt: previous.codReceivedAt,
+    };
+    audit(state, actor.id, "order.shipping", order.id, previous, order.shipping);
+  });
+}
+
+export async function markCodReceived(actor: Actor, orderId: string, received: boolean) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    const previous = orderShipping(order);
+    order.shipping = { ...previous, codReceivedAt: received ? nowIso() : null };
+    audit(state, actor.id, "order.cod", order.id, { codReceivedAt: previous.codReceivedAt }, { received });
+  });
+}
+
+export async function deliveryBoard(actor: Actor) {
+  const state = await readState();
+  const money = actor.role !== "production";
+  return state.orders.filter(shipsOut).map((order) => {
+    const customer = customerName(state, order.customerId);
+    const ship = orderShipping(order);
+    return {
+      id: order.id,
+      code: order.code,
+      status: order.status,
+      statusLabel: STATUS_LABEL[order.status],
+      channel: order.channel,
+      channelLabel: CHANNEL_LABEL[order.channel],
+      customerName: customer.name,
+      phone: customer.phone,
+      address: order.address,
+      itemSummary: order.items.map((item) => `${item.quantity}× ${item.name}`).join(", "),
+      carrier: ship.carrier,
+      tracking: ship.tracking,
+      shipFee: money ? ship.shipFee : null,
+      codAmount: money ? ship.codAmount : null,
+      codReceivedAt: money ? ship.codReceivedAt : null,
+      canLabel: order.channel === "tai_tiem" || order.channel === "facebook",
+    };
+  });
+}
+
+export async function codBoard(actor: Actor, month: string) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const rows = state.orders
+    .filter((order) => vnParts(new Date(order.createdAt)).month === month)
+    .map((order) => ({ order, ship: orderShipping(order) }))
+    .filter((row) => (row.ship.codAmount ?? 0) > 0);
+  const byCarrier = new Map<string, { carrier: string; orders: number; expected: number; received: number }>();
+  const lines = rows.map(({ order, ship }) => {
+    const carrier = ship.carrier || "Chưa ghi hãng";
+    const bucket = byCarrier.get(carrier) ?? { carrier, orders: 0, expected: 0, received: 0 };
+    bucket.orders += 1;
+    bucket.expected += ship.codAmount ?? 0;
+    if (ship.codReceivedAt) bucket.received += ship.codAmount ?? 0;
+    byCarrier.set(carrier, bucket);
+    const customer = customerName(state, order.customerId);
+    return {
+      id: order.id,
+      code: order.code,
+      carrier,
+      customerName: customer.name,
+      codAmount: ship.codAmount,
+      codReceivedAt: ship.codReceivedAt,
+      createdAt: order.createdAt,
+    };
+  });
+  const carriers = [...byCarrier.values()].map((row) => ({ ...row, outstanding: row.expected - row.received }));
+  return {
+    month,
+    lines,
+    carriers,
+    expected: carriers.reduce((sum, row) => sum + row.expected, 0),
+    received: carriers.reduce((sum, row) => sum + row.received, 0),
+  };
+}
+
+export async function listGroupPhotos(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  return state.groups
+    .slice()
+    .sort((a, b) => a.sort - b.sort)
+    .map((group) => ({
+      id: group.id,
+      name: group.name,
+      slug: group.slug,
+      custom: Boolean(state.settings.productPhotos?.[group.slug]),
+    }));
+}
+
+export async function saveGroupPhoto(actor: Actor, slug: string, bytes: Uint8Array, mime: string) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  if (!state.groups.some((group) => group.slug === slug)) throw new Error("Không có nhóm này.");
+  await writeProductPhoto(slug, bytes, mime);
+  await mutate(async (draft) => {
+    draft.settings.productPhotos = { ...(draft.settings.productPhotos ?? {}), [slug]: mime };
+    audit(draft, actor.id, "photo.product", slug, null, { mime });
+  });
+}
+
+export async function removeGroupPhoto(actor: Actor, slug: string) {
+  assertRole(actor, ["owner", "sale"]);
+  await clearProductPhoto(slug);
+  await mutate(async (draft) => {
+    const photos = { ...(draft.settings.productPhotos ?? {}) };
+    delete photos[slug];
+    draft.settings.productPhotos = photos;
+    audit(draft, actor.id, "photo.product", slug, null, { cleared: true });
+  });
+}
+
+export async function publicProductPhoto(slug: string) {
+  const state = await readState();
+  if (!state.settings.productPhotos?.[slug]) return null;
+  return readProductPhoto(slug);
 }

@@ -18,7 +18,7 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { catalogQueryOptions, minPrice, publicConfigQueryOptions } from "@/lib/catalog.functions";
-import { productImage } from "@/lib/product-images";
+import { catalogImage } from "@/lib/product-images";
 import { BRAND, formatVnd } from "@/lib/brand";
 
 export const Route = createFileRoute("/")({
@@ -193,7 +193,7 @@ function HomePage() {
             {featured.map((product) => (
               <article key={product.id} className="glass-card overflow-hidden rounded-3xl">
                 <img
-                  src={productImage(product.slug)}
+                  src={catalogImage(product.slug, product.cover_path)}
                   alt={`Ảnh mẫu ${product.name}`}
                   loading="lazy"
                   width={800}

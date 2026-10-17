@@ -5,6 +5,7 @@ import {
   quoteSku,
   vnParts,
 } from "./calc.ts";
+import { orderShipping } from "./shipping.ts";
 import type { Order, OrderStatus, Role, ShopState } from "./types.ts";
 import { CHANNEL_LABEL, STATUS_LABEL, STATUS_REPLY } from "./types.ts";
 
@@ -216,6 +217,15 @@ export function orderDetail(state: ShopState, order: Order, role: Role) {
     internalNote: role === "production" ? "" : order.internalNote,
     dueDate: order.dueDate,
     marketplaceCode: order.marketplaceCode,
+    shipping: (() => {
+      const ship = orderShipping(order);
+      return {
+        ...ship,
+        shipFee: showMoney ? ship.shipFee : null,
+        codAmount: showMoney ? ship.codAmount : null,
+        codReceivedAt: showMoney ? ship.codReceivedAt : null,
+      };
+    })(),
     depositRequired: showMoney ? order.depositRequired : null,
     depositPaid: showMoney ? order.depositPaid : null,
     depositMethod: showMoney ? order.depositMethod : "",

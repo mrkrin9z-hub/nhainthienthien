@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RoleGate } from "@/components/role-gate";
 import { dueFiles, loadSettings, removeFile, runRecalc, storeSettings, storeStaff } from "@/lib/admin.functions";
 import { ROLE_LABEL, type Role } from "@/domain/types";
 
@@ -55,6 +56,14 @@ const NUMBER_FIELDS: { key: string; label: string; nullable?: boolean }[] = [
 ];
 
 function SettingsPage() {
+  return (
+    <RoleGate allow={["owner"]} deny="Chỉ chủ xem.">
+      <SettingsBody />
+    </RoleGate>
+  );
+}
+
+function SettingsBody() {
   const queryClient = useQueryClient();
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => loadSettings() });
   const files = useQuery({ queryKey: ["due-files"], queryFn: () => dueFiles() });
@@ -65,6 +74,7 @@ function SettingsPage() {
     return [field.key, raw === null || raw === undefined ? "" : String(raw)];
   })) : null);
 
+  if (settings.isError) return <p className="font-semibold text-destructive">{(settings.error as Error).message}</p>;
   if (!data || !values) return <p className="text-muted-foreground">Đang tải cài đặt…</p>;
 
   return (

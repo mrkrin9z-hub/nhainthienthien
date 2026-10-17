@@ -485,6 +485,114 @@ export const saveIntegration = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const previewRestore = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ key: z.string().min(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { restorePreview } = await import("@/server/service");
+    return restorePreview(await actor(), data.key);
+  });
+
+export const createBackupNow = createServerFn({ method: "POST" }).handler(async () => {
+  const { backupNow } = await import("@/server/service");
+  return backupNow(await actor());
+});
+
+const channelFile = z.object({
+  channel: z.enum(["tiktok", "shopee"]),
+  filename: z.string().min(1),
+  base64: z.string().min(8),
+});
+
+export const previewMarketplace = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => channelFile.parse(data))
+  .handler(async ({ data }) => {
+    const { previewMarketplaceFile } = await import("@/server/service");
+    return previewMarketplaceFile(await actor(), data);
+  });
+
+export const importMarketplace = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => channelFile.parse(data))
+  .handler(async ({ data }) => {
+    const { importMarketplaceFile } = await import("@/server/service");
+    return importMarketplaceFile(await actor(), data);
+  });
+
+export const getSkuMaps = createServerFn({ method: "GET" }).handler(async () => {
+  const { listSkuMaps } = await import("@/server/service");
+  return listSkuMaps(await actor());
+});
+
+export const storeSkuMap = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ channel: z.enum(["tiktok", "shopee"]), externalSku: z.string().min(1), skuId: z.string().min(1) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveSkuMap } = await import("@/server/service");
+    await saveSkuMap(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteSkuMap = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ channel: z.enum(["tiktok", "shopee"]), externalSku: z.string().min(1) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { removeSkuMap } = await import("@/server/service");
+    await removeSkuMap(await actor(), data);
+    return { ok: true };
+  });
+
+export const storeShipping = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        orderId: z.string(),
+        carrier: z.string(),
+        tracking: z.string(),
+        shipFee: z.number().nullable(),
+        codAmount: z.number().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveOrderShipping } = await import("@/server/service");
+    await saveOrderShipping(await actor(), data);
+    return { ok: true };
+  });
+
+export const setCodReceived = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string(), received: z.boolean() }).parse(data))
+  .handler(async ({ data }) => {
+    const { markCodReceived } = await import("@/server/service");
+    await markCodReceived(await actor(), data.orderId, data.received);
+    return { ok: true };
+  });
+
+export const getDeliveries = createServerFn({ method: "GET" }).handler(async () => {
+  const { deliveryBoard } = await import("@/server/service");
+  return deliveryBoard(await actor());
+});
+
+export const getCod = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { codBoard } = await import("@/server/service");
+    return codBoard(await actor(), data.month);
+  });
+
+export const getGroupPhotos = createServerFn({ method: "GET" }).handler(async () => {
+  const { listGroupPhotos } = await import("@/server/service");
+  return listGroupPhotos(await actor());
+});
+
+export const clearGroupPhoto = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ slug: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeGroupPhoto } = await import("@/server/service");
+    await removeGroupPhoto(await actor(), data.slug);
+    return { ok: true };
+  });
+
 export const removeFile = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ fileId: z.string() }).parse(data))
   .handler(async ({ data }) => {

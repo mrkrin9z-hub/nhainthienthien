@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import { commitLoop } from "@/domain/commit";
-import { backupKeysToDrop } from "@/domain/guard";
+import { backupFileName, backupKeyFromFile, backupKeysToDrop, dailyBackupKey, manualBackupKey, vnBackupDay } from "@/domain/guard";
 import { buildSeed } from "@/domain/seed";
 import type { ShopState } from "@/domain/types";
 import { onWorkers, shopKv } from "@/server/bindings";
@@ -174,59 +174,59 @@ export async function mutate<T>(fn: (state: ShopState) => T | Promise<T>): Promi
 
 let backedUpDay = "";
 
-function backupStamp(date = new Date()): string {
-  return date.toISOString().replace(/[:.]/g, "-");
-}
-
 function backupDir(): string {
   return path.join(process.cwd(), "data", "backups");
 }
 
+function backupPayload(state: ShopState): string {
+  return JSON.stringify({ at: new Date().toISOString(), version: state.version, doc: state });
+}
+
+/** Ghi đè đúng một khóa. Không list trước khi ghi, vì list KV có thể chưa thấy bản vừa put. */
+async function putBackup(key: string, state: ShopState): Promise<boolean> {
+  const payload = backupPayload(state);
+  const kv = await shopKv();
+  if (kv) {
+    await kv.put(key, payload);
+    if (kv.list) {
+      const all = await kv.list({ prefix: BACKUP_PREFIX });
+      for (const drop of backupKeysToDrop((all.keys ?? []).map((item) => item.name))) {
+        if (drop !== key) await kv.delete(drop);
+      }
+    }
+    return true;
+  }
+  if (onWorkers()) return false;
+  const { mkdir, readdir, writeFile, unlink } = await import("node:fs/promises");
+  const dir = backupDir();
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, backupFileName(key)), payload);
+  const names = (await readdir(dir)).filter((name) => name.startsWith("shop_backup-") && name.endsWith(".json"));
+  const keys = names.map((name) => backupKeyFromFile(name)).filter((item): item is string => Boolean(item));
+  const drop = new Set(backupKeysToDrop(keys));
+  for (const name of names) {
+    const fileKey = backupKeyFromFile(name);
+    if (fileKey && drop.has(fileKey)) await unlink(path.join(dir, name)).catch(() => undefined);
+  }
+  return true;
+}
+
 async function ensureDailyBackup(state: ShopState): Promise<void> {
-  const day = new Date().toISOString().slice(0, 10);
+  const day = vnBackupDay();
   if (backedUpDay === day) return;
   try {
-    const kv = await shopKv();
-    if (kv?.list) {
-      const today = await kv.list({ prefix: `${BACKUP_PREFIX}${day}` });
-      if ((today.keys?.length ?? 0) === 0) {
-        await kv.put(
-          `${BACKUP_PREFIX}${backupStamp()}`,
-          JSON.stringify({ at: new Date().toISOString(), version: state.version, doc: state }),
-        );
-      }
-      const all = await kv.list({ prefix: BACKUP_PREFIX });
-      for (const key of backupKeysToDrop((all.keys ?? []).map((item) => item.name))) {
-        await kv.delete(key);
-      }
-      backedUpDay = day;
-      return;
-    }
-    if (onWorkers()) return;
-    const { mkdir, readdir, writeFile, unlink } = await import("node:fs/promises");
-    const dir = backupDir();
-    await mkdir(dir, { recursive: true });
-    const names = (await readdir(dir)).filter((name) => name.startsWith("shop_backup-") && name.endsWith(".json"));
-    const todayName = names.find((name) => name.includes(day));
-    if (!todayName) {
-      const key = `${BACKUP_PREFIX}${backupStamp()}`;
-      await writeFile(path.join(dir, `${key.replace(BACKUP_PREFIX, "shop_backup-")}.json`), JSON.stringify({
-        at: new Date().toISOString(),
-        version: state.version,
-        doc: state,
-      }));
-      names.push(`${key.replace(BACKUP_PREFIX, "shop_backup-")}.json`);
-    }
-    const keys = names.map((name) => `${BACKUP_PREFIX}${name.slice("shop_backup-".length, -".json".length)}`);
-    const drop = new Set(backupKeysToDrop(keys));
-    for (const name of names) {
-      const key = `${BACKUP_PREFIX}${name.slice("shop_backup-".length, -".json".length)}`;
-      if (drop.has(key)) await unlink(path.join(dir, name)).catch(() => undefined);
-    }
-    backedUpDay = day;
+    const saved = await putBackup(dailyBackupKey(), state);
+    backedUpDay = saved ? day : "";
   } catch {
     backedUpDay = "";
   }
+}
+
+export async function writeManualBackup(state: ShopState): Promise<string> {
+  const key = manualBackupKey();
+  const saved = await putBackup(key, state);
+  if (!saved) throw new Error("Chưa có chỗ lưu bản sao.");
+  return key;
 }
 
 export type BackupEntry = { key: string; at: string };
@@ -253,8 +253,8 @@ export async function listBackups(): Promise<BackupEntry[]> {
   }
   const rows: BackupEntry[] = [];
   for (const name of names) {
-    if (!name.startsWith("shop_backup-") || !name.endsWith(".json")) continue;
-    const key = `${BACKUP_PREFIX}${name.slice("shop_backup-".length, -".json".length)}`;
+    const key = backupKeyFromFile(name);
+    if (!key) continue;
     try {
       const parsed = JSON.parse(await readFile(path.join(backupDir(), name), "utf8")) as { at?: string };
       rows.push({ key, at: parsed.at ?? key });
@@ -276,7 +276,7 @@ export async function readBackup(key: string): Promise<ShopState> {
     return parsed.doc;
   }
   const { readFile } = await import("node:fs/promises");
-  const name = `shop_backup-${key.slice(BACKUP_PREFIX.length)}.json`;
+  const name = backupFileName(key);
   const parsed = JSON.parse(await readFile(path.join(backupDir(), name), "utf8")) as { doc?: ShopState };
   if (!parsed.doc) throw new Error("Bản sao lưu hỏng.");
   return parsed.doc;

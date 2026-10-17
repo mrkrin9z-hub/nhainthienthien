@@ -13,8 +13,8 @@ export const Route = createFileRoute("/admin/ket-noi")({
 });
 
 const FIELDS: { id: "tiktok" | "shopee" | "meta" | "zalo" | "carrier"; label: string; hint: string }[] = [
-  { id: "tiktok", label: "TikTok Shop", hint: "Khóa API cửa hàng, chưa gọi sang TikTok." },
-  { id: "shopee", label: "Shopee", hint: "Khóa API cửa hàng, chưa gọi sang Shopee." },
+  { id: "tiktok", label: "TikTok Shop", hint: "Khóa API để sau. Đơn hiện nhập từ file, cùng một cổng với API." },
+  { id: "shopee", label: "Shopee", hint: "Khóa API để sau. Đơn hiện nhập từ file, cùng một cổng với API." },
   { id: "meta", label: "Meta / Facebook", hint: "Token trang hoặc ứng dụng, chưa đồng bộ đơn." },
   { id: "zalo", label: "Zalo OA", hint: "Khóa Official Account, chưa gửi tin." },
   { id: "carrier", label: "Đơn vị vận chuyển", hint: "Khóa hãng giao hàng, chưa tạo vận đơn." },

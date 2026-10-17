@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
-import { changeStatus, getMe, getOrderDetail, recordDeposit, saveNote, saveReprint } from "@/lib/admin.functions";
+import { changeStatus, getMe, getOrderDetail, recordDeposit, saveNote, saveReprint, storeShipping } from "@/lib/admin.functions";
 import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-hang/$code")({
@@ -37,12 +37,13 @@ function OrderDetailPage() {
 
   return (
     <div className="space-y-4">
-      <style>{`@media print { body * { visibility: hidden } .label-print, .label-print * { visibility: visible } .label-print { position: absolute; left: 0; top: 0; width: 80mm; } }`}</style>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
-        <Button variant="outline" className="min-h-11" onClick={() => window.print()}>
-          In tem
-        </Button>
+        {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
+          <Button asChild variant="outline" className="min-h-11">
+            <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
+          </Button>
+        ) : null}
       </div>
       <p className="text-sm">
         {data.customerName} · {data.phone} · {data.channelLabel} · {data.statusLabel}
@@ -55,13 +56,9 @@ function OrderDetailPage() {
         Kho in: {data.printDeducted ? "đã trừ" : "chưa trừ"} · Kho đóng gói: {data.packDeducted ? "đã trừ" : "chưa trừ"}
       </p>
 
-      <section className="label-print glass-card rounded-3xl p-4">
-        <p className="text-lg font-extrabold">{data.code}</p>
-        <p>{data.customerName}</p>
-        <p>{data.phone}</p>
-        <p>{data.address}</p>
-        <p className="text-sm">{data.itemSummary}</p>
-      </section>
+      {role !== "production" ? <ShippingForm orderId={data.id} shipping={data.shipping} onDone={refresh} /> : (
+        <p className="text-sm">Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}</p>
+      )}
 
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Sản phẩm</h2>
@@ -263,5 +260,47 @@ function OrderDetailPage() {
         </Link>
       ) : null}
     </div>
+  );
+}
+
+function ShippingForm({
+  orderId,
+  shipping,
+  onDone,
+}: {
+  orderId: string;
+  shipping?: { carrier: string; tracking: string; shipFee: number | null; codAmount: number | null };
+  onDone: () => Promise<void>;
+}) {
+  const [carrier, setCarrier] = useState(shipping?.carrier ?? "");
+  const [tracking, setTracking] = useState(shipping?.tracking ?? "");
+  const [shipFee, setShipFee] = useState(shipping?.shipFee === null || shipping?.shipFee === undefined ? "" : String(shipping.shipFee));
+  const [codAmount, setCodAmount] = useState(shipping?.codAmount === null || shipping?.codAmount === undefined ? "" : String(shipping.codAmount));
+  return (
+    <section className="glass-card space-y-2 rounded-3xl p-4">
+      <h2 className="font-bold text-primary">Giao hàng</h2>
+      <Input className="min-h-12" placeholder="Hãng vận chuyển" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
+      <Input className="min-h-12" placeholder="Mã vận đơn" value={tracking} onChange={(e) => setTracking(e.target.value)} />
+      <Input className="min-h-12" inputMode="numeric" placeholder="Phí ship" value={shipFee} onChange={(e) => setShipFee(e.target.value.replace(/[^\d]/g, ""))} />
+      <Input className="min-h-12" inputMode="numeric" placeholder="Tiền thu hộ COD" value={codAmount} onChange={(e) => setCodAmount(e.target.value.replace(/[^\d]/g, ""))} />
+      <Button
+        className="min-h-11"
+        onClick={async () => {
+          await storeShipping({
+            data: {
+              orderId,
+              carrier,
+              tracking,
+              shipFee: shipFee === "" ? null : Number(shipFee),
+              codAmount: codAmount === "" ? null : Number(codAmount),
+            },
+          });
+          toast.success("Đã lưu giao hàng");
+          await onDone();
+        }}
+      >
+        Lưu giao hàng
+      </Button>
+    </section>
   );
 }

@@ -23,6 +23,7 @@ function OrdersPage() {
               <Link to="/admin/don-moi">Ghi đơn</Link>
             </Button>
           )}
+          {me.data && me.data.role !== "production" ? (
           <Button
             variant="outline"
             className="min-h-12"
@@ -39,6 +40,7 @@ function OrdersPage() {
           >
             Xuất Excel
           </Button>
+          ) : null}
         </div>
       </div>
       <div className="grid gap-3">

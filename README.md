@@ -126,7 +126,15 @@ Kho trừ vật tư in khi đơn sang bước **In**, trừ túi / xốp / carto
 
 Worker đọc `ASSETS_KV` từ binding `cloudflare:workers`, không từ tham số `env` của `fetch` (lớp bọc chỉ truyền request). Deploy lại worker là đủ nếu khóa file tĩnh đã nạp. Xóa khối `assets` trong `.output/server/wrangler.json` khi API upload static không chạy.
 
-Lần đăng nhập đầu của tài khoản mẫu bắt đổi mật khẩu ngay trên trang quản trị. Chủ bật mã 6 số ở **Tài khoản**. Nhật ký, sao lưu (30 bản theo ngày trong KV) và **Kết nối** (khóa để trống, chưa gọi API) chỉ chủ xem.
+Lần đăng nhập đầu của tài khoản mẫu bắt đổi mật khẩu ngay trên trang quản trị. Chủ bật mã 6 số ở **Tài khoản**. Nhật ký, sao lưu và **Kết nối** chỉ chủ xem.
+
+Sao lưu hằng ngày dùng khóa cố định `shop_backup:YYYY-MM-DD` theo giờ Việt Nam (ghi đè, không tạo thêm bản khi list KV bị trễ), giữ 30 ngày. **Sao lưu ngay** ghi `shop_backup:manual:<mốc>` và giữ 10 bản. Khôi phục không đổi tài khoản, mật khẩu hay mã 2 lớp.
+
+Ảnh bìa có số Zalo in sẵn đã bỏ. Ảnh sản phẩm trên web là ảnh mẫu cho đến khi chủ hoặc sale tải ảnh thật ở **Ảnh web** (lưu KV, tối đa 2MB).
+
+Đơn TikTok/Shopee nhập từ file CSV hoặc XLSX ở **Nhập đơn sàn**. Cột nhận: mã đơn, SKU người bán, tên, số lượng, người nhận, điện thoại, địa chỉ, hãng, mã vận đơn, phí ship, COD. SKU sàn map sang mã tiệm; dòng chưa map không tạo đơn. Đơn vào trạng thái Nhận đơn, kho trừ khi chuyển In và Giao. API sau này dùng cùng cổng `MarketplaceOrderAdapter`, chưa gọi.
+
+**Giao hàng** ghi hãng, mã vận đơn, phí ship và COD. **Đối soát COD** cộng theo hãng trong tháng. Tem 100×150mm in từ trình duyệt cho đơn tại tiệm và Facebook. Sản xuất không xuất Excel đơn hoặc tồn kho.
 
 ## Kiểm tra
 

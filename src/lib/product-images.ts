@@ -26,3 +26,7 @@ export const FALLBACK_PRODUCT_IMAGE = imgGoLua;
 export function productImage(slug: string): string {
   return PRODUCT_IMAGES[slug] ?? FALLBACK_PRODUCT_IMAGE;
 }
+
+export function catalogImage(slug: string, coverPath?: string | null): string {
+  return coverPath || productImage(slug);
+}

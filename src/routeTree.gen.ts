@@ -18,14 +18,18 @@ import { Route as LienHeRouteImport } from './routes/lien-he'
 import { Route as SanPhamRouteImport } from './routes/san-pham'
 import { Route as TraCuuRouteImport } from './routes/tra-cuu'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminAnhRouteImport } from './routes/admin.anh'
 import { Route as AdminCaiDatRouteImport } from './routes/admin.cai-dat'
 import { Route as AdminChamCongRouteImport } from './routes/admin.cham-cong'
+import { Route as AdminCodRouteImport } from './routes/admin.cod'
 import { Route as AdminDonMoiRouteImport } from './routes/admin.don-moi'
 import { Route as AdminGiaRouteImport } from './routes/admin.gia'
+import { Route as AdminGiaoHangRouteImport } from './routes/admin.giao-hang'
 import { Route as AdminKetNoiRouteImport } from './routes/admin.ket-noi'
 import { Route as AdminKhoRouteImport } from './routes/admin.kho'
 import { Route as AdminLoiNhuanRouteImport } from './routes/admin.loi-nhuan'
 import { Route as AdminLuongRouteImport } from './routes/admin.luong'
+import { Route as AdminNhapDonRouteImport } from './routes/admin.nhap-don'
 import { Route as AdminNhatKyRouteImport } from './routes/admin.nhat-ky'
 import { Route as AdminSanPhamRouteImport } from './routes/admin.san-pham'
 import { Route as AdminSaoLuuRouteImport } from './routes/admin.sao-luu'
@@ -34,8 +38,11 @@ import { Route as AdminDonHangIndexRouteImport } from './routes/admin.don-hang.i
 import { Route as AdminDonHangCodeRouteImport } from './routes/admin.don-hang.$code'
 import { Route as AdminKhachIndexRouteImport } from './routes/admin.khach.index'
 import { Route as AdminKhachIdRouteImport } from './routes/admin.khach.$id'
+import { Route as AdminTemCodeRouteImport } from './routes/admin.tem.$code'
+import { Route as ApiAdminProductPhotoRouteImport } from './routes/api/admin/product-photo'
 import { Route as ApiPublicCleanupFilesRouteImport } from './routes/api/public/cleanup-files'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
+import { Route as ApiPublicProductPhotoSlugRouteImport } from './routes/api/public/product-photo.$slug'
 import { Route as ApiStaffFileIdRouteImport } from './routes/api/staff/file.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -83,6 +90,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAnhRoute = AdminAnhRouteImport.update({
+  id: '/anh',
+  path: '/anh',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCaiDatRoute = AdminCaiDatRouteImport.update({
   id: '/cai-dat',
   path: '/cai-dat',
@@ -93,6 +105,11 @@ const AdminChamCongRoute = AdminChamCongRouteImport.update({
   path: '/cham-cong',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCodRoute = AdminCodRouteImport.update({
+  id: '/cod',
+  path: '/cod',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminDonMoiRoute = AdminDonMoiRouteImport.update({
   id: '/don-moi',
   path: '/don-moi',
@@ -101,6 +118,11 @@ const AdminDonMoiRoute = AdminDonMoiRouteImport.update({
 const AdminGiaRoute = AdminGiaRouteImport.update({
   id: '/gia',
   path: '/gia',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminGiaoHangRoute = AdminGiaoHangRouteImport.update({
+  id: '/giao-hang',
+  path: '/giao-hang',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminKetNoiRoute = AdminKetNoiRouteImport.update({
@@ -121,6 +143,11 @@ const AdminLoiNhuanRoute = AdminLoiNhuanRouteImport.update({
 const AdminLuongRoute = AdminLuongRouteImport.update({
   id: '/luong',
   path: '/luong',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNhapDonRoute = AdminNhapDonRouteImport.update({
+  id: '/nhap-don',
+  path: '/nhap-don',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminNhatKyRoute = AdminNhatKyRouteImport.update({
@@ -163,6 +190,16 @@ const AdminKhachIdRoute = AdminKhachIdRouteImport.update({
   path: '/khach/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTemCodeRoute = AdminTemCodeRouteImport.update({
+  id: '/tem/$code',
+  path: '/tem/$code',
+  getParentRoute: () => AdminRoute,
+} as any)
+const ApiAdminProductPhotoRoute = ApiAdminProductPhotoRouteImport.update({
+  id: '/api/admin/product-photo',
+  path: '/api/admin/product-photo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCleanupFilesRoute = ApiPublicCleanupFilesRouteImport.update({
   id: '/api/public/cleanup-files',
   path: '/api/public/cleanup-files',
@@ -173,6 +210,12 @@ const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
   path: '/api/public/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicProductPhotoSlugRoute =
+  ApiPublicProductPhotoSlugRouteImport.update({
+    id: '/api/public/product-photo/$slug',
+    path: '/api/public/product-photo/$slug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiStaffFileIdRoute = ApiStaffFileIdRouteImport.update({
   id: '/api/staff/file/$id',
   path: '/api/staff/file/$id',
@@ -188,14 +231,18 @@ export interface FileRoutesByFullPath {
   '/lien-he': typeof LienHeRoute
   '/san-pham': typeof SanPhamRoute
   '/tra-cuu': typeof TraCuuRoute
+  '/admin/anh': typeof AdminAnhRoute
   '/admin/cai-dat': typeof AdminCaiDatRoute
   '/admin/cham-cong': typeof AdminChamCongRoute
+  '/admin/cod': typeof AdminCodRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
   '/admin/gia': typeof AdminGiaRoute
+  '/admin/giao-hang': typeof AdminGiaoHangRoute
   '/admin/ket-noi': typeof AdminKetNoiRoute
   '/admin/kho': typeof AdminKhoRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/nhap-don': typeof AdminNhapDonRoute
   '/admin/nhat-ky': typeof AdminNhatKyRoute
   '/admin/san-pham': typeof AdminSanPhamRoute
   '/admin/sao-luu': typeof AdminSaoLuuRoute
@@ -203,10 +250,13 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
+  '/admin/tem/$code': typeof AdminTemCodeRoute
+  '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/admin/don-hang/': typeof AdminDonHangIndexRoute
   '/admin/khach/': typeof AdminKhachIndexRoute
+  '/api/public/product-photo/$slug': typeof ApiPublicProductPhotoSlugRoute
   '/api/staff/file/$id': typeof ApiStaffFileIdRoute
 }
 export interface FileRoutesByTo {
@@ -217,14 +267,18 @@ export interface FileRoutesByTo {
   '/lien-he': typeof LienHeRoute
   '/san-pham': typeof SanPhamRoute
   '/tra-cuu': typeof TraCuuRoute
+  '/admin/anh': typeof AdminAnhRoute
   '/admin/cai-dat': typeof AdminCaiDatRoute
   '/admin/cham-cong': typeof AdminChamCongRoute
+  '/admin/cod': typeof AdminCodRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
   '/admin/gia': typeof AdminGiaRoute
+  '/admin/giao-hang': typeof AdminGiaoHangRoute
   '/admin/ket-noi': typeof AdminKetNoiRoute
   '/admin/kho': typeof AdminKhoRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/nhap-don': typeof AdminNhapDonRoute
   '/admin/nhat-ky': typeof AdminNhatKyRoute
   '/admin/san-pham': typeof AdminSanPhamRoute
   '/admin/sao-luu': typeof AdminSaoLuuRoute
@@ -232,10 +286,13 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
+  '/admin/tem/$code': typeof AdminTemCodeRoute
+  '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/admin/don-hang': typeof AdminDonHangIndexRoute
   '/admin/khach': typeof AdminKhachIndexRoute
+  '/api/public/product-photo/$slug': typeof ApiPublicProductPhotoSlugRoute
   '/api/staff/file/$id': typeof ApiStaffFileIdRoute
 }
 export interface FileRoutesById {
@@ -248,14 +305,18 @@ export interface FileRoutesById {
   '/lien-he': typeof LienHeRoute
   '/san-pham': typeof SanPhamRoute
   '/tra-cuu': typeof TraCuuRoute
+  '/admin/anh': typeof AdminAnhRoute
   '/admin/cai-dat': typeof AdminCaiDatRoute
   '/admin/cham-cong': typeof AdminChamCongRoute
+  '/admin/cod': typeof AdminCodRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
   '/admin/gia': typeof AdminGiaRoute
+  '/admin/giao-hang': typeof AdminGiaoHangRoute
   '/admin/ket-noi': typeof AdminKetNoiRoute
   '/admin/kho': typeof AdminKhoRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/nhap-don': typeof AdminNhapDonRoute
   '/admin/nhat-ky': typeof AdminNhatKyRoute
   '/admin/san-pham': typeof AdminSanPhamRoute
   '/admin/sao-luu': typeof AdminSaoLuuRoute
@@ -263,10 +324,13 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
+  '/admin/tem/$code': typeof AdminTemCodeRoute
+  '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/admin/don-hang/': typeof AdminDonHangIndexRoute
   '/admin/khach/': typeof AdminKhachIndexRoute
+  '/api/public/product-photo/$slug': typeof ApiPublicProductPhotoSlugRoute
   '/api/staff/file/$id': typeof ApiStaffFileIdRoute
 }
 export interface FileRouteTypes {
@@ -280,14 +344,18 @@ export interface FileRouteTypes {
     | '/lien-he'
     | '/san-pham'
     | '/tra-cuu'
+    | '/admin/anh'
     | '/admin/cai-dat'
     | '/admin/cham-cong'
+    | '/admin/cod'
     | '/admin/don-moi'
     | '/admin/gia'
+    | '/admin/giao-hang'
     | '/admin/ket-noi'
     | '/admin/kho'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/nhap-don'
     | '/admin/nhat-ky'
     | '/admin/san-pham'
     | '/admin/sao-luu'
@@ -295,10 +363,13 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
+    | '/admin/tem/$code'
+    | '/api/admin/product-photo'
     | '/api/public/cleanup-files'
     | '/api/public/upload'
     | '/admin/don-hang/'
     | '/admin/khach/'
+    | '/api/public/product-photo/$slug'
     | '/api/staff/file/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -309,14 +380,18 @@ export interface FileRouteTypes {
     | '/lien-he'
     | '/san-pham'
     | '/tra-cuu'
+    | '/admin/anh'
     | '/admin/cai-dat'
     | '/admin/cham-cong'
+    | '/admin/cod'
     | '/admin/don-moi'
     | '/admin/gia'
+    | '/admin/giao-hang'
     | '/admin/ket-noi'
     | '/admin/kho'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/nhap-don'
     | '/admin/nhat-ky'
     | '/admin/san-pham'
     | '/admin/sao-luu'
@@ -324,10 +399,13 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
+    | '/admin/tem/$code'
+    | '/api/admin/product-photo'
     | '/api/public/cleanup-files'
     | '/api/public/upload'
     | '/admin/don-hang'
     | '/admin/khach'
+    | '/api/public/product-photo/$slug'
     | '/api/staff/file/$id'
   id:
     | '__root__'
@@ -339,14 +417,18 @@ export interface FileRouteTypes {
     | '/lien-he'
     | '/san-pham'
     | '/tra-cuu'
+    | '/admin/anh'
     | '/admin/cai-dat'
     | '/admin/cham-cong'
+    | '/admin/cod'
     | '/admin/don-moi'
     | '/admin/gia'
+    | '/admin/giao-hang'
     | '/admin/ket-noi'
     | '/admin/kho'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/nhap-don'
     | '/admin/nhat-ky'
     | '/admin/san-pham'
     | '/admin/sao-luu'
@@ -354,10 +436,13 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
+    | '/admin/tem/$code'
+    | '/api/admin/product-photo'
     | '/api/public/cleanup-files'
     | '/api/public/upload'
     | '/admin/don-hang/'
     | '/admin/khach/'
+    | '/api/public/product-photo/$slug'
     | '/api/staff/file/$id'
   fileRoutesById: FileRoutesById
 }
@@ -370,8 +455,10 @@ export interface RootRouteChildren {
   LienHeRoute: typeof LienHeRoute
   SanPhamRoute: typeof SanPhamRoute
   TraCuuRoute: typeof TraCuuRoute
+  ApiAdminProductPhotoRoute: typeof ApiAdminProductPhotoRoute
   ApiPublicCleanupFilesRoute: typeof ApiPublicCleanupFilesRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
+  ApiPublicProductPhotoSlugRoute: typeof ApiPublicProductPhotoSlugRoute
   ApiStaffFileIdRoute: typeof ApiStaffFileIdRoute
 }
 
@@ -440,6 +527,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/anh': {
+      id: '/admin/anh'
+      path: '/anh'
+      fullPath: '/admin/anh'
+      preLoaderRoute: typeof AdminAnhRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/cai-dat': {
       id: '/admin/cai-dat'
       path: '/cai-dat'
@@ -454,6 +548,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminChamCongRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/cod': {
+      id: '/admin/cod'
+      path: '/cod'
+      fullPath: '/admin/cod'
+      preLoaderRoute: typeof AdminCodRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/don-moi': {
       id: '/admin/don-moi'
       path: '/don-moi'
@@ -466,6 +567,13 @@ declare module '@tanstack/react-router' {
       path: '/gia'
       fullPath: '/admin/gia'
       preLoaderRoute: typeof AdminGiaRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/giao-hang': {
+      id: '/admin/giao-hang'
+      path: '/giao-hang'
+      fullPath: '/admin/giao-hang'
+      preLoaderRoute: typeof AdminGiaoHangRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/ket-noi': {
@@ -494,6 +602,13 @@ declare module '@tanstack/react-router' {
       path: '/luong'
       fullPath: '/admin/luong'
       preLoaderRoute: typeof AdminLuongRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/nhap-don': {
+      id: '/admin/nhap-don'
+      path: '/nhap-don'
+      fullPath: '/admin/nhap-don'
+      preLoaderRoute: typeof AdminNhapDonRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/nhat-ky': {
@@ -552,6 +667,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminKhachIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/tem/$code': {
+      id: '/admin/tem/$code'
+      path: '/tem/$code'
+      fullPath: '/admin/tem/$code'
+      preLoaderRoute: typeof AdminTemCodeRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/api/admin/product-photo': {
+      id: '/api/admin/product-photo'
+      path: '/api/admin/product-photo'
+      fullPath: '/api/admin/product-photo'
+      preLoaderRoute: typeof ApiAdminProductPhotoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cleanup-files': {
       id: '/api/public/cleanup-files'
       path: '/api/public/cleanup-files'
@@ -566,6 +695,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/product-photo/$slug': {
+      id: '/api/public/product-photo/$slug'
+      path: '/api/public/product-photo/$slug'
+      fullPath: '/api/public/product-photo/$slug'
+      preLoaderRoute: typeof ApiPublicProductPhotoSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/staff/file/$id': {
       id: '/api/staff/file/$id'
       path: '/api/staff/file/$id'
@@ -577,14 +713,18 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminAnhRoute: typeof AdminAnhRoute
   AdminCaiDatRoute: typeof AdminCaiDatRoute
   AdminChamCongRoute: typeof AdminChamCongRoute
+  AdminCodRoute: typeof AdminCodRoute
   AdminDonMoiRoute: typeof AdminDonMoiRoute
   AdminGiaRoute: typeof AdminGiaRoute
+  AdminGiaoHangRoute: typeof AdminGiaoHangRoute
   AdminKetNoiRoute: typeof AdminKetNoiRoute
   AdminKhoRoute: typeof AdminKhoRoute
   AdminLoiNhuanRoute: typeof AdminLoiNhuanRoute
   AdminLuongRoute: typeof AdminLuongRoute
+  AdminNhapDonRoute: typeof AdminNhapDonRoute
   AdminNhatKyRoute: typeof AdminNhatKyRoute
   AdminSanPhamRoute: typeof AdminSanPhamRoute
   AdminSaoLuuRoute: typeof AdminSaoLuuRoute
@@ -592,19 +732,24 @@ interface AdminRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminDonHangCodeRoute: typeof AdminDonHangCodeRoute
   AdminKhachIdRoute: typeof AdminKhachIdRoute
+  AdminTemCodeRoute: typeof AdminTemCodeRoute
   AdminDonHangIndexRoute: typeof AdminDonHangIndexRoute
   AdminKhachIndexRoute: typeof AdminKhachIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAnhRoute: AdminAnhRoute,
   AdminCaiDatRoute: AdminCaiDatRoute,
   AdminChamCongRoute: AdminChamCongRoute,
+  AdminCodRoute: AdminCodRoute,
   AdminDonMoiRoute: AdminDonMoiRoute,
   AdminGiaRoute: AdminGiaRoute,
+  AdminGiaoHangRoute: AdminGiaoHangRoute,
   AdminKetNoiRoute: AdminKetNoiRoute,
   AdminKhoRoute: AdminKhoRoute,
   AdminLoiNhuanRoute: AdminLoiNhuanRoute,
   AdminLuongRoute: AdminLuongRoute,
+  AdminNhapDonRoute: AdminNhapDonRoute,
   AdminNhatKyRoute: AdminNhatKyRoute,
   AdminSanPhamRoute: AdminSanPhamRoute,
   AdminSaoLuuRoute: AdminSaoLuuRoute,
@@ -612,6 +757,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminDonHangCodeRoute: AdminDonHangCodeRoute,
   AdminKhachIdRoute: AdminKhachIdRoute,
+  AdminTemCodeRoute: AdminTemCodeRoute,
   AdminDonHangIndexRoute: AdminDonHangIndexRoute,
   AdminKhachIndexRoute: AdminKhachIndexRoute,
 }
@@ -627,8 +773,10 @@ const rootRouteChildren: RootRouteChildren = {
   LienHeRoute: LienHeRoute,
   SanPhamRoute: SanPhamRoute,
   TraCuuRoute: TraCuuRoute,
+  ApiAdminProductPhotoRoute: ApiAdminProductPhotoRoute,
   ApiPublicCleanupFilesRoute: ApiPublicCleanupFilesRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
+  ApiPublicProductPhotoSlugRoute: ApiPublicProductPhotoSlugRoute,
   ApiStaffFileIdRoute: ApiStaffFileIdRoute,
 }
 export const routeTree = rootRouteImport

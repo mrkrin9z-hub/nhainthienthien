@@ -123,6 +123,8 @@ export type Settings = {
   showAnhThe: boolean;
   showAlbum: boolean;
   groupListed: Record<string, boolean>;
+  /** slug → mime khi đã tải ảnh thật lên KV. Thiếu thì web dùng ảnh mẫu. */
+  productPhotos?: Record<string, string>;
   marketplaceCutoff: string;
   marketplaceHandover: string;
   fixedCosts: { key: string; name: string; amount: number; note: string }[];
@@ -230,6 +232,20 @@ export type OrderFile = {
   deletedAt: string | null;
 };
 
+export type OrderShipping = {
+  carrier: string;
+  tracking: string;
+  shipFee: number | null;
+  codAmount: number | null;
+  codReceivedAt: string | null;
+};
+
+export type SkuMap = {
+  channel: "tiktok" | "shopee";
+  externalSku: string;
+  skuId: string;
+};
+
 export type OrderItem = {
   id: string;
   skuId: string;
@@ -253,6 +269,7 @@ export type Order = {
   internalNote: string;
   dueDate: string | null;
   marketplaceCode: string;
+  shipping?: OrderShipping;
   items: OrderItem[];
   subtotal: number | null;
   total: number | null;
@@ -368,4 +385,5 @@ export type ShopState = {
   monthlyFixed: { month: string; key: string; amount: number }[];
   payrollLocks: PayrollLock[];
   audits: Audit[];
+  skuMaps?: SkuMap[];
 };

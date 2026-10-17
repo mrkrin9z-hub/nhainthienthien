@@ -13,7 +13,7 @@ import {
   type CatalogProduct,
   type CatalogVariant,
 } from "@/lib/catalog.functions";
-import { productImage } from "@/lib/product-images";
+import { catalogImage } from "@/lib/product-images";
 import { formatVnd } from "@/lib/brand";
 
 export const Route = createFileRoute("/san-pham")({
@@ -187,7 +187,7 @@ function ProductTile({ product, onOpen }: { product: CatalogProduct; onOpen: () 
     <article className="glass-card flex flex-col overflow-hidden rounded-2xl">
       <button type="button" onClick={onOpen} className="text-left">
         <img
-          src={productImage(product.slug)}
+          src={catalogImage(product.slug, product.cover_path)}
           alt={`Ảnh mẫu ${product.name}`}
           loading="lazy"
           width={800}
@@ -240,7 +240,7 @@ function VariantSheet({
       <div className="max-h-[88vh] w-full overflow-auto rounded-t-3xl border border-border bg-card p-4 sm:max-w-lg sm:rounded-3xl sm:p-6">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
           <img
-            src={productImage(product.slug)}
+            src={catalogImage(product.slug, product.cover_path)}
             alt={`Ảnh mẫu ${product.name}`}
             width={200}
             height={200}

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
@@ -13,6 +14,14 @@ export const Route = createFileRoute("/admin/khach/$id")({
 });
 
 function CustomerPage() {
+  return (
+    <RoleGate allow={["owner", "sale"]} deny="Chỉ chủ và sale xem.">
+      <CustomerBody />
+    </RoleGate>
+  );
+}
+
+function CustomerBody() {
   const { id } = Route.useParams();
   const customer = useQuery({ queryKey: ["customer", id], queryFn: () => getCustomer({ data: { id } }) });
   const [note, setNote] = useState<string | null>(null);

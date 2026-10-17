@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { RoleGate } from "@/components/role-gate";
 import { Input } from "@/components/ui/input";
 import { getCustomers } from "@/lib/admin.functions";
 
@@ -10,6 +11,14 @@ export const Route = createFileRoute("/admin/khach/")({
 });
 
 function CustomersPage() {
+  return (
+    <RoleGate allow={["owner", "sale"]} deny="Chỉ chủ và sale xem.">
+      <CustomersBody />
+    </RoleGate>
+  );
+}
+
+function CustomersBody() {
   const [q, setQ] = useState("");
   const customers = useQuery({ queryKey: ["customers", q], queryFn: () => getCustomers({ data: { q } }) });
   return (

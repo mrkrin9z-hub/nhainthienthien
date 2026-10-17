@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,14 @@ export const Route = createFileRoute("/admin/don-moi")({
 });
 
 function NewOrderPage() {
+  return (
+    <RoleGate allow={["owner", "sale"]} deny="Chỉ chủ và sale xem.">
+      <NewOrderBody />
+    </RoleGate>
+  );
+}
+
+function NewOrderBody() {
   const router = useRouter();
   const skus = useQuery({ queryKey: ["sku-options"], queryFn: () => getSkuOptions() });
   const [channel, setChannel] = useState<Channel>("tai_tiem");
