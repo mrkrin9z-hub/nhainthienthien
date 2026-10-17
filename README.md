@@ -40,9 +40,9 @@ Thứ tự ảnh khách. Trình duyệt luôn gửi ảnh về `/api/public/uplo
 
 1. Đủ 3 biến Google Drive → thư mục Drive.
 2. Có binding R2 `ORDER_FILES` → bucket đó.
-3. Có `SHOP_KV` mà không có R2 → khóa `upload:<id>` nếu ảnh không quá 10MB.
+3. Có `SHOP_KV` mà không có R2 → khóa `upload:<id>` nếu ảnh không quá 10MB. Trang đặt in hiện câu **Mỗi ảnh tối đa 10MB** và báo lỗi rõ khi ảnh vượt mức (API trả 400, không 500).
 4. Có Supabase service role → bucket `order-originals` (server ghi, bucket không public).
-5. Máy local → `data/uploads`.
+5. Máy local → `data/uploads`, cùng mức 10MB khi không có R2, Drive hay Supabase.
 
 Ảnh gốc được giữ **6 tháng sau khi đơn xong** rồi xoá (`fileRetentionDays`, mặc định 180). Video đóng gói giữ `videoRetentionDays` ngày (mặc định 30) kể từ lúc tải lên. App tự quét khi có người mở catalog. Cron `POST /api/public/cleanup-files` cũng xoá, nếu đặt `LOVABLE_CRON_SECRET`.
 
@@ -73,15 +73,27 @@ npx wrangler kv namespace create SHOP_KV
 ```
 
 3. Mở `wrangler.jsonc`, thay `00000000000000000000000000000000` bằng id vừa in ra (cả `id` và `preview_id` nếu chỉ có một namespace).
-4. Tạo bucket ảnh:
+4. Ảnh khách đi vào `SHOP_KV` (tối đa 10MB mỗi ảnh). Tài khoản chưa bật R2 thì **không** khai báo `r2_buckets` — binding đó làm deploy lỗi. Khi R2 bật, thêm vào `wrangler.jsonc` rồi build lại:
 
-```sh
-npx wrangler r2 bucket create nhainthienthien-files
+```jsonc
+"r2_buckets": [{ "binding": "ORDER_FILES", "bucket_name": "nhainthienthien-files" }]
 ```
 
-Binding trong `wrangler.jsonc` là `ORDER_FILES`. Ảnh nhỏ vẫn vào KV nếu bỏ binding này, nhưng ảnh trên 10MB cần R2.
+5. File tĩnh (CSS, JS, ảnh thương hiệu). Nếu không upload được Assets qua API, tạo namespace thứ hai và nạp từ đĩa:
 
-5. Build và deploy. Nitro gộp `wrangler.jsonc` vào file sinh ra:
+```sh
+npx wrangler kv namespace create ASSETS_KV
+```
+
+Thay `11111111111111111111111111111111` trong `wrangler.jsonc` bằng id đó. Nitro vẫn ghi binding `ASSETS` vào `.output/server/wrangler.json`. Nếu API upload static không chạy, xóa khối `assets` trong file đó trước khi deploy. Khi binding `ASSETS` không có, worker lấy file từ `ASSETS_KV`: pathname là khóa (`/assets/...`, `/brand/...`). Đường `/` vẫn do SSR trả, không lấy `index.html` trong KV.
+
+```sh
+npm run build
+node scripts/pack-assets-kv.mjs
+npx wrangler kv bulk put .output/assets-kv.json --namespace-id <id ASSETS_KV>
+```
+
+6. Build và deploy. Nitro gộp `wrangler.jsonc` vào file sinh ra:
 
 ```sh
 npm run build
@@ -96,9 +108,11 @@ Tên miền dự kiến `nhainthienthien.com`. Quản trị nằm tại `/admin`
 
 ## Số liệu
 
-Giá bán để trống, trừ combo 4 tấm 13×18 kênh TikTok là 249.000đ — số duy nhất có trong đặc tả. File bảng giá theo kênh không có trong repo, nên kênh **Tại tiệm / Web** vẫn trống và trang khách hiện **Liên hệ** cho đến khi chủ nhập giá trong Quản trị → Bảng giá. Không lấy giá thử của bản cũ.
+Giá bán lấy từ bảng chủ duyệt ngày 17/10/2026 (sheet Gia của bảng theo kênh, khớp bảng trực tiếp, Facebook và combo FINAL). Kênh **Tại tiệm / Web** là giá trang khách. Mã chưa có số để trạng thái nháp, nên trang khách không hiện **Liên hệ** cho sản phẩm đã có giá tại tiệm. Không lấy giá thử của bản cũ.
 
-Giá túi bọc ảnh, carton, tem nhiệt, phí ship Facebook và định mức nam châm xe để trống. Chủ sửa trong Quản trị → Cài đặt / Kho / Bảng giá.
+Giá túi bọc ảnh, carton, tem nhiệt, phí ship Facebook thật và định mức nam châm xe để trống. Chính sách ship khách ghi trong file Facebook (25.000 / 40.000) không ghi vào cài đặt. Chủ sửa trong Quản trị → Cài đặt / Kho / Bảng giá.
+
+Ảnh tráng gương hiện trên web. Ép gỗ chỉ có giá từ 40×60. Ảnh thờ và giấy khen chỉ có giá tấm lẻ (ảnh thờ từ 20×30; giấy khen A5, A4, A3). Thời khóa biểu và ảnh lụa có giá trong sổ nhưng nhóm đang ẩn. Nam châm xe chỉ còn 9×19 và 17×22. Gói lụa một vài mức không giảm giá mỗi tấm — sổ giữ đúng số trong file và cảnh báo combo.
 
 Lương sale phương án A: 8.000.000đ (thử việc 85%). Sản xuất: 11.000.000đ. Giờ ca 8:00–18:00. Ngày nghỉ trong tuần để trống vì JD ghi làm hằng ngày; chủ chọn ngày nghỉ trong Cài đặt. Mức trừ đi trễ và vắng để trống cho đến khi chủ nhập.
 
@@ -111,6 +125,7 @@ Kho trừ vật tư in khi đơn sang bước **In**, trừ túi / xốp / carto
 ## Kiểm tra
 
 ```sh
+npm ci
 npm test
 npm run build
 ```

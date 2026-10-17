@@ -12,6 +12,7 @@ import {
   collectedRevenue,
   minutesEarly,
   minutesLate,
+  groupIsListed,
   priceOf,
   quoteSku,
   statusChangeError,
@@ -123,9 +124,7 @@ export async function changePassword(actor: Actor, current: string, next: string
 function groupListed(state: ShopState, groupId: string): boolean {
   const group = state.groups.find((g) => g.id === groupId);
   if (!group) return false;
-  if (group.gate === "anh_the" && !state.settings.showAnhThe) return false;
-  if (group.gate === "album" && !state.settings.showAlbum) return false;
-  return state.settings.groupListed[groupId] !== false;
+  return groupIsListed(state.settings, group);
 }
 
 export async function publicConfig() {
@@ -141,6 +140,7 @@ export async function publicConfig() {
     zalo: showZalo ? `https://zalo.me/${digits}` : "",
     hours: state.settings.publicHours,
     region: "Xuân Lộc, Đồng Nai",
+    maxPhotoBytes: await photoByteLimit(),
   };
 }
 
@@ -344,6 +344,14 @@ async function orderByToken(state: ShopState, orderId: string, accessToken: stri
 
 const KV_UPLOAD_MAX = 10 * 1024 * 1024;
 
+/** null khi Drive, R2 hoặc Supabase nhận ảnh lớn. Còn lại (KV hoặc đĩa local) là 10MB. */
+export async function photoByteLimit(): Promise<number | null> {
+  if (driveConfigured()) return null;
+  if (await orderFiles()) return null;
+  if (usesSupabase()) return null;
+  return KV_UPLOAD_MAX;
+}
+
 export async function createUploadTicket(input: {
   orderId: string;
   accessToken: string;
@@ -353,6 +361,8 @@ export async function createUploadTicket(input: {
 }) {
   const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"];
   if (!allowed.includes(input.mimeType.toLowerCase())) throw new Error("Định dạng ảnh không được hỗ trợ.");
+  const limit = await photoByteLimit();
+  if (limit !== null && input.sizeBytes > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
   const fileId = nid();
   const safe = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
   const storagePath = `orders/${input.orderId}/originals/${fileId}-${safe}`;
@@ -391,7 +401,7 @@ async function putPhoto(file: OrderFile, orderId: string, bytes: Uint8Array, mim
   const kv = await shopKv();
   if (kv) {
     if (bytes.byteLength > KV_UPLOAD_MAX) {
-      throw new Error("Ảnh lớn hơn 10MB. Tạo bucket R2 và gắn binding ORDER_FILES (xem README).");
+      throw new Error("Mỗi ảnh tối đa 10MB.");
     }
     const key = `upload:${file.id}`;
     await kv.put(key, bytes);
@@ -454,6 +464,8 @@ export async function saveDirectUpload(input: {
   bytes: Uint8Array;
   mime: string;
 }) {
+  const limit = await photoByteLimit();
+  if (limit !== null && input.bytes.byteLength > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
   await mutate(async (state) => {
     const order = await orderByToken(state, input.orderId, input.accessToken);
     const file = order.files.find((item) => item.id === input.fileId);

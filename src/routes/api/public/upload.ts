@@ -13,13 +13,18 @@ export const Route = createFileRoute("/api/public/upload")({
           return new Response("Thiếu ảnh hoặc mã đơn.", { status: 400 });
         }
         const { saveDirectUpload } = await import("@/server/service");
-        await saveDirectUpload({
-          orderId,
-          accessToken,
-          fileId,
-          bytes: new Uint8Array(await file.arrayBuffer()),
-          mime: file.type || "image/jpeg",
-        });
+        try {
+          await saveDirectUpload({
+            orderId,
+            accessToken,
+            fileId,
+            bytes: new Uint8Array(await file.arrayBuffer()),
+            mime: file.type || "image/jpeg",
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Không lưu được ảnh.";
+          return new Response(message, { status: 400 });
+        }
         return Response.json({ ok: true });
       },
     },

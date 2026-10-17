@@ -495,16 +495,44 @@ export function formulaQty(formula: string, sku: Sku, settings: Settings): numbe
     return rollMeters(w, h, settings.filmRollWidthCm, settings.wasteRate);
   }
   if (formula === "pp-pack" || formula === "silk-pack" || formula === "film-pack") {
-    if (!sku.piecesPerPack || !w || !h) return null;
+    if (!w || !h) return null;
     const width = formula === "film-pack" ? settings.filmRollWidthCm : settings.ppRollWidthCm;
-    const one = rollMeters(w, h, width, settings.wasteRate);
-    return one === null ? null : round4(one * sku.piecesPerPack);
+    return rollMeters(w, h, width, settings.wasteRate);
   }
   if (formula === "magnet-6x9") {
-    if (!sku.piecesPerPack || !settings.magnetPiecesPerSheet) return null;
-    return round4(sku.piecesPerPack / settings.magnetPiecesPerSheet);
+    if (!settings.magnetPiecesPerSheet) return null;
+    return round4(1 / settings.magnetPiecesPerSheet);
   }
   return null;
+}
+
+export function groupIsListed(
+  settings: Settings,
+  group: { id: string; gate: "anh_the" | "album" | null },
+): boolean {
+  if (group.gate === "anh_the" && !settings.showAnhThe) return false;
+  if (group.gate === "album" && !settings.showAlbum) return false;
+  return settings.groupListed[group.id] !== false;
+}
+
+/** Catalog khách: nhóm đang hiện, biến thể tại tiệm đang bán. Giá null thì requires_quote (chữ Liên hệ). */
+export function walkInPublicOffers(state: {
+  settings: Settings;
+  groups: { id: string; gate: "anh_the" | "album" | null }[];
+  skus: { id: string; code: string; groupId: string }[];
+  prices: ChannelPrice[];
+}): { code: string; groupId: string; price: number | null; requires_quote: boolean }[] {
+  return state.groups
+    .filter((group) => groupIsListed(state.settings, group))
+    .flatMap((group) =>
+      state.skus
+        .filter((sku) => sku.groupId === group.id)
+        .filter((sku) => walkInListed(priceOf(state.prices, sku.id, "tai_tiem")?.status))
+        .map((sku) => {
+          const price = priceOf(state.prices, sku.id, "tai_tiem")?.price ?? null;
+          return { code: sku.code, groupId: group.id, price, requires_quote: price === null };
+        }),
+    );
 }
 
 export function walkInListed(status: ChannelPrice["status"] | undefined): boolean {
