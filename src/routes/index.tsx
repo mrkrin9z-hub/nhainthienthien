@@ -13,7 +13,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 
-import { BRAND_COVER } from "@/lib/assets";
+import { LOGO_SQUARE } from "@/lib/assets";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { Button } from "@/components/ui/button";
@@ -142,12 +142,17 @@ function HomePage() {
 
           </div>
 
-          <div className="glass-card overflow-hidden rounded-3xl p-3">
-            <img
-              src={BRAND_COVER}
-              alt="Ảnh in mẫu của Nhà In Thiên Thiên"
-              className="w-full rounded-2xl object-cover"
-            />
+          <div className="glass-card rounded-3xl p-6">
+            <img src={LOGO_SQUARE} alt="Logo Nhà In Thiên Thiên" className="mx-auto h-24 w-24 object-contain" />
+            <p className="mt-4 text-center text-sm font-bold uppercase tracking-wide text-accent">In tại xưởng</p>
+            <ul className="mt-4 space-y-2 text-sm text-foreground">
+              <li>Ảnh tráng gương, ảnh ép gỗ</li>
+              <li>Ảnh thờ và giấy khen</li>
+              <li>Nam châm dán xe, nam châm tủ lạnh</li>
+            </ul>
+            <p className="mt-4 text-center text-sm text-muted-foreground">
+              {config.data?.hours || "08:00 – 20:00"} · {BRAND.region}
+            </p>
           </div>
         </section>
 

@@ -3,11 +3,17 @@ import { z } from "zod";
 
 import type { Actor } from "@/server/service";
 
-async function actor(): Promise<Actor> {
+async function session(): Promise<Actor> {
   const { readStaffId } = await import("@/server/session");
   const { currentActor } = await import("@/server/service");
   const person = await currentActor(await readStaffId());
   if (!person) throw new Error("Chưa đăng nhập.");
+  return person;
+}
+
+async function actor(): Promise<Actor> {
+  const person = await session();
+  if (person.mustChangePassword) throw new Error("Đổi mật khẩu trước khi dùng.");
   return person;
 }
 
@@ -18,11 +24,14 @@ export const getMe = createServerFn({ method: "GET" }).handler(async () => {
 });
 
 export const loginStaff = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ email: z.string().email(), password: z.string().min(4) }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ email: z.string().email(), password: z.string().min(4), code: z.string().optional() }).parse(data),
+  )
   .handler(async ({ data }) => {
     const { login } = await import("@/server/service");
     const { writeStaffId } = await import("@/server/session");
-    const person = await login(data.email, data.password);
+    const person = await login(data.email, data.password, data.code);
+    if ("needsTotp" in person) return person;
     await writeStaffId(person.id);
     return person;
   });
@@ -37,7 +46,7 @@ export const changeOwnPassword = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ current: z.string().min(4), next: z.string().min(8) }).parse(data))
   .handler(async ({ data }) => {
     const { changePassword } = await import("@/server/service");
-    await changePassword(await actor(), data.current, data.next);
+    await changePassword(await session(), data.current, data.next);
     return { ok: true };
   });
 
@@ -416,6 +425,65 @@ export const dueFiles = createServerFn({ method: "GET" }).handler(async () => {
   const { filesDue } = await import("@/server/service");
   return filesDue(await actor());
 });
+
+export const getAudits = createServerFn({ method: "GET" }).handler(async () => {
+  const { listAudits } = await import("@/server/service");
+  return listAudits(await actor());
+});
+
+export const startTotp = createServerFn({ method: "POST" }).handler(async () => {
+  const { beginTotp } = await import("@/server/service");
+  return beginTotp(await actor());
+});
+
+export const finishTotp = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ code: z.string().min(6).max(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { confirmTotp } = await import("@/server/service");
+    await confirmTotp(await actor(), data.code);
+    return { ok: true };
+  });
+
+export const stopTotp = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ password: z.string().min(4), code: z.string().min(6).max(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { disableTotp } = await import("@/server/service");
+    await disableTotp(await actor(), data.password, data.code);
+    return { ok: true };
+  });
+
+export const getBackups = createServerFn({ method: "GET" }).handler(async () => {
+  const { backups } = await import("@/server/service");
+  return backups(await actor());
+});
+
+export const fetchBackup = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ key: z.string().min(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { downloadBackupFile } = await import("@/server/service");
+    return downloadBackupFile(await actor(), data.key);
+  });
+
+export const restoreBackup = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ key: z.string().min(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { restoreFromBackup } = await import("@/server/service");
+    await restoreFromBackup(await actor(), data.key);
+    return { ok: true };
+  });
+
+export const getIntegrations = createServerFn({ method: "GET" }).handler(async () => {
+  const { integrations } = await import("@/server/service");
+  return integrations(await actor());
+});
+
+export const saveIntegration = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ provider: z.string(), value: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { setIntegration } = await import("@/server/service");
+    await setIntegration(await actor(), data.provider, data.value);
+    return { ok: true };
+  });
 
 export const removeFile = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ fileId: z.string() }).parse(data))

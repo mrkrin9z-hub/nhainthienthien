@@ -492,6 +492,9 @@ export async function buildSeed(): Promise<ShopState> {
     mustChangePassword: true,
     probation: false,
     hiredAt: null,
+    totpEnabled: false,
+    totpSecret: null,
+    totpPendingSecret: null,
   };
   return {
     version: 1,

@@ -22,12 +22,18 @@ function PayrollPage() {
   const [month, setMonth] = useState(monthNow());
   const payroll = useQuery({ queryKey: ["payroll", month], queryFn: () => getPayroll({ data: { month } }) });
   const owner = me.data?.role === "owner";
+  if (me.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
+  if (payroll.isError) return <p className="font-semibold text-destructive">{(payroll.error as Error).message}</p>;
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-extrabold text-primary">Lương tháng</h1>
-      <p className="text-sm text-muted-foreground">
-        Sale phương án A: 8.000.000đ cứng (thử việc 85%). Hoa hồng 3% / 5% / 7%. Sản xuất 11.000.000đ, không thưởng sản phẩm. Mức trừ đi trễ và nghỉ để trống cho đến khi chủ nhập.
-      </p>
+      <h1 className="text-2xl font-extrabold text-primary">{owner ? "Lương tháng" : "Lương của tôi"}</h1>
+      {owner ? (
+        <p className="text-sm text-muted-foreground">
+          Sale phương án A: 8.000.000đ cứng (thử việc 85%). Hoa hồng 3% / 5% / 7%. Sản xuất 11.000.000đ, không thưởng sản phẩm. Mức trừ đi trễ và nghỉ để trống cho đến khi chủ nhập.
+        </p>
+      ) : (
+        <p className="text-sm text-muted-foreground">Chỉ hiện lương của tài khoản đang đăng nhập.</p>
+      )}
       <div className="flex flex-wrap gap-2">
         <Input className="min-h-12 max-w-xs" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         {owner ? (

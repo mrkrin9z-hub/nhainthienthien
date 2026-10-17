@@ -21,7 +21,9 @@ import {
 } from "@/domain/calc";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { filesToPurge } from "@/domain/files";
+import { canExport, payrollForActor } from "@/domain/guard";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
+import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
 import type {
   Channel,
@@ -36,10 +38,27 @@ import type {
 import { CHANNEL_LABEL, STATUS_LABEL } from "@/domain/types";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
 import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
+import { listBackups, readBackup } from "@/server/store";
+import { integrationStatus, saveIntegrationSecret } from "@/server/secrets";
 import { deleteFromDrive, downloadFromDrive, driveConfigured, uploadToDrive } from "@/server/drive";
 import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
 
-export type Actor = Pick<Staff, "id" | "name" | "email" | "role" | "mustChangePassword">;
+export type Actor = Pick<Staff, "id" | "name" | "email" | "role" | "mustChangePassword"> & {
+  totpEnabled: boolean;
+};
+
+export type LoginResult = Actor | { needsTotp: true };
+
+function toActor(staff: Staff): Actor {
+  return {
+    id: staff.id,
+    name: staff.name,
+    email: staff.email,
+    role: staff.role,
+    mustChangePassword: staff.mustChangePassword,
+    totpEnabled: staff.totpEnabled === true,
+  };
+}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -86,28 +105,23 @@ export async function currentActor(staffId: string | null): Promise<Actor | null
   const state = await readState();
   const staff = state.staff.find((s) => s.id === staffId && s.active);
   if (!staff) return null;
-  return {
-    id: staff.id,
-    name: staff.name,
-    email: staff.email,
-    role: staff.role,
-    mustChangePassword: staff.mustChangePassword,
-  };
+  return toActor(staff);
 }
 
-export async function login(email: string, password: string): Promise<Actor> {
+export async function login(email: string, password: string, code?: string): Promise<LoginResult> {
   const state = await readState();
   const staff = state.staff.find((s) => s.email.toLowerCase() === email.trim().toLowerCase() && s.active);
   if (!staff || !(await verifyPassword(password, staff.passwordHash))) {
     throw new Error("Email hoặc mật khẩu không đúng.");
   }
-  return {
-    id: staff.id,
-    name: staff.name,
-    email: staff.email,
-    role: staff.role,
-    mustChangePassword: staff.mustChangePassword,
-  };
+  if (staff.totpEnabled && staff.totpSecret) {
+    if (!code?.trim()) return { needsTotp: true };
+    if (!(await verifyTotp(staff.totpSecret, code))) throw new Error("Mã xác thực không đúng.");
+  }
+  await mutate(async (draft) => {
+    audit(draft, staff.id, "auth.login", staff.id, null, { email: staff.email });
+  });
+  return toActor(staff);
 }
 
 export async function changePassword(actor: Actor, current: string, next: string): Promise<void> {
@@ -893,6 +907,7 @@ export async function recount(actor: Actor, input: { materialId: string; actual:
       by: actor.id,
       note: input.note.trim(),
     });
+    audit(state, actor.id, "stock.count", material.id, { stock: systemQty }, { stock: input.actual });
   });
 }
 
@@ -911,6 +926,7 @@ export async function openInk(actor: Actor) {
       by: actor.id,
       note: "",
     });
+    audit(state, actor.id, "stock.ink", ink.id, null, { qty: -1 });
   });
 }
 
@@ -1088,33 +1104,13 @@ function payrollRow(state: ShopState, person: Staff, month: string) {
 export async function payroll(actor: Actor, month: string) {
   const state = await readState();
   const locked = state.payrollLocks.some((item) => item.month === month);
-  if (actor.role === "owner") {
-    const rows = state.staff.filter((person) => person.role !== "owner").map((person) => payrollRow(state, person, month));
-    return visibleToRole(actor.role, { month, locked, rows });
-  }
-  if (actor.role !== "sale") throw new Error("Không có quyền xem lương.");
-  const person = state.staff.find((item) => item.id === actor.id);
-  if (!person) throw new Error("Không thấy nhân viên.");
-  const row = payrollRow(state, person, month);
-  return visibleToRole(actor.role, {
+  const rows = state.staff.filter((person) => person.role !== "owner").map((person) => payrollRow(state, person, month));
+  return {
     month,
     locked,
-    rows: [
-      {
-        staffId: row.staffId,
-        name: row.name,
-        role: row.role,
-        base: row.base,
-        commission: row.commission,
-        kpiBonus: row.kpiBonus,
-        deduction: row.deduction,
-        net: row.net,
-        lateMinutes: row.lateMinutes,
-        absentDays: row.absentDays,
-        kpiPercent: row.kpiPercent,
-      },
-    ],
-  });
+    scope: actor.role === "owner" ? ("all" as const) : ("self" as const),
+    rows: payrollForActor(actor.role, actor.id, rows),
+  };
 }
 
 export async function lockPayroll(actor: Actor, month: string) {
@@ -1472,7 +1468,7 @@ export async function fileForStaff(actor: Actor, fileId: string): Promise<{ name
 }
 
 export async function exportWorkbook(actor: Actor, kind: "orders" | "stock" | "moves" | "payroll" | "profit", month: string) {
-  if (kind === "profit" || kind === "payroll") assertRole(actor, ["owner"]);
+  if (!canExport(actor.role, kind)) throw new Error("Không có quyền làm việc này.");
   const state = await readState();
   const sheets: Sheet[] = [];
   if (kind === "orders") {
@@ -1581,4 +1577,106 @@ export async function skuOptions(actor: Actor) {
 export async function recalc(actor: Actor) {
   assertRole(actor, ["owner"]);
   return mutate(async (state) => recalcBoms(state));
+}
+
+export async function listAudits(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  return state.audits.slice(0, 200).map((item) => ({
+    id: item.id,
+    at: item.at,
+    action: item.action,
+    entity: item.entity,
+    actorName: state.staff.find((person) => person.id === item.actorId)?.name ?? "",
+    before: item.before,
+    after: item.after,
+  }));
+}
+
+export async function beginTotp(actor: Actor) {
+  const secret = generateTotpSecret();
+  await mutate(async (state) => {
+    const staff = staffOf(state, actor.id);
+    if (staff.totpEnabled) throw new Error("Xác thực 2 lớp đang bật. Tắt trước khi tạo mã mới.");
+    staff.totpPendingSecret = secret;
+  });
+  return { secret, uri: otpauthUri(actor.email, secret) };
+}
+
+export async function confirmTotp(actor: Actor, code: string) {
+  await mutate(async (state) => {
+    const staff = staffOf(state, actor.id);
+    if (!staff.totpPendingSecret) throw new Error("Chưa tạo mã bí mật.");
+    if (!(await verifyTotp(staff.totpPendingSecret, code))) throw new Error("Mã xác thực không đúng.");
+    staff.totpSecret = staff.totpPendingSecret;
+    staff.totpPendingSecret = null;
+    staff.totpEnabled = true;
+    audit(state, actor.id, "auth.totp", staff.id, null, { enabled: true });
+  });
+}
+
+export async function disableTotp(actor: Actor, password: string, code: string) {
+  await mutate(async (state) => {
+    const staff = staffOf(state, actor.id);
+    if (!(await verifyPassword(password, staff.passwordHash))) throw new Error("Mật khẩu hiện tại không đúng.");
+    if (!staff.totpEnabled || !staff.totpSecret) throw new Error("Xác thực 2 lớp đang tắt.");
+    if (!(await verifyTotp(staff.totpSecret, code))) throw new Error("Mã xác thực không đúng.");
+    staff.totpEnabled = false;
+    staff.totpSecret = null;
+    staff.totpPendingSecret = null;
+    audit(state, actor.id, "auth.totp", staff.id, null, { enabled: false });
+  });
+}
+
+export async function backups(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  return listBackups();
+}
+
+export async function downloadBackupFile(actor: Actor, key: string) {
+  assertRole(actor, ["owner"]);
+  const doc = await readBackup(key);
+  return {
+    filename: `${key.replaceAll(":", "-")}.json`,
+    json: JSON.stringify({ version: doc.version, doc }),
+  };
+}
+
+export async function restoreFromBackup(actor: Actor, key: string) {
+  assertRole(actor, ["owner"]);
+  const doc = await readBackup(key);
+  await mutate(async (state) => {
+    const version = state.version;
+    const previous = state.audits;
+    const next = structuredClone(doc);
+    next.version = version;
+    next.audits = [
+      {
+        id: nid(),
+        at: nowIso(),
+        actorId: actor.id,
+        action: "backup.restore",
+        entity: key,
+        before: null,
+        after: { version: doc.version },
+      },
+      ...previous,
+    ].slice(0, 2000);
+    const draft = state as unknown as Record<string, unknown>;
+    for (const field of Object.keys(draft)) delete draft[field];
+    Object.assign(draft, next);
+  });
+}
+
+export async function integrations(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  return integrationStatus();
+}
+
+export async function setIntegration(actor: Actor, provider: string, value: string) {
+  assertRole(actor, ["owner"]);
+  await saveIntegrationSecret(provider, value);
+  await mutate(async (state) => {
+    audit(state, actor.id, "secret.update", provider, null, { set: value.trim().length > 0 });
+  });
 }

@@ -139,6 +139,10 @@ export type Staff = {
   mustChangePassword: boolean;
   probation: boolean;
   hiredAt: string | null;
+  /** Bật thì lần đăng nhập sau bắt mã 6 số. Chủ cũng vậy, không ngoại lệ. */
+  totpEnabled?: boolean;
+  totpSecret?: string | null;
+  totpPendingSecret?: string | null;
 };
 
 export type Group = {

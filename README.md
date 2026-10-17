@@ -122,6 +122,12 @@ Cảnh báo lãi: vàng khi lãi gộp dưới 30%, đỏ khi lỗ. Hai ngưỡn
 
 Kho trừ vật tư in khi đơn sang bước **In**, trừ túi / xốp / carton / băng keo / tem khi sang bước **Giao** (đóng gói xong). Lùi bước hoặc hủy thì hoàn đúng số đã trừ. Không dùng thùng, không túi zip. Nam châm xe chỉ còn size 9×19 và 17×22.
 
+## Sau bản sửa deploy Workers
+
+Worker đọc `ASSETS_KV` từ binding `cloudflare:workers`, không từ tham số `env` của `fetch` (lớp bọc chỉ truyền request). Deploy lại worker là đủ nếu khóa file tĩnh đã nạp. Xóa khối `assets` trong `.output/server/wrangler.json` khi API upload static không chạy.
+
+Lần đăng nhập đầu của tài khoản mẫu bắt đổi mật khẩu ngay trên trang quản trị. Chủ bật mã 6 số ở **Tài khoản**. Nhật ký, sao lưu (30 bản theo ngày trong KV) và **Kết nối** (khóa để trống, chưa gọi API) chỉ chủ xem.
+
 ## Kiểm tra
 
 ```sh

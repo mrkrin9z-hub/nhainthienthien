@@ -1,7 +1,9 @@
 import "./lib/error-capture";
 
+import { staticAssetPath } from "./domain/guard";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { assetsKv, type AssetsKv } from "./server/bindings";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -44,19 +46,6 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
-type AssetsKv = {
-  get(key: string, type: "arrayBuffer"): Promise<ArrayBuffer | null>;
-  getWithMetadata?(
-    key: string,
-    type: "arrayBuffer",
-  ): Promise<{ value: ArrayBuffer | null; metadata?: { contentType?: string } | null }>;
-};
-
-type AssetEnv = {
-  ASSETS?: { fetch?: (request: Request) => Promise<Response> };
-  ASSETS_KV?: AssetsKv;
-};
-
 const STATIC_TYPES: Record<string, string> = {
   ".js": "text/javascript; charset=utf-8",
   ".mjs": "text/javascript; charset=utf-8",
@@ -86,22 +75,19 @@ function contentTypeFor(path: string): string {
 /**
  * Khi không có binding ASSETS (API upload static không dùng được), phục vụ file build
  * từ KV. Khóa = pathname (có dấu /). Không trả index cho `/` để SSR giữ trang chủ.
+ * Binding đọc từ `cloudflare:workers`, không từ tham số env của fetch.
  */
-async function assetsFromKv(request: Request, env: AssetEnv): Promise<Response | null> {
+async function assetsFromKv(request: Request, kv: AssetsKv): Promise<Response | null> {
   if (request.method !== "GET" && request.method !== "HEAD") return null;
-  if (env.ASSETS || !env.ASSETS_KV) return null;
   let pathname = "";
   try {
     pathname = decodeURIComponent(new URL(request.url).pathname);
   } catch {
     return null;
   }
-  if (pathname === "/" || pathname === "/index.html" || pathname.includes("..") || pathname.includes("\\")) {
-    return null;
-  }
-  const isAsset = pathname.startsWith("/assets/") || /\.[a-z0-9]+$/i.test(pathname);
-  if (!isAsset) return null;
-  const kv = env.ASSETS_KV;
+  const key = staticAssetPath(pathname);
+  if (!key) return null;
+  pathname = key;
   let body: ArrayBuffer | null = null;
   let contentType = contentTypeFor(pathname);
   try {
@@ -127,8 +113,11 @@ async function assetsFromKv(request: Request, env: AssetEnv): Promise<Response |
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
-      const staticFile = await assetsFromKv(request, (env ?? {}) as AssetEnv);
-      if (staticFile) return staticFile;
+      const kv = await assetsKv();
+      if (kv) {
+        const staticFile = await assetsFromKv(request, kv);
+        if (staticFile) return staticFile;
+      }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

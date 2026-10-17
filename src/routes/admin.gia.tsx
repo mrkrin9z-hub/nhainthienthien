@@ -20,11 +20,15 @@ function PricePage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const [groupId, setGroupId] = useState("ep_go");
   const [channel, setChannel] = useState<Channel>("tai_tiem");
+  const allowed = me.data?.role === "owner" || me.data?.role === "sale";
   const board = useQuery({
     queryKey: ["prices", groupId],
     queryFn: () => getPriceBoard({ data: { groupId } }),
+    enabled: allowed,
   });
   const owner = me.data?.role === "owner";
+  if (me.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
+  if (me.data?.role === "production") return <p className="text-lg font-semibold text-primary">Chỉ chủ và sale xem bảng giá.</p>;
 
   return (
     <div className="space-y-6">

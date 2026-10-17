@@ -22,10 +22,14 @@ import { Route as AdminCaiDatRouteImport } from './routes/admin.cai-dat'
 import { Route as AdminChamCongRouteImport } from './routes/admin.cham-cong'
 import { Route as AdminDonMoiRouteImport } from './routes/admin.don-moi'
 import { Route as AdminGiaRouteImport } from './routes/admin.gia'
+import { Route as AdminKetNoiRouteImport } from './routes/admin.ket-noi'
 import { Route as AdminKhoRouteImport } from './routes/admin.kho'
 import { Route as AdminLoiNhuanRouteImport } from './routes/admin.loi-nhuan'
 import { Route as AdminLuongRouteImport } from './routes/admin.luong'
+import { Route as AdminNhatKyRouteImport } from './routes/admin.nhat-ky'
 import { Route as AdminSanPhamRouteImport } from './routes/admin.san-pham'
+import { Route as AdminSaoLuuRouteImport } from './routes/admin.sao-luu'
+import { Route as AdminTaiKhoanRouteImport } from './routes/admin.tai-khoan'
 import { Route as AdminDonHangIndexRouteImport } from './routes/admin.don-hang.index'
 import { Route as AdminDonHangCodeRouteImport } from './routes/admin.don-hang.$code'
 import { Route as AdminKhachIndexRouteImport } from './routes/admin.khach.index'
@@ -99,6 +103,11 @@ const AdminGiaRoute = AdminGiaRouteImport.update({
   path: '/gia',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminKetNoiRoute = AdminKetNoiRouteImport.update({
+  id: '/ket-noi',
+  path: '/ket-noi',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminKhoRoute = AdminKhoRouteImport.update({
   id: '/kho',
   path: '/kho',
@@ -114,9 +123,24 @@ const AdminLuongRoute = AdminLuongRouteImport.update({
   path: '/luong',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminNhatKyRoute = AdminNhatKyRouteImport.update({
+  id: '/nhat-ky',
+  path: '/nhat-ky',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSanPhamRoute = AdminSanPhamRouteImport.update({
   id: '/san-pham',
   path: '/san-pham',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSaoLuuRoute = AdminSaoLuuRouteImport.update({
+  id: '/sao-luu',
+  path: '/sao-luu',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTaiKhoanRoute = AdminTaiKhoanRouteImport.update({
+  id: '/tai-khoan',
+  path: '/tai-khoan',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminDonHangIndexRoute = AdminDonHangIndexRouteImport.update({
@@ -168,10 +192,14 @@ export interface FileRoutesByFullPath {
   '/admin/cham-cong': typeof AdminChamCongRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
   '/admin/gia': typeof AdminGiaRoute
+  '/admin/ket-noi': typeof AdminKetNoiRoute
   '/admin/kho': typeof AdminKhoRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/nhat-ky': typeof AdminNhatKyRoute
   '/admin/san-pham': typeof AdminSanPhamRoute
+  '/admin/sao-luu': typeof AdminSaoLuuRoute
+  '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
@@ -193,10 +221,14 @@ export interface FileRoutesByTo {
   '/admin/cham-cong': typeof AdminChamCongRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
   '/admin/gia': typeof AdminGiaRoute
+  '/admin/ket-noi': typeof AdminKetNoiRoute
   '/admin/kho': typeof AdminKhoRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/nhat-ky': typeof AdminNhatKyRoute
   '/admin/san-pham': typeof AdminSanPhamRoute
+  '/admin/sao-luu': typeof AdminSaoLuuRoute
+  '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin': typeof AdminIndexRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
@@ -220,10 +252,14 @@ export interface FileRoutesById {
   '/admin/cham-cong': typeof AdminChamCongRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
   '/admin/gia': typeof AdminGiaRoute
+  '/admin/ket-noi': typeof AdminKetNoiRoute
   '/admin/kho': typeof AdminKhoRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/nhat-ky': typeof AdminNhatKyRoute
   '/admin/san-pham': typeof AdminSanPhamRoute
+  '/admin/sao-luu': typeof AdminSaoLuuRoute
+  '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
@@ -248,10 +284,14 @@ export interface FileRouteTypes {
     | '/admin/cham-cong'
     | '/admin/don-moi'
     | '/admin/gia'
+    | '/admin/ket-noi'
     | '/admin/kho'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/nhat-ky'
     | '/admin/san-pham'
+    | '/admin/sao-luu'
+    | '/admin/tai-khoan'
     | '/admin/'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
@@ -273,10 +313,14 @@ export interface FileRouteTypes {
     | '/admin/cham-cong'
     | '/admin/don-moi'
     | '/admin/gia'
+    | '/admin/ket-noi'
     | '/admin/kho'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/nhat-ky'
     | '/admin/san-pham'
+    | '/admin/sao-luu'
+    | '/admin/tai-khoan'
     | '/admin'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
@@ -299,10 +343,14 @@ export interface FileRouteTypes {
     | '/admin/cham-cong'
     | '/admin/don-moi'
     | '/admin/gia'
+    | '/admin/ket-noi'
     | '/admin/kho'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/nhat-ky'
     | '/admin/san-pham'
+    | '/admin/sao-luu'
+    | '/admin/tai-khoan'
     | '/admin/'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
@@ -420,6 +468,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminGiaRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/ket-noi': {
+      id: '/admin/ket-noi'
+      path: '/ket-noi'
+      fullPath: '/admin/ket-noi'
+      preLoaderRoute: typeof AdminKetNoiRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/kho': {
       id: '/admin/kho'
       path: '/kho'
@@ -441,11 +496,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLuongRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/nhat-ky': {
+      id: '/admin/nhat-ky'
+      path: '/nhat-ky'
+      fullPath: '/admin/nhat-ky'
+      preLoaderRoute: typeof AdminNhatKyRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/san-pham': {
       id: '/admin/san-pham'
       path: '/san-pham'
       fullPath: '/admin/san-pham'
       preLoaderRoute: typeof AdminSanPhamRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/sao-luu': {
+      id: '/admin/sao-luu'
+      path: '/sao-luu'
+      fullPath: '/admin/sao-luu'
+      preLoaderRoute: typeof AdminSaoLuuRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/tai-khoan': {
+      id: '/admin/tai-khoan'
+      path: '/tai-khoan'
+      fullPath: '/admin/tai-khoan'
+      preLoaderRoute: typeof AdminTaiKhoanRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/don-hang/': {
@@ -505,10 +581,14 @@ interface AdminRouteChildren {
   AdminChamCongRoute: typeof AdminChamCongRoute
   AdminDonMoiRoute: typeof AdminDonMoiRoute
   AdminGiaRoute: typeof AdminGiaRoute
+  AdminKetNoiRoute: typeof AdminKetNoiRoute
   AdminKhoRoute: typeof AdminKhoRoute
   AdminLoiNhuanRoute: typeof AdminLoiNhuanRoute
   AdminLuongRoute: typeof AdminLuongRoute
+  AdminNhatKyRoute: typeof AdminNhatKyRoute
   AdminSanPhamRoute: typeof AdminSanPhamRoute
+  AdminSaoLuuRoute: typeof AdminSaoLuuRoute
+  AdminTaiKhoanRoute: typeof AdminTaiKhoanRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminDonHangCodeRoute: typeof AdminDonHangCodeRoute
   AdminKhachIdRoute: typeof AdminKhachIdRoute
@@ -521,10 +601,14 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminChamCongRoute: AdminChamCongRoute,
   AdminDonMoiRoute: AdminDonMoiRoute,
   AdminGiaRoute: AdminGiaRoute,
+  AdminKetNoiRoute: AdminKetNoiRoute,
   AdminKhoRoute: AdminKhoRoute,
   AdminLoiNhuanRoute: AdminLoiNhuanRoute,
   AdminLuongRoute: AdminLuongRoute,
+  AdminNhatKyRoute: AdminNhatKyRoute,
   AdminSanPhamRoute: AdminSanPhamRoute,
+  AdminSaoLuuRoute: AdminSaoLuuRoute,
+  AdminTaiKhoanRoute: AdminTaiKhoanRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminDonHangCodeRoute: AdminDonHangCodeRoute,
   AdminKhachIdRoute: AdminKhachIdRoute,

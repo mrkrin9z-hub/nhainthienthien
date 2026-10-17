@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMaybe } from "@/lib/brand";
-import { downloadExcel, getProfit, saveExpense, saveFixedMonth } from "@/lib/admin.functions";
+import { downloadExcel, getMe, getProfit, saveExpense, saveFixedMonth } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/loi-nhuan")({
   component: ProfitPage,
@@ -17,6 +17,13 @@ function monthNow() {
 }
 
 function ProfitPage() {
+  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
+  if (me.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
+  if (me.data?.role !== "owner") return <p className="text-lg font-semibold text-primary">Chỉ chủ xem.</p>;
+  return <ProfitBody />;
+}
+
+function ProfitBody() {
   const [month, setMonth] = useState(monthNow());
   const queryClient = useQueryClient();
   const report = useQuery({ queryKey: ["profit", month], queryFn: () => getProfit({ data: { month } }) });
@@ -46,7 +53,8 @@ function ProfitPage() {
         </Button>
       </div>
       <Input className="min-h-12 max-w-xs" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-      {!data ? <p className="text-muted-foreground">Đang tải…</p> : null}
+      {report.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
+      {report.isError ? <p className="font-semibold text-destructive">{(report.error as Error).message}</p> : null}
       {data ? (
         <>
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
