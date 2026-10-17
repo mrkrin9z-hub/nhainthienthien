@@ -82,7 +82,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Nhà In Thiên Thiên — In đẹp từng khoảnh khắc" },
       {
         name: "description",
-        content: "In ảnh gỗ lụa, tráng gương, ảnh thẻ, phục hồi ảnh cũ — giá xưởng cho mọi nhà.",
+        content: "In ảnh ép gỗ, ảnh thờ, giấy khen và nam châm — giá xưởng tại Xuân Lộc, Đồng Nai.",
       },
       { name: "author", content: "Nhà In Thiên Thiên" },
       { property: "og:title", content: "Nhà In Thiên Thiên — In đẹp từng khoảnh khắc" },
@@ -92,7 +92,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {

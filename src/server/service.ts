@@ -1,42 +1,44 @@
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { visibleToRole } from "@/domain/access";
 import {
-  collectedRevenue,
-  commissionOf,
   comboPriceError,
-  depositBlocks,
+  comboWarnings,
+  commissionOf,
   depositFor,
   formulaQty,
   isWeeklyOff,
   kpiTarget,
+  collectedRevenue,
   minutesEarly,
   minutesLate,
   priceOf,
   quoteSku,
-  statusRank,
-  stockNeeds,
+  statusChangeError,
   vnParts,
   walkInListed,
 } from "@/domain/calc";
 import { workbookXml, type Sheet } from "@/domain/excel";
+import { filesToPurge } from "@/domain/files";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
+import { syncOrderStock } from "@/domain/stock";
 import type {
   Channel,
   Order,
+  OrderFile,
   OrderStatus,
   Role,
   ShopState,
   Sku,
   Staff,
 } from "@/domain/types";
-import { CHANNEL_LABEL, STATUS_LABEL, STATUS_REPLY } from "@/domain/types";
+import { CHANNEL_LABEL, STATUS_LABEL } from "@/domain/types";
+import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
+import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
 import { deleteFromDrive, downloadFromDrive, driveConfigured, uploadToDrive } from "@/server/drive";
-import { mutate, readState } from "@/server/store";
+import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
 
 export type Actor = Pick<Staff, "id" | "name" | "email" | "role" | "mustChangePassword">;
-
-const MONEY_ROLES: Role[] = ["owner"];
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -129,17 +131,32 @@ function groupListed(state: ShopState, groupId: string): boolean {
 export async function publicConfig() {
   const state = await readState();
   const phone = state.settings.zaloPhone || "0778662227";
+  const digits = phone.replace(/\D/g, "");
+  const showZalo = state.settings.showZalo !== false;
   return {
     name: "NHÀ IN THIÊN THIÊN",
-    phone: prettyPhone(phone),
-    phoneRaw: phone.replace(/\D/g, ""),
-    zalo: `https://zalo.me/${phone.replace(/\D/g, "")}`,
+    showZalo,
+    phone: showZalo ? prettyPhone(phone) : "",
+    phoneRaw: showZalo ? digits : "",
+    zalo: showZalo ? `https://zalo.me/${digits}` : "",
     hours: state.settings.publicHours,
     region: "Xuân Lộc, Đồng Nai",
   };
 }
 
+let lastFileSweep = 0;
+
+function sweepExpiredFiles() {
+  const now = Date.now();
+  if (now - lastFileSweep < 6 * 60 * 60 * 1000) return;
+  lastFileSweep = now;
+  void purgeExpiredFiles(now).catch(() => {
+    lastFileSweep = 0;
+  });
+}
+
 export async function publicCatalog() {
+  sweepExpiredFiles();
   const state = await readState();
   return state.groups
     .filter((g) => groupListed(state, g.id))
@@ -249,35 +266,6 @@ function refreshDeposit(state: ShopState, order: Order) {
   });
 }
 
-function orderLines(state: ShopState, order: Order) {
-  return order.items.map((item) => ({ sku: skuOrThrow(state, item.skuId), quantity: item.quantity }));
-}
-
-function applyStock(state: ShopState, order: Order, phase: "print" | "pack", by: string | null) {
-  const { needs, missing } = stockNeeds(orderLines(state, order), state.boms, phase);
-  const names: string[] = [];
-  for (const id of missing) names.push(state.materials.find((m) => m.id === id)?.name ?? id);
-  for (const need of needs) {
-    if (need.materialId === "tem" && order.channel === "tai_tiem" && order.fulfillment === "pickup") continue;
-    const material = state.materials.find((m) => m.id === need.materialId);
-    if (!material) continue;
-    material.stock = Math.round((material.stock - need.qty) * 10000) / 10000;
-    state.movements.unshift({
-      id: nid(),
-      at: nowIso(),
-      materialId: material.id,
-      qty: -need.qty,
-      reason: phase === "print" ? "Trừ kho khi vào bước in" : "Trừ kho khi đóng gói xong",
-      orderId: order.id,
-      by,
-      note: order.code,
-    });
-  }
-  if (names.length) {
-    order.stockWarning = `Chưa trừ được: ${[...new Set(names)].join(", ")} (chưa có định mức).`;
-  }
-}
-
 function nextCode(state: ShopState): string {
   const ymd = vnParts().ymd;
   const prefix = `TT${ymd.slice(2).replaceAll("-", "")}`;
@@ -354,11 +342,7 @@ async function orderByToken(state: ShopState, orderId: string, accessToken: stri
   return order;
 }
 
-function storageMode(): "drive" | "supabase" | "local" {
-  if (driveConfigured()) return "drive";
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) return "supabase";
-  return "local";
-}
+const KV_UPLOAD_MAX = 10 * 1024 * 1024;
 
 export async function createUploadTicket(input: {
   orderId: string;
@@ -369,20 +353,9 @@ export async function createUploadTicket(input: {
 }) {
   const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"];
   if (!allowed.includes(input.mimeType.toLowerCase())) throw new Error("Định dạng ảnh không được hỗ trợ.");
-  const mode = storageMode();
   const fileId = nid();
   const safe = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
   const storagePath = `orders/${input.orderId}/originals/${fileId}-${safe}`;
-  let token = "";
-  if (mode === "supabase") {
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const signed = await supabase.storage.from("order-originals").createSignedUploadUrl(storagePath);
-    if (signed.error || !signed.data) throw new Error(signed.error?.message ?? "Không tạo được đường dẫn tải lên.");
-    token = signed.data.token;
-  }
   await mutate(async (state) => {
     const order = await orderByToken(state, input.orderId, input.accessToken);
     order.files.push({
@@ -392,14 +365,86 @@ export async function createUploadTicket(input: {
       size: input.sizeBytes,
       status: "uploading",
       kind: "original",
-      storage: mode === "supabase" ? "supabase" : mode === "drive" ? "drive" : "local",
+      storage: "local",
       path: storagePath,
       driveFileId: null,
       createdAt: nowIso(),
       deletedAt: null,
     });
   });
-  return { fileId, path: storagePath, token, mode };
+  return { fileId, path: storagePath, mode: "server" as const };
+}
+
+async function putPhoto(file: OrderFile, orderId: string, bytes: Uint8Array, mime: string) {
+  if (driveConfigured()) {
+    file.driveFileId = await uploadToDrive(file.name, mime || file.mime, bytes);
+    file.storage = "drive";
+    file.path = file.driveFileId;
+    return;
+  }
+  const bucket = await orderFiles();
+  if (bucket) {
+    await bucket.put(file.path, bytes, { httpMetadata: { contentType: mime || file.mime } });
+    file.storage = "r2";
+    return;
+  }
+  const kv = await shopKv();
+  if (kv) {
+    if (bytes.byteLength > KV_UPLOAD_MAX) {
+      throw new Error("Ảnh lớn hơn 10MB. Tạo bucket R2 và gắn binding ORDER_FILES (xem README).");
+    }
+    const key = `upload:${file.id}`;
+    await kv.put(key, bytes);
+    file.storage = "kv";
+    file.path = key;
+    return;
+  }
+  if (usesSupabase()) {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const uploaded = await supabase.storage.from("order-originals").upload(file.path, bytes, {
+      contentType: mime || file.mime,
+      upsert: true,
+    });
+    if (uploaded.error) throw new Error(uploaded.error.message);
+    file.storage = "supabase";
+    return;
+  }
+  if (onWorkers()) {
+    throw new Error("Không có chỗ lưu ảnh trên Workers. Gắn R2 ORDER_FILES hoặc KV SHOP_KV.");
+  }
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const relative = path.join("data", "uploads", orderId, file.id);
+  const absolute = path.join(process.cwd(), relative);
+  await mkdir(path.dirname(absolute), { recursive: true });
+  await writeFile(absolute, bytes);
+  file.storage = "local";
+  file.path = relative;
+}
+
+async function removePhoto(file: OrderFile) {
+  if (file.storage === "local" && (await usesDisk())) {
+    const { unlink } = await import("node:fs/promises");
+    await unlink(path.join(process.cwd(), file.path)).catch(() => undefined);
+  }
+  if (file.storage === "drive" && file.driveFileId) await deleteFromDrive(file.driveFileId).catch(() => undefined);
+  if (file.storage === "r2") {
+    const bucket = await orderFiles();
+    if (bucket) await bucket.delete(file.path).catch(() => undefined);
+  }
+  if (file.storage === "kv") {
+    const kv = await shopKv();
+    if (kv) await kv.delete(file.path || `upload:${file.id}`).catch(() => undefined);
+  }
+  if (file.storage === "supabase" && usesSupabase()) {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    await supabase.storage.from("order-originals").remove([file.path]);
+  }
 }
 
 export async function saveDirectUpload(input: {
@@ -413,18 +458,7 @@ export async function saveDirectUpload(input: {
     const order = await orderByToken(state, input.orderId, input.accessToken);
     const file = order.files.find((item) => item.id === input.fileId);
     if (!file) throw new Error("Không thấy file của đơn.");
-    if (driveConfigured()) {
-      file.driveFileId = await uploadToDrive(file.name, input.mime || file.mime, input.bytes);
-      file.storage = "drive";
-      file.path = file.driveFileId;
-    } else {
-      const relative = path.join("data", "uploads", order.id, file.id);
-      const absolute = path.join(process.cwd(), relative);
-      await mkdir(path.dirname(absolute), { recursive: true });
-      await writeFile(absolute, input.bytes);
-      file.storage = "local";
-      file.path = relative;
-    }
+    await putPhoto(file, order.id, input.bytes, input.mime);
     file.status = "complete";
     file.size = input.bytes.byteLength;
   });
@@ -497,220 +531,24 @@ export async function lookupOrder(code: string, phone: string) {
   };
 }
 
-function customerName(state: ShopState, id: string): { name: string; phone: string } {
-  const customer = state.customers.find((item) => item.id === id);
-  return { name: customer?.name ?? "", phone: customer?.phone ?? "" };
-}
-
-function isLate(state: ShopState, order: Order, clock = vnParts()): boolean {
-  if (!["facebook", "tiktok", "shopee"].includes(order.channel)) return false;
-  if (["giao", "xong", "huy", "draft_upload", "upload_error"].includes(order.status)) return false;
-  const created = vnParts(new Date(order.createdAt));
-  if (created.ymd < clock.ymd) return true;
-  return created.hm <= state.settings.marketplaceCutoff && clock.hm > state.settings.marketplaceHandover;
-}
-
-function orderSummary(state: ShopState, order: Order, role: Role) {
-  const customer = customerName(state, order.customerId);
-  const showMoney = role !== "production";
-  return {
-    id: order.id,
-    code: order.code,
-    status: order.status,
-    statusLabel: STATUS_LABEL[order.status],
-    createdAt: order.createdAt,
-    channel: order.channel,
-    channelLabel: CHANNEL_LABEL[order.channel],
-    source: order.source,
-    customerName: customer.name,
-    phone: customer.phone,
-    address: order.address,
-    itemSummary: order.items.map((item) => `${item.quantity}× ${item.name}`).join(", "),
-    total: showMoney ? order.total : null,
-    late: isLate(state, order),
-    fileCount: order.files.filter((file) => !file.deletedAt && file.status === "complete").length,
-    fulfillment: order.fulfillment,
-  };
-}
-
 export async function dashboard(actor: Actor) {
-  const state = await readState();
-  const clock = vnParts();
-  const visible = state.orders.filter((order) => !["draft_upload"].includes(order.status));
-  const byStatus = (["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"] as OrderStatus[]).map(
-    (status) => ({ status, label: STATUS_LABEL[status], count: visible.filter((order) => order.status === status).length }),
-  );
-  const late = visible.filter((order) => isLate(state, order, clock)).map((order) => orderSummary(state, order, actor.role));
-  const lowStock = state.materials
-    .filter((material) => material.minStock !== null && material.stock <= material.minStock)
-    .map((material) => ({ id: material.id, name: material.name, stock: material.stock, unit: material.unit, min: material.minStock }));
-  const onShift = state.staff
-    .filter((person) =>
-      state.punches.some((punch) => punch.staffId === person.id && !punch.outAt && punch.inAt.slice(0, 10) === clock.ymd),
-    )
-    .map((person) => ({ id: person.id, name: person.name, role: person.role }));
-  const mineOpen = state.punches.find((punch) => punch.staffId === actor.id && !punch.outAt) ?? null;
-  if (actor.role === "production") {
-    return {
-      role: actor.role,
-      name: actor.name,
-      byStatus: byStatus.filter((row) => ["thiet_ke", "cho_duyet", "in", "dong_goi", "giao"].includes(row.status)),
-      queue: visible
-        .filter((order) => ["thiet_ke", "cho_duyet", "in", "dong_goi"].includes(order.status))
-        .map((order) => orderSummary(state, order, actor.role)),
-      late,
-      lowStock,
-      onShift: onShift.filter((person) => person.id === actor.id),
-      clockedIn: Boolean(mineOpen),
-    };
-  }
-  if (actor.role === "sale") {
-    const revenue = collectedRevenue(state.orders, clock.month);
-    const target = kpiTarget(state.settings.shopOpenDate, clock.month, state.settings.kpiTargets);
-    return {
-      role: actor.role,
-      name: actor.name,
-      byStatus,
-      late,
-      lowStock,
-      onShift,
-      clockedIn: Boolean(mineOpen),
-      orders: visible.slice(0, 12).map((order) => orderSummary(state, order, actor.role)),
-      kpiPercent: target > 0 ? Math.round((revenue / target) * 1000) / 10 : null,
-      commission: commissionOf(revenue, state.settings.commissionTiers),
-      kpiMonthLabel: `Mốc hòa vốn tháng ${clock.month} không hiện doanh thu.`,
-    };
-  }
-  const doneMonth = state.orders.filter((order) => order.status === "xong" && (order.completedAt ?? "").slice(0, 7) === clock.month);
-  const revenueMonth = doneMonth.reduce((sum, order) => sum + (order.total ?? 0), 0);
-  const revenueToday = doneMonth
-    .filter((order) => (order.completedAt ?? "").slice(0, 10) === clock.ymd)
-    .reduce((sum, order) => sum + (order.total ?? 0), 0);
-  let gross = 0;
-  let grossIncomplete = false;
-  for (const order of doneMonth) {
-    for (const item of order.items) {
-      const sku = state.skus.find((row) => row.id === item.skuId);
-      if (!sku || item.unitPrice === null) {
-        grossIncomplete = true;
-        continue;
-      }
-      const quote = quoteSku({
-        sku,
-        price: item.unitPrice * item.quantity,
-        channel: order.channel,
-        settings: state.settings,
-        boms: state.boms.map((bom) => ({ ...bom, qty: bom.scope === "sheet" ? bom.qty : bom.qty })),
-        materials: state.materials,
-        affiliate: false,
-      });
-      if (quote.profit === null) grossIncomplete = true;
-      else gross += quote.profit;
-    }
-  }
-  const fixed = fixedTotal(state, clock.month);
-  return {
-    role: actor.role,
-    name: actor.name,
-    byStatus,
-    late,
-    lowStock,
-    onShift,
-    clockedIn: Boolean(mineOpen),
-    revenueToday,
-    revenueMonth,
-    breakevenPercent: state.settings.breakevenMonth
-      ? Math.round((revenueMonth / state.settings.breakevenMonth) * 1000) / 10
-      : null,
-    todayGap: Math.max(0, state.settings.breakevenDay - revenueToday),
-    gross: Math.round(gross),
-    grossIncomplete,
-    fixed,
-    profit: grossIncomplete ? null : Math.round(gross - fixed - extraTotal(state, clock.month)),
-    orders: visible.slice(0, 12).map((order) => orderSummary(state, order, actor.role)),
-  };
-}
-
-function fixedAmount(state: ShopState, month: string, key: string, fallback: number): number {
-  return state.monthlyFixed.find((row) => row.month === month && row.key === key)?.amount ?? fallback;
-}
-
-function fixedRows(state: ShopState, month: string) {
-  return state.settings.fixedCosts.map((row) => ({
-    ...row,
-    amount: fixedAmount(state, month, row.key, row.amount),
-  }));
-}
-
-function fixedTotal(state: ShopState, month: string): number {
-  return fixedRows(state, month).reduce((sum, row) => sum + row.amount, 0);
-}
-
-function extraTotal(state: ShopState, month: string): number {
-  return state.expenses.filter((row) => row.month === month).reduce((sum, row) => sum + row.amount, 0);
+  return visibleToRole(actor.role, buildDashboard(await readState(), actor));
 }
 
 export async function listOrders(actor: Actor) {
   const state = await readState();
-  return {
+  return visibleToRole(actor.role, {
     orders: state.orders
       .filter((order) => order.status !== "draft_upload")
       .map((order) => orderSummary(state, order, actor.role)),
-  };
+  });
 }
 
 export async function getOrder(actor: Actor, code: string) {
   const state = await readState();
   const order = state.orders.find((item) => item.code.toUpperCase() === code.toUpperCase());
   if (!order) throw new Error("Không tìm thấy đơn hàng.");
-  const customer = state.customers.find((item) => item.id === order.customerId);
-  const showMoney = actor.role !== "production";
-  const quote =
-    actor.role === "owner"
-      ? order.items.map((item) => {
-          const sku = state.skus.find((row) => row.id === item.skuId);
-          if (!sku) return null;
-          const priced = sku.sheets > 0 ? { ...sku, sheets: sku.sheets * item.quantity } : sku;
-          return quoteSku({
-            sku: priced,
-            price: item.lineTotal,
-            channel: order.channel,
-            settings: state.settings,
-            boms: state.boms,
-            materials: state.materials,
-            affiliate: false,
-          });
-        })
-      : null;
-  return {
-    ...orderSummary(state, order, actor.role),
-    customerNote: order.customerNote,
-    internalNote: actor.role === "production" ? "" : order.internalNote,
-    dueDate: order.dueDate,
-    marketplaceCode: order.marketplaceCode,
-    depositRequired: showMoney ? order.depositRequired : null,
-    depositPaid: showMoney ? order.depositPaid : null,
-    depositMethod: showMoney ? order.depositMethod : "",
-    items: order.items.map((item) => ({
-      ...item,
-      unitPrice: showMoney ? item.unitPrice : null,
-      lineTotal: showMoney ? item.lineTotal : null,
-    })),
-    subtotal: showMoney ? order.subtotal : null,
-    reply: STATUS_REPLY[order.status],
-    history: order.history.map((item) => ({
-      ...item,
-      byName: state.staff.find((person) => person.id === item.by)?.name ?? "Khách / hệ thống",
-      toLabel: STATUS_LABEL[item.to],
-    })),
-    files: order.files.filter((file) => !file.deletedAt),
-    reprints: state.reprints.filter((item) => item.orderId === order.id),
-    stockWarning: order.stockWarning,
-    quote,
-    customerId: customer?.id ?? order.customerId,
-    printDeducted: order.printDeducted,
-    packDeducted: order.packDeducted,
-  };
+  return visibleToRole(actor.role, orderDetail(state, order, actor.role));
 }
 
 export async function createManualOrder(
@@ -771,36 +609,28 @@ export async function createManualOrder(
   });
 }
 
-const PRODUCTION_STATUS: OrderStatus[] = ["in", "dong_goi", "giao"];
-
 export async function setOrderStatus(
   actor: Actor,
   input: { orderId: string; status: OrderStatus; note: string; ownerOverride?: boolean },
 ) {
-  if (actor.role === "production" && !PRODUCTION_STATUS.includes(input.status)) {
-    throw new Error("Sản xuất chỉ chuyển các bước in, đóng gói và giao.");
-  }
   await mutate(async (state) => {
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
-    if (
-      depositBlocks(input.status, order.depositRequired, order.depositPaid) &&
-      !(actor.role === "owner" && input.ownerOverride)
-    ) {
-      throw new Error("Đơn Facebook chưa ghi đủ cọc. Chưa chuyển sang thiết kế hoặc in.");
-    }
+    refreshDeposit(state, order);
+    const blocked = statusChangeError({
+      role: actor.role,
+      ownerOverride: Boolean(input.ownerOverride),
+      next: input.status,
+      depositRequired: order.depositRequired,
+      depositPaid: order.depositPaid,
+    });
+    if (blocked) throw new Error(blocked);
     const from = order.status;
-    if (input.status !== "huy" && statusRank(input.status) >= statusRank("in") && !order.printDeducted && statusRank(from) < statusRank("in")) {
-      applyStock(state, order, "print", actor.id);
-      order.printDeducted = true;
-    }
-    if (input.status !== "huy" && statusRank(input.status) >= statusRank("giao") && !order.packDeducted && statusRank(from) < statusRank("giao")) {
-      applyStock(state, order, "pack", actor.id);
-      order.packDeducted = true;
-    }
+    syncOrderStock(state, order, input.status, actor.id);
     order.status = input.status;
     order.updatedAt = nowIso();
     if (input.status === "xong") order.completedAt = nowIso();
+    else if (from === "xong") order.completedAt = null;
     order.history.push({ at: nowIso(), from, to: input.status, by: actor.id, note: input.note.trim() });
     audit(state, actor.id, "order.status", order.id, { status: from }, { status: input.status });
   });
@@ -881,8 +711,12 @@ export async function priceBoard(actor: Actor, groupId?: string) {
   assertRole(actor, ["owner", "sale"]);
   const state = await readState();
   const skus = state.skus.filter((sku) => !groupId || sku.groupId === groupId);
-  return {
+  const warnings = (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]).flatMap((channel) =>
+    comboWarnings(skus, state.prices, channel).map((text) => `${CHANNEL_LABEL[channel]}: ${text}`),
+  );
+  return visibleToRole(actor.role, {
     groups: state.groups.map((group) => ({ id: group.id, name: group.name })),
+    warnings,
     rows: skus.map((sku) => ({
       skuId: sku.id,
       code: sku.code,
@@ -898,7 +732,7 @@ export async function priceBoard(actor: Actor, groupId?: string) {
         }),
       ),
     })),
-  };
+  });
 }
 
 export async function updateChannelPrice(
@@ -958,29 +792,7 @@ export async function quote(actor: Actor, input: { skuId: string; channel: Chann
 }
 
 export async function inventory(actor: Actor) {
-  const state = await readState();
-  const showCost = MONEY_ROLES.includes(actor.role);
-  return {
-    materials: state.materials.map((material) => ({
-      id: material.id,
-      name: material.name,
-      buyLabel: material.buyLabel,
-      unit: material.unit,
-      stock: material.stock,
-      minStock: material.minStock,
-      supplier: material.supplier,
-      packSize: showCost ? material.packSize : null,
-      packPrice: showCost ? material.packPrice : null,
-      pendingPrice: showCost ? material.pendingPrice : null,
-      low: material.minStock !== null && material.stock <= material.minStock,
-    })),
-    movements: state.movements.slice(0, 80).map((move) => ({
-      ...move,
-      materialName: state.materials.find((item) => item.id === move.materialId)?.name ?? move.materialId,
-      byName: state.staff.find((item) => item.id === move.by)?.name ?? "",
-    })),
-    counts: state.counts.slice(0, 40),
-  };
+  return visibleToRole(actor.role, inventoryView(await readState(), actor.role));
 }
 
 export async function stockIn(
@@ -1125,12 +937,12 @@ export async function customerDetail(actor: Actor, id: string) {
   const state = await readState();
   const customer = state.customers.find((item) => item.id === id);
   if (!customer) throw new Error("Không thấy khách.");
-  return {
+  return visibleToRole(actor.role, {
     ...customer,
     orders: state.orders
       .filter((order) => order.customerId === id && order.status !== "draft_upload")
       .map((order) => orderSummary(state, order, actor.role)),
-  };
+  });
 }
 
 export async function saveCustomerNote(actor: Actor, id: string, note: string) {
@@ -1266,13 +1078,13 @@ export async function payroll(actor: Actor, month: string) {
   const locked = state.payrollLocks.some((item) => item.month === month);
   if (actor.role === "owner") {
     const rows = state.staff.filter((person) => person.role !== "owner").map((person) => payrollRow(state, person, month));
-    return { month, locked, rows };
+    return visibleToRole(actor.role, { month, locked, rows });
   }
   if (actor.role !== "sale") throw new Error("Không có quyền xem lương.");
   const person = state.staff.find((item) => item.id === actor.id);
   if (!person) throw new Error("Không thấy nhân viên.");
   const row = payrollRow(state, person, month);
-  return {
+  return visibleToRole(actor.role, {
     month,
     locked,
     rows: [
@@ -1290,7 +1102,7 @@ export async function payroll(actor: Actor, month: string) {
         kpiPercent: row.kpiPercent,
       },
     ],
-  };
+  });
 }
 
 export async function lockPayroll(actor: Actor, month: string) {
@@ -1493,6 +1305,7 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
       state.settings.absenceDeductionPerDay = value === null || value === "" ? null : Number(value);
     }
     if (typeof patch.zaloPhone === "string") state.settings.zaloPhone = patch.zaloPhone.replace(/\D/g, "");
+    if (typeof patch.showZalo === "boolean") state.settings.showZalo = patch.showZalo;
     if (typeof patch.publicHours === "string") state.settings.publicHours = patch.publicHours;
     if (typeof patch.workStart === "string") state.settings.workStart = patch.workStart;
     if (typeof patch.workEnd === "string") state.settings.workEnd = patch.workEnd;
@@ -1564,17 +1377,30 @@ export async function saveStaff(actor: Actor, input: { id?: string; name: string
 export async function filesDue(actor: Actor) {
   assertRole(actor, ["owner"]);
   const state = await readState();
-  const now = Date.now();
-  const rows = [];
-  for (const order of state.orders) {
-    for (const file of order.files) {
-      if (file.deletedAt || file.status !== "complete") continue;
-      const age = (now - new Date(file.createdAt).getTime()) / 86400000;
-      const limit = file.kind === "packing_video" ? state.settings.videoRetentionDays : state.settings.fileRetentionDays;
-      if (age >= limit) rows.push({ orderCode: order.code, fileId: file.id, name: file.name, kind: file.kind, ageDays: Math.floor(age) });
+  return filesToPurge(state).map((row) => ({
+    orderCode: row.orderCode,
+    fileId: row.fileId,
+    name: row.name,
+    kind: row.kind,
+    ageDays: row.ageDays,
+  }));
+}
+
+export async function purgeExpiredFiles(now = Date.now()): Promise<number> {
+  const preview = await readState();
+  if (!filesToPurge(preview, now).length) return 0;
+  return mutate(async (state) => {
+    let removed = 0;
+    for (const target of filesToPurge(state, now)) {
+      const order = state.orders.find((item) => item.id === target.orderId);
+      const file = order?.files.find((item) => item.id === target.fileId);
+      if (!file || file.deletedAt) continue;
+      await removePhoto(file);
+      file.deletedAt = new Date(now).toISOString();
+      removed += 1;
     }
-  }
-  return rows;
+    return removed;
+  });
 }
 
 export async function deleteStoredFile(actor: Actor, fileId: string) {
@@ -1584,17 +1410,7 @@ export async function deleteStoredFile(actor: Actor, fileId: string) {
       const file = order.files.find((item) => item.id === fileId);
       if (!file) continue;
       file.deletedAt = nowIso();
-      if (file.storage === "local") {
-        await unlink(path.join(process.cwd(), file.path)).catch(() => undefined);
-      }
-      if (file.storage === "drive" && file.driveFileId) await deleteFromDrive(file.driveFileId).catch(() => undefined);
-      if (file.storage === "supabase" && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        const { createClient } = await import("@supabase/supabase-js");
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        });
-        await supabase.storage.from("order-originals").remove([file.path]);
-      }
+      await removePhoto(file);
       audit(state, actor.id, "file.delete", file.id, { name: file.name }, { deletedAt: file.deletedAt });
       return;
     }
@@ -1608,15 +1424,29 @@ export async function fileForStaff(actor: Actor, fileId: string): Promise<{ name
     const file = order.files.find((item) => item.id === fileId && !item.deletedAt);
     if (!file) continue;
     if (file.storage === "local") {
+      if (!(await usesDisk())) throw new Error("File nằm trên đĩa local, không đọc được trên Workers.");
+      const { readFile } = await import("node:fs/promises");
       const bytes = new Uint8Array(await readFile(path.join(process.cwd(), file.path)));
       return { name: file.name, mime: file.mime, bytes };
     }
     if (file.storage === "drive" && file.driveFileId) {
       return { name: file.name, mime: file.mime, bytes: await downloadFromDrive(file.driveFileId) };
     }
-    if (file.storage === "supabase" && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    if (file.storage === "r2") {
+      const bucket = await orderFiles();
+      const object = bucket ? await bucket.get(file.path) : null;
+      if (!object) throw new Error("Không thấy ảnh trong R2.");
+      return { name: file.name, mime: file.mime, bytes: new Uint8Array(await object.arrayBuffer()) };
+    }
+    if (file.storage === "kv") {
+      const kv = await shopKv();
+      const buf = kv ? await kv.get(file.path || `upload:${file.id}`, "arrayBuffer") : null;
+      if (!buf) throw new Error("Không thấy ảnh trong KV.");
+      return { name: file.name, mime: file.mime, bytes: new Uint8Array(buf) };
+    }
+    if (file.storage === "supabase" && usesSupabase()) {
       const { createClient } = await import("@supabase/supabase-js");
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+      const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
       const signed = await supabase.storage.from("order-originals").createSignedUrl(file.path, 60 * 10);
@@ -1642,7 +1472,16 @@ export async function exportWorkbook(actor: Actor, kind: "orders" | "stock" | "m
           .filter((order) => order.status !== "draft_upload")
           .map((order) => {
             const customer = customerName(state, order.customerId);
-            return [order.code, CHANNEL_LABEL[order.channel], customer.name, customer.phone, STATUS_LABEL[order.status], order.total, order.createdAt, order.source];
+            return [
+              order.code,
+              CHANNEL_LABEL[order.channel],
+              customer.name,
+              customer.phone,
+              STATUS_LABEL[order.status],
+              actor.role === "production" ? null : order.total,
+              order.createdAt,
+              order.source,
+            ];
           }),
       ],
     });
@@ -1712,16 +1551,19 @@ export async function exportWorkbook(actor: Actor, kind: "orders" | "stock" | "m
 
 export async function skuOptions(actor: Actor) {
   const state = await readState();
-  return state.skus.map((sku) => {
-    const group = state.groups.find((item) => item.id === sku.groupId);
-    const price = priceOf(state.prices, sku.id, "tai_tiem")?.price ?? null;
-    return {
-      id: sku.id,
-      label: `${sku.code} · ${group?.name ?? ""} · ${sku.name}`,
-      groupId: sku.groupId,
-      price: actor.role === "production" ? null : price,
-    };
-  });
+  return visibleToRole(
+    actor.role,
+    state.skus.map((sku) => {
+      const group = state.groups.find((item) => item.id === sku.groupId);
+      const price = priceOf(state.prices, sku.id, "tai_tiem")?.price ?? null;
+      return {
+        id: sku.id,
+        label: `${sku.code} · ${group?.name ?? ""} · ${sku.name}`,
+        groupId: sku.groupId,
+        ...(actor.role === "production" ? {} : { price }),
+      };
+    }),
+  );
 }
 
 export async function recalc(actor: Actor) {

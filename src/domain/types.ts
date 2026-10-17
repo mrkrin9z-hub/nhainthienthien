@@ -117,6 +117,8 @@ export type Settings = {
   fileRetentionDays: number;
   videoRetentionDays: number;
   zaloPhone: string;
+  /** false = ẩn số Zalo trên web. Thiếu field (sổ cũ) thì vẫn hiện. */
+  showZalo?: boolean;
   publicHours: string;
   showAnhThe: boolean;
   showAlbum: boolean;
@@ -217,7 +219,7 @@ export type OrderFile = {
   size: number;
   status: "uploading" | "complete" | "error";
   kind: "original" | "design" | "approval" | "packing_video";
-  storage: "supabase" | "drive" | "local";
+  storage: "supabase" | "drive" | "local" | "r2" | "kv";
   path: string;
   driveFileId: string | null;
   createdAt: string;
@@ -250,7 +252,7 @@ export type Order = {
   items: OrderItem[];
   subtotal: number | null;
   total: number | null;
-  depositRequired: number;
+  depositRequired: number | null;
   depositPaid: number;
   depositMethod: string;
   depositBy: string | null;

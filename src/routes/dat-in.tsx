@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
 import { catalogQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
 import { createOrder, createUploadTicket, markFileStatus, submitOrder } from "@/lib/orders.functions";
 import { formatVnd } from "@/lib/brand";
@@ -158,20 +157,13 @@ function OrderPage() {
               sizeBytes: item.file.size,
             },
           });
-          if (ticket.mode === "supabase") {
-            const { error: uploadError } = await supabase.storage
-              .from("order-originals")
-              .uploadToSignedUrl(ticket.path, ticket.token, item.file);
-            if (uploadError) throw new Error(uploadError.message);
-          } else {
-            const body = new FormData();
-            body.set("orderId", order.orderId);
-            body.set("accessToken", order.accessToken);
-            body.set("fileId", ticket.fileId);
-            body.set("file", item.file);
-            const uploaded = await fetch("/api/public/upload", { method: "POST", body });
-            if (!uploaded.ok) throw new Error(await uploaded.text());
-          }
+          const body = new FormData();
+          body.set("orderId", order.orderId);
+          body.set("accessToken", order.accessToken);
+          body.set("fileId", ticket.fileId);
+          body.set("file", item.file);
+          const uploaded = await fetch("/api/public/upload", { method: "POST", body });
+          if (!uploaded.ok) throw new Error(await uploaded.text());
 
           await markFileStatus({
             data: {

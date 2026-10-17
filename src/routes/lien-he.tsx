@@ -30,9 +30,10 @@ export const Route = createFileRoute("/lien-he")({
 
 function ContactPage() {
   const config = useQuery(publicConfigQueryOptions);
-  const phone = config.data?.phone ?? BRAND.phone;
-  const phoneRaw = config.data?.phoneRaw ?? BRAND.phoneRaw;
-  const zalo = config.data?.zalo ?? BRAND.zalo;
+  const showZalo = config.data ? config.data.showZalo : true;
+  const phone = showZalo ? (config.data?.phone || BRAND.phone) : "";
+  const phoneRaw = showZalo ? (config.data?.phoneRaw || BRAND.phoneRaw) : "";
+  const zalo = showZalo ? (config.data?.zalo || BRAND.zalo) : "";
   const hours = config.data?.hours ?? "08:00 – 20:00";
   return (
     <div className="min-h-screen bg-background">
@@ -44,16 +45,20 @@ function ContactPage() {
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <a href={zalo} className="glass-card rounded-3xl p-5">
-            <MessageCircle className="size-6 text-accent" />
-            <h2 className="mt-3 text-lg font-bold text-foreground">Zalo tư vấn</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{phone}</p>
-          </a>
-          <a href={`tel:${phoneRaw}`} className="glass-card rounded-3xl p-5">
-            <Phone className="size-6 text-accent" />
-            <h2 className="mt-3 text-lg font-bold text-foreground">Gọi điện</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{phone}</p>
-          </a>
+          {showZalo ? (
+            <a href={zalo} className="glass-card rounded-3xl p-5">
+              <MessageCircle className="size-6 text-accent" />
+              <h2 className="mt-3 text-lg font-bold text-foreground">Zalo tư vấn</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{phone}</p>
+            </a>
+          ) : null}
+          {showZalo ? (
+            <a href={`tel:${phoneRaw}`} className="glass-card rounded-3xl p-5">
+              <Phone className="size-6 text-accent" />
+              <h2 className="mt-3 text-lg font-bold text-foreground">Gọi điện</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{phone}</p>
+            </a>
+          ) : null}
           <div className="glass-card rounded-3xl p-5">
             <MapPin className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Khu vực</h2>

@@ -1,6 +1,9 @@
 {
   "name": "tanstack_start_ts",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "sideEffects": false,
   "type": "module",
   "scripts": {
@@ -9,7 +12,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types --test src/domain/domain.test.ts",
+    "test": "node --experimental-strip-types --test src/domain/domain.test.ts src/domain/audit.test.ts",
     "format": "prettier --write ."
   },
   "overrides": {

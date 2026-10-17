@@ -20,7 +20,12 @@ dist-ssr
 .wrangler/
 .dev.vars
 
-# Dữ liệu local (sổ đơn, ảnh khách). Production dùng Supabase.
+# Bí mật local. Không commit (kể cả khóa Supabase cũ).
+.env
+.env.*
+!.env.example
+
+# Dữ liệu local (sổ đơn, ảnh khách). Production dùng Supabase, KV hoặc R2.
 data/
 
 # Editor directories and files

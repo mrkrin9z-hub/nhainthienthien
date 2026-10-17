@@ -88,11 +88,13 @@ function OrderDetailPage() {
         <section className="glass-card rounded-3xl p-4">
           <h2 className="font-bold text-primary">Cọc</h2>
           <p className="text-sm">
-            Cần cọc {formatMaybe(data.depositRequired)} · Đã ghi {formatMaybe(data.depositPaid)} {data.depositMethod}
+            {data.depositRequired === null
+              ? "Cần cọc 50% nhưng chưa có giá bán để tính số tiền."
+              : `Cần cọc ${formatMaybe(data.depositRequired)} · Đã ghi ${formatMaybe(data.depositPaid)} ${data.depositMethod}`}
           </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Input className="min-h-12 w-36" inputMode="numeric" placeholder="Số tiền" value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/\D/g, ""))} />
-            <Input className="min-h-12 w-40" value={method} onChange={(e) => setMethod(e.target.value)} />
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+            <Input className="min-h-12 w-full sm:w-36" inputMode="numeric" placeholder="Số tiền" value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/\D/g, ""))} />
+            <Input className="min-h-12 w-full sm:w-40" value={method} onChange={(e) => setMethod(e.target.value)} />
             <Button
               className="min-h-12"
               onClick={async () => {
@@ -121,12 +123,12 @@ function OrderDetailPage() {
             Chủ bỏ qua điều kiện cọc
           </label>
         ) : null}
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           {NEXT.map((status) => (
             <Button
               key={status}
               variant={data.status === status ? "default" : "outline"}
-              className="min-h-11"
+              className="min-h-12 w-full sm:w-auto"
               onClick={async () => {
                 try {
                   await changeStatus({ data: { orderId: data.id, status, note: "", ownerOverride: override } });

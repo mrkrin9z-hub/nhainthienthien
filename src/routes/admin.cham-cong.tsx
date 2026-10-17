@@ -29,7 +29,7 @@ function ClockPage() {
         Ca {sheet.data?.workStart ?? "08:00"}–{sheet.data?.workEnd ?? "18:00"}. Ngày nghỉ tuần:{" "}
         {(sheet.data?.weeklyOff ?? []).length === 0 ? "chưa đặt (JD ghi làm hằng ngày, chủ sửa trong Cài đặt)." : sheet.data?.weeklyOff.join(", ")}
       </p>
-      <div className="flex gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Button
           className="min-h-14 flex-1 bg-accent text-accent-foreground text-base"
           onClick={async () => {
@@ -88,7 +88,7 @@ function PunchRow({
   const [outAt, setOutAt] = useState(punch.outAt ? punch.outAt.slice(0, 16) : "");
   return (
     <li className="rounded-2xl bg-background p-3">
-      <p>
+      <p className="break-words">
         Vào {new Date(punch.inAt).toLocaleString("vi-VN")}
         {punch.outAt ? ` · Ra ${new Date(punch.outAt).toLocaleString("vi-VN")}` : " · đang trong ca"}
       </p>
@@ -96,9 +96,9 @@ function PunchRow({
         Trễ {punch.lateMinutes} phút · Về sớm {punch.earlyMinutes} phút
       </p>
       {owner ? (
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Input className="h-11 w-52" type="datetime-local" value={inAt} onChange={(e) => setInAt(e.target.value)} />
-          <Input className="h-11 w-52" type="datetime-local" value={outAt} onChange={(e) => setOutAt(e.target.value)} />
+        <div className="mt-2 grid grid-cols-1 gap-2">
+          <Input className="h-12 w-full min-w-0" type="datetime-local" value={inAt} onChange={(e) => setInAt(e.target.value)} />
+          <Input className="h-12 w-full min-w-0" type="datetime-local" value={outAt} onChange={(e) => setOutAt(e.target.value)} />
           <Button
             size="sm"
             variant="outline"
@@ -127,8 +127,8 @@ function PunchRow({
 function LeaveForm({ staffId, onDone }: { staffId: string; onDone: () => Promise<void> }) {
   const [date, setDate] = useState("");
   return (
-    <div className="mt-3 flex gap-2">
-      <Input className="h-11" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+    <div className="mt-3 grid grid-cols-1 gap-2 sm:flex">
+      <Input className="h-12 w-full sm:w-auto" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       <Button
         variant="outline"
         className="min-h-11"

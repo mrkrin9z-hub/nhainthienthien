@@ -44,9 +44,9 @@ function AdminLayout() {
   return (
     <div className="min-h-screen bg-background">
       <header className="glass-panel sticky top-0 z-40">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 md:px-6">
-          <Link to="/">
-            <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="h-9 w-auto" />
+        <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center gap-3 px-4 py-2 md:px-6">
+          <Link to="/" className="min-w-0">
+            <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="h-9 w-auto max-w-[150px] object-contain" />
           </Link>
           <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
             {me.data.name}

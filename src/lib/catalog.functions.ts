@@ -29,6 +29,7 @@ export type CatalogProduct = {
 
 export type PublicConfig = {
   name: string;
+  showZalo: boolean;
   phone: string;
   phoneRaw: string;
   zalo: string;
