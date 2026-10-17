@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { moneyLeaks, visibleToRole } from "./access.ts";
+import { describeAudit } from "./audit-text.ts";
 import { comboPriceError, comboWarnings, depositBlocks, depositFor, statusChangeError } from "./calc.ts";
 import { commitLoop } from "./commit.ts";
 import { filesToPurge } from "./files.ts";
@@ -260,4 +261,78 @@ test("server không import filesystem ở đầu file và luôn lọc theo vai t
   assert.doesNotMatch(upload, /supabase/);
   const start = readFileSync(new URL("../start.ts", import.meta.url), "utf8");
   assert.doesNotMatch(start, /supabase/);
+});
+
+test("nhật ký đọc bằng tiếng Việt", () => {
+  const shop = {
+    staff: [
+      { id: "sale-1", name: "Lan", role: "sale" as const },
+      { id: "owner-1", name: "Chu", role: "owner" as const },
+      { id: "sx-1", name: "Minh", role: "production" as const },
+    ],
+    orders: [{ id: "order-1", code: "TT261017-001" }],
+    materials: [
+      { id: "giay", name: "Giấy ảnh", unit: "tờ" },
+      { id: "tui", name: "Túi", unit: "cái" },
+    ],
+    skus: [{ id: "sku-1", code: "TG-13x18-C1" }],
+    customers: [{ id: "c1", name: "An" }],
+    groups: [{ id: "g1", slug: "tranh-go", name: "Tranh gỗ" }],
+    boms: [{ id: "b1", skuId: "sku-1", materialId: "giay" }],
+    punches: [{ id: "p1", staffId: "sale-1" }],
+    fixedCosts: [{ key: "rent", name: "Thuê nhà" }],
+  };
+  assert.equal(
+    describeAudit({ action: "order.status", entity: "order-1", actorId: "sale-1", before: { status: "in" }, after: { status: "dong_goi" } }, shop),
+    "Sale Lan chuyển đơn TT261017-001: In → Đóng gói",
+  );
+  assert.equal(
+    describeAudit(
+      { action: "order.status", entity: "order-1", actorId: "owner-1", before: { status: "xong" }, after: { status: "nhan_don", reason: "khách đổi" } },
+      shop,
+    ),
+    "Chủ Chu mở lại đơn TT261017-001: Xong → Nhận đơn (lý do: khách đổi)",
+  );
+  assert.equal(
+    describeAudit(
+      { action: "price.update", entity: "TG-13x18-C1:tai_tiem", actorId: "owner-1", before: { price: 35000 }, after: { price: 40000 } },
+      shop,
+    ),
+    "Chủ Chu đổi giá TG-13x18-C1 kênh Tại tiệm / Web: 35.000đ → 40.000đ",
+  );
+  assert.equal(
+    describeAudit({ action: "stock.count", entity: "giay", actorId: "sx-1", before: { stock: 12 }, after: { stock: 10 } }, shop),
+    "Sản xuất Minh kiểm kho Giấy ảnh: 12 tờ → 10 tờ",
+  );
+  assert.equal(
+    describeAudit({ action: "stock.in", entity: "tui", actorId: "sale-1", before: null, after: { qty: 20 } }, shop),
+    "Sale Lan nhập kho Túi +20 cái",
+  );
+  const secret = describeAudit(
+    { action: "secret.update", entity: "tiktok", actorId: "owner-1", before: null, after: { set: true, value: "super-secret-token" } },
+    shop,
+  );
+  assert.match(secret, /khóa kết nối TikTok Shop/);
+  assert.equal(secret.includes("super-secret-token"), false);
+  assert.match(
+    describeAudit(
+      {
+        action: "settings.update",
+        entity: "settings",
+        actorId: "owner-1",
+        before: { commissionBasis: "shop" },
+        after: { commissionBasis: "handled" },
+      },
+      shop,
+    ),
+    /Cách tính hoa hồng Toàn tiệm → Theo đơn người đó xử lý/,
+  );
+  const named = {
+    ...shop,
+    staff: [{ id: "owner-1", name: "Chủ tiệm", role: "owner" as const }],
+  };
+  assert.equal(
+    describeAudit({ action: "auth.login", entity: "owner-1", actorId: "owner-1", before: null, after: null }, named),
+    "Chủ tiệm đăng nhập",
+  );
 });

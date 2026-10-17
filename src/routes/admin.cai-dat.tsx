@@ -235,7 +235,7 @@ function SettingsBody() {
         <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
           {data.audits.map((item) => (
             <li key={item.id}>
-              {new Date(item.at).toLocaleString("vi-VN")} · {item.actorName || "Hệ thống"} · {item.action}
+              {new Date(item.at).toLocaleString("vi-VN")} · {item.sentence}
             </li>
           ))}
         </ul>

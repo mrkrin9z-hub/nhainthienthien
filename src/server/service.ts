@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { visibleToRole } from "@/domain/access";
+import { auditActionLabel, auditDay, describeAudit, type AuditShop } from "@/domain/audit-text";
 import {
   comboPriceError,
   comboWarnings,
@@ -1487,8 +1488,9 @@ export async function getSettings(actor: Actor) {
   return {
     settings: state.settings,
     audits: state.audits.slice(0, 40).map((item) => ({
-      ...item,
-      actorName: state.staff.find((person) => person.id === item.actorId)?.name ?? "",
+      id: item.id,
+      at: item.at,
+      sentence: describeAudit(item, shopForAudit(state)),
     })),
     groups: state.groups.map((group) => ({ id: group.id, name: group.name, gate: group.gate })),
     staff: state.staff.map((person) => ({
@@ -1808,17 +1810,33 @@ export async function recalc(actor: Actor) {
   return mutate(async (state) => recalcBoms(state));
 }
 
+function shopForAudit(state: ShopState): AuditShop {
+  return {
+    staff: state.staff,
+    orders: state.orders,
+    materials: state.materials,
+    skus: state.skus,
+    customers: state.customers,
+    groups: state.groups,
+    boms: state.boms,
+    punches: state.punches,
+    fixedCosts: state.settings.fixedCosts ?? [],
+  };
+}
+
 export async function listAudits(actor: Actor) {
   assertRole(actor, ["owner"]);
   const state = await readState();
+  const shop = shopForAudit(state);
   return state.audits.slice(0, 200).map((item) => ({
     id: item.id,
     at: item.at,
+    day: auditDay(item.at),
     action: item.action,
-    entity: item.entity,
-    actorName: state.staff.find((person) => person.id === item.actorId)?.name ?? "",
-    before: item.before,
-    after: item.after,
+    actionLabel: auditActionLabel(item.action),
+    actorId: item.actorId,
+    actorName: item.actorId ? (state.staff.find((person) => person.id === item.actorId)?.name ?? "Người đã nghỉ") : "Hệ thống",
+    sentence: describeAudit(item, shop),
   }));
 }
 
