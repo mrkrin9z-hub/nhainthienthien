@@ -158,10 +158,20 @@ function OrderPage() {
               sizeBytes: item.file.size,
             },
           });
-          const { error: uploadError } = await supabase.storage
-            .from("order-originals")
-            .uploadToSignedUrl(ticket.path, ticket.token, item.file);
-          if (uploadError) throw new Error(uploadError.message);
+          if (ticket.mode === "supabase") {
+            const { error: uploadError } = await supabase.storage
+              .from("order-originals")
+              .uploadToSignedUrl(ticket.path, ticket.token, item.file);
+            if (uploadError) throw new Error(uploadError.message);
+          } else {
+            const body = new FormData();
+            body.set("orderId", order.orderId);
+            body.set("accessToken", order.accessToken);
+            body.set("fileId", ticket.fileId);
+            body.set("file", item.file);
+            const uploaded = await fetch("/api/public/upload", { method: "POST", body });
+            if (!uploaded.ok) throw new Error(await uploaded.text());
+          }
 
           await markFileStatus({
             data: {

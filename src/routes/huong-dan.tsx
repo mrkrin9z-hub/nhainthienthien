@@ -30,7 +30,7 @@ const GUIDE = [
   {
     title: "Bước 1 — Chọn sản phẩm và quy cách",
     points: [
-      "Xem bảng giá để chọn loại in phù hợp: gỗ lụa, tráng gương, ảnh thẻ, phục hồi ảnh cũ…",
+      "Chọn ảnh ép gỗ, ảnh thờ, giấy khen ép gỗ hoặc nam châm. Giá lấy từ bảng giá tại tiệm.",
       "Chọn kích thước và số lượng cho từng quy cách.",
     ],
   },

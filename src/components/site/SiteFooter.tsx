@@ -1,10 +1,15 @@
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { BadgeCheck, Globe, MapPin, MessageCircle } from "lucide-react";
 
 import { LOGO_HORIZONTAL } from "@/lib/assets";
 import { BRAND } from "@/lib/brand";
+import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 
 export function SiteFooter() {
+  const config = useQuery(publicConfigQueryOptions);
+  const phone = config.data?.phone ?? BRAND.phone;
+  const zalo = config.data?.zalo ?? BRAND.zalo;
   return (
     <footer className="mt-16 border-t border-border bg-card/60">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-3 md:px-6">
@@ -18,8 +23,8 @@ export function SiteFooter() {
           <h3 className="text-base font-bold text-primary">Liên hệ</h3>
           <p className="flex items-center gap-2">
             <MessageCircle className="size-4 text-accent" />
-            <a href={BRAND.zalo} className="font-semibold hover:text-primary">
-              Zalo {BRAND.phone}
+            <a href={zalo} className="font-semibold hover:text-primary">
+              Zalo {phone}
             </a>
           </p>
           <p className="flex items-center gap-2">

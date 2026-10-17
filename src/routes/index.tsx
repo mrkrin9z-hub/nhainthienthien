@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Camera,
@@ -7,10 +7,8 @@ import {
   Clock,
   Heart,
   MessageCircle,
-  Quote,
   ShieldCheck,
   Sparkles,
-  Star,
   Truck,
   UploadCloud,
 } from "lucide-react";
@@ -19,7 +17,7 @@ import { BRAND_COVER } from "@/lib/assets";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { Button } from "@/components/ui/button";
-import { catalogQueryOptions, minPrice } from "@/lib/catalog.functions";
+import { catalogQueryOptions, minPrice, publicConfigQueryOptions } from "@/lib/catalog.functions";
 import { productImage } from "@/lib/product-images";
 import { BRAND, formatVnd } from "@/lib/brand";
 
@@ -31,7 +29,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "In ảnh gỗ lụa, tráng gương, ảnh thẻ, phục hồi ảnh cũ tại Xuân Lộc, Đồng Nai. Gửi ảnh online 3 bước, nhận mã đơn và theo dõi tiến trình.",
+          "In ảnh ép gỗ, ảnh thờ, giấy khen và nam châm tại Xuân Lộc, Đồng Nai. Gửi ảnh online 3 bước, nhận mã đơn và theo dõi tiến trình.",
       },
       { property: "og:title", content: "Nhà In Thiên Thiên — In đẹp từng khoảnh khắc" },
       {
@@ -70,35 +68,11 @@ const BENEFITS = [
   { icon: Heart, title: "Kiểm ảnh thủ công", desc: "Chỉnh sáng, canh nét trước khi in." },
 ];
 
-const STATS = [
-  { value: "8.000+", label: "Bức ảnh đã in" },
-  { value: "24–48h", label: "Thời gian trả hàng" },
-  { value: "4.9/5", label: "Khách hài lòng" },
-];
-
 const REASONS = [
   "Xem trước giá từng kích thước, không cần hỏi tới lui.",
   "Kỹ thuật viên kiểm tra độ phân giải và báo lại nếu ảnh chưa đủ nét.",
   "In sai màu, sai kích thước — xưởng in lại miễn phí.",
   "Ảnh gốc của bạn được lưu riêng tư và tự xoá sau khi hoàn tất.",
-];
-
-const TESTIMONIALS = [
-  {
-    name: "Chị Hồng",
-    place: "Xuân Lộc",
-    text: "Gửi ảnh buổi tối, hôm sau đã có ảnh gỗ lụa treo phòng khách. Màu lên rất đẹp.",
-  },
-  {
-    name: "Anh Tuấn",
-    place: "Long Khánh",
-    text: "Ảnh cưới cũ ố vàng được phục hồi gần như mới. Giá lại mềm hơn chỗ khác.",
-  },
-  {
-    name: "Chị Mai",
-    place: "Biên Hoà",
-    text: "Đặt ảnh thẻ cho cả nhà, nhắn Zalo là được tư vấn ngay, nhận trong ngày.",
-  },
 ];
 
 const FAQS = [
@@ -112,12 +86,15 @@ const FAQS = [
   },
   {
     q: "Bao lâu thì nhận được hàng?",
-    a: "Phần lớn đơn hoàn tất trong 24–48 giờ. Ảnh thẻ lấy trong ngày, đơn số lượng lớn sẽ được báo lịch cụ thể.",
+    a: "Phần lớn đơn hoàn tất trong 24–48 giờ. Ảnh thờ làm nhanh, không giới hạn số lần sửa. Đơn số lượng lớn sẽ được báo lịch cụ thể.",
   },
 ];
 
 function HomePage() {
   const { data: products } = useSuspenseQuery(catalogQueryOptions);
+  const config = useQuery(publicConfigQueryOptions);
+  const zalo = config.data?.zalo ?? BRAND.zalo;
+  const phone = config.data?.phone ?? BRAND.phone;
   const featured = products.slice(0, 6);
 
   return (
@@ -134,8 +111,8 @@ function HomePage() {
               {BRAND.slogan}
             </h1>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">
-              Gửi ảnh online chỉ với 3 bước — Nhà In Thiên Thiên in ảnh gỗ lụa, tráng gương, ảnh thẻ
-              và phục hồi ảnh cũ với chất lượng xưởng tại {BRAND.region}.
+              Gửi ảnh online chỉ với 3 bước — ảnh ép gỗ, ảnh thờ, giấy khen ép gỗ và nam châm,
+              in tại xưởng ở {BRAND.region}.
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -154,22 +131,12 @@ function HomePage() {
             </div>
 
             <a
-              href={BRAND.zalo}
+              href={zalo}
               className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary"
             >
-              <MessageCircle className="size-4 shrink-0 text-accent" /> Zalo tư vấn {BRAND.phone}
+              <MessageCircle className="size-4 shrink-0 text-accent" /> Zalo tư vấn {phone}
             </a>
 
-            <dl className="mt-6 grid grid-cols-3 gap-3">
-              {STATS.map((s) => (
-                <div key={s.label} className="glass-panel rounded-2xl px-3 py-3 text-center">
-                  <dt className="text-lg font-extrabold text-primary">{s.value}</dt>
-                  <dd className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
-                    {s.label}
-                  </dd>
-                </div>
-              ))}
-            </dl>
           </div>
 
           <div className="glass-card overflow-hidden rounded-3xl p-3">
@@ -284,31 +251,6 @@ function HomePage() {
           </div>
         </section>
 
-        {/* Khách nói gì */}
-        <section className="mx-auto max-w-6xl px-4 py-12 md:px-6">
-          <h2 className="text-2xl font-extrabold text-primary md:text-3xl">Khách hàng nói gì</h2>
-          <div className="mt-5 grid gap-4 sm:grid-cols-3">
-            {TESTIMONIALS.map((t) => (
-              <figure key={t.name} className="glass-card rounded-3xl p-5">
-                <Quote className="size-5 text-accent" />
-                <blockquote className="mt-3 text-sm leading-relaxed text-foreground/85">
-                  {t.text}
-                </blockquote>
-                <figcaption className="mt-4 flex items-center gap-2">
-                  <span className="flex items-center gap-0.5 text-accent">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className="size-3.5 fill-current" />
-                    ))}
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {t.name} • {t.place}
-                  </span>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </section>
-
         {/* FAQ */}
         <section className="mx-auto max-w-3xl px-4 md:px-6">
           <h2 className="text-2xl font-extrabold text-primary md:text-3xl">Câu hỏi thường gặp</h2>
@@ -344,7 +286,7 @@ function HomePage() {
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="min-h-12 w-full sm:w-auto">
-                <a href={BRAND.zalo}>
+                <a href={zalo}>
                   <MessageCircle className="size-4" /> Nhắn Zalo
                 </a>
               </Button>
@@ -357,7 +299,7 @@ function HomePage() {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-4 py-2.5 backdrop-blur md:hidden">
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" className="min-h-12 flex-1">
-            <a href={BRAND.zalo}>
+            <a href={zalo}>
               <MessageCircle className="size-4" /> Zalo
             </a>
           </Button>

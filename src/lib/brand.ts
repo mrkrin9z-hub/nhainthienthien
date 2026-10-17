@@ -13,3 +13,8 @@ export const BRAND = {
 export function formatVnd(amount: number): string {
   return new Intl.NumberFormat("vi-VN").format(Math.round(amount)) + "đ";
 }
+
+export function formatMaybe(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined || Number.isNaN(amount)) return "—";
+  return formatVnd(amount);
+}

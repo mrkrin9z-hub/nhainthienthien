@@ -1,8 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { queryOptions } from "@tanstack/react-query";
-
-import type { Database } from "@/integrations/supabase/types";
 
 export type CatalogVariant = {
   id: string;
@@ -30,52 +27,36 @@ export type CatalogProduct = {
   variants: CatalogVariant[];
 };
 
-export const getCatalog = createServerFn({ method: "GET" }).handler(
-  async (): Promise<CatalogProduct[]> => {
-    const supabase = createClient<Database>(
-      process.env["SUPABASE_URL"]!,
-      process.env["SUPABASE_PUBLISHABLE_KEY"]!,
-      { auth: { persistSession: false, autoRefreshToken: false } },
-    );
+export type PublicConfig = {
+  name: string;
+  phone: string;
+  phoneRaw: string;
+  zalo: string;
+  hours: string;
+  region: string;
+};
 
-    const { data, error } = await supabase
-      .from("products")
-      .select(
-        "id,name,slug,category,description,cover_path,turnaround_text,sort_order,product_variants(id,name,width,height,unit,price,sale_price,requires_quote,recommended_width_px,recommended_height_px,sort_order,is_active)",
-      )
-      .order("sort_order", { ascending: true });
+export const getCatalog = createServerFn({ method: "GET" }).handler(async (): Promise<CatalogProduct[]> => {
+  const { publicCatalog } = await import("@/server/service");
+  return publicCatalog();
+});
 
-    if (error) throw new Error(error.message);
-
-    return (data ?? []).map((p) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      category: p.category,
-      description: p.description,
-      cover_path: p.cover_path,
-      turnaround_text: p.turnaround_text,
-      sort_order: p.sort_order,
-      variants: (p.product_variants ?? [])
-        .filter((v) => v.is_active)
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map(({ is_active: _ignored, ...v }) => ({
-          ...v,
-          width: v.width === null ? null : Number(v.width),
-          height: v.height === null ? null : Number(v.height),
-        })),
-    }));
-  },
-);
+export const getPublicConfig = createServerFn({ method: "GET" }).handler(async (): Promise<PublicConfig> => {
+  const { publicConfig } = await import("@/server/service");
+  return publicConfig();
+});
 
 export const catalogQueryOptions = queryOptions({
   queryKey: ["catalog"],
   queryFn: () => getCatalog(),
 });
 
+export const publicConfigQueryOptions = queryOptions({
+  queryKey: ["public-config"],
+  queryFn: () => getPublicConfig(),
+});
+
 export function minPrice(product: CatalogProduct): number | null {
-  const prices = product.variants
-    .map((v) => v.sale_price ?? v.price)
-    .filter((p): p is number => typeof p === "number");
+  const prices = product.variants.map((variant) => variant.price).filter((price): price is number => typeof price === "number");
   return prices.length ? Math.min(...prices) : null;
 }

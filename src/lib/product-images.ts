@@ -6,8 +6,15 @@ import imgNamCham from "@/assets/prod-anh-nam-cham.jpg";
 import imgAlbum from "@/assets/prod-album.jpg";
 
 export const PRODUCT_IMAGES: Record<string, string> = {
+  "anh-ep-go": imgGoLua,
+  "anh-tho": imgPhucHoi,
+  "giay-khen": imgGoLua,
+  "nam-cham-xe": imgNamCham,
+  "nam-cham-tu-lanh": imgNamCham,
   "anh-go-lua": imgGoLua,
   "trang-guong": imgTrangGuong,
+  "thoi-khoa-bieu": imgGoLua,
+  "anh-lua-6x9": imgTrangGuong,
   "anh-the": imgAnhThe,
   "phuc-hoi-anh-cu": imgPhucHoi,
   "anh-nam-cham": imgNamCham,

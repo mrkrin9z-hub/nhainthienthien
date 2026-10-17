@@ -1,172 +1,265 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Download } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  getOrderDetail,
-  STATUS_LABEL,
-  STATUS_OPTIONS,
-  updateInternalNote,
-  updateOrderStatus,
-  type OrderStatus,
-} from "@/lib/admin.functions";
-import { formatVnd } from "@/lib/brand";
+import { formatMaybe } from "@/lib/brand";
+import { changeStatus, getMe, getOrderDetail, recordDeposit, saveNote, saveReprint } from "@/lib/admin.functions";
+import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-hang/$code")({
-  component: AdminOrderDetail,
+  component: OrderDetailPage,
 });
 
-function AdminOrderDetail() {
+const NEXT: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"];
+
+function OrderDetailPage() {
   const { code } = Route.useParams();
   const queryClient = useQueryClient();
-  const [note, setNote] = useState<string | null>(null);
+  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
+  const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
+  const [note, setNote] = useState("");
+  const [deposit, setDeposit] = useState("");
+  const [method, setMethod] = useState("chuyển khoản");
+  const [override, setOverride] = useState(false);
+  const [reason, setReason] = useState("");
+  const data = order.data;
+  const role = me.data?.role;
 
-  const detailQuery = useQuery({
-    queryKey: ["admin", "order", code],
-    queryFn: () => getOrderDetail({ data: { code } }),
-  });
+  async function refresh() {
+    await queryClient.invalidateQueries({ queryKey: ["order", code] });
+  }
 
-  const statusMutation = useMutation({
-    mutationFn: (status: OrderStatus) =>
-      updateOrderStatus({ data: { orderId: detailQuery.data!.id, status, note: "" } }),
-    onSuccess: async () => {
-      toast.success("Đã cập nhật trạng thái");
-      await queryClient.invalidateQueries({ queryKey: ["admin"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const noteMutation = useMutation({
-    mutationFn: (value: string) =>
-      updateInternalNote({ data: { orderId: detailQuery.data!.id, note: value } }),
-    onSuccess: () => toast.success("Đã lưu ghi chú nội bộ"),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  if (detailQuery.isLoading) return <p className="text-muted-foreground">Đang tải đơn hàng…</p>;
-  if (detailQuery.error)
-    return <p className="text-destructive">{(detailQuery.error as Error).message}</p>;
-
-  const order = detailQuery.data!;
+  if (!data) return <p className="text-muted-foreground">{order.isError ? (order.error as Error).message : "Đang tải đơn…"}</p>;
 
   return (
-    <div className="space-y-5">
-      <Link to="/admin/don-hang" className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
-        <ArrowLeft className="size-4" /> Về danh sách đơn
-      </Link>
-
-      <div className="glass-card rounded-3xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-extrabold text-primary">{order.code}</h1>
-          <span className="rounded-full bg-accent/15 px-3 py-1 text-sm font-bold text-accent">
-            {STATUS_LABEL[order.status]}
-          </span>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {order.customerName} · {order.phone} ·{" "}
-          {order.fulfillment === "pickup" ? "Nhận tại xưởng" : "Giao tận nơi"}
-        </p>
-        {order.address ? <p className="text-sm text-muted-foreground">{order.address}</p> : null}
-        {order.customerNote ? (
-          <p className="mt-2 rounded-2xl bg-card p-3 text-sm">Ghi chú khách: {order.customerNote}</p>
-        ) : null}
-      </div>
-
-      <div className="glass-card rounded-3xl p-5">
-        <h2 className="text-lg font-bold">Đổi trạng thái</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {STATUS_OPTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              disabled={statusMutation.isPending || s === order.status}
-              onClick={() => statusMutation.mutate(s)}
-              className={`min-h-11 rounded-xl px-4 text-sm font-semibold disabled:opacity-50 ${
-                s === order.status ? "bg-primary text-primary-foreground" : "bg-card"
-              }`}
-            >
-              {STATUS_LABEL[s]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="glass-card rounded-3xl p-5">
-        <h2 className="text-lg font-bold">Chi tiết đơn</h2>
-        <div className="mt-3 space-y-2">
-          {order.items.map((i) => (
-            <div key={i.id} className="flex justify-between gap-3 rounded-2xl bg-card px-4 py-3 text-sm">
-              <span>
-                {i.name} — {i.variant} × {i.quantity}
-              </span>
-              <span className="font-bold">{formatVnd(i.lineTotal)}</span>
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-right text-lg font-extrabold text-primary">
-          Tổng: {formatVnd(order.total)}
-        </p>
-      </div>
-
-      <div className="glass-card rounded-3xl p-5">
-        <h2 className="text-lg font-bold">Ảnh khách gửi ({order.files.length})</h2>
-        <div className="mt-3 space-y-2">
-          {order.files.map((f) => (
-            <div key={f.id} className="flex items-center justify-between gap-3 rounded-2xl bg-card px-4 py-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{f.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {(f.sizeBytes / 1024 / 1024).toFixed(1)} MB · {f.status}
-                </p>
-              </div>
-              {f.url ? (
-                <Button asChild size="sm" variant="outline">
-                  <a href={f.url} target="_blank" rel="noreferrer">
-                    <Download className="size-4" /> Tải
-                  </a>
-                </Button>
-              ) : null}
-            </div>
-          ))}
-          {order.files.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Chưa có ảnh nào.</p>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="glass-card rounded-3xl p-5">
-        <h2 className="text-lg font-bold">Ghi chú nội bộ</h2>
-        <Textarea
-          className="mt-3"
-          rows={4}
-          value={note ?? order.internalNote ?? ""}
-          onChange={(e) => setNote(e.target.value)}
-        />
-        <Button
-          className="mt-3"
-          disabled={noteMutation.isPending}
-          onClick={() => noteMutation.mutate(note ?? order.internalNote ?? "")}
-        >
-          Lưu ghi chú
+    <div className="space-y-4">
+      <style>{`@media print { body * { visibility: hidden } .label-print, .label-print * { visibility: visible } .label-print { position: absolute; left: 0; top: 0; width: 80mm; } }`}</style>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
+        <Button variant="outline" className="min-h-11" onClick={() => window.print()}>
+          In tem
         </Button>
       </div>
+      <p className="text-sm">
+        {data.customerName} · {data.phone} · {data.channelLabel} · {data.statusLabel}
+        {data.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
+      </p>
+      {data.address ? <p className="text-sm">Địa chỉ: {data.address}</p> : null}
+      {data.marketplaceCode ? <p className="text-sm">Mã sàn: {data.marketplaceCode}</p> : null}
+      {data.stockWarning ? <p className="rounded-2xl bg-accent/30 px-3 py-2 text-sm font-semibold">{data.stockWarning}</p> : null}
+      <p className="text-xs text-muted-foreground">
+        Kho in: {data.printDeducted ? "đã trừ" : "chưa trừ"} · Kho đóng gói: {data.packDeducted ? "đã trừ" : "chưa trừ"}
+      </p>
 
-      <div className="glass-card rounded-3xl p-5">
-        <h2 className="text-lg font-bold">Lịch sử trạng thái</h2>
-        <ol className="mt-3 space-y-2 text-sm">
-          {order.history.map((h, idx) => (
-            <li key={idx} className="rounded-2xl bg-card px-4 py-2">
-              <span className="font-semibold text-primary">{STATUS_LABEL[h.to]}</span> ·{" "}
-              {new Date(h.at).toLocaleString("vi-VN")}
-              {h.note ? ` · ${h.note}` : ""}
+      <section className="label-print glass-card rounded-3xl p-4">
+        <p className="text-lg font-extrabold">{data.code}</p>
+        <p>{data.customerName}</p>
+        <p>{data.phone}</p>
+        <p>{data.address}</p>
+        <p className="text-sm">{data.itemSummary}</p>
+      </section>
+
+      <section className="glass-card rounded-3xl p-4">
+        <h2 className="font-bold text-primary">Sản phẩm</h2>
+        <ul className="mt-2 space-y-1 text-sm">
+          {data.items.map((item) => (
+            <li key={item.id} className="flex justify-between gap-3">
+              <span>
+                {item.quantity}× {item.name}
+              </span>
+              {role === "production" ? null : (
+                <span>{item.lineTotal === null ? "Chưa có giá" : formatMaybe(item.lineTotal)}</span>
+              )}
             </li>
           ))}
-        </ol>
-      </div>
+        </ul>
+        {role === "production" ? null : data.total !== null ? (
+          <p className="mt-2 font-bold">Tổng {formatMaybe(data.total)}</p>
+        ) : (
+          <p className="mt-2 text-sm">Chưa đủ giá bán để ra tổng.</p>
+        )}
+      </section>
+
+      {role !== "production" ? (
+        <section className="glass-card rounded-3xl p-4">
+          <h2 className="font-bold text-primary">Cọc</h2>
+          <p className="text-sm">
+            Cần cọc {formatMaybe(data.depositRequired)} · Đã ghi {formatMaybe(data.depositPaid)} {data.depositMethod}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Input className="min-h-12 w-36" inputMode="numeric" placeholder="Số tiền" value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/\D/g, ""))} />
+            <Input className="min-h-12 w-40" value={method} onChange={(e) => setMethod(e.target.value)} />
+            <Button
+              className="min-h-12"
+              onClick={async () => {
+                try {
+                  await recordDeposit({ data: { orderId: data.id, amount: Number(deposit), method } });
+                  toast.success("Đã ghi cọc");
+                  setDeposit("");
+                  await refresh();
+                } catch (error) {
+                  toast.error((error as Error).message);
+                }
+              }}
+            >
+              Ghi nhận
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="glass-card rounded-3xl p-4">
+        <h2 className="font-bold text-primary">Chuyển bước</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem.</p>
+        {role === "owner" ? (
+          <label className="mt-2 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
+            Chủ bỏ qua điều kiện cọc
+          </label>
+        ) : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {NEXT.map((status) => (
+            <Button
+              key={status}
+              variant={data.status === status ? "default" : "outline"}
+              className="min-h-11"
+              onClick={async () => {
+                try {
+                  await changeStatus({ data: { orderId: data.id, status, note: "", ownerOverride: override } });
+                  toast.success(STATUS_LABEL[status]);
+                  await refresh();
+                } catch (error) {
+                  toast.error((error as Error).message);
+                }
+              }}
+            >
+              {STATUS_LABEL[status]}
+            </Button>
+          ))}
+        </div>
+        <div className="mt-3 rounded-2xl bg-background p-3 text-sm">
+          <p>{data.reply}</p>
+          <Button
+            variant="outline"
+            className="mt-2 min-h-11"
+            onClick={() => {
+              void navigator.clipboard.writeText(data.reply);
+              toast.success("Đã chép câu trả lời");
+            }}
+          >
+            Chép câu trả lời
+          </Button>
+        </div>
+      </section>
+
+      {role !== "production" ? (
+        <section className="glass-card rounded-3xl p-4">
+          <h2 className="font-bold text-primary">Ghi chú nội bộ</h2>
+          <Textarea className="mt-2" defaultValue={data.internalNote} onChange={(e) => setNote(e.target.value)} />
+          <Button
+            className="mt-2 min-h-11"
+            variant="outline"
+            onClick={async () => {
+              await saveNote({ data: { orderId: data.id, note: note || data.internalNote } });
+              toast.success("Đã lưu ghi chú");
+            }}
+          >
+            Lưu ghi chú
+          </Button>
+        </section>
+      ) : null}
+
+      <section className="glass-card rounded-3xl p-4">
+        <h2 className="font-bold text-primary">Ảnh khách</h2>
+        <ul className="mt-2 space-y-2 text-sm">
+          {data.files.map((file) => (
+            <li key={file.id}>
+              <a className="font-semibold text-primary" href={`/api/staff/file/${file.id}`}>
+                {file.name}
+              </a>
+              <span className="text-muted-foreground"> · {file.kind} · {file.storage}</span>
+            </li>
+          ))}
+          {data.files.length === 0 ? <li className="text-muted-foreground">Chưa có file.</li> : null}
+        </ul>
+      </section>
+
+      {role !== "production" ? (
+        <section className="glass-card rounded-3xl p-4">
+          <h2 className="font-bold text-primary">In lại</h2>
+          <p className="text-sm text-muted-foreground">Trong 3 ngày sau khi giao, lỗi xưởng thì in lại miễn phí. Quá hạn web sẽ cảnh báo.</p>
+          <Textarea className="mt-2" placeholder="Lý do khách báo" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div className="mt-2 flex gap-2">
+            <Button
+              className="min-h-11"
+              onClick={async () => {
+                await saveReprint({ data: { orderId: data.id, reason, decision: "reprint", extraCost: null, uses: [] } });
+                toast.success("Đã ghi in lại");
+                setReason("");
+                await refresh();
+              }}
+            >
+              In lại
+            </Button>
+            <Button
+              variant="outline"
+              className="min-h-11"
+              onClick={async () => {
+                await saveReprint({ data: { orderId: data.id, reason, decision: "reject", extraCost: null, uses: [] } });
+                toast.success("Đã từ chối");
+                await refresh();
+              }}
+            >
+              Từ chối
+            </Button>
+          </div>
+          <ul className="mt-3 space-y-1 text-sm">
+            {data.reprints.map((item) => (
+              <li key={item.id}>
+                {item.decision === "reprint" ? "In lại" : item.decision === "reject" ? "Từ chối" : "Chờ"} · {item.reason}
+                {item.overdue ? <strong className="text-destructive"> · Quá hạn in lại</strong> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {role === "owner" && data.quote ? (
+        <section className="glass-card rounded-3xl p-4">
+          <h2 className="font-bold text-primary">Lãi gộp theo định mức hiện tại</h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {data.quote.map((quote, index) =>
+              quote ? (
+                <li key={index}>
+                  {quote.profit === null ? "Chưa đủ số" : `${formatMaybe(quote.profit)} (${quote.marginPercent}%)`}
+                  {quote.tone === "red" ? " · LỖ" : quote.tone === "yellow" ? " · dưới ngưỡng vàng" : ""}
+                </li>
+              ) : null,
+            )}
+          </ul>
+        </section>
+      ) : null}
+
+      <section className="glass-card rounded-3xl p-4">
+        <h2 className="font-bold text-primary">Lịch sử</h2>
+        <ul className="mt-2 space-y-1 text-sm">
+          {data.history.map((item, index) => (
+            <li key={index}>
+              {new Date(item.at).toLocaleString("vi-VN")} · {item.toLabel} · {item.byName}
+              {item.note ? ` · ${item.note}` : ""}
+            </li>
+          ))}
+        </ul>
+      </section>
+      {role !== "production" ? (
+        <Link to="/admin/khach/$id" params={{ id: data.customerId }} className="text-sm font-semibold text-accent">
+          Hồ sơ khách
+        </Link>
+      ) : null}
     </div>
   );
 }
