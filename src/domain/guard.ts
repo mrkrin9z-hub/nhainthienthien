@@ -93,9 +93,27 @@ export function staticAssetPath(pathname: string): string | null {
   return null;
 }
 
-export const INTEGRATION_PROVIDERS = ["tiktok", "shopee", "meta", "zalo", "carrier"] as const;
+export const INTEGRATION_PROVIDERS = [
+  "tiktok",
+  "shopee",
+  "meta",
+  "zalo",
+  "carrier",
+  "google_client_id",
+  "google_client_secret",
+  "google_drive",
+] as const;
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
 
 export function emptySecretStatus(): Record<IntegrationProvider, boolean> {
-  return { tiktok: false, shopee: false, meta: false, zalo: false, carrier: false };
+  return {
+    tiktok: false,
+    shopee: false,
+    meta: false,
+    zalo: false,
+    carrier: false,
+    google_client_id: false,
+    google_client_secret: false,
+    google_drive: false,
+  };
 }

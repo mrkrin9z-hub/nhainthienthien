@@ -39,6 +39,11 @@ async function writeMap(map: SecretMap): Promise<void> {
   await writeFile(file, JSON.stringify(map));
 }
 
+export async function readIntegrationSecret(provider: IntegrationProvider): Promise<string> {
+  const map = await readMap();
+  return map[provider] ?? "";
+}
+
 export async function integrationStatus(): Promise<Record<IntegrationProvider, boolean>> {
   const map = await readMap();
   const status = emptySecretStatus();

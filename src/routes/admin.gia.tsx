@@ -161,7 +161,7 @@ function PriceRow({
         <div className="flex gap-2">
           <select className="min-h-11 rounded-xl border bg-background px-2" value={status} disabled={!owner} onChange={(e) => setStatus(e.target.value)}>
             <option value="dang_ban">Đang bán</option>
-            <option value="nhap">Nháp</option>
+            <option value="nhap">Chưa có giá</option>
             <option value="cho_duyet">Chờ duyệt</option>
           </select>
           {owner ? (

@@ -1,6 +1,7 @@
 import { APPROVED_PRICES } from "./approved-prices.ts";
 import { DEFAULT_REMIND_MESSAGE } from "./crm.ts";
 import { formulaQty } from "./calc.ts";
+import { CAR_MAGNET_SIZES, FRIDGE_MAGNET_SIZES, PHOTO_PRINT_SIZES } from "./sizes.ts";
 import type {
   BomLine,
   Channel,
@@ -108,15 +109,12 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
 };
 
-const SIZES = [
-  { code: "13x18", w: 13, h: 18 },
-  { code: "15x21", w: 15, h: 21 },
-  { code: "20x30", w: 20, h: 30 },
-  { code: "30x45", w: 30, h: 45 },
-  { code: "40x60", w: 40, h: 60 },
-  { code: "50x75", w: 50, h: 75 },
-  { code: "60x90", w: 60, h: 90 },
-];
+function sizeCm(code: string): { code: string; w: number; h: number } {
+  const [w, h] = code.split("x");
+  return { code, w: Number(w), h: Number(h) };
+}
+
+const SIZES = PHOTO_PRINT_SIZES.map(sizeCm);
 
 const WOOD_PRICE: Record<string, number> = {
   "13x18": 1900,
@@ -270,7 +268,7 @@ const SPECS: Spec[] = [
   {
     groupId: "anh_tho",
     prefix: "AT",
-    sizes: SIZES.filter((s) => !["13x18", "15x21"].includes(s.code)),
+    sizes: PHOTO_PRINT_SIZES.filter((code) => code !== "13x18" && code !== "15x21").map(sizeCm),
     combos: [1, 2, 3, 4, 5],
     kind: "wood",
   },
@@ -278,17 +276,14 @@ const SPECS: Spec[] = [
   {
     groupId: "nam_cham_xe",
     prefix: "NX",
-    sizes: [
-      { code: "9x19", w: 9, h: 19 },
-      { code: "17x22", w: 17, h: 22 },
-    ],
+    sizes: CAR_MAGNET_SIZES.map(sizeCm),
     combos: [1],
     kind: "car",
   },
   {
     groupId: "nam_cham_tu",
     prefix: "NCT",
-    sizes: [{ code: "6x9", w: 6, h: 9 }],
+    sizes: FRIDGE_MAGNET_SIZES.map(sizeCm),
     combos: [],
     packs: [1, 5, 10, 20, 50],
     kind: "fridge",

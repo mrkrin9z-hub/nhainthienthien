@@ -63,7 +63,7 @@ export type PriceStatus = (typeof PRICE_STATUSES)[number];
 
 export const PRICE_STATUS_LABEL: Record<PriceStatus, string> = {
   dang_ban: "Đang bán",
-  nhap: "Nháp",
+  nhap: "Chưa có giá",
   cho_duyet: "Chờ duyệt",
 };
 

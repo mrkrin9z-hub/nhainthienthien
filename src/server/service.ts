@@ -30,6 +30,8 @@ import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
 import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type PlannedItem } from "@/domain/marketplace";
 import { applyRestore, restoreSummary } from "@/domain/restore";
+import { driveFolderParts } from "@/domain/drive-path";
+import { defaultCarrier } from "@/domain/jt";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
 import { publicContact } from "@/domain/public-contact";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
@@ -56,7 +58,7 @@ import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
 import { listBackups, readBackup, writeManualBackup } from "@/server/store";
 import { clearProductPhoto, readProductPhoto, writeProductPhoto } from "@/server/photos";
 import { integrationStatus, saveIntegrationSecret } from "@/server/secrets";
-import { deleteFromDrive, downloadFromDrive, driveConfigured, uploadToDrive } from "@/server/drive";
+import { deleteFromDrive, downloadFromDrive, driveConnected, uploadToDrive } from "@/server/drive";
 import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
 
 export type Actor = Pick<Staff, "id" | "name" | "email" | "role" | "mustChangePassword"> & {
@@ -483,7 +485,7 @@ export async function createWebOrder(input: {
       internalNote: "",
       dueDate: null,
       marketplaceCode: "",
-      shipping: blankShipping(),
+      shipping: { ...blankShipping(), carrier: defaultCarrier({ channel: "tai_tiem", source: "web", fulfillment: input.fulfillment }) },
       items,
       subtotal: totals.subtotal,
       total: totals.total,
@@ -517,11 +519,9 @@ async function orderByToken(state: ShopState, orderId: string, accessToken: stri
 
 const KV_UPLOAD_MAX = 10 * 1024 * 1024;
 
-/** null khi Drive, R2 hoặc Supabase nhận ảnh lớn. Còn lại (KV hoặc đĩa local) là 10MB. */
+/** null khi Drive của chủ đã kết nối. Chưa kết nối thì KV hoặc đĩa local, mỗi ảnh 10MB. */
 export async function photoByteLimit(): Promise<number | null> {
-  if (driveConfigured()) return null;
-  if (await orderFiles()) return null;
-  if (usesSupabase()) return null;
+  if (await driveConnected()) return null;
   return KV_UPLOAD_MAX;
 }
 
@@ -557,17 +557,21 @@ export async function createUploadTicket(input: {
   return { fileId, path: storagePath, mode: "server" as const };
 }
 
-async function putPhoto(file: OrderFile, orderId: string, bytes: Uint8Array, mime: string) {
-  if (driveConfigured()) {
-    file.driveFileId = await uploadToDrive(file.name, mime || file.mime, bytes);
+async function putPhoto(
+  file: OrderFile,
+  folder: { orderId: string; code: string; customerName: string; createdAt: string; source: string; channel: string },
+  bytes: Uint8Array,
+  mime: string,
+) {
+  if (await driveConnected()) {
+    file.driveFileId = await uploadToDrive({
+      name: file.name,
+      mime: mime || file.mime,
+      bytes,
+      folders: driveFolderParts(folder),
+    });
     file.storage = "drive";
     file.path = file.driveFileId;
-    return;
-  }
-  const bucket = await orderFiles();
-  if (bucket) {
-    await bucket.put(file.path, bytes, { httpMetadata: { contentType: mime || file.mime } });
-    file.storage = "r2";
     return;
   }
   const kv = await shopKv();
@@ -581,24 +585,11 @@ async function putPhoto(file: OrderFile, orderId: string, bytes: Uint8Array, mim
     file.path = key;
     return;
   }
-  if (usesSupabase()) {
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const uploaded = await supabase.storage.from("order-originals").upload(file.path, bytes, {
-      contentType: mime || file.mime,
-      upsert: true,
-    });
-    if (uploaded.error) throw new Error(uploaded.error.message);
-    file.storage = "supabase";
-    return;
-  }
   if (onWorkers()) {
-    throw new Error("Không có chỗ lưu ảnh trên Workers. Gắn R2 ORDER_FILES hoặc KV SHOP_KV.");
+    throw new Error("Chưa kết nối Google Drive và chưa có KV để lưu ảnh.");
   }
   const { mkdir, writeFile } = await import("node:fs/promises");
-  const relative = path.join("data", "uploads", orderId, file.id);
+  const relative = path.join("data", "uploads", folder.orderId, file.id);
   const absolute = path.join(process.cwd(), relative);
   await mkdir(path.dirname(absolute), { recursive: true });
   await writeFile(absolute, bytes);
@@ -645,7 +636,20 @@ export async function saveDirectUpload(input: {
     const order = await orderByToken(state, input.orderId, input.accessToken);
     const file = order.files.find((item) => item.id === input.fileId);
     if (!file) throw new Error("Không thấy file của đơn.");
-    await putPhoto(file, order.id, input.bytes, input.mime);
+    const customer = state.customers.find((item) => item.id === order.customerId);
+    await putPhoto(
+      file,
+      {
+        orderId: order.id,
+        code: order.code,
+        customerName: customer?.name ?? "",
+        createdAt: order.createdAt,
+        source: order.source,
+        channel: order.channel,
+      },
+      input.bytes,
+      input.mime,
+    );
     file.status = "complete";
     file.size = input.bytes.byteLength;
   });
@@ -770,7 +774,10 @@ export async function createManualOrder(
       internalNote: "",
       dueDate: input.dueDate,
       marketplaceCode: input.marketplaceCode.trim(),
-      shipping: blankShipping(),
+      shipping: {
+        ...blankShipping(),
+        carrier: defaultCarrier({ channel: input.channel, source: "manual", fulfillment: input.fulfillment }),
+      },
       items,
       subtotal: totals.subtotal,
       total: totals.total,
@@ -2017,7 +2024,7 @@ export async function importMarketplaceFile(
         marketplaceCode: planned.platformOrderId,
         recipientName: planned.buyer,
         shipping: {
-          carrier: planned.carrier,
+          carrier: planned.carrier.trim() || defaultCarrier({ channel: input.channel, source: "manual", fulfillment: "delivery" }),
           tracking: planned.tracking,
           shipFee: planned.shipFee,
           codAmount: planned.codAmount,

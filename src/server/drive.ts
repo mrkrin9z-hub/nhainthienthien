@@ -1,54 +1,54 @@
-function driveEnv() {
-  const email = process.env.GOOGLE_DRIVE_CLIENT_EMAIL;
-  const key = process.env.GOOGLE_DRIVE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  if (!email || !key || !folderId) return null;
-  return { email, key, folderId };
+import { readIntegrationSecret } from "@/server/secrets";
+
+const TOKEN_URL = "https://oauth2.googleapis.com/token";
+const FILES_URL = "https://www.googleapis.com/drive/v3/files";
+
+type DriveCreds = { clientId: string; clientSecret: string; refreshToken: string };
+
+export async function driveConnected(): Promise<boolean> {
+  return (await driveCreds()) !== null;
 }
 
-export function driveConfigured(): boolean {
-  return driveEnv() !== null;
+async function driveCreds(): Promise<DriveCreds | null> {
+  const clientId = (await readIntegrationSecret("google_client_id")).trim();
+  const clientSecret = (await readIntegrationSecret("google_client_secret")).trim();
+  const refreshToken = (await readIntegrationSecret("google_drive")).trim();
+  if (!clientId || !clientSecret || !refreshToken) return null;
+  return { clientId, clientSecret, refreshToken };
 }
 
-function bytesOfPem(pem: string): ArrayBuffer {
-  const body = pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
-  const buf = Buffer.from(body, "base64");
-  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-}
-
-function b64url(input: Buffer | Uint8Array | string): string {
-  const buf = typeof input === "string" ? Buffer.from(input) : Buffer.from(input);
-  return buf.toString("base64url");
+export async function exchangeDriveCode(input: { code: string; redirectUri: string }): Promise<string> {
+  const clientId = (await readIntegrationSecret("google_client_id")).trim();
+  const clientSecret = (await readIntegrationSecret("google_client_secret")).trim();
+  if (!clientId || !clientSecret) throw new Error("Chưa có Client ID hoặc Client secret.");
+  const body = new URLSearchParams({
+    code: input.code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: input.redirectUri,
+    grant_type: "authorization_code",
+  });
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  if (!res.ok) throw new Error(`Google từ chối mã kết nối (${res.status}).`);
+  const json = (await res.json()) as { refresh_token?: string };
+  if (!json.refresh_token) throw new Error("Google không trả mã làm mới. Bấm Kết nối Google Drive và đồng ý quyền.");
+  return json.refresh_token;
 }
 
 async function accessToken(): Promise<string> {
-  const env = driveEnv();
-  if (!env) throw new Error("Chưa cấu hình Google Drive.");
-  const now = Math.floor(Date.now() / 1000);
-  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claim = b64url(
-    JSON.stringify({
-      iss: env.email,
-      scope: "https://www.googleapis.com/auth/drive",
-      aud: "https://oauth2.googleapis.com/token",
-      iat: now,
-      exp: now + 3600,
-    }),
-  );
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    bytesOfPem(env.key),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(`${header}.${claim}`));
-  const jwt = `${header}.${claim}.${b64url(new Uint8Array(sig))}`;
+  const creds = await driveCreds();
+  if (!creds) throw new Error("Chưa kết nối Google Drive.");
   const body = new URLSearchParams({
-    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-    assertion: jwt,
+    grant_type: "refresh_token",
+    refresh_token: creds.refreshToken,
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
   });
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body,
@@ -59,32 +59,80 @@ async function accessToken(): Promise<string> {
   return json.access_token;
 }
 
-export async function uploadToDrive(name: string, mime: string, bytes: Uint8Array): Promise<string> {
-  const env = driveEnv();
-  if (!env) throw new Error("Chưa cấu hình Google Drive.");
-  const token = await accessToken();
-  const boundary = `tt${crypto.randomUUID().replace(/-/g, "")}`;
-  const meta = JSON.stringify({ name, parents: [env.folderId] });
-  const head = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`;
-  const tail = `\r\n--${boundary}--`;
-  const payload = Buffer.concat([Buffer.from(head), Buffer.from(bytes), Buffer.from(tail)]);
-  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+function escapeQuery(name: string): string {
+  return name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+async function findFolder(token: string, name: string, parentId: string): Promise<string | null> {
+  const q = `name = '${escapeQuery(name)}' and mimeType = 'application/vnd.google-apps.folder' and '${parentId}' in parents and trashed = false`;
+  const url = `${FILES_URL}?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=1&spaces=drive`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`Không tìm thư mục trên Drive (${res.status}).`);
+  const json = (await res.json()) as { files?: { id?: string }[] };
+  return json.files?.[0]?.id ?? null;
+}
+
+async function createFolder(token: string, name: string, parentId: string): Promise<string> {
+  const res = await fetch(`${FILES_URL}?fields=id`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": `multipart/related; boundary=${boundary}`,
-    },
-    body: payload,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] }),
   });
-  if (!res.ok) throw new Error(`Không tải ảnh lên Drive (${res.status}).`);
+  if (!res.ok) throw new Error(`Không tạo thư mục trên Drive (${res.status}).`);
   const json = (await res.json()) as { id?: string };
-  if (!json.id) throw new Error("Drive không trả mã file.");
+  if (!json.id) throw new Error("Drive không trả mã thư mục.");
   return json.id;
+}
+
+let folderChain: Promise<unknown> = Promise.resolve();
+
+function oneFolderAtATime<T>(run: () => Promise<T>): Promise<T> {
+  const next = folderChain.then(run, run);
+  folderChain = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  return next;
+}
+
+async function ensureFolder(token: string, name: string, parentId: string): Promise<string> {
+  return (await findFolder(token, name, parentId)) ?? createFolder(token, name, parentId);
+}
+
+export async function uploadToDrive(input: {
+  name: string;
+  mime: string;
+  bytes: Uint8Array;
+  folders: readonly string[];
+}): Promise<string> {
+  return oneFolderAtATime(async () => {
+    const token = await accessToken();
+    let parent = "root";
+    for (const part of input.folders) parent = await ensureFolder(token, part, parent);
+    const safeName = input.name.replace(/[\\/]/g, "-").slice(-120) || "anh.jpg";
+    const boundary = `tt${crypto.randomUUID().replace(/-/g, "")}`;
+    const meta = JSON.stringify({ name: safeName, parents: [parent] });
+    const head = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${input.mime || "application/octet-stream"}\r\n\r\n`;
+    const tail = `\r\n--${boundary}--`;
+    const payload = Buffer.concat([Buffer.from(head), Buffer.from(input.bytes), Buffer.from(tail)]);
+    const res = await fetch(`${FILES_URL}?uploadType=multipart&fields=id`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": `multipart/related; boundary=${boundary}`,
+      },
+      body: payload,
+    });
+    if (!res.ok) throw new Error(`Không tải ảnh lên Drive (${res.status}).`);
+    const json = (await res.json()) as { id?: string };
+    if (!json.id) throw new Error("Drive không trả mã file.");
+    return json.id;
+  });
 }
 
 export async function deleteFromDrive(fileId: string): Promise<void> {
   const token = await accessToken();
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+  const res = await fetch(`${FILES_URL}/${encodeURIComponent(fileId)}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -93,7 +141,7 @@ export async function deleteFromDrive(fileId: string): Promise<void> {
 
 export async function downloadFromDrive(fileId: string): Promise<Uint8Array> {
   const token = await accessToken();
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+  const res = await fetch(`${FILES_URL}/${encodeURIComponent(fileId)}?alt=media`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`Không tải được ảnh từ Drive (${res.status}).`);

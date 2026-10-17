@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
 import { changeStatus, getMe, getOrderDetail, recordDeposit, saveNote, saveReprint, storeShipping } from "@/lib/admin.functions";
 import { isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
+import { JT_CARRIER, jtOrder } from "@/domain/jt";
 import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-hang/$code")({
@@ -67,7 +68,16 @@ function OrderDetailPage() {
         Kho in: {data.printDeducted ? "đã trừ" : "chưa trừ"} · Kho đóng gói: {data.packDeducted ? "đã trừ" : "chưa trừ"}
       </p>
 
-      {role !== "production" ? <ShippingForm orderId={data.id} shipping={data.shipping} onDone={refresh} /> : (
+      {role !== "production" ? (
+        <ShippingForm
+          orderId={data.id}
+          shipping={data.shipping}
+          channel={data.channel}
+          source={data.source}
+          fulfillment={data.fulfillment}
+          onDone={refresh}
+        />
+      ) : (
         <p className="text-sm">Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}</p>
       )}
 
@@ -323,19 +333,31 @@ function OrderDetailPage() {
 function ShippingForm({
   orderId,
   shipping,
+  channel,
+  source,
+  fulfillment,
   onDone,
 }: {
   orderId: string;
   shipping?: { carrier: string; tracking: string; shipFee: number | null; codAmount: number | null };
+  channel: string;
+  source: string;
+  fulfillment: string;
   onDone: () => Promise<void>;
 }) {
-  const [carrier, setCarrier] = useState(shipping?.carrier ?? "");
+  const jt = jtOrder({ channel, source, fulfillment });
+  const [carrier, setCarrier] = useState(shipping?.carrier || (jt ? JT_CARRIER : ""));
   const [tracking, setTracking] = useState(shipping?.tracking ?? "");
   const [shipFee, setShipFee] = useState(shipping?.shipFee === null || shipping?.shipFee === undefined ? "" : String(shipping.shipFee));
   const [codAmount, setCodAmount] = useState(shipping?.codAmount === null || shipping?.codAmount === undefined ? "" : String(shipping.codAmount));
   return (
     <section className="glass-card space-y-2 rounded-3xl p-4">
       <h2 className="font-bold text-primary">Giao hàng</h2>
+      {jt ? (
+        <p className="text-xs text-muted-foreground">
+          Đơn web giao tận nơi và đơn Facebook đi J&T Express. Chưa có khóa thì ghi mã vận đơn và phí bằng tay. Tem in khổ 100×150.
+        </p>
+      ) : null}
       <Input className="min-h-12" placeholder="Hãng vận chuyển" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
       <Input className="min-h-12" placeholder="Mã vận đơn" value={tracking} onChange={(e) => setTracking(e.target.value)} />
       <Input className="min-h-12" inputMode="numeric" placeholder="Phí ship" value={shipFee} onChange={(e) => setShipFee(e.target.value.replace(/[^\d]/g, ""))} />

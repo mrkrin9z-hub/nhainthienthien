@@ -45,7 +45,7 @@ const GUIDE = [
     title: "Bước 3 — Gửi ảnh gốc",
     points: [
       "Gửi file gốc từ máy ảnh hoặc điện thoại, không chụp lại màn hình.",
-      "Định dạng JPG, PNG, WEBP hoặc HEIC. Mỗi ảnh tối đa 10MB khi tiệm chưa gắn kho R2.",
+      "Định dạng JPG, PNG, WEBP hoặc HEIC. Mỗi ảnh tối đa 10MB khi tiệm chưa kết nối Google Drive.",
       "Ảnh càng lớn (cạnh dài trên 2000px) thì bản in càng sắc nét.",
     ],
   },
