@@ -1,0 +1,365 @@
+export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee"] as const;
+export type Channel = (typeof CHANNELS)[number];
+
+export const CHANNEL_LABEL: Record<Channel, string> = {
+  tai_tiem: "Tại tiệm / Web",
+  facebook: "Facebook",
+  tiktok: "TikTok",
+  shopee: "Shopee",
+};
+
+export const ROLES = ["owner", "sale", "production"] as const;
+export type Role = (typeof ROLES)[number];
+
+export const ROLE_LABEL: Record<Role, string> = {
+  owner: "Chủ",
+  sale: "Sale",
+  production: "Sản xuất",
+};
+
+export const ORDER_STATUSES = [
+  "draft_upload",
+  "upload_error",
+  "nhan_don",
+  "thiet_ke",
+  "cho_duyet",
+  "in",
+  "dong_goi",
+  "giao",
+  "xong",
+  "huy",
+] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+export const STATUS_LABEL: Record<OrderStatus, string> = {
+  draft_upload: "Đang gửi ảnh",
+  upload_error: "Lỗi tải ảnh",
+  nhan_don: "Nhận đơn",
+  thiet_ke: "Thiết kế",
+  cho_duyet: "Chờ khách duyệt",
+  in: "In",
+  dong_goi: "Đóng gói",
+  giao: "Giao",
+  xong: "Xong",
+  huy: "Hủy",
+};
+
+/** Câu sale bấm sao chép khi khách hỏi tình trạng. */
+export const STATUS_REPLY: Record<OrderStatus, string> = {
+  draft_upload: "Đã nhận đơn, shop đang chuẩn bị hàng, anh/chị chờ chút nhé",
+  upload_error: "Ảnh chưa gửi đủ, anh/chị gửi lại giúp shop nhé",
+  nhan_don: "Đã nhận đơn, shop đang chuẩn bị hàng, anh/chị chờ chút nhé",
+  thiet_ke: "Shop đang thiết kế, anh/chị chờ chút nhé",
+  cho_duyet: "Shop gửi mẫu để anh/chị duyệt giúp ạ",
+  in: "Đơn đang in, anh/chị chờ chút nhé",
+  dong_goi: "Đơn đang đóng gói, anh/chị chờ chút nhé",
+  giao: "Đơn đang trên đường giao, anh/chị chú ý điện thoại giúp shop nhé",
+  xong: "Đơn đã hoàn tất. Cảm ơn anh/chị đã ủng hộ Nhà In Thiên Thiên.",
+  huy: "Đơn đã hủy.",
+};
+
+export const PRICE_STATUSES = ["dang_ban", "nhap", "cho_duyet"] as const;
+export type PriceStatus = (typeof PRICE_STATUSES)[number];
+
+export const PRICE_STATUS_LABEL: Record<PriceStatus, string> = {
+  dang_ban: "Đang bán",
+  nhap: "Nháp",
+  cho_duyet: "Chờ duyệt",
+};
+
+export type Settings = {
+  inkPercent: number;
+  tiktokFeePercent: number;
+  tiktokExtraPercent: number;
+  tiktokFixed: number;
+  tiktokTaxPercent: number;
+  tiktokCommissionPercent: number;
+  tiktokAffiliatePercent: number;
+  shopeeFeePercent: number;
+  shopeeExtraPercent: number;
+  shopeeInfra: number;
+  shopeePiship: number;
+  shopeeTaxPercent: number;
+  shopeeCommissionPercent: number;
+  shopeeAffiliatePercent: number;
+  fbTaxPercent: number;
+  fbCommissionPercent: number;
+  fbAdsPercent: number;
+  fbCodPercent: number;
+  fbShipping: number | null;
+  walkinCommissionPercent: number;
+  marginYellowPercent: number;
+  marginRedPercent: number;
+  wasteRate: number;
+  tapeOrdersPerRoll: number;
+  magnetPiecesPerSheet: number;
+  ppRollWidthCm: number;
+  filmRollWidthCm: number;
+  foamRollWidthCm: number;
+  foamRollLengthM: number;
+  depositMinTotal: number;
+  depositPercent: number;
+  breakevenMonth: number;
+  breakevenDay: number;
+  workStart: string;
+  workEnd: string;
+  /** 0 = Chủ nhật … 6 = Thứ bảy. Trống = làm cả tuần (JD ghi 8:00–18:00 hằng ngày). */
+  weeklyOff: number[];
+  lateGraceMinutes: number;
+  lateDeductionPerMinute: number | null;
+  absenceDeductionPerDay: number | null;
+  saleBase: number;
+  saleProbationPercent: number;
+  productionBase: number;
+  kpiTargets: number[];
+  commissionTiers: { upto: number | null; percent: number }[];
+  shopOpenDate: string;
+  fileRetentionDays: number;
+  videoRetentionDays: number;
+  zaloPhone: string;
+  publicHours: string;
+  showAnhThe: boolean;
+  showAlbum: boolean;
+  groupListed: Record<string, boolean>;
+  marketplaceCutoff: string;
+  marketplaceHandover: string;
+  fixedCosts: { key: string; name: string; amount: number; note: string }[];
+  rentFromJune2027: number;
+};
+
+export type Staff = {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  passwordHash: string;
+  active: boolean;
+  mustChangePassword: boolean;
+  probation: boolean;
+  hiredAt: string | null;
+};
+
+export type Group = {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  description: string;
+  turnaround: string;
+  sort: number;
+  /** Ảnh thẻ / album chỉ hiện khi cài đặt bật. */
+  gate: "anh_the" | "album" | null;
+};
+
+export type Sku = {
+  id: string;
+  code: string;
+  groupId: string;
+  name: string;
+  size: string | null;
+  widthCm: number | null;
+  heightCm: number | null;
+  sheets: number;
+  piecesPerPack: number | null;
+  sort: number;
+};
+
+export type ChannelPrice = {
+  skuId: string;
+  channel: Channel;
+  price: number | null;
+  status: PriceStatus;
+  note: string;
+};
+
+export type Material = {
+  id: string;
+  name: string;
+  buyLabel: string;
+  /** Đơn vị đang trừ kho. */
+  unit: string;
+  /** Số đơn vị trong 1 lần mua (cuộn/thùng/tấm). Null nếu chưa biết quy cách. */
+  packSize: number | null;
+  packPrice: number | null;
+  stock: number;
+  minStock: number | null;
+  supplier: string;
+  pendingPrice: number | null;
+};
+
+export type BomPhase = "print" | "pack";
+export type BomScope = "sheet" | "parcel";
+
+export type BomLine = {
+  id: string;
+  skuId: string;
+  materialId: string;
+  phase: BomPhase;
+  scope: BomScope;
+  qty: number | null;
+  formula: string;
+};
+
+export type Customer = {
+  id: string;
+  name: string;
+  phone: string;
+  phoneNormalized: string;
+  address: string;
+  note: string;
+  createdAt: string;
+};
+
+export type OrderFile = {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+  status: "uploading" | "complete" | "error";
+  kind: "original" | "design" | "approval" | "packing_video";
+  storage: "supabase" | "drive" | "local";
+  path: string;
+  driveFileId: string | null;
+  createdAt: string;
+  deletedAt: string | null;
+};
+
+export type OrderItem = {
+  id: string;
+  skuId: string;
+  name: string;
+  skuCode: string;
+  quantity: number;
+  unitPrice: number | null;
+  lineTotal: number | null;
+};
+
+export type Order = {
+  id: string;
+  code: string;
+  channel: Channel;
+  source: "web" | "manual";
+  customerId: string;
+  status: OrderStatus;
+  fulfillment: "pickup" | "delivery";
+  address: string;
+  customerNote: string;
+  internalNote: string;
+  dueDate: string | null;
+  marketplaceCode: string;
+  items: OrderItem[];
+  subtotal: number | null;
+  total: number | null;
+  depositRequired: number;
+  depositPaid: number;
+  depositMethod: string;
+  depositBy: string | null;
+  printDeducted: boolean;
+  packDeducted: boolean;
+  stockWarning: string;
+  accessTokenHash: string;
+  accessToken: string;
+  idempotencyKey: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  files: OrderFile[];
+  history: { at: string; from: OrderStatus | null; to: OrderStatus; by: string | null; note: string }[];
+};
+
+export type Reprint = {
+  id: string;
+  orderId: string;
+  reportedAt: string;
+  reason: string;
+  decision: "reprint" | "reject" | null;
+  extraCost: number | null;
+  materialNote: string;
+  overdue: boolean;
+  by: string | null;
+  uses: { materialId: string; qty: number }[];
+};
+
+export type Movement = {
+  id: string;
+  at: string;
+  materialId: string;
+  qty: number;
+  reason: string;
+  orderId: string | null;
+  by: string | null;
+  note: string;
+};
+
+export type StockCount = {
+  id: string;
+  at: string;
+  materialId: string;
+  systemQty: number;
+  actualQty: number;
+  by: string | null;
+  note: string;
+};
+
+export type Punch = {
+  id: string;
+  staffId: string;
+  inAt: string;
+  outAt: string | null;
+  lateMinutes: number;
+  earlyMinutes: number;
+  note: string;
+  editedBy: string | null;
+};
+
+export type Leave = {
+  id: string;
+  staffId: string;
+  date: string;
+  paid: boolean;
+  note: string;
+};
+
+export type Expense = {
+  id: string;
+  month: string;
+  name: string;
+  amount: number;
+  note: string;
+  at: string;
+  by: string | null;
+};
+
+export type PayrollLock = { month: string; at: string; by: string };
+
+export type Audit = {
+  id: string;
+  at: string;
+  actorId: string | null;
+  action: string;
+  entity: string;
+  before: unknown;
+  after: unknown;
+};
+
+export type ShopState = {
+  version: number;
+  settings: Settings;
+  staff: Staff[];
+  groups: Group[];
+  skus: Sku[];
+  prices: ChannelPrice[];
+  materials: Material[];
+  boms: BomLine[];
+  customers: Customer[];
+  orders: Order[];
+  reprints: Reprint[];
+  movements: Movement[];
+  counts: StockCount[];
+  punches: Punch[];
+  leaves: Leave[];
+  expenses: Expense[];
+  monthlyFixed: { month: string; key: string; amount: number }[];
+  payrollLocks: PayrollLock[];
+  audits: Audit[];
+};

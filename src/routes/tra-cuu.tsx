@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { lookupOrder, type OrderLookupResult } from "@/lib/orders.functions";
-import { formatVnd } from "@/lib/brand";
+import { formatMaybe, formatVnd } from "@/lib/brand";
 
 export const Route = createFileRoute("/tra-cuu")({
   head: () => ({
@@ -32,13 +32,14 @@ export const Route = createFileRoute("/tra-cuu")({
 export const STATUS_LABEL: Record<string, string> = {
   draft_upload: "Đang gửi ảnh",
   upload_error: "Lỗi tải ảnh",
-  pending_review: "Chờ duyệt",
-  confirmed: "Đã xác nhận",
-  printing: "Đang in",
-  ready: "Sẵn sàng giao/nhận",
-  delivering: "Đang giao",
-  completed: "Hoàn tất",
-  cancelled: "Đã hủy",
+  nhan_don: "Đã nhận đơn",
+  thiet_ke: "Đang thiết kế",
+  cho_duyet: "Chờ khách duyệt",
+  in: "Đang in",
+  dong_goi: "Đang đóng gói",
+  giao: "Đang giao",
+  xong: "Hoàn tất",
+  huy: "Đã hủy",
 };
 
 function LookupPage() {
@@ -129,13 +130,13 @@ function LookupPage() {
                   <span className="text-foreground/80">
                     {item.name} — {item.variant} × {item.quantity}
                   </span>
-                  <span className="font-semibold text-primary">{formatVnd(item.lineTotal)}</span>
+                  <span className="font-semibold text-primary">{item.lineTotal === null ? "Liên hệ" : formatVnd(item.lineTotal)}</span>
                 </li>
               ))}
             </ul>
             <div className="mt-3 flex justify-between border-t border-border pt-3 text-base font-bold">
               <span>Tạm tính</span>
-              <span className="text-accent">{formatVnd(result.total)}</span>
+              <span className="text-accent">{formatMaybe(result.total) === "—" ? "Liên hệ" : formatMaybe(result.total)}</span>
             </div>
 
             {result.history.length ? (

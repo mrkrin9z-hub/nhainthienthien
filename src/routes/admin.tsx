@@ -1,54 +1,46 @@
 import { createFileRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { LayoutDashboard, LogOut, Package, ShoppingBag } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
 import { LOGO_HORIZONTAL } from "@/lib/assets";
+import { getMe, loginStaff, logoutStaff } from "@/lib/admin.functions";
+import type { Role } from "@/domain/types";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
       { title: "Quản trị — Nhà In Thiên Thiên" },
       { name: "robots", content: "noindex, nofollow" },
-      { name: "description", content: "Khu vực quản trị đơn hàng Nhà In Thiên Thiên." },
     ],
   }),
   component: AdminLayout,
 });
 
-const NAV = [
-  { to: "/admin", label: "Tổng quan", icon: LayoutDashboard, exact: true },
-  { to: "/admin/don-hang", label: "Đơn hàng", icon: ShoppingBag, exact: false },
-  { to: "/admin/san-pham", label: "Sản phẩm & giá", icon: Package, exact: false },
-] as const;
+const NAV: { to: string; label: string; roles: Role[] }[] = [
+  { to: "/admin", label: "Tổng quan", roles: ["owner", "sale", "production"] },
+  { to: "/admin/gia", label: "Bảng giá", roles: ["owner", "sale"] },
+  { to: "/admin/don-hang", label: "Đơn hàng", roles: ["owner", "sale", "production"] },
+  { to: "/admin/khach", label: "Khách", roles: ["owner", "sale"] },
+  { to: "/admin/kho", label: "Kho", roles: ["owner", "sale", "production"] },
+  { to: "/admin/cham-cong", label: "Chấm công", roles: ["owner", "sale", "production"] },
+  { to: "/admin/luong", label: "Lương", roles: ["owner", "sale"] },
+  { to: "/admin/loi-nhuan", label: "Lãi lỗ", roles: ["owner"] },
+  { to: "/admin/cai-dat", label: "Cài đặt", roles: ["owner"] },
+];
 
 function AdminLayout() {
+  const queryClient = useQueryClient();
   const router = useRouter();
-  const [checked, setChecked] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
+  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
 
-  useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      setSignedIn(!!session);
-      setChecked(true);
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      setSignedIn(!!data.session);
-      setChecked(true);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
+  if (me.isLoading) return <div className="p-10 text-center text-muted-foreground">Đang tải…</div>;
+  if (!me.data) return <AdminLogin onDone={() => queryClient.invalidateQueries({ queryKey: ["me"] })} />;
 
-  if (!checked) {
-    return <div className="p-10 text-center text-muted-foreground">Đang tải…</div>;
-  }
-
-  if (!signedIn) return <AdminLogin />;
-
+  const role = me.data.role;
   return (
     <div className="min-h-screen bg-background">
       <header className="glass-panel sticky top-0 z-40">
@@ -57,44 +49,51 @@ function AdminLayout() {
             <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="h-9 w-auto" />
           </Link>
           <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-            Quản trị
+            {me.data.name}
           </span>
           <Button
             variant="outline"
             size="sm"
-            className="ml-auto"
+            className="ml-auto min-h-11"
             onClick={async () => {
-              await supabase.auth.signOut();
+              await logoutStaff();
+              queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "me" });
+              await queryClient.invalidateQueries({ queryKey: ["me"] });
               toast.success("Đã đăng xuất");
               router.navigate({ to: "/admin" });
             }}
           >
-            <LogOut className="size-4" /> Đăng xuất
+            Đăng xuất
           </Button>
         </div>
         <nav className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 pb-3 md:px-6">
-          {NAV.map((item) => (
+          {NAV.filter((item) => item.roles.includes(role)).map((item) => (
             <Link
               key={item.to}
               to={item.to}
-              activeOptions={{ exact: item.exact }}
+              activeOptions={{ exact: item.to === "/admin" }}
               activeProps={{ className: "bg-primary text-primary-foreground" }}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-card px-4 text-sm font-semibold text-foreground/80"
+              className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-card px-4 text-sm font-semibold text-foreground/80"
             >
-              <item.icon className="size-4" />
               {item.label}
             </Link>
           ))}
         </nav>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+        {me.data.mustChangePassword ? (
+          <p className="mb-4 rounded-2xl bg-accent/20 px-4 py-3 text-sm font-semibold text-foreground">
+            Mật khẩu đang là mật khẩu ban đầu. Vào Cài đặt (chủ) hoặc nhờ chủ đổi trước khi dùng thật.
+          </p>
+        ) : null}
         <Outlet />
       </main>
     </div>
   );
 }
 
-function AdminLogin() {
+function AdminLogin({ onDone }: { onDone: () => void }) {
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -103,42 +102,35 @@ function AdminLogin() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <form
         className="glass-card w-full max-w-md rounded-3xl p-6"
-        onSubmit={async (e) => {
-          e.preventDefault();
+        onSubmit={async (event) => {
+          event.preventDefault();
           setLoading(true);
-          const { error } = await supabase.auth.signInWithPassword({ email, password });
-          setLoading(false);
-          if (error) toast.error("Không đăng nhập được: " + error.message);
-          else toast.success("Chào mừng trở lại!");
+          try {
+            await loginStaff({ data: { email, password } });
+            queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "me" });
+            toast.success("Đã đăng nhập");
+            onDone();
+          } catch (error) {
+            toast.error((error as Error).message);
+          } finally {
+            setLoading(false);
+          }
         }}
       >
         <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="mx-auto h-12 w-auto" />
-        <h1 className="mt-4 text-center text-2xl font-extrabold text-primary">Đăng nhập quản trị</h1>
+        <h1 className="mt-4 text-center text-2xl font-extrabold text-primary">Đăng nhập nội bộ</h1>
+        <p className="mt-1 text-center text-sm text-muted-foreground">Chủ, sale và sản xuất — mỗi người một tài khoản.</p>
         <div className="mt-6 space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              required
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1"
-            />
+            <Input id="email" type="email" autoComplete="username" className="mt-1 min-h-12" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div>
             <Label htmlFor="password">Mật khẩu</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              required
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1"
-            />
+            <Input id="password" type="password" autoComplete="current-password" className="mt-1 min-h-12" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Đang đăng nhập…" : "Đăng nhập"}
+          <Button type="submit" className="min-h-12 w-full bg-accent text-accent-foreground" disabled={loading}>
+            {loading ? "Đang vào…" : "Vào ca làm"}
           </Button>
         </div>
       </form>

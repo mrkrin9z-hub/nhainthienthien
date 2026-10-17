@@ -20,6 +20,9 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Dữ liệu local (sổ đơn, ảnh khách). Production dùng Supabase.
+data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

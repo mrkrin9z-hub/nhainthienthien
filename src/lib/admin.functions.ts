@@ -1,326 +1,426 @@
 import { createServerFn } from "@tanstack/react-start";
-import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Actor } from "@/server/service";
 
-const ORDER_STATUSES = [
-  "draft_upload",
-  "pending_review",
-  "confirmed",
-  "processing",
-  "producing",
-  "ready",
-  "completed",
-  "cancelled",
-  "upload_error",
-] as const;
-
-export type OrderStatus = (typeof ORDER_STATUSES)[number];
-
-export const STATUS_LABEL: Record<OrderStatus, string> = {
-  draft_upload: "Đang gửi ảnh",
-  pending_review: "Chờ duyệt",
-  confirmed: "Đã xác nhận",
-  processing: "Đang xử lý ảnh",
-  producing: "Đang in",
-  ready: "Sẵn sàng giao",
-  completed: "Hoàn tất",
-  cancelled: "Đã huỷ",
-  upload_error: "Lỗi tải ảnh",
-};
-
-export const STATUS_OPTIONS = ORDER_STATUSES.filter(
-  (s) => s !== "draft_upload" && s !== "upload_error",
-);
-
-type StaffContext = { supabase: any; userId: string };
-
-async function assertStaff(context: StaffContext) {
-  const { data, error } = await context.supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", context.userId);
-  if (error) throw new Error(error.message);
-  if (!data || data.length === 0) throw new Error("Tài khoản không có quyền quản trị.");
-  return data.map((r: { role: string }) => r.role);
+async function actor(): Promise<Actor> {
+  const { readStaffId } = await import("@/server/session");
+  const { currentActor } = await import("@/server/service");
+  const person = await currentActor(await readStaffId());
+  if (!person) throw new Error("Chưa đăng nhập.");
+  return person;
 }
 
-export const getMyRoles = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId);
-    if (error) throw new Error(error.message);
-    return { roles: (data ?? []).map((r: { role: string }) => r.role) };
-  });
-
-export type AdminOrderRow = {
-  id: string;
-  code: string;
-  status: OrderStatus;
-  createdAt: string;
-  total: number;
-  customerName: string;
-  phone: string;
-  fulfillment: string;
-  fileCount: number;
-};
-
-export const listOrders = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{ orders: AdminOrderRow[] }> => {
-    await assertStaff(context);
-    const { data, error } = await context.supabase
-      .from("orders")
-      .select(
-        "id, code, status, created_at, total, fulfillment_method, customers(full_name, phone), order_files(id)",
-      )
-      .order("created_at", { ascending: false })
-      .limit(200);
-    if (error) throw new Error(error.message);
-    return {
-      orders: (data ?? []).map((o: any) => ({
-        id: o.id,
-        code: o.code ?? "",
-        status: o.status,
-        createdAt: o.created_at,
-        total: o.total,
-        customerName: o.customers?.full_name ?? "",
-        phone: o.customers?.phone ?? "",
-        fulfillment: o.fulfillment_method,
-        fileCount: (o.order_files ?? []).length,
-      })),
-    };
-  });
-
-export const adminOrdersQueryOptions = queryOptions({
-  queryKey: ["admin", "orders"],
-  queryFn: () => listOrders(),
+export const getMe = createServerFn({ method: "GET" }).handler(async () => {
+  const { readStaffId } = await import("@/server/session");
+  const { currentActor } = await import("@/server/service");
+  return currentActor(await readStaffId());
 });
 
-export type AdminOrderDetail = {
-  id: string;
-  code: string;
-  status: OrderStatus;
-  createdAt: string;
-  subtotal: number;
-  total: number;
-  fulfillment: string;
-  address: string | null;
-  customerNote: string | null;
-  internalNote: string | null;
-  customerName: string;
-  phone: string;
-  items: { id: string; name: string; variant: string; quantity: number; unitPrice: number; lineTotal: number }[];
-  files: { id: string; name: string; sizeBytes: number; status: string; url: string | null }[];
-  history: { to: OrderStatus; at: string; note: string | null }[];
-};
-
-export const getOrderDetail = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => z.object({ code: z.string().min(3).max(30) }).parse(data))
-  .handler(async ({ context, data }): Promise<AdminOrderDetail> => {
-    await assertStaff(context);
-    const { data: order, error } = await context.supabase
-      .from("orders")
-      .select(
-        "id, code, status, created_at, subtotal, total, fulfillment_method, address, customer_note, internal_note, customers(full_name, phone), order_items(id, product_name_snapshot, variant_name_snapshot, quantity, unit_price, line_total), order_files(id, original_name, size_bytes, upload_status, storage_path), order_status_history(to_status, created_at, note)",
-      )
-      .eq("code", data.code.toUpperCase())
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!order) throw new Error("Không tìm thấy đơn hàng.");
-
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const files = await Promise.all(
-      ((order as any).order_files ?? []).map(async (f: any) => {
-        const { data: signed } = await supabaseAdmin.storage
-          .from("order-originals")
-          .createSignedUrl(f.storage_path, 60 * 30);
-        return {
-          id: f.id,
-          name: f.original_name,
-          sizeBytes: f.size_bytes,
-          status: f.upload_status,
-          url: signed?.signedUrl ?? null,
-        };
-      }),
-    );
-
-    const o = order as any;
-    return {
-      id: o.id,
-      code: o.code ?? "",
-      status: o.status,
-      createdAt: o.created_at,
-      subtotal: o.subtotal,
-      total: o.total,
-      fulfillment: o.fulfillment_method,
-      address: o.address,
-      customerNote: o.customer_note,
-      internalNote: o.internal_note,
-      customerName: o.customers?.full_name ?? "",
-      phone: o.customers?.phone ?? "",
-      items: (o.order_items ?? []).map((i: any) => ({
-        id: i.id,
-        name: i.product_name_snapshot,
-        variant: i.variant_name_snapshot,
-        quantity: i.quantity,
-        unitPrice: i.unit_price,
-        lineTotal: i.line_total,
-      })),
-      files,
-      history: (o.order_status_history ?? [])
-        .sort((a: any, b: any) => a.created_at.localeCompare(b.created_at))
-        .map((h: any) => ({ to: h.to_status, at: h.created_at, note: h.note })),
-    };
+export const loginStaff = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ email: z.string().email(), password: z.string().min(4) }).parse(data))
+  .handler(async ({ data }) => {
+    const { login } = await import("@/server/service");
+    const { writeStaffId } = await import("@/server/session");
+    const person = await login(data.email, data.password);
+    await writeStaffId(person.id);
+    return person;
   });
 
-export const updateOrderStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+export const logoutStaff = createServerFn({ method: "POST" }).handler(async () => {
+  const { writeStaffId } = await import("@/server/session");
+  await writeStaffId(null);
+  return { ok: true };
+});
+
+export const changeOwnPassword = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ current: z.string().min(4), next: z.string().min(8) }).parse(data))
+  .handler(async ({ data }) => {
+    const { changePassword } = await import("@/server/service");
+    await changePassword(await actor(), data.current, data.next);
+    return { ok: true };
+  });
+
+export const getDashboard = createServerFn({ method: "GET" }).handler(async () => {
+  const { dashboard } = await import("@/server/service");
+  return dashboard(await actor());
+});
+
+export const getOrders = createServerFn({ method: "GET" }).handler(async () => {
+  const { listOrders } = await import("@/server/service");
+  return listOrders(await actor());
+});
+
+export const getOrderDetail = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ code: z.string().min(3) }).parse(data))
+  .handler(async ({ data }) => {
+    const { getOrder } = await import("@/server/service");
+    return getOrder(await actor(), data.code);
+  });
+
+const itemSchema = z.object({
+  skuId: z.string().min(2),
+  quantity: z.number().int().min(1).max(500),
+  unitPrice: z.number().int().min(0).nullable().optional(),
+});
+
+export const createDeskOrder = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        channel: z.enum(["tai_tiem", "facebook", "tiktok", "shopee"]),
+        fullName: z.string().min(2),
+        phone: z.string().min(8),
+        address: z.string().optional().default(""),
+        fulfillment: z.enum(["pickup", "delivery"]),
+        note: z.string().optional().default(""),
+        dueDate: z.string().nullable().optional().default(null),
+        marketplaceCode: z.string().optional().default(""),
+        items: z.array(itemSchema).min(1),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { createManualOrder } = await import("@/server/service");
+    return createManualOrder(await actor(), data);
+  });
+
+export const changeStatus = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
       .object({
         orderId: z.string().uuid(),
-        status: z.enum(ORDER_STATUSES),
-        note: z.string().trim().max(500).optional().default(""),
+        status: z.enum(["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"]),
+        note: z.string().optional().default(""),
+        ownerOverride: z.boolean().optional(),
       })
       .parse(data),
   )
-  .handler(async ({ context, data }) => {
-    await assertStaff(context);
-    const { data: current, error: readError } = await context.supabase
-      .from("orders")
-      .select("status")
-      .eq("id", data.orderId)
-      .maybeSingle();
-    if (readError) throw new Error(readError.message);
-    if (!current) throw new Error("Không tìm thấy đơn hàng.");
-
-    const patch = {
-      status: data.status,
-      updated_at: new Date().toISOString(),
-      ...(data.status === "completed" ? { completed_at: new Date().toISOString() } : {}),
-    };
-
-    const { error } = await context.supabase.from("orders").update(patch).eq("id", data.orderId);
-    if (error) throw new Error(error.message);
-
-    await context.supabase.from("order_status_history").insert({
-      order_id: data.orderId,
-      from_status: current.status,
-      to_status: data.status,
-      changed_by: context.userId,
-      note: data.note || null,
-    });
-
+  .handler(async ({ data }) => {
+    const { setOrderStatus } = await import("@/server/service");
+    await setOrderStatus(await actor(), data);
     return { ok: true };
   });
 
-export const updateInternalNote = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+export const recordDeposit = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({ orderId: z.string().uuid(), note: z.string().max(2000) }).parse(data),
+    z.object({ orderId: z.string().uuid(), amount: z.number().positive(), method: z.string().min(1) }).parse(data),
   )
-  .handler(async ({ context, data }) => {
-    await assertStaff(context);
-    const { error } = await context.supabase
-      .from("orders")
-      .update({ internal_note: data.note || null })
-      .eq("id", data.orderId);
-    if (error) throw new Error(error.message);
+  .handler(async ({ data }) => {
+    const { addDeposit } = await import("@/server/service");
+    await addDeposit(await actor(), data);
     return { ok: true };
   });
 
-export type AdminProduct = {
-  id: string;
-  name: string;
-  slug: string;
-  category: string;
-  isActive: boolean;
-  archivedAt: string | null;
-  variants: { id: string; name: string; price: number | null; isActive: boolean; unit: string }[];
-};
-
-export const listAdminProducts = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{ products: AdminProduct[] }> => {
-    await assertStaff(context);
-    const { data, error } = await context.supabase
-      .from("products")
-      .select(
-        "id, name, slug, category, is_active, archived_at, product_variants(id, name, price, is_active, unit, sort_order)",
-      )
-      .order("sort_order", { ascending: true });
-    if (error) throw new Error(error.message);
-    return {
-      products: (data ?? []).map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        category: p.category,
-        isActive: p.is_active,
-        archivedAt: p.archived_at,
-        variants: (p.product_variants ?? [])
-          .sort((a: any, b: any) => a.sort_order - b.sort_order)
-          .map((v: any) => ({
-            id: v.id,
-            name: v.name,
-            price: v.price,
-            isActive: v.is_active,
-            unit: v.unit,
-          })),
-      })),
-    };
+export const saveNote = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), note: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { saveInternalNote } = await import("@/server/service");
+    await saveInternalNote(await actor(), data.orderId, data.note);
+    return { ok: true };
   });
 
-export const adminProductsQueryOptions = queryOptions({
-  queryKey: ["admin", "products"],
-  queryFn: () => listAdminProducts(),
-});
-
-export const updateVariantPrice = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+export const saveReprint = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
-      .object({ variantId: z.string().uuid(), price: z.number().int().min(0).max(100000000) })
+      .object({
+        orderId: z.string().uuid(),
+        reason: z.string().min(2),
+        decision: z.enum(["reprint", "reject"]).nullable(),
+        extraCost: z.number().nullable(),
+        uses: z.array(z.object({ materialId: z.string(), qty: z.number().positive() })).default([]),
+      })
       .parse(data),
   )
-  .handler(async ({ context, data }) => {
-    await assertStaff(context);
-    const { error } = await context.supabase
-      .from("product_variants")
-      .update({ price: data.price, updated_at: new Date().toISOString() })
-      .eq("id", data.variantId);
-    if (error) throw new Error(error.message);
-    await context.supabase.from("audit_logs").insert({
-      actor_id: context.userId,
-      action: "variant.price.update",
-      entity_type: "product_variants",
-      entity_id: data.variantId,
-      metadata: { price: data.price },
-    });
+  .handler(async ({ data }) => {
+    const { addReprint } = await import("@/server/service");
+    await addReprint(await actor(), data);
     return { ok: true };
   });
 
-export const setProductArchived = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+export const getPriceBoard = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ groupId: z.string().optional() }).parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const { priceBoard } = await import("@/server/service");
+    return priceBoard(await actor(), data.groupId);
+  });
+
+export const savePrice = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({ productId: z.string().uuid(), archived: z.boolean() }).parse(data),
-  )
-  .handler(async ({ context, data }) => {
-    await assertStaff(context);
-    const { error } = await context.supabase
-      .from("products")
-      .update({
-        archived_at: data.archived ? new Date().toISOString() : null,
-        is_active: !data.archived,
-        updated_at: new Date().toISOString(),
+    z
+      .object({
+        skuId: z.string(),
+        channel: z.enum(["tai_tiem", "facebook", "tiktok", "shopee"]),
+        price: z.number().int().min(0).nullable(),
+        status: z.enum(["dang_ban", "nhap", "cho_duyet"]),
+        note: z.string().optional().default(""),
       })
-      .eq("id", data.productId);
-    if (error) throw new Error(error.message);
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { updateChannelPrice } = await import("@/server/service");
+    await updateChannelPrice(await actor(), data);
+    return { ok: true };
+  });
+
+export const savePieces = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ skuId: z.string(), pieces: z.number().int().positive().nullable() }).parse(data))
+  .handler(async ({ data }) => {
+    const { setPiecesPerPack } = await import("@/server/service");
+    await setPiecesPerPack(await actor(), data.skuId, data.pieces);
+    return { ok: true };
+  });
+
+export const runQuote = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        skuId: z.string(),
+        channel: z.enum(["tai_tiem", "facebook", "tiktok", "shopee"]),
+        price: z.number().nullable(),
+        affiliate: z.boolean(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { quote } = await import("@/server/service");
+    return quote(await actor(), data);
+  });
+
+export const getInventory = createServerFn({ method: "GET" }).handler(async () => {
+  const { inventory } = await import("@/server/service");
+  return inventory(await actor());
+});
+
+export const receiveStock = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        materialId: z.string(),
+        packs: z.number().positive(),
+        packPrice: z.number().min(0).nullable(),
+        supplier: z.string().optional().default(""),
+        note: z.string().optional().default(""),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { stockIn } = await import("@/server/service");
+    await stockIn(await actor(), data);
+    return { ok: true };
+  });
+
+export const approvePrice = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ materialId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { approveMaterialPrice } = await import("@/server/service");
+    await approveMaterialPrice(await actor(), data.materialId);
+    return { ok: true };
+  });
+
+export const saveMaterial = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        materialId: z.string(),
+        packPrice: z.number().min(0).nullable(),
+        packSize: z.number().positive().nullable(),
+        minStock: z.number().min(0).nullable(),
+        supplier: z.string(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { updateMaterial } = await import("@/server/service");
+    await updateMaterial(await actor(), data);
+    return { ok: true };
+  });
+
+export const saveBomQty = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ bomId: z.string(), qty: z.number().min(0).nullable() }).parse(data))
+  .handler(async ({ data }) => {
+    const { updateBom } = await import("@/server/service");
+    await updateBom(await actor(), data);
+    return { ok: true };
+  });
+
+export const countStock = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ materialId: z.string(), actual: z.number().min(0), note: z.string().optional().default("") }).parse(data))
+  .handler(async ({ data }) => {
+    const { recount } = await import("@/server/service");
+    await recount(await actor(), data);
+    return { ok: true };
+  });
+
+export const markInkOpened = createServerFn({ method: "POST" }).handler(async () => {
+  const { openInk } = await import("@/server/service");
+  await openInk(await actor());
+  return { ok: true };
+});
+
+export const getBom = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ skuId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { bomOf } = await import("@/server/service");
+    return bomOf(await actor(), data.skuId);
+  });
+
+export const getCustomers = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ q: z.string().optional().default("") }).parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const { customerList } = await import("@/server/service");
+    return customerList(await actor(), data.q);
+  });
+
+export const getCustomer = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { customerDetail } = await import("@/server/service");
+    return customerDetail(await actor(), data.id);
+  });
+
+export const saveCustomer = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string(), note: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { saveCustomerNote } = await import("@/server/service");
+    await saveCustomerNote(await actor(), data.id, data.note);
+    return { ok: true };
+  });
+
+export const punchClock = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ action: z.enum(["in", "out"]) }).parse(data))
+  .handler(async ({ data }) => {
+    const { clock } = await import("@/server/service");
+    await clock(await actor(), data.action);
+    return { ok: true };
+  });
+
+export const getAttendance = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { attendance } = await import("@/server/service");
+    return attendance(await actor(), data.month);
+  });
+
+export const correctPunch = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ punchId: z.string(), inAt: z.string(), outAt: z.string().nullable(), note: z.string().optional().default("") }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { editPunch } = await import("@/server/service");
+    await editPunch(await actor(), data);
+    return { ok: true };
+  });
+
+export const grantLeave = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ staffId: z.string(), date: z.string(), note: z.string().optional().default("") }).parse(data))
+  .handler(async ({ data }) => {
+    const { addLeave } = await import("@/server/service");
+    await addLeave(await actor(), data);
+    return { ok: true };
+  });
+
+export const getPayroll = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { payroll } = await import("@/server/service");
+    return payroll(await actor(), data.month);
+  });
+
+export const closePayroll = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { lockPayroll } = await import("@/server/service");
+    await lockPayroll(await actor(), data.month);
+    return { ok: true };
+  });
+
+export const getProfit = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { profitReport } = await import("@/server/service");
+    return profitReport(await actor(), data.month);
+  });
+
+export const saveFixedMonth = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ month: z.string(), rows: z.array(z.object({ key: z.string(), amount: z.number() })) }).parse(data))
+  .handler(async ({ data }) => {
+    const { saveMonthlyFixed } = await import("@/server/service");
+    await saveMonthlyFixed(await actor(), data.month, data.rows);
+    return { ok: true };
+  });
+
+export const saveExpense = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ month: z.string(), name: z.string(), amount: z.number(), note: z.string().optional().default("") }).parse(data))
+  .handler(async ({ data }) => {
+    const { addExpense } = await import("@/server/service");
+    await addExpense(await actor(), data);
+    return { ok: true };
+  });
+
+export const loadSettings = createServerFn({ method: "GET" }).handler(async () => {
+  const { getSettings } = await import("@/server/service");
+  return getSettings(await actor());
+});
+
+export const storeSettings = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.record(z.unknown()).parse(data))
+  .handler(async ({ data }) => {
+    const { saveSettings } = await import("@/server/service");
+    await saveSettings(await actor(), data);
+    return { ok: true };
+  });
+
+export const storeStaff = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        name: z.string().min(2),
+        email: z.string().email(),
+        role: z.enum(["owner", "sale", "production"]),
+        password: z.string().optional(),
+        probation: z.boolean().optional(),
+        hiredAt: z.string().nullable().optional(),
+        active: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveStaff } = await import("@/server/service");
+    await saveStaff(await actor(), data);
+    return { ok: true };
+  });
+
+export const getSkuOptions = createServerFn({ method: "GET" }).handler(async () => {
+  const { skuOptions } = await import("@/server/service");
+  return skuOptions(await actor());
+});
+
+export const downloadExcel = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ kind: z.enum(["orders", "stock", "moves", "payroll", "profit"]), month: z.string() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { exportWorkbook } = await import("@/server/service");
+    return exportWorkbook(await actor(), data.kind, data.month);
+  });
+
+export const runRecalc = createServerFn({ method: "POST" }).handler(async () => {
+  const { recalc } = await import("@/server/service");
+  const changed = await recalc(await actor());
+  return { changed };
+});
+
+export const dueFiles = createServerFn({ method: "GET" }).handler(async () => {
+  const { filesDue } = await import("@/server/service");
+  return filesDue(await actor());
+});
+
+export const removeFile = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ fileId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { deleteStoredFile } = await import("@/server/service");
+    await deleteStoredFile(await actor(), data.fileId);
     return { ok: true };
   });

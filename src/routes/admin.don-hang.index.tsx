@@ -1,94 +1,61 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 
-import { Input } from "@/components/ui/input";
-import { adminOrdersQueryOptions, STATUS_LABEL, type OrderStatus } from "@/lib/admin.functions";
-import { formatVnd } from "@/lib/brand";
+import { Button } from "@/components/ui/button";
+import { formatMaybe } from "@/lib/brand";
+import { downloadExcel, getOrders } from "@/lib/admin.functions";
+import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-hang/")({
-  component: AdminOrders,
+  component: OrdersPage,
 });
 
-const FILTERS: ("all" | OrderStatus)[] = [
-  "all",
-  "pending_review",
-  "confirmed",
-  "processing",
-  "producing",
-  "ready",
-  "completed",
-  "cancelled",
-];
-
-function AdminOrders() {
-  const { data, isLoading, error } = useQuery(adminOrdersQueryOptions);
-  const [filter, setFilter] = useState<"all" | OrderStatus>("all");
-  const [term, setTerm] = useState("");
-
-  const orders = (data?.orders ?? []).filter((o) => {
-    const matchStatus = filter === "all" || o.status === filter;
-    const q = term.trim().toLowerCase();
-    const matchTerm =
-      !q ||
-      o.code.toLowerCase().includes(q) ||
-      o.customerName.toLowerCase().includes(q) ||
-      o.phone.includes(q);
-    return matchStatus && matchTerm;
-  });
-
+function OrdersPage() {
+  const orders = useQuery({ queryKey: ["orders"], queryFn: () => getOrders() });
   return (
-    <div className="space-y-5">
-      <h1 className="text-2xl font-extrabold text-primary">Đơn hàng</h1>
-
-      <Input
-        value={term}
-        onChange={(e) => setTerm(e.target.value)}
-        placeholder="Tìm theo mã đơn, tên hoặc số điện thoại"
-      />
-
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={`min-h-11 rounded-xl px-4 text-sm font-semibold ${
-              filter === f ? "bg-primary text-primary-foreground" : "bg-card text-foreground/75"
-            }`}
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-extrabold text-primary">Đơn hàng</h1>
+        <div className="flex gap-2">
+          <Button asChild className="min-h-11 bg-accent text-accent-foreground">
+            <Link to="/admin/don-moi">Ghi đơn</Link>
+          </Button>
+          <Button
+            variant="outline"
+            className="min-h-11"
+            onClick={async () => {
+              const file = await downloadExcel({ data: { kind: "orders", month: "all" } });
+              const blob = new Blob([file.xml], { type: "application/vnd.ms-excel" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = file.filename;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
           >
-            {f === "all" ? "Tất cả" : STATUS_LABEL[f]}
-          </button>
-        ))}
+            Xuất Excel
+          </Button>
+        </div>
       </div>
-
-      {isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
-      {error ? <p className="text-destructive">{(error as Error).message}</p> : null}
-
-      <div className="space-y-3">
-        {orders.map((o) => (
-          <Link
-            key={o.id}
-            to="/admin/don-hang/$code"
-            params={{ code: o.code }}
-            className="glass-card block rounded-3xl p-4"
-          >
+      <div className="grid gap-3">
+        {(orders.data?.orders ?? []).map((order) => (
+          <Link key={order.id} to="/admin/don-hang/$code" params={{ code: order.code }} className="glass-card block rounded-3xl p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-lg font-extrabold text-primary">{o.code}</span>
-              <span className="rounded-full bg-accent/15 px-3 py-1 text-xs font-bold text-accent">
-                {STATUS_LABEL[o.status]}
+              <p className="text-lg font-extrabold text-primary">{order.code}</p>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                {STATUS_LABEL[order.status as OrderStatus] ?? order.statusLabel}
               </span>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {o.customerName} · {o.phone} · {o.fileCount} ảnh ·{" "}
-              {o.fulfillment === "pickup" ? "Nhận tại xưởng" : "Giao tận nơi"}
+            <p className="mt-1 text-sm">
+              {order.customerName} · {order.phone} · {order.channelLabel}
+              {order.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
             </p>
-            <p className="mt-2 font-bold">{formatVnd(o.total)}</p>
+            <p className="text-sm text-muted-foreground">{order.itemSummary}</p>
+            <p className="mt-1 text-sm font-semibold">{order.total === null ? `${order.fileCount} ảnh` : `${formatMaybe(order.total)} · ${order.fileCount} ảnh`}</p>
           </Link>
         ))}
-        {!isLoading && orders.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Không có đơn nào phù hợp.</p>
-        ) : null}
+        {orders.data && orders.data.orders.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có đơn. Đơn trên web sẽ hiện ở đây sau khi khách gửi ảnh.</p> : null}
       </div>
     </div>
   );

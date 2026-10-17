@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { Clock, Globe, MapPin, MessageCircle, Phone } from "lucide-react";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { BRAND } from "@/lib/brand";
+import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 
 export const Route = createFileRoute("/lien-he")({
   head: () => ({
@@ -27,6 +29,11 @@ export const Route = createFileRoute("/lien-he")({
 });
 
 function ContactPage() {
+  const config = useQuery(publicConfigQueryOptions);
+  const phone = config.data?.phone ?? BRAND.phone;
+  const phoneRaw = config.data?.phoneRaw ?? BRAND.phoneRaw;
+  const zalo = config.data?.zalo ?? BRAND.zalo;
+  const hours = config.data?.hours ?? "08:00 – 20:00";
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
@@ -37,15 +44,15 @@ function ContactPage() {
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <a href={BRAND.zalo} className="glass-card rounded-3xl p-5">
+          <a href={zalo} className="glass-card rounded-3xl p-5">
             <MessageCircle className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Zalo tư vấn</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{BRAND.phone}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{phone}</p>
           </a>
-          <a href={`tel:${BRAND.phoneRaw}`} className="glass-card rounded-3xl p-5">
+          <a href={`tel:${phoneRaw}`} className="glass-card rounded-3xl p-5">
             <Phone className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Gọi điện</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{BRAND.phone}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{phone}</p>
           </a>
           <div className="glass-card rounded-3xl p-5">
             <MapPin className="size-6 text-accent" />
@@ -55,7 +62,7 @@ function ContactPage() {
           <div className="glass-card rounded-3xl p-5">
             <Clock className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Thời gian làm việc</h2>
-            <p className="mt-1 text-sm text-muted-foreground">08:00 – 20:00 mỗi ngày</p>
+            <p className="mt-1 text-sm text-muted-foreground">{hours}</p>
           </div>
         </div>
 
