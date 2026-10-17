@@ -29,6 +29,7 @@ import { Route as AdminKetNoiRouteImport } from './routes/admin.ket-noi'
 import { Route as AdminKhoRouteImport } from './routes/admin.kho'
 import { Route as AdminLoiNhuanRouteImport } from './routes/admin.loi-nhuan'
 import { Route as AdminLuongRouteImport } from './routes/admin.luong'
+import { Route as AdminNhacKhachRouteImport } from './routes/admin.nhac-khach'
 import { Route as AdminNhapDonRouteImport } from './routes/admin.nhap-don'
 import { Route as AdminNhatKyRouteImport } from './routes/admin.nhat-ky'
 import { Route as AdminSanPhamRouteImport } from './routes/admin.san-pham'
@@ -145,6 +146,11 @@ const AdminLuongRoute = AdminLuongRouteImport.update({
   path: '/luong',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminNhacKhachRoute = AdminNhacKhachRouteImport.update({
+  id: '/nhac-khach',
+  path: '/nhac-khach',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminNhapDonRoute = AdminNhapDonRouteImport.update({
   id: '/nhap-don',
   path: '/nhap-don',
@@ -242,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/admin/kho': typeof AdminKhoRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/nhac-khach': typeof AdminNhacKhachRoute
   '/admin/nhap-don': typeof AdminNhapDonRoute
   '/admin/nhat-ky': typeof AdminNhatKyRoute
   '/admin/san-pham': typeof AdminSanPhamRoute
@@ -278,6 +285,7 @@ export interface FileRoutesByTo {
   '/admin/kho': typeof AdminKhoRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/nhac-khach': typeof AdminNhacKhachRoute
   '/admin/nhap-don': typeof AdminNhapDonRoute
   '/admin/nhat-ky': typeof AdminNhatKyRoute
   '/admin/san-pham': typeof AdminSanPhamRoute
@@ -316,6 +324,7 @@ export interface FileRoutesById {
   '/admin/kho': typeof AdminKhoRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/nhac-khach': typeof AdminNhacKhachRoute
   '/admin/nhap-don': typeof AdminNhapDonRoute
   '/admin/nhat-ky': typeof AdminNhatKyRoute
   '/admin/san-pham': typeof AdminSanPhamRoute
@@ -355,6 +364,7 @@ export interface FileRouteTypes {
     | '/admin/kho'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/nhac-khach'
     | '/admin/nhap-don'
     | '/admin/nhat-ky'
     | '/admin/san-pham'
@@ -391,6 +401,7 @@ export interface FileRouteTypes {
     | '/admin/kho'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/nhac-khach'
     | '/admin/nhap-don'
     | '/admin/nhat-ky'
     | '/admin/san-pham'
@@ -428,6 +439,7 @@ export interface FileRouteTypes {
     | '/admin/kho'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/nhac-khach'
     | '/admin/nhap-don'
     | '/admin/nhat-ky'
     | '/admin/san-pham'
@@ -604,6 +616,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLuongRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/nhac-khach': {
+      id: '/admin/nhac-khach'
+      path: '/nhac-khach'
+      fullPath: '/admin/nhac-khach'
+      preLoaderRoute: typeof AdminNhacKhachRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/nhap-don': {
       id: '/admin/nhap-don'
       path: '/nhap-don'
@@ -724,6 +743,7 @@ interface AdminRouteChildren {
   AdminKhoRoute: typeof AdminKhoRoute
   AdminLoiNhuanRoute: typeof AdminLoiNhuanRoute
   AdminLuongRoute: typeof AdminLuongRoute
+  AdminNhacKhachRoute: typeof AdminNhacKhachRoute
   AdminNhapDonRoute: typeof AdminNhapDonRoute
   AdminNhatKyRoute: typeof AdminNhatKyRoute
   AdminSanPhamRoute: typeof AdminSanPhamRoute
@@ -749,6 +769,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminKhoRoute: AdminKhoRoute,
   AdminLoiNhuanRoute: AdminLoiNhuanRoute,
   AdminLuongRoute: AdminLuongRoute,
+  AdminNhacKhachRoute: AdminNhacKhachRoute,
   AdminNhapDonRoute: AdminNhapDonRoute,
   AdminNhatKyRoute: AdminNhatKyRoute,
   AdminSanPhamRoute: AdminSanPhamRoute,

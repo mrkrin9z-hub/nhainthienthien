@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { zipSync, strToU8 } from "fflate";
@@ -17,7 +18,7 @@ import {
 } from "./marketplace.ts";
 import { applyRestore, restoreSummary } from "./restore.ts";
 import { buildSeed } from "./seed.ts";
-import { parseCsv, rowsFromXlsx } from "./sheet.ts";
+import { decodeXml, parseCsv, rowsFromUpload, rowsFromXlsx } from "./sheet.ts";
 
 test("ngày sao lưu theo giờ Việt Nam", () => {
   assert.equal(vnBackupDay(new Date("2026-10-17T16:30:00Z")), "2026-10-17");
@@ -95,6 +96,7 @@ test("số điện thoại sàn và trạng thái hủy", () => {
   assert.equal(isCancelledStatus("Cancelled"), true);
   assert.equal(isCancelledStatus("Đã giao"), false);
   assert.equal(isCodPayment("Thanh toán khi giao hàng"), true);
+  assert.equal(isCodPayment("Thanh toán khi nhận hàng"), true);
   assert.equal(isCodPayment("Cash on delivery"), true);
   assert.equal(isCodPayment("COD"), true);
   assert.equal(isCodPayment("Chuyển khoản"), false);
@@ -353,6 +355,120 @@ function sheetBytes(rows: string[][]): Uint8Array {
     "xl/sharedStrings.xml": strToU8(shared),
     "xl/worksheets/sheet1.xml": strToU8(`<?xml version="1.0"?><worksheet><sheetData>${sheet}</sheetData></worksheet>`),
   });
+}
+
+test("giải mã ký tự số trong Excel trước khi đổi &amp;", () => {
+  assert.equal(decodeXml("M&#227; &#273;&#417;n h&#224;ng"), "Mã đơn hàng");
+  assert.equal(decodeXml("&#x111;"), "đ");
+  assert.equal(decodeXml("&amp;#273;"), "&#273;");
+  assert.equal(decodeXml("A &amp; B"), "A & B");
+});
+
+test("file mẫu Shopee: COD khi nhận hàng bằng tiền người mua trả", () => {
+  const numeric = rowsFromXlsx(readFileSync(new URL("./fixtures/shopee-order-all.xlsx", import.meta.url)));
+  const shared = rowsFromXlsx(readFileSync(new URL("./fixtures/shopee-order-all-sst.xlsx", import.meta.url)));
+  assert.equal(numeric[0]?.[0], "Mã đơn hàng");
+  assert.equal(shared[0]?.[0], "Mã đơn hàng");
+  const planNumeric = shopeePlan(numeric);
+  const planShared = shopeePlan(shared);
+  assert.equal(planNumeric.cancelled, 1);
+  assert.equal(planShared.cancelled, 1);
+  assert.equal(planNumeric.orders.length, 2);
+  const cod = planNumeric.orders.find((order) => order.platformOrderId === "261017ABCDEF01");
+  const sharedCod = planShared.orders.find((order) => order.platformOrderId === "261017ABCDEF01");
+  assert.equal(cod?.buyer, "Phạm Văn D");
+  assert.equal(cod?.phone, "0912345678");
+  assert.equal(cod?.address, "12 Hùng Vương, Thị trấn Gia Ray, Huyện Xuân Lộc, Đồng Nai, VN");
+  assert.equal(cod?.address.startsWith("12 Hùng Vương"), true);
+  assert.equal(cod?.shipFee, 30000);
+  assert.equal(cod?.orderAmount, 470000);
+  assert.equal(cod?.codAmount, 470000);
+  assert.equal(cod?.items.length, 2);
+  assert.equal(cod?.items[0]?.platformLineTotal, 110000);
+  assert.equal(cod?.items[1]?.platformLineTotal, 330000);
+  assert.equal(cod?.items[0]?.externalSku, "ANH-TG-2030");
+  assert.equal(sharedCod?.orderAmount, cod?.orderAmount);
+  assert.equal(sharedCod?.address, cod?.address);
+  assert.equal(sharedCod?.codAmount, cod?.codAmount);
+  const paid = planNumeric.orders.find((order) => order.platformOrderId === "261017ABCDEF03");
+  assert.equal(paid?.phone, "******789");
+  assert.ok(paid?.flags.includes("SĐT bị ẩn"));
+  assert.equal(paid?.codAmount, null);
+  assert.equal(paid?.orderAmount, 124000);
+  assert.equal(paid?.shipFee, 15000);
+  assert.equal(paid?.items[0]?.platformLineTotal, 109000);
+  assert.equal(paid?.address, "5 Trần Phú, Xuân Lộc, Đồng Nai, VN");
+});
+
+test("file mẫu TikTok có phường xã và số che", () => {
+  const numeric = rowsFromXlsx(readFileSync(new URL("./fixtures/tiktok-export-realistic.xlsx", import.meta.url)));
+  const shared = rowsFromXlsx(readFileSync(new URL("./fixtures/tiktok-export-realistic-sst.xlsx", import.meta.url)));
+  assert.equal(numeric[1]?.[0], "Platform unique order ID.");
+  const plan = tiktokPlan(numeric);
+  const sharedPlan = tiktokPlan(shared);
+  assert.equal(plan.orders.length, 2);
+  assert.equal(plan.issues.some((issue) => issue.sku === "MOC-KHOA"), true);
+  assert.equal(sharedPlan.orders.length, 2);
+  const order = plan.orders.find((item) => item.platformOrderId === "578123456789012345");
+  assert.equal(order?.buyer, "Nguyễn Văn A");
+  assert.equal(order?.phone, "(+84)90*****12");
+  assert.ok(order?.flags.includes("SĐT bị ẩn"));
+  assert.equal(order?.codAmount, 203000);
+  assert.equal(order?.orderAmount, 203000);
+  assert.equal(order?.shipFee, 25000);
+  assert.equal(order?.items.length, 2);
+  assert.equal(order?.items[0]?.platformLineTotal, 59000);
+  assert.equal(order?.items[1]?.platformLineTotal, 119000);
+  assert.equal(order?.address, "1** H*** V*****, Xã Xuân Hiệp, Huyện Xuân Lộc, Đồng Nai, Việt Nam");
+  assert.equal(order?.createdAt, "2026-10-17T13:15:03.000Z");
+  assert.equal(plan.orders.some((item) => item.buyer === "khachhang_a"), false);
+  const card = plan.orders.find((item) => item.platformOrderId === "578123456789099999");
+  assert.equal(card?.codAmount, null);
+  assert.equal(card?.orderAmount, 330000);
+  assert.equal(card?.address.startsWith("45 Trần Phú, Xã Xuân Hiệp"), true);
+  assert.equal(sharedPlan.orders.find((item) => item.platformOrderId === order?.platformOrderId)?.address, order?.address);
+});
+
+test("csv TikTok v2 chuẩn hóa số và bỏ đơn đã hủy", () => {
+  const table = rowsFromUpload("tiktok-export-v2.csv", readFileSync(new URL("./fixtures/tiktok-export-v2.csv", import.meta.url)));
+  const plan = tiktokPlan(table);
+  assert.equal(plan.cancelled, 1);
+  const order = plan.orders.find((item) => item.platformOrderId === "578123456789012345");
+  assert.equal(order?.phone, "0901234512");
+  assert.equal(order?.address, "123 Hùng Vương, Xã Xuân Hiệp, Huyện Xuân Lộc, Đồng Nai, Việt Nam");
+  assert.equal(order?.codAmount, 203000);
+});
+
+test("Shopee lấy giá ưu đãi khi thiếu tổng giá bán và lấy phí người mua trả", () => {
+  const table = parseCsv(
+    "Mã đơn hàng,SKU phân loại hàng,Số lượng,Giá ưu đãi,Tên Người nhận,Số điện thoại,Địa chỉ nhận hàng,Tỉnh/Thành phố,Quốc gia,Phí vận chuyển (dự kiến),Phí vận chuyển mà người mua trả,Tổng số tiền người mua thanh toán,Phương thức thanh toán\n" +
+      "2610990000001,SKU1,3,20.000,An,0901111222,1 Đường A,Đồng Nai,VN,40000,15000,75000,Thanh toán khi nhận hàng\n",
+  );
+  const plan = planMarketplaceImport({
+    lines: parseMarketplaceTable(table),
+    maps: [{ externalSku: "SKU1", skuId: "sku-1" }],
+    existingIds: [],
+  });
+  const order = plan.orders[0];
+  assert.equal(order?.items[0]?.platformLineTotal, 60000);
+  assert.equal(order?.orderAmount, 75000);
+  assert.equal(order?.codAmount, 75000);
+  assert.equal(order?.shipFee, 15000);
+  assert.equal(order?.address, "1 Đường A, VN");
+});
+
+const SAMPLE_MAPS = [
+  { externalSku: "ANH-TG-2030", skuId: "sku-1" },
+  { externalSku: "ANH-TG-1318-C3", skuId: "sku-2" },
+  { externalSku: "ANHTHO-4060", skuId: "sku-3" },
+];
+
+function shopeePlan(table: string[][]) {
+  return planMarketplaceImport({ lines: parseMarketplaceTable(table), maps: SAMPLE_MAPS, existingIds: [] });
+}
+
+function tiktokPlan(table: string[][]) {
+  return planMarketplaceImport({ lines: parseMarketplaceTable(table), maps: SAMPLE_MAPS, existingIds: [] });
 }
 
 test("khôi phục giữ nhân viên", async () => {

@@ -128,8 +128,13 @@ function colIndex(letters: string): number {
   return n - 1;
 }
 
-function decodeXml(value: string): string {
-  return value
+export function decodeXml(value: string): string {
+  const chars = value.replace(/&#x([0-9a-fA-F]+);|&#(\d+);/g, (match, hex: string | undefined, dec: string | undefined) => {
+    const code = hex !== undefined ? Number.parseInt(hex, 16) : Number.parseInt(dec ?? "", 10);
+    if (!Number.isInteger(code) || code < 0 || code > 0x10ffff) return match;
+    return String.fromCodePoint(code);
+  });
+  return chars
     .replaceAll("&lt;", "<")
     .replaceAll("&gt;", ">")
     .replaceAll("&quot;", '"')

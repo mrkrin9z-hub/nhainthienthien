@@ -289,12 +289,26 @@ export const getCustomer = createServerFn({ method: "GET" })
   });
 
 export const saveCustomer = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ id: z.string(), note: z.string() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string(),
+        note: z.string(),
+        tags: z.array(z.string()).optional(),
+        specialDates: z.array(z.object({ label: z.string(), month: z.number().int(), day: z.number().int() })).optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
     const { saveCustomerNote } = await import("@/server/service");
-    await saveCustomerNote(await actor(), data.id, data.note);
+    await saveCustomerNote(await actor(), data.id, data.note, data.tags, data.specialDates);
     return { ok: true };
   });
+
+export const getReminders = createServerFn({ method: "GET" }).handler(async () => {
+  const { reminderList } = await import("@/server/service");
+  return reminderList(await actor());
+});
 
 export const punchClock = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ action: z.enum(["in", "out"]) }).parse(data))

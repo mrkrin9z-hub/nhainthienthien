@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RoleGate } from "@/components/role-gate";
 import { dueFiles, loadSettings, removeFile, runRecalc, storeSettings, storeStaff } from "@/lib/admin.functions";
+import { DEFAULT_REMIND_DAYS, DEFAULT_REMIND_MESSAGE, DEFAULT_REPEAT_ORDERS } from "@/domain/crm";
 import { ROLE_LABEL, type Role } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/cai-dat")({
@@ -53,6 +54,8 @@ const NUMBER_FIELDS: { key: string; label: string; nullable?: boolean }[] = [
   { key: "fileRetentionDays", label: "Giữ ảnh khách (ngày)" },
   { key: "videoRetentionDays", label: "Giữ video đóng gói (ngày)" },
   { key: "rentFromJune2027", label: "Mặt bằng từ T6/2027" },
+  { key: "repeatCustomerOrders", label: "Khách quay lại từ số đơn" },
+  { key: "remindAfterDays", label: "Nhắc khi đơn cuối cách đây (ngày)" },
 ];
 
 function SettingsPage() {
@@ -71,7 +74,12 @@ function SettingsBody() {
   const data = settings.data;
   const values = draft ?? (data ? Object.fromEntries(NUMBER_FIELDS.map((field) => {
     const raw = (data.settings as Record<string, unknown>)[field.key];
-    return [field.key, raw === null || raw === undefined ? "" : String(raw)];
+    if (raw === null || raw === undefined) {
+      if (field.key === "repeatCustomerOrders") return [field.key, String(DEFAULT_REPEAT_ORDERS)];
+      if (field.key === "remindAfterDays") return [field.key, String(DEFAULT_REMIND_DAYS)];
+      return [field.key, ""];
+    }
+    return [field.key, String(raw)];
   })) : null);
 
   if (settings.isError) return <p className="font-semibold text-destructive">{(settings.error as Error).message}</p>;
@@ -133,6 +141,10 @@ function SettingsBody() {
             </label>
           ))}
         </div>
+        <label className="block text-sm font-semibold">
+          Mẫu tin nhắc khách. Chỗ trống: {"{ten}"} {"{so_don}"} {"{ngay}"} {"{dip}"} {"{so_dt}"}. Không tự gửi.
+          <textarea id="remindMessage" className="mt-1 min-h-24 w-full rounded-xl border bg-card px-3 py-2" defaultValue={data.settings.remindMessage || DEFAULT_REMIND_MESSAGE} />
+        </label>
         <Button
           className="min-h-12 bg-accent text-accent-foreground"
           onClick={async () => {
@@ -156,6 +168,7 @@ function SettingsBody() {
             patch.showAnhThe = checked("anhThe");
             patch.showAlbum = checked("album");
             patch.groupListed = Object.fromEntries(data.groups.map((group) => [group.id, checked(`g-${group.id}`)]));
+            patch.remindMessage = (document.getElementById("remindMessage") as HTMLTextAreaElement).value;
             await storeSettings({ data: patch });
             await runRecalc();
             toast.success("Đã lưu cài đặt và tính lại định mức");

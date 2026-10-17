@@ -26,9 +26,10 @@ const FIELD_ALIASES = {
   phone: ["phone number", "recipient phone", "so dien thoai", "phone", "sdt"],
   detailAddress: ["detail address", "dia chi chi tiet"],
   additionalAddress: ["additional address information", "additional address"],
+  commune: ["commune", "ward", "phuong xa", "phuong", "xa"],
   district: ["districts", "district", "quan huyen"],
   city: ["thanh pho", "city"],
-  province: ["province", "tinh"],
+  province: ["tinh thanh pho", "province", "tinh"],
   country: ["country", "quoc gia"],
   address: ["dia chi nhan hang", "delivery address", "full address", "dia chi"],
   tracking: ["tracking number", "tracking id", "ma van don", "tracking"],
@@ -41,11 +42,13 @@ const FIELD_ALIASES = {
     "hang van chuyen",
     "carrier",
   ],
-  shipFee: ["shipping fee after discount", "phi van chuyen", "shipping fee", "ship fee"],
-  shipFeeOriginal: ["original shipping fee"],
+  shipFee: ["shipping fee after discount", "phi van chuyen ma nguoi mua tra", "phi van chuyen", "shipping fee", "ship fee"],
+  shipFeeOriginal: ["phi van chuyen du kien", "original shipping fee"],
   payment: ["phuong thuc thanh toan", "payment method", "payment"],
+  buyerPaid: ["tong so tien nguoi mua thanh toan"],
   orderAmount: ["tong gia tri don hang vnd", "tong gia tri don hang", "order amount", "order total"],
-  lineAmount: ["sku subtotal after discount"],
+  lineAmount: ["sku subtotal after discount", "tong gia ban san pham"],
+  dealPrice: ["gia uu dai"],
   status: ["trang thai don hang", "order status", "status"],
   createdAt: ["created time", "ngay dat hang", "order creation date", "created at"],
   cod: ["cod amount", "tien thu ho", "cod"],
@@ -58,13 +61,13 @@ export const EXPECTED_COLUMNS = [
   "Số lượng",
   "Người nhận (Recipient / Tên Người nhận). Không lấy Buyer Username",
   "Số điện thoại, kể cả số bị che",
-  "Địa chỉ: Detail Address, Additional address, Districts, City, Province, Country — hoặc một cột Địa chỉ nhận hàng",
+  "Địa chỉ: cột Địa chỉ nhận hàng nếu có; không thì Detail Address, phường/xã, quận, tỉnh. Quốc gia để cuối",
   "Đơn vị vận chuyển (Shipping Provider Name / Đơn Vị Vận Chuyển)",
   "Mã vận đơn (Tracking ID / Mã vận đơn)",
-  "Phí vận chuyển sau giảm; không có thì phí gốc hoặc cột Phí vận chuyển",
-  "Phương thức thanh toán. COD thì tiền thu hộ bằng tổng đơn",
-  "Tổng đơn (Order Amount / Tổng giá trị đơn hàng)",
-  "Tiền từng dòng (SKU Subtotal After Discount)",
+  "Phí vận chuyển người mua trả, không có thì phí sau giảm hoặc phí dự kiến",
+  "Phương thức thanh toán. COD (khi giao hoặc khi nhận) thì tiền thu hộ bằng số người mua trả",
+  "Tổng đơn: Tổng số tiền người mua thanh toán, không có thì Order Amount",
+  "Tiền từng dòng: SKU Subtotal After Discount hoặc Tổng giá bán (sản phẩm), không có thì Giá ưu đãi × số lượng",
   "Trạng thái. Đơn Đã hủy / Cancelled bị bỏ qua",
   "Thời gian tạo (Created Time)",
 ];
@@ -192,7 +195,7 @@ export function isCodPayment(payment: string): boolean {
   const folded = foldHeader(payment);
   if (!folded) return false;
   if (folded === "cod" || folded.split(" ").includes("cod")) return true;
-  return folded.includes("cash on delivery") || folded.includes("thanh toan khi giao hang");
+  return folded.includes("cash on delivery") || folded.includes("thanh toan khi giao hang") || folded.includes("thanh toan khi nhan hang");
 }
 
 /** Giờ Việt Nam (UTC+7) từ Created Time. Không đọc được thì null. */
@@ -299,14 +302,22 @@ export function parseMarketplaceTable(table: string[][]): ParsedLine[] {
     if (!orderId && !sku) continue;
     if (!looksLikeOrderId(orderId)) continue;
     const qty = Math.round(parseMoney(cell(row, columns.qty)) ?? 0);
+    const quantity = qty > 0 ? qty : 1;
     const discounted = columns.shipFee === undefined ? null : parseMoney(cell(row, columns.shipFee));
     const original = columns.shipFeeOriginal === undefined ? null : parseMoney(cell(row, columns.shipFeeOriginal));
+    const paid = columns.buyerPaid === undefined ? null : parseMoney(cell(row, columns.buyerPaid));
+    const goods = columns.orderAmount === undefined ? null : parseMoney(cell(row, columns.orderAmount));
+    let lineAmount = columns.lineAmount === undefined ? null : parseMoney(cell(row, columns.lineAmount));
+    if (lineAmount === null && columns.dealPrice !== undefined) {
+      const unit = parseMoney(cell(row, columns.dealPrice));
+      if (unit !== null) lineAmount = unit * quantity;
+    }
     lines.push({
       orderId,
       sku,
       name: cell(row, columns.name),
       variation: cell(row, columns.variation),
-      qty: qty > 0 ? qty : 1,
+      qty: quantity,
       buyer: cell(row, columns.buyer),
       phone: cell(row, columns.phone),
       address: joinedAddress(row, columns),
@@ -315,8 +326,8 @@ export function parseMarketplaceTable(table: string[][]): ParsedLine[] {
       shipFee: discounted ?? original,
       codAmount: columns.cod === undefined ? null : parseMoney(cell(row, columns.cod)),
       payment: cell(row, columns.payment),
-      orderAmount: columns.orderAmount === undefined ? null : parseMoney(cell(row, columns.orderAmount)),
-      lineAmount: columns.lineAmount === undefined ? null : parseMoney(cell(row, columns.lineAmount)),
+      orderAmount: paid ?? goods,
+      lineAmount,
       status: cell(row, columns.status),
       createdAt: parseCreatedTime(cell(row, columns.createdAt)),
     });
@@ -324,11 +335,17 @@ export function parseMarketplaceTable(table: string[][]): ParsedLine[] {
   return lines;
 }
 
-const ADDRESS_FIELDS: Field[] = ["detailAddress", "additionalAddress", "district", "city", "province", "country", "address"];
+const ADDRESS_PARTS: Field[] = ["detailAddress", "additionalAddress", "commune", "district", "city", "province", "country"];
 
 function joinedAddress(row: string[], columns: ColumnMap): string {
+  const full = cell(row, columns.address);
+  if (full) {
+    const country = cell(row, columns.country);
+    if (country && !full.toLowerCase().includes(country.toLowerCase())) return `${full}, ${country}`;
+    return full;
+  }
   const parts: string[] = [];
-  for (const field of ADDRESS_FIELDS) {
+  for (const field of ADDRESS_PARTS) {
     const value = cell(row, columns[field]);
     if (value && !parts.includes(value)) parts.push(value);
   }

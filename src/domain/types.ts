@@ -127,6 +127,12 @@ export type Settings = {
   productPhotos?: Record<string, string>;
   marketplaceCutoff: string;
   marketplaceHandover: string;
+  /** Số đơn để gắn khách quay lại. Thiếu thì 2. */
+  repeatCustomerOrders?: number;
+  /** Nhắc khi đơn cuối cách đây ít nhất bấy nhiêu ngày. Thiếu thì 60. */
+  remindAfterDays?: number;
+  /** Mẫu tin nhắn chép tay. {ten} {so_don} {ngay} {dip} {so_dt}. */
+  remindMessage?: string;
   fixedCosts: { key: string; name: string; amount: number; note: string }[];
   rentFromJune2027: number;
 };
@@ -216,6 +222,9 @@ export type Customer = {
   address: string;
   note: string;
   createdAt: string;
+  tags?: string[];
+  /** Ngày lặp lại mỗi năm, ví dụ ngày giỗ. */
+  specialDates?: { label: string; month: number; day: number }[];
 };
 
 export type OrderFile = {

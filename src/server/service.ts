@@ -22,6 +22,7 @@ import {
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
+import { customerCard, customerCards, customerReminders, ordersForCustomer, type SpecialDate } from "@/domain/crm";
 import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type PlannedItem } from "@/domain/marketplace";
 import { applyRestore, restoreSummary } from "@/domain/restore";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
@@ -976,39 +977,56 @@ export async function customerList(actor: Actor, q: string) {
   assertRole(actor, ["owner", "sale"]);
   const state = await readState();
   const query = q.trim().toLowerCase();
-  return state.customers
-    .filter((customer) => {
-      if (!query) return true;
-      return customer.name.toLowerCase().includes(query) || customer.phoneNormalized.includes(query.replace(/\D/g, ""));
-    })
-    .map((customer) => ({
-      id: customer.id,
-      name: customer.name,
-      phone: customer.phone,
-      address: customer.address,
-      orders: state.orders.filter((order) => order.customerId === customer.id && order.status !== "draft_upload").length,
-    }));
+  return customerCards(state).filter((customer) => {
+    if (!query) return true;
+    const digits = query.replace(/\D/g, "");
+    return (
+      customer.name.toLowerCase().includes(query) ||
+      customer.phone.toLowerCase().includes(query) ||
+      (digits.length >= 3 && customer.phoneNormalized.includes(digits)) ||
+      customer.tags.some((tag) => tag.toLowerCase().includes(query))
+    );
+  });
 }
 
 export async function customerDetail(actor: Actor, id: string) {
   assertRole(actor, ["owner", "sale"]);
   const state = await readState();
-  const customer = state.customers.find((item) => item.id === id);
+  const customer = customerCard(state, id);
   if (!customer) throw new Error("Không thấy khách.");
   return visibleToRole(actor.role, {
     ...customer,
-    orders: state.orders
-      .filter((order) => order.customerId === id && order.status !== "draft_upload")
-      .map((order) => orderSummary(state, order, actor.role)),
+    orders: ordersForCustomer(state, id).map((order) => orderSummary(state, order, actor.role)),
   });
 }
 
-export async function saveCustomerNote(actor: Actor, id: string, note: string) {
+export async function reminderList(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  return visibleToRole(actor.role, customerReminders(await readState()));
+}
+
+export async function saveCustomerNote(
+  actor: Actor,
+  id: string,
+  note: string,
+  tags?: string[],
+  specialDates?: SpecialDate[],
+) {
   assertRole(actor, ["owner", "sale"]);
   await mutate(async (state) => {
-    const customer = state.customers.find((item) => item.id === id);
-    if (!customer) throw new Error("Không thấy khách.");
-    customer.note = note;
+    const card = customerCard(state, id);
+    if (!card) throw new Error("Không thấy khách.");
+    const cleanTags = [...new Set((tags ?? []).map((tag) => tag.trim()).filter(Boolean))];
+    const cleanDates = (specialDates ?? [])
+      .map((date) => ({ label: date.label.trim(), month: date.month, day: date.day }))
+      .filter((date) => date.label && date.month >= 1 && date.month <= 12 && date.day >= 1 && date.day <= 31);
+    for (const customer of state.customers) {
+      if (!card.ids.includes(customer.id)) continue;
+      customer.note = note;
+      if (tags) customer.tags = cleanTags;
+      if (specialDates) customer.specialDates = cleanDates;
+    }
+    audit(state, actor.id, "customer.update", id, null, { note, tags: cleanTags });
   });
 }
 
@@ -1294,6 +1312,8 @@ const SETTING_NUMBERS = [
   "fileRetentionDays",
   "videoRetentionDays",
   "rentFromJune2027",
+  "repeatCustomerOrders",
+  "remindAfterDays",
 ] as const;
 
 export async function getSettings(actor: Actor) {
@@ -1350,6 +1370,7 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
     if (typeof patch.shopOpenDate === "string") state.settings.shopOpenDate = patch.shopOpenDate;
     if (typeof patch.marketplaceCutoff === "string") state.settings.marketplaceCutoff = patch.marketplaceCutoff;
     if (typeof patch.marketplaceHandover === "string") state.settings.marketplaceHandover = patch.marketplaceHandover;
+    if (typeof patch.remindMessage === "string") state.settings.remindMessage = patch.remindMessage.trim();
     if (typeof patch.showAnhThe === "boolean") state.settings.showAnhThe = patch.showAnhThe;
     if (typeof patch.showAlbum === "boolean") state.settings.showAlbum = patch.showAlbum;
     if (Array.isArray(patch.weeklyOff)) {

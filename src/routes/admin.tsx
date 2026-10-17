@@ -25,6 +25,7 @@ const NAV: { to: string; label: string; roles: Role[] }[] = [
   { to: "/admin/gia", label: "Bảng giá", roles: ["owner", "sale"] },
   { to: "/admin/don-hang", label: "Đơn hàng", roles: ["owner", "sale", "production"] },
   { to: "/admin/khach", label: "Khách", roles: ["owner", "sale"] },
+  { to: "/admin/nhac-khach", label: "Nhắc khách", roles: ["owner", "sale"] },
   { to: "/admin/kho", label: "Kho", roles: ["owner", "sale", "production"] },
   { to: "/admin/giao-hang", label: "Giao hàng", roles: ["owner", "sale", "production"] },
   { to: "/admin/cod", label: "Đối soát COD", roles: ["owner", "sale"] },

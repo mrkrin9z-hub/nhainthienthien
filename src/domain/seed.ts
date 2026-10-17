@@ -1,4 +1,5 @@
 import { APPROVED_PRICES } from "./approved-prices.ts";
+import { DEFAULT_REMIND_MESSAGE } from "./crm.ts";
 import { formulaQty } from "./calc.ts";
 import type {
   BomLine,
@@ -85,6 +86,9 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   marketplaceCutoff: "14:00",
   marketplaceHandover: "18:00",
+  repeatCustomerOrders: 2,
+  remindAfterDays: 60,
+  remindMessage: DEFAULT_REMIND_MESSAGE,
   rentFromJune2027: 4000000,
   fixedCosts: [
     { key: "mat_bang", name: "Mặt bằng", amount: 3500000, note: "T12/2026–T5/2027. Từ T6/2027 dùng mức trong cài đặt." },
