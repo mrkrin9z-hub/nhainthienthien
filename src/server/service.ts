@@ -35,6 +35,8 @@ import { driveFolderParts } from "@/domain/drive-path";
 import { defaultCarrier } from "@/domain/jt";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
 import { publicContact } from "@/domain/public-contact";
+import { applyPriceDrafts, parsePriceRows, type PriceDraft } from "@/domain/price-sheet";
+import { rowsFromUpload } from "@/domain/sheet";
 import { buildWebProduct, type WebProductInput } from "@/domain/web-product";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
@@ -993,6 +995,41 @@ export async function updateChannelPrice(
       row.note = input.note;
     }
     audit(state, actor.id, "price.update", `${sku.code}:${input.channel}`, before, input);
+  });
+}
+
+export async function createPriceSize(
+  actor: Actor,
+  input: {
+    groupId: string;
+    widthCm: number;
+    heightCm: number;
+    sheets: number;
+    prices: Partial<Record<Channel, number>>;
+  },
+) {
+  assertRole(actor, ["owner"]);
+  const draft: PriceDraft = {
+    code: null,
+    widthCm: input.widthCm,
+    heightCm: input.heightCm,
+    sheets: input.sheets,
+    prices: input.prices,
+  };
+  return mutate(async (state) => {
+    const result = applyPriceDrafts(state, input.groupId, [draft]);
+    audit(state, actor.id, "price.create", input.groupId, null, { ...input, ...result });
+    return result;
+  });
+}
+
+export async function importPriceSheet(actor: Actor, input: { groupId: string; filename: string; base64: string }) {
+  assertRole(actor, ["owner"]);
+  const drafts = parsePriceRows(rowsFromUpload(input.filename, bytesFromBase64(input.base64)));
+  return mutate(async (state) => {
+    const result = applyPriceDrafts(state, input.groupId, drafts);
+    audit(state, actor.id, "price.import", input.groupId, null, { filename: input.filename, ...result });
+    return result;
   });
 }
 
