@@ -4,9 +4,6 @@ export const BRAND = {
   slogan: "In đẹp từng khoảnh khắc.",
   message: "Giá xưởng cho mọi nhà.",
   website: "nhainthienthien.com",
-  phone: "0778 662 227",
-  phoneRaw: "0778662227",
-  zalo: "https://zalo.me/0778662227",
   region: "Xuân Lộc, Đồng Nai",
 } as const;
 

@@ -1,6 +1,7 @@
 import { APPROVED_PRICES } from "./approved-prices.ts";
 import { DEFAULT_REMIND_MESSAGE } from "./crm.ts";
 import { formulaQty } from "./calc.ts";
+import { CAR_MAGNET_SIZES, FRIDGE_MAGNET_SIZES, PHOTO_PRINT_SIZES } from "./sizes.ts";
 import type {
   BomLine,
   Channel,
@@ -68,13 +69,14 @@ export const DEFAULT_SETTINGS: Settings = {
   shopOpenDate: "2026-12-01",
   fileRetentionDays: 180,
   videoRetentionDays: 30,
-  zaloPhone: "0778662227",
-  showZalo: true,
+  zaloPhone: "",
+  showZalo: false,
+  zaloDefaultMigrated: true,
   publicHours: "08:00 – 20:00",
   showAnhThe: false,
   showAlbum: false,
   groupListed: {
-    ep_go: true,
+    ep_go: false,
     anh_tho: true,
     giay_khen: true,
     nam_cham_xe: true,
@@ -108,15 +110,12 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
 };
 
-const SIZES = [
-  { code: "13x18", w: 13, h: 18 },
-  { code: "15x21", w: 15, h: 21 },
-  { code: "20x30", w: 20, h: 30 },
-  { code: "30x45", w: 30, h: 45 },
-  { code: "40x60", w: 40, h: 60 },
-  { code: "50x75", w: 50, h: 75 },
-  { code: "60x90", w: 60, h: 90 },
-];
+function sizeCm(code: string): { code: string; w: number; h: number } {
+  const [w, h] = code.split("x");
+  return { code, w: Number(w), h: Number(h) };
+}
+
+const SIZES = PHOTO_PRINT_SIZES.map(sizeCm);
 
 const WOOD_PRICE: Record<string, number> = {
   "13x18": 1900,
@@ -153,22 +152,12 @@ function material(
 function groups(): Group[] {
   return [
     {
-      id: "ep_go",
-      name: "Ảnh ép gỗ tráng gương",
-      slug: "anh-ep-go",
-      category: "Ảnh gỗ",
-      description: "Ảnh ép gỗ tráng gương khổ 40×60, 50×75 và 60×90, bán lẻ và combo. Khổ nhỏ hơn nằm ở ảnh tráng gương.",
-      turnaround: "1–2 ngày",
-      sort: 1,
-      gate: null,
-    },
-    {
       id: "anh_tho",
       name: "Ảnh thờ ép gỗ",
       slug: "anh-tho",
       category: "Ảnh gỗ",
-      description: "Ảnh thờ ép gỗ tráng gương, khổ 20×30 đến 60×90. Miễn phí khôi phục, thay áo, đổi nền. Không giới hạn số lần sửa.",
-      turnaround: "Có liền",
+      description: "Ảnh thờ ép gỗ tráng gương, khổ 20×30 đến 60×90. Hỗ trợ chỉnh sửa ảnh cơ bản.",
+      turnaround: "Theo đơn",
       sort: 2,
       gate: null,
     },
@@ -178,7 +167,7 @@ function groups(): Group[] {
       slug: "giay-khen",
       category: "Ảnh gỗ",
       description: "Giấy khen ép gỗ tráng gương, khổ A5 (15×21), A4 (20×30) và A3 (30×45).",
-      turnaround: "1–2 ngày",
+      turnaround: "",
       sort: 3,
       gate: null,
     },
@@ -188,7 +177,7 @@ function groups(): Group[] {
       slug: "nam-cham-xe",
       category: "Nam châm",
       description: "Ảnh ép lụa nam châm dán xe. Size 9×19 và 17×22.",
-      turnaround: "1–2 ngày",
+      turnaround: "",
       sort: 4,
       gate: null,
     },
@@ -198,18 +187,18 @@ function groups(): Group[] {
       slug: "nam-cham-tu-lanh",
       category: "Nam châm",
       description: "Nam châm tủ lạnh tráng gương 6×9, Bản Đặc Biệt. Tại xưởng có bán lẻ một tấm. Kênh khác chỉ bán theo gói.",
-      turnaround: "1–2 ngày",
+      turnaround: "",
       sort: 5,
       gate: null,
     },
     {
       id: "trang_guong",
-      name: "Ảnh tráng gương bo viền",
+      name: "Ảnh ép gỗ tráng gương bo viền",
       slug: "trang-guong",
-      category: "Ảnh trang trí",
-      description: "Để bàn với khổ từ 20×30 trở xuống có chân dựng. Từ 30×45 có móc treo tường.",
-      turnaround: "1–2 ngày",
-      sort: 6,
+      category: "Ảnh gỗ",
+      description: "Khổ 13×18 đến 60×90. Để bàn với khổ từ 20×30 trở xuống có chân dựng. Từ 30×45 có móc treo tường.",
+      turnaround: "",
+      sort: 1,
       gate: null,
     },
     {
@@ -218,7 +207,7 @@ function groups(): Group[] {
       slug: "thoi-khoa-bieu",
       category: "Ảnh gỗ",
       description: "Thời khóa biểu ép gỗ tráng gương khổ 20×30.",
-      turnaround: "1–2 ngày",
+      turnaround: "",
       sort: 7,
       gate: null,
     },
@@ -228,7 +217,7 @@ function groups(): Group[] {
       slug: "anh-lua-6x9",
       category: "Ảnh lụa",
       description: "Ảnh lụa 6×9, bán theo gói.",
-      turnaround: "1–2 ngày",
+      turnaround: "",
       sort: 8,
       gate: null,
     },
@@ -266,11 +255,11 @@ type Spec = {
 };
 
 const SPECS: Spec[] = [
-  { groupId: "ep_go", prefix: "EG", sizes: SIZES, combos: [1, 2, 3, 4, 5], kind: "wood" },
+  { groupId: "trang_guong", prefix: "EG", sizes: SIZES, combos: [1, 2, 3, 4, 5], kind: "wood" },
   {
     groupId: "anh_tho",
     prefix: "AT",
-    sizes: SIZES.filter((s) => !["13x18", "15x21"].includes(s.code)),
+    sizes: PHOTO_PRINT_SIZES.filter((code) => code !== "13x18" && code !== "15x21").map(sizeCm),
     combos: [1, 2, 3, 4, 5],
     kind: "wood",
   },
@@ -278,17 +267,14 @@ const SPECS: Spec[] = [
   {
     groupId: "nam_cham_xe",
     prefix: "NX",
-    sizes: [
-      { code: "9x19", w: 9, h: 19 },
-      { code: "17x22", w: 17, h: 22 },
-    ],
+    sizes: CAR_MAGNET_SIZES.map(sizeCm),
     combos: [1],
     kind: "car",
   },
   {
     groupId: "nam_cham_tu",
     prefix: "NCT",
-    sizes: [{ code: "6x9", w: 6, h: 9 }],
+    sizes: FRIDGE_MAGNET_SIZES.map(sizeCm),
     combos: [],
     packs: [1, 5, 10, 20, 50],
     kind: "fridge",

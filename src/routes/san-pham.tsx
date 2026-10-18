@@ -13,6 +13,7 @@ import {
   type CatalogProduct,
   type CatalogVariant,
 } from "@/lib/catalog.functions";
+import { sizeSummary } from "@/domain/catalog-label";
 import { catalogImage } from "@/lib/product-images";
 import { formatVnd } from "@/lib/brand";
 
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/san-pham")({
       {
         name: "description",
         content:
-          "Xem ảnh mẫu và giá từng kích thước: in ảnh gỗ lụa, tráng gương, ảnh thẻ, ảnh nam châm, album và phục hồi ảnh cũ. Chọn size, chọn số lượng và đặt mua ngay.",
+          "Xem ảnh mẫu và giá từng kích thước: ảnh ép gỗ tráng gương bo viền, ảnh thờ, giấy khen và nam châm. Chọn size, chọn số lượng và đặt mua ngay.",
       },
       { property: "og:title", content: "Sản phẩm & bảng giá in ảnh — Nhà In Thiên Thiên" },
       {
@@ -132,7 +133,7 @@ function ProductsPage() {
       ) : null}
 
       {lines.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-[4.5rem] z-40 border-t border-border bg-card md:bottom-0">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6">
             <div className="max-h-24 overflow-auto text-sm">
               {lines.map((l) => (
@@ -199,7 +200,9 @@ function ProductTile({ product, onOpen }: { product: CatalogProduct; onOpen: () 
         <h2 className="line-clamp-2 text-sm font-bold text-foreground sm:text-base">
           {product.name}
         </h2>
-        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{product.turnaround_text}</p>
+        {product.turnaround_text ? (
+          <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{product.turnaround_text}</p>
+        ) : null}
         <p className="mt-2 text-base font-extrabold text-accent sm:text-lg">
           {from === null ? null : (
             <span className="mr-1 text-[11px] font-medium text-muted-foreground">từ</span>
@@ -207,7 +210,7 @@ function ProductTile({ product, onOpen }: { product: CatalogProduct; onOpen: () 
           {from === null ? "Liên hệ" : formatVnd(from)}
         </p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {product.variants.length} kích thước
+          {sizeSummary(product.variants)}
         </p>
         <Button
           onClick={onOpen}
@@ -266,7 +269,7 @@ function VariantSheet({
         </div>
 
         <p className="mt-3 text-sm text-muted-foreground">
-          {product.description} • {product.turnaround_text}
+          {product.turnaround_text ? `${product.description} • ${product.turnaround_text}` : product.description}
         </p>
 
         <p className="mt-5 text-sm font-semibold text-foreground">Chọn kích thước</p>

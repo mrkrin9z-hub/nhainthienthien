@@ -119,8 +119,11 @@ const SECRET_LABEL: Record<string, string> = {
   tiktok: "TikTok Shop",
   shopee: "Shopee",
   meta: "Meta / Facebook",
-  zalo: "Zalo OA",
-  carrier: "Đơn vị vận chuyển",
+  zalo: "Zalo",
+  carrier: "J&T Express",
+  google_client_id: "Google Client ID",
+  google_client_secret: "Google Client secret",
+  google_drive: "Google Drive",
 };
 
 const WEEKDAY = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];

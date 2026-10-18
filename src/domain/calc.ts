@@ -561,6 +561,7 @@ export function walkInPublicOffers(state: {
     .flatMap((group) =>
       state.skus
         .filter((sku) => sku.groupId === group.id)
+        .filter((sku) => !isMergedWoodAlias(sku))
         .filter((sku) => walkInListed(priceOf(state.prices, sku.id, "tai_tiem")?.status))
         .map((sku) => {
           const price = priceOf(state.prices, sku.id, "tai_tiem")?.price ?? null;
@@ -571,4 +572,9 @@ export function walkInPublicOffers(state: {
 
 export function walkInListed(status: ChannelPrice["status"] | undefined): boolean {
   return status === "dang_ban";
+}
+
+/** Mã EG là cùng sản phẩm với mã TG. Giữ mã cho đơn cũ, map sàn và định mức. Không hiện thêm thẻ. */
+export function isMergedWoodAlias(sku: { code: string }): boolean {
+  return sku.code.startsWith("EG-");
 }

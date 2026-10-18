@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { code128Widths } from "@/domain/barcode";
+import { jtOrder } from "@/domain/jt";
 import { formatMaybe } from "@/lib/brand";
 import { getOrderDetail } from "@/lib/admin.functions";
 
@@ -29,6 +30,7 @@ function LabelBody() {
     return <p className="text-lg font-semibold text-primary">Đơn sàn này in tem của TikTok hoặc Shopee.</p>;
   }
   const cod = data.shipping?.codAmount;
+  const jt = jtOrder({ channel: data.channel, source: data.source, fulfillment: data.fulfillment });
   return (
     <div className="space-y-4">
       <style>{`
@@ -44,11 +46,13 @@ function LabelBody() {
       </div>
       <article className="label-sheet mx-auto box-border flex h-[150mm] w-[100mm] flex-col gap-2 bg-white p-3 text-black shadow">
         <p className="text-lg font-extrabold leading-tight">Nhà In Thiên Thiên</p>
+        {jt ? <p className="text-sm font-extrabold tracking-wide">J&T Express</p> : null}
         <p className="text-xs uppercase tracking-wide">Người nhận</p>
         <p className="text-base font-bold leading-tight">{data.customerName}</p>
         <p className="text-sm">{data.phone}</p>
         <p className="text-sm leading-snug">{data.address || "Nhận tại tiệm"}</p>
         <p className="text-sm font-bold">Đơn {data.code}</p>
+        {jt ? <p className="text-sm font-bold">Vận đơn: {data.shipping?.tracking || "chưa có"}</p> : null}
         <p className="text-sm font-bold">COD: {cod ? formatMaybe(cod) : "Không thu hộ"}</p>
         <p className="text-xs leading-snug">{data.itemSummary}</p>
         <div className="mt-auto">

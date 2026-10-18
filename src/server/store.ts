@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { commitLoop } from "@/domain/commit";
+import { applyStoreMigrations } from "@/domain/migrate-shop";
 import { backupFileName, backupKeyFromFile, backupKeysToDrop, dailyBackupKey, manualBackupKey, vnBackupDay } from "@/domain/guard";
 import { buildSeed } from "@/domain/seed";
 import type { ShopState } from "@/domain/types";
@@ -131,10 +132,22 @@ async function writeIfVersion(state: ShopState, expected: number, where: Where):
   return true;
 }
 
-async function loadWhere(where: Where): Promise<ShopState> {
+async function loadRaw(where: Where): Promise<ShopState> {
   if (where === "supabase") return loadFromSupabase();
   if (where === "kv") return loadFromKv();
   return loadFromDisk();
+}
+
+/** Chạy migration sổ một lần rồi ghi lại. Lần sau không đụng phần chủ đã sửa. */
+async function loadWhere(where: Where): Promise<ShopState> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const state = await loadRaw(where);
+    if (!applyStoreMigrations(state)) return state;
+    const expected = state.version;
+    state.version = expected + 1;
+    if (await writeIfVersion(state, expected, where)) return state;
+  }
+  return loadRaw(where);
 }
 
 export async function readState(): Promise<ShopState> {

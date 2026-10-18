@@ -109,7 +109,7 @@ function SettingsBody() {
           <Input className="mt-1 min-h-11" defaultValue={data.settings.zaloPhone} id="zalo" />
         </label>
         <label className="flex items-center gap-2 text-sm font-semibold">
-          <input type="checkbox" id="showZalo" defaultChecked={data.settings.showZalo !== false} /> Hiện số Zalo trên web
+          <input type="checkbox" id="showZalo" defaultChecked={data.settings.showZalo === true} /> Hiện số Zalo trên web
         </label>
         <label className="block text-sm font-semibold">
           Giờ mở cửa (hiện trên web)

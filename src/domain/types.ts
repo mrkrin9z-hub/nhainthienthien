@@ -63,7 +63,7 @@ export type PriceStatus = (typeof PRICE_STATUSES)[number];
 
 export const PRICE_STATUS_LABEL: Record<PriceStatus, string> = {
   dang_ban: "Đang bán",
-  nhap: "Nháp",
+  nhap: "Chưa có giá",
   cho_duyet: "Chờ duyệt",
 };
 
@@ -119,8 +119,10 @@ export type Settings = {
   fileRetentionDays: number;
   videoRetentionDays: number;
   zaloPhone: string;
-  /** false = ẩn số Zalo trên web. Thiếu field (sổ cũ) thì vẫn hiện. */
+  /** Chỉ `true` mới hiện số trên web. Thiếu field hoặc false thì ẩn. */
   showZalo?: boolean;
+  /** Đã tắt Zalo một lần trên sổ seed cũ. Sau mốc này, ô trong Cài đặt được giữ nguyên. */
+  zaloDefaultMigrated?: boolean;
   publicHours: string;
   showAnhThe: boolean;
   showAlbum: boolean;

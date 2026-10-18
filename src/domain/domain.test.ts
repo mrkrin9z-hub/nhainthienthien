@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -20,6 +21,8 @@ import { commissionBasisOf, commissionForSale } from "./commission.ts";
 import { contentDisposition, imageBytesMatch, imageMimeAllowed, servedMime } from "./images.ts";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginLocked } from "./login-limit.ts";
 import { vnBackupDay } from "./guard.ts";
+import { publicContact } from "./public-contact.ts";
+import { applyStoreMigrations } from "./migrate-shop.ts";
 import { buildSeed, DEFAULT_SETTINGS, hashPassword, PBKDF2_ITERATIONS, verifyPassword } from "./seed.ts";
 import type { BomLine, Material, Order, Settings, Sku } from "./types.ts";
 
@@ -222,6 +225,7 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   const offered = new Set(offers.map((row) => row.code));
   assert.equal(offered.has("TG-13x18-C1"), true);
   assert.equal(offered.has("EG-13x18-C1"), false);
+  assert.equal(offered.has("EG-40x60-C1"), false);
   assert.equal(offered.has("NCT-6x9-1"), true);
   assert.equal(offered.has("LUA-6x9-10"), false);
   assert.deepEqual(
@@ -258,7 +262,8 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(state.settings.lateDeductionPerMinute, null);
   assert.equal(state.settings.showAnhThe, false);
   assert.equal(state.settings.showAlbum, false);
-  assert.equal(state.settings.showZalo, true);
+  assert.equal(state.settings.showZalo, false);
+  assert.equal(state.settings.zaloPhone, "");
   assert.equal(state.settings.fileRetentionDays, 180);
   assert.equal(state.settings.saleBase, 8000000);
   assert.equal(state.settings.productionBase, 11000000);
@@ -271,7 +276,7 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(bag, 1);
   const tape = formulaQty("tape", state.skus[0]!, state.settings);
   assert.equal(tape, 0.05);
-  assert.equal(state.settings.groupListed.ep_go, true);
+  assert.equal(state.settings.groupListed.ep_go, false);
   assert.equal(state.settings.groupListed.trang_guong, true);
   assert.equal(state.settings.groupListed.anh_the, false);
   assert.equal(state.settings.groupListed.lua, false);
@@ -301,4 +306,177 @@ test("mật khẩu ghi số vòng PBKDF2 và vẫn đọc hash cũ", async () =>
   assert.equal(await verifyPassword("sai", legacy), false);
   assert.equal(await verifyPassword("ThienThien#2026", "pbkdf2$120001$salt-cu$00"), false);
   assert.equal(await verifyPassword("ThienThien#2026", "khong-phai-hash"), false);
+});
+
+test("web ẩn số Zalo khi tắt hoặc sổ cũ chưa ghi", () => {
+  const hidden = { phone: "", phoneRaw: "", zalo: "", showZalo: false };
+  assert.deepEqual(publicContact({}), hidden);
+  assert.deepEqual(publicContact({ zaloPhone: "0778662227" }), hidden);
+  assert.deepEqual(publicContact({ showZalo: false, zaloPhone: "0778662227" }), hidden);
+  const on = publicContact({ showZalo: true, zaloPhone: "0901111222" });
+  assert.equal(on.showZalo, true);
+  assert.equal(on.phone, "0901 111 222");
+  assert.equal(on.phoneRaw, "0901111222");
+  assert.equal(on.zalo, "https://zalo.me/0901111222");
+  assert.equal(publicContact({ showZalo: true, zaloPhone: "" }).showZalo, false);
+
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  const pages = [
+    "../routes/index.tsx",
+    "../routes/lien-he.tsx",
+    "../routes/tra-cuu.tsx",
+    "../routes/dat-in.tsx",
+    "../routes/huong-dan.tsx",
+    "../routes/san-pham.tsx",
+    "../components/site/SiteFooter.tsx",
+    "../components/site/SiteHeader.tsx",
+    "../lib/brand.ts",
+    "./seed.ts",
+    "../server/service.ts",
+  ];
+  for (const file of pages) {
+    const source = read(file);
+    assert.doesNotMatch(source, /0778662227|0778\s*662\s*227/, file);
+  }
+  const contact = read("../routes/lien-he.tsx");
+  assert.match(contact, /Đặt in online/);
+  assert.match(contact, /Tra cứu đơn/);
+  assert.doesNotMatch(contact, /MapPin|BRAND\.region/);
+  const config = read("../server/service.ts");
+  const body = config.slice(config.indexOf("export async function publicConfig"), config.indexOf("let lastFileSweep"));
+  assert.match(body, /publicContact\(/);
+  assert.doesNotMatch(body, /!== false/);
+});
+
+test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của chủ", () => {
+  assert.equal(DEFAULT_SETTINGS.zaloDefaultMigrated, true);
+  assert.equal(DEFAULT_SETTINGS.showZalo, false);
+  const state = {
+    settings: { showZalo: true, zaloPhone: "0778662227" },
+    groups: [
+      {
+        id: "anh_tho",
+        description: "Ảnh thờ. Miễn phí khôi phục, thay áo, đổi nền. Không giới hạn số lần sửa.",
+        turnaround: "Có liền",
+      },
+    ],
+  };
+  assert.equal(applyStoreMigrations(state), true);
+  assert.equal(state.settings.showZalo, false);
+  assert.equal(state.settings.zaloDefaultMigrated, true);
+  assert.equal(state.groups[0]?.description, "Ảnh thờ. Hỗ trợ chỉnh sửa ảnh cơ bản.");
+  assert.equal(state.groups[0]?.turnaround, "Theo đơn");
+  state.settings.showZalo = true;
+  assert.equal(applyStoreMigrations(state), false);
+  assert.equal(state.settings.showZalo, true);
+
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  for (const file of ["../routes/index.tsx", "../routes/huong-dan.tsx", "./seed.ts"]) {
+    const source = read(file);
+    assert.doesNotMatch(source, /miễn phí|Miễn phí|24–48|ít phút|Có liền|\btặng\b/i, file);
+  }
+});
+
+test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và định mức giữ nguyên", async () => {
+  const seeded = await buildSeed();
+  const cards = seeded.groups.filter((group) => group.name === "Ảnh ép gỗ tráng gương bo viền");
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.id, "trang_guong");
+  assert.equal(cards[0]?.slug, "trang-guong");
+  assert.equal(cards[0]?.turnaround, "");
+  assert.equal(seeded.groups.some((group) => group.id === "ep_go"), false);
+  assert.ok(seeded.groups.every((group) => group.turnaround !== "1–2 ngày"));
+  const eg = seeded.skus.find((sku) => sku.code === "EG-40x60-C1");
+  const tg = seeded.skus.find((sku) => sku.code === "TG-40x60-C1");
+  assert.equal(eg?.id, "EG-40x60-C1");
+  assert.equal(eg?.groupId, "trang_guong");
+  assert.equal(tg?.groupId, "trang_guong");
+  assert.equal(seeded.boms.some((row) => row.skuId === "EG-40x60-C1" && row.materialId === "go-40x60"), true);
+  assert.equal(seeded.boms.some((row) => row.skuId === "TG-40x60-C1" && row.materialId === "go-40x60"), false);
+  const walkIn: Record<string, number> = {
+    "13x18": 35000,
+    "15x21": 39000,
+    "20x30": 59000,
+    "30x45": 89000,
+    "40x60": 149000,
+    "50x75": 239000,
+    "60x90": 349000,
+  };
+  for (const [size, amount] of Object.entries(walkIn)) {
+    const row = seeded.prices.find((price) => price.skuId === `TG-${size}-C1` && price.channel === "tai_tiem");
+    assert.equal(row?.price, amount, size);
+  }
+  const offers = walkInPublicOffers(seeded);
+  for (const size of Object.keys(walkIn)) assert.equal(offers.some((row) => row.code === `TG-${size}-C1`), true, size);
+  assert.equal(offers.some((row) => row.code.startsWith("EG-")), false);
+  assert.equal(offers.filter((row) => row.groupId === "trang_guong").length > 0, true);
+  assert.equal(applyStoreMigrations(seeded), false);
+
+  const legacy = {
+    settings: { showZalo: false, zaloDefaultMigrated: true, groupListed: { ep_go: true, trang_guong: true } },
+    groups: [
+      {
+        id: "trang_guong",
+        name: "Ảnh tráng gương bo viền",
+        description: "Để bàn với khổ từ 20×30 trở xuống có chân dựng. Từ 30×45 có móc treo tường.",
+        category: "Ảnh trang trí",
+        sort: 6,
+        turnaround: "1–2 ngày",
+      },
+      {
+        id: "ep_go",
+        name: "Ảnh ép gỗ tráng gương",
+        description: "Khổ nhỏ hơn nằm ở ảnh tráng gương.",
+        turnaround: "1–2 ngày",
+      },
+      { id: "anh_tho", name: "Ảnh thờ ép gỗ", description: "x", turnaround: "Theo đơn" },
+    ],
+    skus: [
+      { id: "EG-40x60-C1", code: "EG-40x60-C1", groupId: "ep_go" },
+      { id: "TG-13x18-C1", code: "TG-13x18-C1", groupId: "trang_guong" },
+    ],
+    boms: [{ id: "EG-40x60-C1:go-40x60:print", skuId: "EG-40x60-C1", materialId: "go-40x60" }],
+    skuMaps: [{ channel: "tiktok" as const, externalSku: "EG-40", skuId: "EG-40x60-C1" }],
+    orders: [
+      {
+        items: [
+          { skuId: "EG-40x60-C1", name: "Ảnh ép gỗ tráng gương — 40×60 cm" },
+          { skuId: "TG-13x18-C1", name: "Ảnh tráng gương bo viền — 13×18 cm" },
+          { skuId: "TG-20x30-C1", name: "Ảnh tráng gương - 20×30 cm" },
+        ],
+      },
+    ],
+  };
+  assert.equal(applyStoreMigrations(legacy), true);
+  assert.equal(legacy.groups.some((group) => group.id === "ep_go"), false);
+  assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.name, "Ảnh ép gỗ tráng gương bo viền");
+  assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.category, "Ảnh gỗ");
+  assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.turnaround, "");
+  assert.match(legacy.groups.find((group) => group.id === "trang_guong")?.description ?? "", /13×18 đến 60×90/);
+  assert.equal(legacy.groups.find((group) => group.id === "anh_tho")?.turnaround, "Theo đơn");
+  assert.equal(legacy.skus[0]?.groupId, "trang_guong");
+  assert.equal(legacy.skus[0]?.id, "EG-40x60-C1");
+  assert.equal(legacy.boms[0]?.skuId, "EG-40x60-C1");
+  assert.equal(legacy.boms[0]?.materialId, "go-40x60");
+  assert.equal(legacy.skuMaps[0]?.skuId, "EG-40x60-C1");
+  assert.equal(legacy.orders[0]?.items[0]?.skuId, "EG-40x60-C1");
+  assert.equal(legacy.orders[0]?.items[0]?.name, "Ảnh ép gỗ tráng gương bo viền — 40×60 cm");
+  assert.equal(legacy.orders[0]?.items[1]?.name, "Ảnh ép gỗ tráng gương bo viền — 13×18 cm");
+  assert.equal(legacy.orders[0]?.items[2]?.name, "Ảnh ép gỗ tráng gương bo viền - 20×30 cm");
+  assert.equal(legacy.settings.groupListed.ep_go, false);
+  assert.equal(applyStoreMigrations(legacy), false);
+
+  const renamedByOwner = {
+    settings: { zaloDefaultMigrated: true, groupListed: { ep_go: false, trang_guong: true } },
+    groups: [{ id: "trang_guong", name: "Tên chủ đã sửa", description: "x", turnaround: "3 ngày" }],
+    skus: [{ id: "EG-40x60-C1", code: "EG-40x60-C1", groupId: "trang_guong" }],
+  };
+  assert.equal(applyStoreMigrations(renamedByOwner), false);
+  assert.equal(renamedByOwner.groups[0]?.name, "Tên chủ đã sửa");
+  assert.equal(renamedByOwner.groups[0]?.turnaround, "3 ngày");
+
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  for (const file of ["../routes/index.tsx", "../routes/huong-dan.tsx", "../routes/san-pham.tsx", "./seed.ts", "../../README.md"]) {
+    assert.doesNotMatch(read(file), /Ảnh tráng gương|ảnh tráng gương|1–2 ngày/, file);
+  }
 });

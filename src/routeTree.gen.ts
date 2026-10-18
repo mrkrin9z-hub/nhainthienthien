@@ -45,6 +45,8 @@ import { Route as AdminTemCodeRouteImport } from './routes/admin.tem.$code'
 import { Route as ApiAdminProductPhotoRouteImport } from './routes/api/admin/product-photo'
 import { Route as ApiPublicCleanupFilesRouteImport } from './routes/api/public/cleanup-files'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
+import { Route as ApiAdminDriveCallbackRouteImport } from './routes/api/admin/drive.callback'
+import { Route as ApiAdminDriveStartRouteImport } from './routes/api/admin/drive.start'
 import { Route as ApiPublicProductPhotoSlugRouteImport } from './routes/api/public/product-photo.$slug'
 import { Route as ApiStaffFileIdRouteImport } from './routes/api/staff/file.$id'
 
@@ -228,6 +230,16 @@ const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
   path: '/api/public/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminDriveCallbackRoute = ApiAdminDriveCallbackRouteImport.update({
+  id: '/api/admin/drive/callback',
+  path: '/api/admin/drive/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminDriveStartRoute = ApiAdminDriveStartRouteImport.update({
+  id: '/api/admin/drive/start',
+  path: '/api/admin/drive/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicProductPhotoSlugRoute =
   ApiPublicProductPhotoSlugRouteImport.update({
     id: '/api/public/product-photo/$slug',
@@ -277,6 +289,8 @@ export interface FileRoutesByFullPath {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/admin/don-hang/': typeof AdminDonHangIndexRoute
   '/admin/khach/': typeof AdminKhachIndexRoute
+  '/api/admin/drive/callback': typeof ApiAdminDriveCallbackRoute
+  '/api/admin/drive/start': typeof ApiAdminDriveStartRoute
   '/api/public/product-photo/$slug': typeof ApiPublicProductPhotoSlugRoute
   '/api/staff/file/$id': typeof ApiStaffFileIdRoute
 }
@@ -316,6 +330,8 @@ export interface FileRoutesByTo {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/admin/don-hang': typeof AdminDonHangIndexRoute
   '/admin/khach': typeof AdminKhachIndexRoute
+  '/api/admin/drive/callback': typeof ApiAdminDriveCallbackRoute
+  '/api/admin/drive/start': typeof ApiAdminDriveStartRoute
   '/api/public/product-photo/$slug': typeof ApiPublicProductPhotoSlugRoute
   '/api/staff/file/$id': typeof ApiStaffFileIdRoute
 }
@@ -357,6 +373,8 @@ export interface FileRoutesById {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/admin/don-hang/': typeof AdminDonHangIndexRoute
   '/admin/khach/': typeof AdminKhachIndexRoute
+  '/api/admin/drive/callback': typeof ApiAdminDriveCallbackRoute
+  '/api/admin/drive/start': typeof ApiAdminDriveStartRoute
   '/api/public/product-photo/$slug': typeof ApiPublicProductPhotoSlugRoute
   '/api/staff/file/$id': typeof ApiStaffFileIdRoute
 }
@@ -399,6 +417,8 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/admin/don-hang/'
     | '/admin/khach/'
+    | '/api/admin/drive/callback'
+    | '/api/admin/drive/start'
     | '/api/public/product-photo/$slug'
     | '/api/staff/file/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -438,6 +458,8 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/admin/don-hang'
     | '/admin/khach'
+    | '/api/admin/drive/callback'
+    | '/api/admin/drive/start'
     | '/api/public/product-photo/$slug'
     | '/api/staff/file/$id'
   id:
@@ -478,6 +500,8 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/admin/don-hang/'
     | '/admin/khach/'
+    | '/api/admin/drive/callback'
+    | '/api/admin/drive/start'
     | '/api/public/product-photo/$slug'
     | '/api/staff/file/$id'
   fileRoutesById: FileRoutesById
@@ -494,6 +518,8 @@ export interface RootRouteChildren {
   ApiAdminProductPhotoRoute: typeof ApiAdminProductPhotoRoute
   ApiPublicCleanupFilesRoute: typeof ApiPublicCleanupFilesRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
+  ApiAdminDriveCallbackRoute: typeof ApiAdminDriveCallbackRoute
+  ApiAdminDriveStartRoute: typeof ApiAdminDriveStartRoute
   ApiPublicProductPhotoSlugRoute: typeof ApiPublicProductPhotoSlugRoute
   ApiStaffFileIdRoute: typeof ApiStaffFileIdRoute
 }
@@ -752,6 +778,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/drive/callback': {
+      id: '/api/admin/drive/callback'
+      path: '/api/admin/drive/callback'
+      fullPath: '/api/admin/drive/callback'
+      preLoaderRoute: typeof ApiAdminDriveCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/drive/start': {
+      id: '/api/admin/drive/start'
+      path: '/api/admin/drive/start'
+      fullPath: '/api/admin/drive/start'
+      preLoaderRoute: typeof ApiAdminDriveStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/product-photo/$slug': {
       id: '/api/public/product-photo/$slug'
       path: '/api/public/product-photo/$slug'
@@ -839,6 +879,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminProductPhotoRoute: ApiAdminProductPhotoRoute,
   ApiPublicCleanupFilesRoute: ApiPublicCleanupFilesRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
+  ApiAdminDriveCallbackRoute: ApiAdminDriveCallbackRoute,
+  ApiAdminDriveStartRoute: ApiAdminDriveStartRoute,
   ApiPublicProductPhotoSlugRoute: ApiPublicProductPhotoSlugRoute,
   ApiStaffFileIdRoute: ApiStaffFileIdRoute,
 }

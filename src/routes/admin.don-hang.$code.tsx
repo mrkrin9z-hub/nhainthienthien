@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
 import { changeStatus, getMe, getOrderDetail, recordDeposit, saveNote, saveReprint, storeShipping } from "@/lib/admin.functions";
 import { isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
+import { JT_CARRIER, jtOrder } from "@/domain/jt";
 import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-hang/$code")({
@@ -67,7 +68,16 @@ function OrderDetailPage() {
         Kho in: {data.printDeducted ? "đã trừ" : "chưa trừ"} · Kho đóng gói: {data.packDeducted ? "đã trừ" : "chưa trừ"}
       </p>
 
-      {role !== "production" ? <ShippingForm orderId={data.id} shipping={data.shipping} onDone={refresh} /> : (
+      {role !== "production" ? (
+        <ShippingForm
+          orderId={data.id}
+          shipping={data.shipping}
+          channel={data.channel}
+          source={data.source}
+          fulfillment={data.fulfillment}
+          onDone={refresh}
+        />
+      ) : (
         <p className="text-sm">Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}</p>
       )}
 
@@ -128,6 +138,24 @@ function OrderDetailPage() {
           </div>
         </section>
       ) : null}
+
+      <section className="glass-card rounded-3xl p-4">
+        <h2 className="font-bold text-primary">Quy trình</h2>
+        {data.status === "huy" ? (
+          <p className="mt-2 text-sm font-semibold text-destructive">Đơn đang Hủy. Chỉ chủ mở lại, và phải ghi lý do.</p>
+        ) : (
+          <ol className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            {(["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"] as OrderStatus[]).map((status, index) => (
+              <li
+                key={status}
+                className={`min-w-24 shrink-0 rounded-2xl px-3 py-2 text-center text-xs font-bold ${data.status === status ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}
+              >
+                {index + 1}. {STATUS_LABEL[status]}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Chuyển bước</h2>
@@ -229,7 +257,7 @@ function OrderDetailPage() {
       {role !== "production" ? (
         <section className="glass-card rounded-3xl p-4">
           <h2 className="font-bold text-primary">In lại</h2>
-          <p className="text-sm text-muted-foreground">Trong 3 ngày sau khi giao, lỗi xưởng thì in lại miễn phí. Quá hạn web sẽ cảnh báo.</p>
+          <p className="text-sm text-muted-foreground">Trong 3 ngày sau khi giao, in lại nếu lỗi do xưởng. Quá hạn web sẽ cảnh báo.</p>
           <Textarea className="mt-2" placeholder="Lý do khách báo" value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="mt-2 flex gap-2">
             <Button
@@ -305,19 +333,31 @@ function OrderDetailPage() {
 function ShippingForm({
   orderId,
   shipping,
+  channel,
+  source,
+  fulfillment,
   onDone,
 }: {
   orderId: string;
   shipping?: { carrier: string; tracking: string; shipFee: number | null; codAmount: number | null };
+  channel: string;
+  source: string;
+  fulfillment: string;
   onDone: () => Promise<void>;
 }) {
-  const [carrier, setCarrier] = useState(shipping?.carrier ?? "");
+  const jt = jtOrder({ channel, source, fulfillment });
+  const [carrier, setCarrier] = useState(shipping?.carrier || (jt ? JT_CARRIER : ""));
   const [tracking, setTracking] = useState(shipping?.tracking ?? "");
   const [shipFee, setShipFee] = useState(shipping?.shipFee === null || shipping?.shipFee === undefined ? "" : String(shipping.shipFee));
   const [codAmount, setCodAmount] = useState(shipping?.codAmount === null || shipping?.codAmount === undefined ? "" : String(shipping.codAmount));
   return (
     <section className="glass-card space-y-2 rounded-3xl p-4">
       <h2 className="font-bold text-primary">Giao hàng</h2>
+      {jt ? (
+        <p className="text-xs text-muted-foreground">
+          Đơn web giao tận nơi và đơn Facebook đi J&T Express. Chưa có khóa thì ghi mã vận đơn và phí bằng tay. Tem in khổ 100×150.
+        </p>
+      ) : null}
       <Input className="min-h-12" placeholder="Hãng vận chuyển" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
       <Input className="min-h-12" placeholder="Mã vận đơn" value={tracking} onChange={(e) => setTracking(e.target.value)} />
       <Input className="min-h-12" inputMode="numeric" placeholder="Phí ship" value={shipFee} onChange={(e) => setShipFee(e.target.value.replace(/[^\d]/g, ""))} />
