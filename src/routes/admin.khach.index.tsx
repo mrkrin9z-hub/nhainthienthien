@@ -7,6 +7,7 @@ import { RoleGate } from "@/components/role-gate";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ALL_TONE, CHANNEL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { CustomerLinks } from "@/components/admin/sections";
 import { formatMaybe } from "@/lib/brand";
@@ -55,6 +56,7 @@ function CustomersBody() {
     if (channel !== "all" && !customer.channels.includes(CHANNEL_LABEL[channel as Channel])) return false;
     return true;
   });
+  const list = useListPage(shown, `${q}|${channel}|${repeatOnly}|${includeCancelled}`);
 
   return (
     <div className="space-y-3">
@@ -81,7 +83,7 @@ function CustomersBody() {
           onClick={() => setIncludeCancelled((value) => !value)}
         />
       </div>
-      <p className="text-xs text-muted-foreground">Hiển thị {shown.length} khách</p>
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="khách" onPage={list.setPage} />
       <div className="overflow-hidden rounded-md border bg-card">
         <Table>
           <TableHeader>
@@ -94,7 +96,7 @@ function CustomersBody() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {shown.map((customer) => (
+            {list.slice.map((customer) => (
               <TableRow key={customer.id}>
                 <TableCell>
                   <Link to="/admin/khach/$id" params={{ id: customer.id }} className="font-medium text-primary">

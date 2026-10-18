@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { AlarmClock, Columns3, Download, FileSpreadsheet, List, Plus, Wallet } from "lucide-react";
 
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { ClearFilters, FilterSheet, PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
 import { OrderLinks } from "@/components/admin/sections";
 import { ALL_TONE, CHANNEL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
@@ -88,6 +89,8 @@ function OrdersPage() {
       .includes(needle);
   });
   const filterCount = (status !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (lateOnly ? 1 : 0);
+  const list = useListPage(shown, `${status}|${channel}|${lateOnly}|${q}`);
+  const pageRows = list.slice;
 
   function clearFilters() {
     setStatus("all");
@@ -116,7 +119,7 @@ function OrdersPage() {
   const columns = (status === "all" ? flow : flow.filter((item) => item === status)).map((item) => ({
     status: item,
     label: STATUS_LABEL[item] ?? item,
-    rows: shown.filter((order) => order.status === item),
+    rows: pageRows.filter((order) => order.status === item),
   }));
 
   return (
@@ -161,7 +164,7 @@ function OrdersPage() {
         }
       />
       <FilterChips label="Trạng thái đơn" value={status} chips={statusChips} onChange={setStatus} />
-      <p className="text-xs text-muted-foreground">{view === "board" ? "Dạng cột" : "Danh sách"} · {shown.length} đơn</p>
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={pageRows.length} noun="đơn" onPage={list.setPage} />
       {view === "board" ? (
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x" style={{ WebkitOverflowScrolling: "touch" }}>
           {columns.map((column) => {
@@ -187,7 +190,7 @@ function OrdersPage() {
       {view === "list" ? (
       <>
       <div className="grid gap-2 md:hidden">
-        {shown.map((order) => (
+        {pageRows.map((order) => (
           <OrderCard key={order.id} order={order} money={!production} />
         ))}
       </div>
@@ -203,7 +206,7 @@ function OrdersPage() {
             </tr>
           </thead>
           <tbody>
-            {shown.map((order) => (
+            {pageRows.map((order) => (
               <tr key={order.id} className="border-t">
                 <td className="px-4 py-3 font-semibold">
                   <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="text-primary">

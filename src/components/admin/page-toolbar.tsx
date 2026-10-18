@@ -37,7 +37,7 @@ export function PageToolbar({
           <h1 className="text-2xl font-bold">{title}</h1>
           {hint ? <p className="text-sm text-muted-foreground">{hint}</p> : null}
         </div>
-        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
       {showSearch || onFilter ? (
         <div className="flex items-center gap-1.5">

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,7 +100,19 @@ function SettingsBody() {
   const files = useQuery({ queryKey: ["due-files"], queryFn: () => dueFiles() });
   const [draft, setDraft] = useState<Record<string, string> | null>(null);
   const [tab, setTab] = useState<"so" | "cua" | "tk" | "file">("so");
+  const [fileQ, setFileQ] = useState("");
+  const [auditQ, setAuditQ] = useState("");
   const data = settings.data;
+  const due = (files.data ?? []).filter((file) => {
+    const needle = fileQ.trim().toLowerCase();
+    return !needle || `${file.orderCode} ${file.name}`.toLowerCase().includes(needle);
+  });
+  const audits = (data?.audits ?? []).filter((item) => {
+    const needle = auditQ.trim().toLowerCase();
+    return !needle || item.sentence.toLowerCase().includes(needle);
+  });
+  const fileList = useListPage(due, fileQ);
+  const auditList = useListPage(audits, auditQ);
   const values = draft ?? (data ? Object.fromEntries(NUMBER_FIELDS.map((field) => {
     const raw = (data.settings as Record<string, unknown>)[field.key];
     if (raw === null || raw === undefined) {
@@ -266,8 +279,12 @@ function SettingsBody() {
       <section className={tab === "file" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
         <h2 className="font-semibold text-primary">Ảnh đến hạn xóa</h2>
         <p className="text-sm text-muted-foreground">Web chỉ liệt kê. Chủ bấm xóa, không tự xóa im lặng.</p>
+        <Input value={fileQ} onChange={(event) => setFileQ(event.target.value)} placeholder="Tìm mã đơn hoặc tên ảnh…" aria-label="Tìm ảnh đến hạn" className="mt-2 h-11" />
+        <div className="mt-2">
+          <ListPager page={fileList.page} pages={fileList.pages} total={fileList.total} start={fileList.start} count={fileList.slice.length} noun="ảnh" onPage={fileList.setPage} />
+        </div>
         <ul className="mt-2 space-y-2 text-sm">
-          {(files.data ?? []).map((file) => (
+          {fileList.slice.map((file) => (
             <li key={file.fileId} className="flex items-center justify-between gap-2">
               <span>
                 {file.orderCode} · {file.name} · {file.ageDays} ngày
@@ -285,14 +302,18 @@ function SettingsBody() {
               </Button>
             </li>
           ))}
-          {files.data && files.data.length === 0 ? <li>Chưa có file đến hạn.</li> : null}
+          {fileList.total === 0 ? <li>{(files.data ?? []).length === 0 ? "Chưa có file đến hạn." : "Không có ảnh khớp bộ lọc."}</li> : null}
         </ul>
       </section>
 
       <section className={tab === "file" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
         <h2 className="font-semibold text-primary">Nhật ký sửa</h2>
+        <Input value={auditQ} onChange={(event) => setAuditQ(event.target.value)} placeholder="Tìm nội dung sửa…" aria-label="Tìm nhật ký sửa" className="mt-2 h-11" />
+        <div className="mt-2">
+          <ListPager page={auditList.page} pages={auditList.pages} total={auditList.total} start={auditList.start} count={auditList.slice.length} noun="dòng" onPage={auditList.setPage} />
+        </div>
         <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-          {data.audits.map((item) => (
+          {auditList.slice.map((item) => (
             <li key={item.id}>
               {new Date(item.at).toLocaleString("vi-VN")} · {item.sentence}
             </li>

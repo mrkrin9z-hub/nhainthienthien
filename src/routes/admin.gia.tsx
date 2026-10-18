@@ -3,6 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
+import { PageToolbar } from "@/components/admin/page-toolbar";
 import { GoodsLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,30 +34,46 @@ function PricePage() {
   const owner = me.data?.role === "owner";
   const [createOpen, setCreateOpen] = useState(false);
   const [excelOpen, setExcelOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [priced, setPriced] = useState("all");
+  const priceRows = (board.data?.rows ?? []).filter((row) => {
+    const cell = row.prices[channel];
+    if (priced === "co" && (cell?.price ?? null) === null) return false;
+    if (priced === "trong" && (cell?.price ?? null) !== null) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || `${row.code} ${row.name}`.toLowerCase().includes(needle);
+  });
+  const priceChips: FilterChip[] = [
+    { id: "all", label: "Tất cả", count: board.data?.rows.length ?? 0, ...ALL_TONE },
+    { id: "co", label: "Đã có giá", count: (board.data?.rows ?? []).filter((row) => (row.prices[channel]?.price ?? null) !== null).length, color: "#059669" },
+    { id: "trong", label: "Chưa có giá", count: (board.data?.rows ?? []).filter((row) => (row.prices[channel]?.price ?? null) === null).length, color: "#D97706" },
+  ];
+  const list = useListPage(priceRows, `${groupId}|${channel}|${q}|${priced}`);
   if (me.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
   if (me.data?.role === "production") return <p className="text-lg font-semibold text-primary">Chỉ chủ và sale xem bảng giá.</p>;
 
   return (
     <div className="space-y-4">
       <GoodsLinks />
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-primary">Bảng giá theo kênh</h1>
-          <p className="text-sm text-muted-foreground">
-            Web khách lấy giá kênh Tại tiệm / Web. Ô trống là chưa có số — không tự đặt giá.
-          </p>
-        </div>
-        {owner ? (
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="min-h-11" onClick={() => setExcelOpen(true)}>
-              Tạo từ Excel
-            </Button>
-            <Button className="min-h-11" onClick={() => setCreateOpen(true)}>
-              Tạo
-            </Button>
-          </div>
-        ) : null}
-      </div>
+      <PageToolbar
+        title="Bảng giá theo kênh"
+        hint="Web khách lấy giá kênh Tại tiệm / Web. Ô trống là chưa có số — không tự đặt giá."
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Tìm mã hoặc quy cách…"
+        actions={
+          owner ? (
+            <>
+              <Button variant="outline" className="min-h-11" onClick={() => setExcelOpen(true)}>
+                Tạo từ Excel
+              </Button>
+              <Button className="min-h-11" onClick={() => setCreateOpen(true)}>
+                Tạo
+              </Button>
+            </>
+          ) : null
+        }
+      />
       {owner ? (
         <>
           <CreatePriceDialog
@@ -102,6 +121,8 @@ function PricePage() {
           ))}
         </div>
       ) : null}
+      <FilterChips label="Giá kênh đang chọn" value={priced} chips={priceChips} onChange={setPriced} />
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="khổ" onPage={list.setPage} />
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="hidden grid-cols-[7rem_minmax(0,1.4fr)_8rem_minmax(0,1fr)] gap-2 border-b bg-muted/50 px-3 py-3 text-xs font-semibold text-muted-foreground md:grid">
           <span>Mã</span>
@@ -110,7 +131,7 @@ function PricePage() {
           <span>Trạng thái</span>
         </div>
         <div className="divide-y">
-          {(board.data?.rows ?? []).map((row) => (
+          {list.slice.map((row) => (
             <PriceRow key={`${row.skuId}-${channel}`} row={row} channel={channel} owner={owner} />
           ))}
         </div>

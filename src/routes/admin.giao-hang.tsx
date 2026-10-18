@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { ALL_TONE, CHANNEL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { ClearFilters, FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
 import { OrderLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ function DeliveryPage() {
       .includes(needle);
   });
   const filterCount = (status !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0);
+  const page = useListPage(shown, `${status}|${channel}|${q}`);
   if (rows.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
   if (rows.isError) return <p className="font-semibold text-destructive">{(rows.error as Error).message}</p>;
   return (
@@ -90,9 +92,9 @@ function DeliveryPage() {
         }
       />
       <FilterChips label="Trạng thái giao" value={status} chips={statusChips} onChange={setStatus} />
-      <p className="text-xs text-muted-foreground">Hiển thị {shown.length} đơn</p>
+      <ListPager page={page.page} pages={page.pages} total={page.total} start={page.start} count={page.slice.length} noun="đơn giao" onPage={page.setPage} />
       <div className="grid gap-3">
-        {shown.map((order) => (
+        {page.slice.map((order) => (
           <article key={order.id} className="space-y-1 rounded-2xl border border-border/70 bg-card p-4 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="text-lg font-extrabold text-primary">

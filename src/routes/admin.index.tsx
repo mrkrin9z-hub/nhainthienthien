@@ -141,11 +141,12 @@ function DashboardPage() {
               <p className="mt-2 text-sm text-muted-foreground">Chưa đặt mức tối thiểu, hoặc chưa có vật tư dưới mức.</p>
             ) : (
               <ul className="mt-3 space-y-2 text-sm">
-                {data.lowStock.map((item) => (
+                {data.lowStock.slice(0, 8).map((item) => (
                   <li key={item.id} className="rounded-xl bg-destructive/10 px-3 py-2 font-semibold text-destructive">
                     {item.name}: {item.stock} {item.unit} (tối thiểu {item.min})
                   </li>
                 ))}
+                {data.lowStock.length > 8 ? <li className="text-muted-foreground">Còn {data.lowStock.length - 8}. Mở kho để lọc.</li> : null}
               </ul>
             )}
           </section>
@@ -208,9 +209,10 @@ function OrderBlock({ title, rows }: { title: string; rows: { code: string; item
 
 function OrderList({ rows }: { rows: { code: string; itemSummary: string; statusLabel: string; late: boolean; customerName?: string }[] }) {
   if (!rows.length) return <p className="mt-2 text-sm text-muted-foreground">Chưa có đơn.</p>;
+  const shown = rows.slice(0, 8);
   return (
     <ul className="mt-3 space-y-2">
-      {rows.map((row) => (
+      {shown.map((row) => (
         <li key={row.code}>
           <Link to="/admin/don-hang/$code" params={{ code: row.code }} className="block rounded-2xl bg-card px-4 py-3">
             <span className="font-bold text-primary">{row.code}</span>
@@ -220,6 +222,7 @@ function OrderList({ rows }: { rows: { code: string; itemSummary: string; status
           </Link>
         </li>
       ))}
+      {rows.length > shown.length ? <li className="text-sm text-muted-foreground">Còn {rows.length - shown.length}. Mở danh sách để lọc.</li> : null}
     </ul>
   );
 }

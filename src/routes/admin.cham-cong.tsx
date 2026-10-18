@@ -3,6 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
+import { PageToolbar } from "@/components/admin/page-toolbar";
 import { StaffLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,12 +23,28 @@ function monthNow() {
 function ClockPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const [month, setMonth] = useState(monthNow());
+  const [q, setQ] = useState("");
+  const [who, setWho] = useState("all");
   const queryClient = useQueryClient();
   const sheet = useQuery({ queryKey: ["attendance", month], queryFn: () => getAttendance({ data: { month } }) });
   const owner = me.data?.role === "owner";
 
-  const people = sheet.data?.people ?? [];
-  const punches = people.flatMap((person) => person.punches);
+  const everyone = sheet.data?.people ?? [];
+  const people = everyone.filter((person) => {
+    const late = person.punches.some((punch) => punch.lateMinutes > 0);
+    const open = person.punches.some((punch) => !punch.outAt);
+    if (who === "open" && !open) return false;
+    if (who === "late" && !late) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || person.name.toLowerCase().includes(needle);
+  });
+  const whoChips: FilterChip[] = [
+    { id: "all", label: "Mọi người", count: everyone.length, ...ALL_TONE },
+    { id: "open", label: "Đang trong ca", count: everyone.filter((person) => person.punches.some((punch) => !punch.outAt)).length, color: "#059669" },
+    { id: "late", label: "Có đi trễ", count: everyone.filter((person) => person.punches.some((punch) => punch.lateMinutes > 0)).length, color: "#DC2626" },
+  ];
+  const list = useListPage(people, `${month}|${q}|${who}`);
+  const punches = everyone.flatMap((person) => person.punches);
   const openCount = punches.filter((punch) => !punch.outAt).length;
   const lateCount = punches.filter((punch) => punch.lateMinutes > 0).length;
   const leaves = sheet.data?.leaves ?? [];
@@ -33,8 +52,9 @@ function ClockPage() {
   return (
     <div className="space-y-4">
       <StaffLinks />
+      <PageToolbar title="Chấm công" search={q} onSearch={setQ} searchPlaceholder="Tìm tên nhân viên…" />
+      <FilterChips label="Ca làm" value={who} chips={whoChips} onChange={setWho} />
       <div>
-        <h1 className="text-2xl font-semibold text-primary">Chấm công</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Ca {sheet.data?.workStart ?? "08:00"}–{sheet.data?.workEnd ?? "18:00"}. Ngày nghỉ tuần:{" "}
           {(sheet.data?.weeklyOff ?? []).length === 0 ? "chưa đặt (hợp đồng ghi làm hằng ngày, chủ sửa trong Cài đặt)." : sheet.data?.weeklyOff.join(", ")}
@@ -70,8 +90,9 @@ function ClockPage() {
           Ra ca
         </Button>
       </div>
-      <Input className="min-h-12 max-w-xs" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-      {people.map((person) => {
+      <Input className="min-h-12 max-w-xs" type="month" aria-label="Tháng chấm công" value={month} onChange={(e) => setMonth(e.target.value)} />
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="người" onPage={list.setPage} />
+      {list.slice.map((person) => {
         const mine = leaves.filter((leave) => leave.staffId === person.id);
         return (
         <section key={person.id} className="rounded-2xl border border-border/70 bg-card p-4">
@@ -89,12 +110,7 @@ function ClockPage() {
               ))}
             </ul>
           ) : null}
-          <ul className="mt-2 space-y-2 text-sm">
-            {person.punches.map((punch) => (
-              <PunchRow key={punch.id} punch={punch} owner={owner} />
-            ))}
-            {person.punches.length === 0 ? <li className="text-muted-foreground">Chưa có lần bấm trong tháng.</li> : null}
-          </ul>
+          <PunchList punches={person.punches} owner={owner} />
           {owner ? (
             <LeaveForm
               staffId={person.id}
@@ -115,6 +131,27 @@ function Summary({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-border/70 bg-card p-3">
       <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
       <p className="mt-1 text-xl font-semibold text-primary">{value}</p>
+    </div>
+  );
+}
+
+function PunchList({
+  punches,
+  owner,
+}: {
+  punches: { id: string; inAt: string; outAt: string | null; lateMinutes: number; earlyMinutes: number; note: string }[];
+  owner: boolean;
+}) {
+  const list = useListPage(punches, String(punches.length));
+  if (punches.length === 0) return <p className="mt-2 text-sm text-muted-foreground">Chưa có lần bấm trong tháng.</p>;
+  return (
+    <div className="mt-2 space-y-2">
+      <ul className="space-y-2 text-sm">
+        {list.slice.map((punch) => (
+          <PunchRow key={punch.id} punch={punch} owner={owner} />
+        ))}
+      </ul>
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="lượt" onPage={list.setPage} />
     </div>
   );
 }

@@ -3,9 +3,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
+import { PageToolbar } from "@/components/admin/page-toolbar";
 import { GoodsLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createWebProduct, getWebProducts, setWebProductListed } from "@/lib/admin.functions";
 import { formatVnd } from "@/lib/brand";
@@ -41,6 +45,22 @@ function WebProductsBody() {
   const [rows, setRows] = useState<SizeRow[]>([blankRow()]);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [listed, setListed] = useState("all");
+  const catalog = products.data ?? [];
+  const shown = catalog.filter((product) => {
+    if (listed === "on" && !product.listed) return false;
+    if (listed === "off" && product.listed) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || `${product.name} ${product.category}`.toLowerCase().includes(needle);
+  });
+  const chips: FilterChip[] = [
+    { id: "all", label: "Tất cả", count: catalog.length, ...ALL_TONE },
+    { id: "on", label: "Đang hiện", count: catalog.filter((product) => product.listed).length, color: "#059669" },
+    { id: "off", label: "Đang ẩn", count: catalog.filter((product) => !product.listed).length, color: "#6B7280" },
+  ];
+  const list = useListPage(shown, `${q}|${listed}`);
 
   function updateRow(index: number, patch: Partial<SizeRow>) {
     setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
@@ -70,6 +90,7 @@ function WebProductsBody() {
       setDescription("");
       setTurnaround("");
       setRows([blankRow()]);
+      setOpen(false);
       await refresh();
     } catch (error) {
       toast.error((error as Error).message);
@@ -94,15 +115,27 @@ function WebProductsBody() {
   return (
     <div className="space-y-6">
       <GoodsLinks />
-      <div>
-        <h1 className="text-2xl font-extrabold text-primary">Sản phẩm trên web</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Sản phẩm đang bật hiện ở gian hàng trang chủ, trang sản phẩm và đặt in. Giá nhập ở đây là giá tại tiệm.
-        </p>
-      </div>
+      <PageToolbar
+        title="Sản phẩm trên web"
+        hint="Sản phẩm đang bật hiện ở gian hàng trang chủ, trang sản phẩm và đặt in. Giá nhập ở đây là giá tại tiệm."
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Tìm tên hoặc nhóm…"
+        actions={
+          <Button className="min-h-11" onClick={() => setOpen(true)}>
+            Thêm sản phẩm
+          </Button>
+        }
+      />
+      <FilterChips label="Trang chủ" value={listed} chips={chips} onChange={setListed} />
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="sản phẩm" onPage={list.setPage} />
 
-      <section className="glass-card space-y-3 rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Thêm sản phẩm</h2>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Thêm sản phẩm</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
         <label className="block text-sm font-semibold">
           Tên
           <Input className="mt-1 min-h-11" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ảnh canvas" />
@@ -163,14 +196,16 @@ function WebProductsBody() {
           Ảnh mẫu dùng tạm. Đổi ảnh thật ở <Link to="/admin/anh" className="font-semibold text-accent">Ảnh web</Link>.
           Kênh Facebook, TikTok và Shopee để trống đến khi sửa ở Bảng giá.
         </p>
-      </section>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <section className="space-y-2">
         <h2 className="font-bold text-primary">Đang có trong sổ</h2>
         {products.isLoading ? <p className="text-sm text-muted-foreground">Đang tải…</p> : null}
         {products.isError ? <p className="text-sm font-semibold text-destructive">{(products.error as Error).message}</p> : null}
         <ul className="space-y-2">
-          {(products.data ?? []).map((product) => (
+          {list.slice.map((product) => (
             <li key={product.id} className="glass-card flex items-center gap-3 rounded-3xl p-3">
               <label className="flex min-h-11 flex-1 items-center gap-3 text-sm">
                 <input

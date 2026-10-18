@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { UserRound } from "lucide-react";
 
 import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { ClearFilters, FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
 import { AUDIT_ACTIONS } from "@/domain/audit-text";
 import { getAudits, getMe } from "@/lib/admin.functions";
@@ -71,6 +72,7 @@ function AuditPage() {
     return true;
   });
   const filterCount = (actorId !== "all" ? 1 : 0) + (action !== "all" ? 1 : 0) + (day ? 1 : 0);
+  const list = useListPage(shown, `${actorId}|${action}|${day}|${q}`);
 
   function clearFilters() {
     setActorId("all");
@@ -117,9 +119,9 @@ function AuditPage() {
         }
       />
       {audits.isError ? <p className="font-semibold text-destructive">{(audits.error as Error).message}</p> : null}
-      <p className="text-xs text-muted-foreground">Hiển thị {shown.length} dòng</p>
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="dòng" onPage={list.setPage} />
       <ul className="space-y-2">
-        {shown.map((item) => (
+        {list.slice.map((item) => (
           <li key={item.id} className="rounded-2xl border border-border/70 bg-card px-4 py-3 text-sm">
             <p className="text-xs text-muted-foreground">{new Date(item.at).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}</p>
             <p className="mt-1 break-words font-semibold text-foreground">{item.sentence}</p>

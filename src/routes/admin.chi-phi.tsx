@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { MoneyLinks } from "@/components/admin/sections";
 import { WalletToggle } from "@/components/admin/wallet-toggle";
 import { RoleGate } from "@/components/role-gate";
@@ -31,11 +32,17 @@ function ExpensePage() {
 function ExpenseBody() {
   const [month, setMonth] = useState(vnMonth());
   const [filter, setFilter] = useState("all");
+  const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const desk = useQuery({ queryKey: ["money", month], queryFn: () => getMoneyDesk({ data: { month } }) });
-  const rows = (desk.data?.expenses ?? []).filter((row) => filter === "all" || row.category === filter);
+  const rows = (desk.data?.expenses ?? []).filter((row) => {
+    if (filter !== "all" && row.category !== filter) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || `${row.name} ${row.note}`.toLowerCase().includes(needle);
+  });
+  const page = useListPage(rows, `${month}|${filter}|${q}`);
 
   async function refresh(nextMonth = month) {
     await queryClient.invalidateQueries({ queryKey: ["money", nextMonth] });
@@ -66,6 +73,7 @@ function ExpenseBody() {
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="font-bold text-primary">Danh sách chi phí</h2>
         <Input className="min-h-11 max-w-xs" type="month" aria-label="Tháng chi phí" value={month} onChange={(e) => setMonth(e.target.value)} />
+        <Input className="min-h-11 max-w-xs" placeholder="Tìm diễn giải" aria-label="Tìm khoản chi" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className={control + " max-w-xs"} aria-label="Lọc nhóm" value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="all">Tất cả nhóm</option>
           {EXPENSE_CATEGORIES.map((item) => (
@@ -78,9 +86,11 @@ function ExpenseBody() {
       </div>
       {desk.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {desk.isError ? <p className="font-semibold text-destructive">{(desk.error as Error).message}</p> : null}
-      {desk.data && rows.length === 0 ? <p className="rounded-md border bg-card p-4 text-sm">Chưa có chi phí nào trong tháng này.</p> : null}
+      {desk.data && (desk.data.expenses ?? []).length === 0 ? <p className="rounded-md border bg-card p-4 text-sm">Chưa có chi phí nào trong tháng này.</p> : null}
+      {desk.data && (desk.data.expenses ?? []).length > 0 && rows.length === 0 ? <p className="rounded-md border bg-card p-4 text-sm">Không có khoản chi khớp bộ lọc.</p> : null}
+      <ListPager page={page.page} pages={page.pages} total={page.total} start={page.start} count={page.slice.length} noun="khoản chi" onPage={page.setPage} />
       <ul className="divide-y overflow-hidden rounded-md border bg-card">
-        {rows.map((row) => (
+        {page.slice.map((row) => (
           <li key={row.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
             <div className="min-w-0 flex-1">
               <p className="font-semibold">{row.name}</p>

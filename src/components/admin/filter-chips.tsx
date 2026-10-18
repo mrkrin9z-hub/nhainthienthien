@@ -69,7 +69,7 @@ export function FilterChips({
       role="tablist"
       aria-label={label}
       className={cn(
-        "flex gap-1.5",
+        "flex min-w-0 max-w-full gap-1.5",
         wrap
           ? "flex-wrap"
           : "overflow-x-auto scrollbar-none rounded-2xl border border-border/70 bg-muted/50 p-1.5 md:flex-wrap md:overflow-visible",
