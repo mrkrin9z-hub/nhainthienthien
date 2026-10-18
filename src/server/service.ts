@@ -50,7 +50,7 @@ import type {
   SkuMap,
   Staff,
 } from "@/domain/types";
-import { CHANNEL_LABEL, STATUS_LABEL } from "@/domain/types";
+import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL } from "@/domain/types";
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
@@ -757,6 +757,8 @@ export async function createManualOrder(
     note: string;
     dueDate: string | null;
     marketplaceCode: string;
+    depositPaid: number;
+    depositMethod: string;
     items: { skuId: string; quantity: number; unitPrice?: number | null }[];
   },
 ) {
@@ -802,6 +804,11 @@ export async function createManualOrder(
       history: [{ at: nowIso(), from: null, to: "nhan_don", by: actor.id, note: "Tạo đơn tại quầy" }],
     };
     refreshDeposit(state, order);
+    if (input.depositPaid > 0) {
+      order.depositPaid = Math.round(input.depositPaid);
+      order.depositMethod = input.depositMethod.trim() || "Tiền mặt";
+      order.depositBy = actor.id;
+    }
     state.orders.unshift(order);
     audit(state, actor.id, "order.create", order.id, null, { code: order.code, channel: order.channel });
     return { code: order.code };
@@ -1798,12 +1805,19 @@ export async function skuOptions(actor: Actor) {
     actor.role,
     state.skus.map((sku) => {
       const group = state.groups.find((item) => item.id === sku.groupId);
-      const price = priceOf(state.prices, sku.id, "tai_tiem")?.price ?? null;
+      const prices = Object.fromEntries(
+        CHANNELS.map((channel) => [channel, priceOf(state.prices, sku.id, channel)?.price ?? null]),
+      ) as Record<(typeof CHANNELS)[number], number | null>;
       return {
         id: sku.id,
+        code: sku.code,
+        name: sku.name,
+        groupName: group?.name ?? "",
         label: `${sku.code} · ${group?.name ?? ""} · ${sku.name}`,
         groupId: sku.groupId,
-        ...(actor.role === "production" ? {} : { price }),
+        size: sku.size,
+        prices,
+        price: prices.tai_tiem,
       };
     }),
   );
