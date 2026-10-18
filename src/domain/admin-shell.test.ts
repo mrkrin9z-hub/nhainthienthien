@@ -20,6 +20,11 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   const orders = readFileSync(new URL("../routes/admin.don-hang.index.tsx", import.meta.url), "utf8");
   assert.match(orders, /Dạng cột/);
   assert.match(orders, /Danh sách/);
+  const form = readFileSync(new URL("../routes/admin.don-moi.tsx", import.meta.url), "utf8");
+  assert.match(form, /Thông tin khách hàng/);
+  assert.match(form, /Danh sách sản phẩm/);
+  assert.match(form, /lg:grid-cols-3/);
+  assert.match(form, /Lưu đơn hàng/);
   const dash = readFileSync(new URL("../routes/admin.index.tsx", import.meta.url), "utf8");
   assert.match(dash, /clockedInAt/);
   assert.match(dash, /Asia\/Ho_Chi_Minh/);

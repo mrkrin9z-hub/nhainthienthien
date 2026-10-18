@@ -122,7 +122,7 @@ function pathActive(pathname: string, to: string) {
 }
 
 function pageTitle(pathname: string, role: Role): string {
-  if (pathname.startsWith("/admin/don-moi")) return "Ghi đơn";
+  if (pathname.startsWith("/admin/don-moi")) return "Tạo đơn hàng mới";
   if (pathname.startsWith("/admin/tem/")) return "Tem đơn";
   if (pathname.startsWith("/admin/don-hang/") && pathname !== "/admin/don-hang" && pathname !== "/admin/don-hang/") return "Chi tiết đơn";
   if (pathname.startsWith("/admin/khach/") && pathname !== "/admin/khach" && pathname !== "/admin/khach/") return "Hồ sơ khách";

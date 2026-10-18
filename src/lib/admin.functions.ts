@@ -85,6 +85,8 @@ export const createDeskOrder = createServerFn({ method: "POST" })
         note: z.string().optional().default(""),
         dueDate: z.string().nullable().optional().default(null),
         marketplaceCode: z.string().optional().default(""),
+        depositPaid: z.number().int().min(0).max(100_000_000).optional().default(0),
+        depositMethod: z.string().optional().default(""),
         items: z.array(itemSchema).min(1),
       })
       .parse(data),

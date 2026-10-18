@@ -38,6 +38,7 @@ export function OrderLinks() {
     { to: "/admin/don-hang", label: "Đơn hàng" },
     { to: "/admin/giao-hang", label: "Giao hàng" },
     ...(production ? [] : [
+      { to: "/admin/don-moi", label: "Ghi đơn" },
       { to: "/admin/cod", label: "Đối soát COD" },
       { to: "/admin/nhap-don", label: "Nhập đơn sàn" },
     ]),
