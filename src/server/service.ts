@@ -55,7 +55,7 @@ import type {
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL } from "@/domain/types";
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
-import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
+import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, holderBalances, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
 import { getRequest } from "@tanstack/react-start/server";
 
@@ -1568,10 +1568,11 @@ function cashOrders(state: ShopState): CashOrder[] {
       total: order.total,
       depositPaid: order.depositPaid,
       depositMethod: order.depositMethod,
+      depositBy: order.depositBy,
       createdAt: order.createdAt,
     };
     if (order.payments && order.payments.length > 0) {
-      row.payments = order.payments.map((payment) => ({ at: payment.at, amount: payment.amount, method: payment.method }));
+      row.payments = order.payments.map((payment) => ({ at: payment.at, amount: payment.amount, method: payment.method, by: payment.by }));
     }
     return row;
   });
@@ -1580,12 +1581,19 @@ function cashOrders(state: ShopState): CashOrder[] {
 export async function moneyDesk(actor: Actor, month: string) {
   assertRole(actor, ["owner"]);
   const state = await readState();
+  const orders = cashOrders(state);
   const lines = buildLedger({
-    orders: cashOrders(state),
+    orders,
     expenses: state.expenses,
     adjusts: state.walletAdjusts ?? [],
   });
-  const monthLines = lines.filter((line) => vnMonth(line.at) === month);
+  const names = new Map(state.staff.map((person) => [person.id, person.name]));
+  const monthLines = lines
+    .filter((line) => vnMonth(line.at) === month)
+    .map((line) => ({
+      ...line,
+      holderName: line.holder ? (names.get(line.holder) ?? "Người đã nghỉ") : "",
+    }));
   const expenses = state.expenses
     .filter((row) => row.month === month)
     .map((row) => ({
@@ -1604,6 +1612,11 @@ export async function moneyDesk(actor: Actor, month: string) {
   return {
     month,
     cards: walletCards(lines, month),
+    holders: holderBalances({
+      orders,
+      expenses: state.expenses,
+      staff: state.staff.map((person) => ({ id: person.id, name: person.name })),
+    }),
     lines: monthLines,
     expenses,
     report: expenseReport(state.expenses, month),
@@ -1614,21 +1627,34 @@ export async function moneyDesk(actor: Actor, month: string) {
 export async function collectList(actor: Actor) {
   assertRole(actor, ["owner", "sale"]);
   const state = await readState();
-  return ordersToCollect(cashOrders(state)).map((order) => {
-    const full = state.orders.find((item) => item.id === order.id);
-    return {
-      id: order.id,
-      code: order.code,
-      customerName: order.customerName,
-      status: order.status,
-      statusLabel: STATUS_LABEL[order.status as keyof typeof STATUS_LABEL] ?? order.status,
-      channelLabel: full ? CHANNEL_LABEL[full.channel] : "",
-      total: order.total,
-      depositPaid: order.depositPaid,
-      remain: remainOf(order),
-      createdAt: order.createdAt,
-    };
-  });
+  const orders = cashOrders(state);
+  const mine = holderBalances({
+    orders,
+    expenses: state.expenses,
+    staff: [{ id: actor.id, name: actor.name }],
+  }).find((row) => row.staffId === actor.id);
+  return {
+    me: {
+      name: actor.name,
+      tien_mat: mine?.tien_mat ?? 0,
+      chuyen_khoan: mine?.chuyen_khoan ?? 0,
+    },
+    rows: ordersToCollect(orders).map((order) => {
+      const full = state.orders.find((item) => item.id === order.id);
+      return {
+        id: order.id,
+        code: order.code,
+        customerName: order.customerName,
+        status: order.status,
+        statusLabel: STATUS_LABEL[order.status as keyof typeof STATUS_LABEL] ?? order.status,
+        channelLabel: full ? CHANNEL_LABEL[full.channel] : "",
+        total: order.total,
+        depositPaid: order.depositPaid,
+        remain: remainOf(order),
+        createdAt: order.createdAt,
+      };
+    }),
+  };
 }
 
 const SETTING_NUMBERS = [

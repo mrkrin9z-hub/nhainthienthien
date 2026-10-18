@@ -51,7 +51,7 @@ function WalletBody() {
       <MoneyLinks />
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Ví tiền</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Hai ví: tiền mặt và chuyển khoản. Số dư = tiền thu đơn − chi phí + điều chỉnh, tính từ trước tới nay.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Hai nguồn của cả tiệm. Phần dưới là ví từng người: thu cộng vào người bấm thu, chi trừ người ghi chi.</p>
       </div>
       <Input className="min-h-12 max-w-xs" type="month" aria-label="Tháng ví" value={month} onChange={(e) => setMonth(e.target.value)} />
       {desk.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
@@ -66,6 +66,19 @@ function WalletBody() {
             </p>
           </article>
         ))}
+      </section>
+      <section className="space-y-2">
+        <h2 className="font-bold text-primary">Ví người thu</h2>
+        {desk.data && (desk.data.holders ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Chưa có tiền gắn với người thu.</p> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(desk.data?.holders ?? []).map((holder) => (
+            <article key={holder.staffId || "none"} className="rounded-md border bg-card p-4">
+              <h3 className="font-bold">{holder.name}</h3>
+              <p className="mt-1 text-sm">Tiền mặt {formatVnd(holder.tien_mat)}</p>
+              <p className="text-sm">Chuyển khoản {formatVnd(holder.chuyen_khoan)}</p>
+            </article>
+          ))}
+        </div>
       </section>
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <section className="order-2 space-y-3 lg:order-1 lg:col-span-2">
@@ -85,6 +98,7 @@ function WalletBody() {
                   <p className="font-semibold">{line.label}</p>
                   <p className="text-sm text-muted-foreground">
                     {vnYmd(line.at)} · {KIND_LABEL[line.kind]} · {line.wallet === "chuyen_khoan" ? "Chuyển khoản" : line.wallet === "tien_mat" ? "Tiền mặt" : "Chưa rõ nguồn"}
+                    {line.holderName ? ` · ví ${line.holderName}` : ""}
                   </p>
                 </div>
                 <p className={`font-extrabold ${line.amount < 0 ? "text-destructive" : "text-primary"}`}>{signed(line.amount)}</p>
