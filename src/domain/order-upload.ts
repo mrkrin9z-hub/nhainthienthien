@@ -29,3 +29,77 @@ export function customerUploadPath(token: string): string {
   if (!uploadTokenShape(token)) throw new Error("Mã gửi ảnh không hợp lệ.");
   return `/gui-anh/${token}`;
 }
+
+export type PublicUploadPhoto = { id: string; name: string; createdAt: string };
+
+export type PublicUploadCard = {
+  orderId: string;
+  code: string;
+  status: string;
+  createdAt: string;
+  channel: string;
+  marketplaceCode: string;
+  fulfillment: "pickup" | "delivery";
+  address: string;
+  customerNote: string;
+  customerName: string;
+  phone: string;
+  items: { name: string; variant: string; quantity: number; lineTotal: number | null }[];
+  total: number | null;
+  photos: PublicUploadPhoto[];
+};
+
+const PHOTO_CAP = 60;
+
+/** Thẻ khách thấy khi mở mã của đúng đơn. Không có ghi chú nội bộ, mã Drive, hay đơn khác. */
+export function publicUploadCard(input: {
+  order: {
+    id: string;
+    code: string;
+    status: string;
+    createdAt: string;
+    channel: string;
+    marketplaceCode: string;
+    fulfillment: "pickup" | "delivery";
+    address: string;
+    customerNote: string;
+    total: number | null;
+    items: { name: string; skuCode: string; quantity: number; lineTotal: number | null }[];
+    files: { id: string; name: string; status: string; kind: string; createdAt: string; deletedAt?: string | null }[];
+  };
+  customer: { name: string; phone: string } | undefined;
+}): PublicUploadCard {
+  const photos = input.order.files
+    .filter((file) => file.kind === "original" && file.status === "complete" && !file.deletedAt)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : b.id.localeCompare(a.id)))
+    .slice(0, PHOTO_CAP)
+    .map((file) => ({ id: file.id, name: file.name, createdAt: file.createdAt }));
+  return {
+    orderId: input.order.id,
+    code: input.order.code,
+    status: input.order.status,
+    createdAt: input.order.createdAt,
+    channel: input.order.channel,
+    marketplaceCode: input.order.marketplaceCode,
+    fulfillment: input.order.fulfillment,
+    address: input.order.address,
+    customerNote: input.order.customerNote,
+    customerName: input.customer?.name ?? "",
+    phone: input.customer?.phone ?? "",
+    items: input.order.items.map((item) => ({
+      name: item.name,
+      variant: item.skuCode,
+      quantity: item.quantity,
+      lineTotal: item.lineTotal,
+    })),
+    total: input.order.total,
+    photos,
+  };
+}
+
+/** Đổi cỡ ảnh nhỏ Google (`=s220`) mà không giữ đường dẫn tải đầy đủ. */
+export function googleThumbSize(link: string, width: number): string | null {
+  if (!link.startsWith("https://")) return null;
+  if (/=s\d+/.test(link)) return link.replace(/=s\d+/, `=s${width}`);
+  return `${link}=s${width}`;
+}

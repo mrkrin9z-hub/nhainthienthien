@@ -1,3 +1,4 @@
+import { googleThumbSize } from "@/domain/order-upload";
 import { readIntegrationSecret } from "@/server/secrets";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -201,6 +202,27 @@ export async function deleteFromDrive(fileId: string): Promise<void> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok && res.status !== 404) throw new Error(`Không xóa được ảnh trên Drive (${res.status}).`);
+}
+
+/** Ảnh nhỏ Google tạo sẵn. Không tải file gốc. */
+export async function downloadDriveThumbnail(fileId: string, width: 480 | 1600): Promise<{ bytes: Uint8Array; mime: string }> {
+  if (!/^[A-Za-z0-9_-]{8,200}$/.test(fileId)) throw new Error("Mã ảnh trên Drive không đúng.");
+  const token = await accessToken();
+  const metaRes = await fetch(`${FILES_URL}/${encodeURIComponent(fileId)}?fields=thumbnailLink`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!metaRes.ok) throw new Error(`Không lấy được ảnh nhỏ từ Google (${metaRes.status}).`);
+  const meta = (await metaRes.json()) as { thumbnailLink?: string };
+  const link = googleThumbSize(meta.thumbnailLink ?? "", width);
+  if (!link) throw new Error("Google chưa có ảnh nhỏ.");
+  let res = await fetch(link, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) res = await fetch(link);
+  if (!res.ok) throw new Error(`Google không trả ảnh nhỏ (${res.status}).`);
+  const mime = (res.headers.get("content-type") || "image/jpeg").split(";")[0]?.trim() || "image/jpeg";
+  if (!mime.startsWith("image/")) throw new Error("Google không trả ảnh.");
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.byteLength < 1 || bytes.byteLength > 2_000_000) throw new Error("Ảnh nhỏ không dùng được.");
+  return { bytes, mime };
 }
 
 export async function downloadFromDrive(fileId: string): Promise<Uint8Array> {

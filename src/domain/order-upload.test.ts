@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { albumFolderParts } from "./drive-path.ts";
 import { bytesStillShared } from "./files.ts";
-import { albumPhone, customerUploadPath, photoLimitLabel, photoTooBig, SHARED_UPLOAD_PATH, uploadTokenShape } from "./order-upload.ts";
+import { albumPhone, customerUploadPath, googleThumbSize, photoLimitLabel, photoTooBig, publicUploadCard, SHARED_UPLOAD_PATH, uploadTokenShape } from "./order-upload.ts";
 import type { OrderFile, ShopState } from "./types.ts";
 
 test("mã gửi ảnh là 32 ký tự hex và ra đúng đường dẫn", () => {
@@ -30,6 +30,42 @@ test("Drive đã nối thì không chặn dung lượng ảnh", () => {
   assert.equal(photoTooBig(10 * 1024 * 1024, 10 * 1024 * 1024), false);
   assert.equal(photoLimitLabel(null), "không giới hạn dung lượng");
   assert.equal(photoLimitLabel(10 * 1024 * 1024), "mỗi ảnh tối đa 10MB");
+});
+
+test("mã đơn cho khách thấy người đặt, sản phẩm và ảnh gốc đã gửi", () => {
+  const card = publicUploadCard({
+    customer: { name: "Lan", phone: "0901234567" },
+    order: {
+      id: "order-1",
+      code: "TT1",
+      status: "nhan_don",
+      createdAt: "2026-10-18T06:00:00.000Z",
+      channel: "tiktok",
+      marketplaceCode: "TTS-9",
+      fulfillment: "delivery",
+      address: "Xuân Lộc",
+      customerNote: "In sáng",
+      total: 70000,
+      items: [{ name: "Ảnh ép gỗ", skuCode: "TG-13x18", quantity: 2, lineTotal: 70000 }],
+      files: [
+        { id: "old", name: "cu.jpg", status: "complete", kind: "original", createdAt: "2026-10-01T00:00:00.000Z" },
+        { id: "new", name: "moi.jpg", status: "complete", kind: "original", createdAt: "2026-10-18T00:00:00.000Z" },
+        { id: "gone", name: "xoa.jpg", status: "complete", kind: "original", createdAt: "2026-10-19T00:00:00.000Z", deletedAt: "2026-10-19T01:00:00.000Z" },
+        { id: "design", name: "mau.jpg", status: "complete", kind: "design", createdAt: "2026-10-18T02:00:00.000Z" },
+        { id: "wait", name: "cho.jpg", status: "uploading", kind: "original", createdAt: "2026-10-18T03:00:00.000Z" },
+      ],
+    },
+  });
+  assert.equal(card.customerName, "Lan");
+  assert.equal(card.phone, "0901234567");
+  assert.equal(card.code, "TT1");
+  assert.equal(card.items[0]?.variant, "TG-13x18");
+  assert.equal(card.items[0]?.quantity, 2);
+  assert.deepEqual(card.photos.map((photo) => photo.id), ["new", "old"]);
+  assert.equal(JSON.stringify(card).includes("mau.jpg"), false);
+  assert.equal(JSON.stringify(card).includes("drive"), false);
+  assert.equal(googleThumbSize("https://lh3.googleusercontent.com/d/abc=s220", 480), "https://lh3.googleusercontent.com/d/abc=s480");
+  assert.equal(googleThumbSize("http://evil.example/a=s220", 480), null);
 });
 
 test("ảnh gắn đơn vẫn giữ byte khi album còn file", () => {

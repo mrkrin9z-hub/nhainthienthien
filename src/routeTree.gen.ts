@@ -64,6 +64,7 @@ import { Route as ApiAdminTiktokCallbackRouteImport } from './routes/api/admin/t
 import { Route as ApiAdminTiktokStartRouteImport } from './routes/api/admin/tiktok.start'
 import { Route as ApiPublicProductPhotoSlugRouteImport } from './routes/api/public/product-photo.$slug'
 import { Route as ApiStaffFileIdRouteImport } from './routes/api/staff/file.$id'
+import { Route as ApiPublicOrderPhotoTokenFileIdRouteImport } from './routes/api/public/order-photo.$token.$fileId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -341,6 +342,12 @@ const ApiStaffFileIdRoute = ApiStaffFileIdRouteImport.update({
   path: '/api/staff/file/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicOrderPhotoTokenFileIdRoute =
+  ApiPublicOrderPhotoTokenFileIdRouteImport.update({
+    id: '/api/public/order-photo/$token/$fileId',
+    path: '/api/public/order-photo/$token/$fileId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -398,6 +405,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/tiktok/start': typeof ApiAdminTiktokStartRoute
   '/api/public/product-photo/$slug': typeof ApiPublicProductPhotoSlugRoute
   '/api/staff/file/$id': typeof ApiStaffFileIdRoute
+  '/api/public/order-photo/$token/$fileId': typeof ApiPublicOrderPhotoTokenFileIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -454,6 +462,7 @@ export interface FileRoutesByTo {
   '/api/admin/tiktok/start': typeof ApiAdminTiktokStartRoute
   '/api/public/product-photo/$slug': typeof ApiPublicProductPhotoSlugRoute
   '/api/staff/file/$id': typeof ApiStaffFileIdRoute
+  '/api/public/order-photo/$token/$fileId': typeof ApiPublicOrderPhotoTokenFileIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -512,6 +521,7 @@ export interface FileRoutesById {
   '/api/admin/tiktok/start': typeof ApiAdminTiktokStartRoute
   '/api/public/product-photo/$slug': typeof ApiPublicProductPhotoSlugRoute
   '/api/staff/file/$id': typeof ApiStaffFileIdRoute
+  '/api/public/order-photo/$token/$fileId': typeof ApiPublicOrderPhotoTokenFileIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -571,6 +581,7 @@ export interface FileRouteTypes {
     | '/api/admin/tiktok/start'
     | '/api/public/product-photo/$slug'
     | '/api/staff/file/$id'
+    | '/api/public/order-photo/$token/$fileId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -627,6 +638,7 @@ export interface FileRouteTypes {
     | '/api/admin/tiktok/start'
     | '/api/public/product-photo/$slug'
     | '/api/staff/file/$id'
+    | '/api/public/order-photo/$token/$fileId'
   id:
     | '__root__'
     | '/'
@@ -684,6 +696,7 @@ export interface FileRouteTypes {
     | '/api/admin/tiktok/start'
     | '/api/public/product-photo/$slug'
     | '/api/staff/file/$id'
+    | '/api/public/order-photo/$token/$fileId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -709,6 +722,7 @@ export interface RootRouteChildren {
   ApiAdminTiktokStartRoute: typeof ApiAdminTiktokStartRoute
   ApiPublicProductPhotoSlugRoute: typeof ApiPublicProductPhotoSlugRoute
   ApiStaffFileIdRoute: typeof ApiStaffFileIdRoute
+  ApiPublicOrderPhotoTokenFileIdRoute: typeof ApiPublicOrderPhotoTokenFileIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1098,6 +1112,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStaffFileIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/order-photo/$token/$fileId': {
+      id: '/api/public/order-photo/$token/$fileId'
+      path: '/api/public/order-photo/$token/$fileId'
+      fullPath: '/api/public/order-photo/$token/$fileId'
+      preLoaderRoute: typeof ApiPublicOrderPhotoTokenFileIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1198,6 +1219,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminTiktokStartRoute: ApiAdminTiktokStartRoute,
   ApiPublicProductPhotoSlugRoute: ApiPublicProductPhotoSlugRoute,
   ApiStaffFileIdRoute: ApiStaffFileIdRoute,
+  ApiPublicOrderPhotoTokenFileIdRoute: ApiPublicOrderPhotoTokenFileIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
