@@ -11,8 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { sheetOptionLabel, sizeChoices, sizeSummary } from "@/domain/catalog-label";
 import { ChoiceChip } from "@/components/site/choice-chip";
+import { photoLimitLabel } from "@/domain/order-upload";
 import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
-import { createOrder, createUploadTicket, markFileStatus, submitOrder } from "@/lib/orders.functions";
+import { putDriveFile } from "@/lib/drive-put";
+import { createOrder, createUploadTicket, finishOrderDriveUpload, markFileStatus, prepareOrderDriveUpload, submitOrder } from "@/lib/orders.functions";
 import { formatVnd } from "@/lib/brand";
 
 export const Route = createFileRoute("/dat-in")({
@@ -47,7 +49,6 @@ export const Route = createFileRoute("/dat-in")({
 });
 
 const MAX_FILES = 30;
-const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const ACCEPT = ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*";
 
 type FileState = {
@@ -127,18 +128,17 @@ function OrderPage() {
 
   function addFiles(list: FileList | null) {
     if (!list) return;
-    const limit = maxPhotoBytes ?? MAX_FILE_BYTES;
-    const limitMb = Math.round(limit / (1024 * 1024));
     const next: FileState[] = [];
     const rejected: string[] = [];
     for (const file of Array.from(list)) {
-      if (file.size > limit) {
+      if (maxPhotoBytes !== null && file.size > maxPhotoBytes) {
         rejected.push(file.name);
         continue;
       }
       next.push({ key: crypto.randomUUID(), file, status: "pending" });
     }
-    if (rejected.length) {
+    if (rejected.length && maxPhotoBytes !== null) {
+      const limitMb = Math.round(maxPhotoBytes / (1024 * 1024));
       setError(`${rejected.join(", ")} lớn hơn ${limitMb}MB. Mỗi ảnh tối đa ${limitMb}MB.`);
     }
     setFiles((prev) => [...prev, ...next].slice(0, MAX_FILES));
@@ -181,22 +181,33 @@ function OrderPage() {
           prev.map((f) => (f.key === item.key ? { ...f, status: "uploading" } : f)),
         );
         try {
+          const mime = item.file.type || "image/jpeg";
           const ticket = await createUploadTicket({
             data: {
               orderId: order.orderId,
               accessToken: order.accessToken,
               fileName: item.file.name,
-              mimeType: item.file.type || "image/jpeg",
+              mimeType: mime,
               sizeBytes: item.file.size,
             },
           });
-          const body = new FormData();
-          body.set("orderId", order.orderId);
-          body.set("accessToken", order.accessToken);
-          body.set("fileId", ticket.fileId);
-          body.set("file", item.file);
-          const uploaded = await fetch("/api/public/upload", { method: "POST", body });
-          if (!uploaded.ok) throw new Error(await uploaded.text());
+          if (maxPhotoBytes === null) {
+            const session = await prepareOrderDriveUpload({
+              data: { orderId: order.orderId, accessToken: order.accessToken, fileId: ticket.fileId },
+            });
+            const driveFileId = await putDriveFile(session.uploadUrl, item.file, mime);
+            await finishOrderDriveUpload({
+              data: { orderId: order.orderId, accessToken: order.accessToken, fileId: ticket.fileId, driveFileId },
+            });
+          } else {
+            const body = new FormData();
+            body.set("orderId", order.orderId);
+            body.set("accessToken", order.accessToken);
+            body.set("fileId", ticket.fileId);
+            body.set("file", item.file);
+            const uploaded = await fetch("/api/public/upload", { method: "POST", body });
+            if (!uploaded.ok) throw new Error(await uploaded.text());
+          }
 
           await markFileStatus({
             data: {
@@ -409,15 +420,8 @@ function OrderPage() {
                   <UploadCloud className="size-8 text-accent" />
                   <span className="mt-2 font-semibold text-foreground">Chọn ảnh gốc</span>
                   <span className="mt-1 text-xs text-muted-foreground">
-                    JPG, PNG, WEBP, HEIC —{" "}
-                    {maxPhotoBytes
-                      ? `mỗi ảnh tối đa ${Math.round(maxPhotoBytes / (1024 * 1024))}MB`
-                      : "tối đa 50MB mỗi ảnh"}
-                    , {MAX_FILES} ảnh mỗi đơn
+                    JPG, PNG, WEBP, HEIC — {photoLimitLabel(maxPhotoBytes)}, {MAX_FILES} ảnh mỗi đơn
                   </span>
-                  {maxPhotoBytes ? (
-                    <span className="mt-2 text-sm font-semibold text-foreground">Mỗi ảnh tối đa 10MB.</span>
-                  ) : null}
                   <input
                     type="file"
                     multiple

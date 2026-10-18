@@ -76,7 +76,7 @@ function DriveCard({
     <section className="glass-card space-y-3 rounded-3xl p-4">
       <h2 className="font-bold text-primary">Google Drive</h2>
       <p className="text-xs text-muted-foreground">
-        Ảnh khách lên Drive của chủ, mỗi đơn một thư mục. Chưa kết nối thì ảnh lưu tạm trên KV, tối đa 10MB. App không chặn khi chưa có khóa.
+        Ảnh khách lên thẳng Drive của chủ, không giới hạn dung lượng. Album theo số điện thoại nằm trong thư mục Album khách. Chưa kết nối thì ảnh lưu tạm, mỗi ảnh tối đa 10MB.
       </p>
       <p className="break-all text-xs text-muted-foreground">
         Redirect URI trên Google Cloud: {origin ? redirect : "/api/admin/drive/callback"}

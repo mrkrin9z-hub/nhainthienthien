@@ -7,8 +7,10 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { photoLimitLabel } from "@/domain/order-upload";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
-import { createAlbumTicket } from "@/lib/orders.functions";
+import { putDriveFile } from "@/lib/drive-put";
+import { createAlbumTicket, finishAlbumDriveUpload, prepareAlbumDriveUpload } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/gui-anh/")({
   head: () => ({
@@ -22,7 +24,6 @@ export const Route = createFileRoute("/gui-anh/")({
 });
 
 const MAX_FILES = 30;
-const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const ACCEPT = ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*";
 
 type Row = {
@@ -44,7 +45,8 @@ function guessMime(file: File): string {
 
 function SharedUploadPage() {
   const config = useQuery(publicConfigQueryOptions);
-  const limit = config.data?.maxPhotoBytes ?? MAX_FILE_BYTES;
+  const limit = config.data ? config.data.maxPhotoBytes : undefined;
+  const direct = limit === null;
   const [phone, setPhone] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
@@ -56,7 +58,7 @@ function SharedUploadPage() {
     const next: Row[] = [];
     for (const file of list) {
       if (rows.length + next.length >= MAX_FILES) break;
-      if (file.size > limit) {
+      if (limit != null && file.size > limit) {
         next.push({ key: crypto.randomUUID(), file, status: "error", message: "Ảnh lớn hơn mức cho phép." });
         continue;
       }
@@ -82,7 +84,7 @@ function SharedUploadPage() {
     let savedPhone = "";
     try {
       for (const row of pending) {
-        if (row.file.size > limit) {
+        if (limit != null && row.file.size > limit) {
           failed = true;
           continue;
         }
@@ -93,13 +95,19 @@ function SharedUploadPage() {
             data: { phone, fileName: row.file.name, mimeType: mime, sizeBytes: row.file.size },
           });
           savedPhone = ticket.phone;
-          const body = new FormData();
-          body.set("albumId", ticket.albumId);
-          body.set("phone", phone);
-          body.set("fileId", ticket.fileId);
-          body.set("file", row.file);
-          const uploaded = await fetch("/api/public/album", { method: "POST", body });
-          if (!uploaded.ok) throw new Error(await uploaded.text());
+          if (direct) {
+            const session = await prepareAlbumDriveUpload({ data: { albumId: ticket.albumId, phone, fileId: ticket.fileId } });
+            const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime);
+            await finishAlbumDriveUpload({ data: { albumId: ticket.albumId, phone, fileId: ticket.fileId, driveFileId } });
+          } else {
+            const body = new FormData();
+            body.set("albumId", ticket.albumId);
+            body.set("phone", phone);
+            body.set("fileId", ticket.fileId);
+            body.set("file", row.file);
+            const uploaded = await fetch("/api/public/album", { method: "POST", body });
+            if (!uploaded.ok) throw new Error(await uploaded.text());
+          }
           setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "complete" } : item)));
         } catch (err) {
           failed = true;
@@ -124,7 +132,7 @@ function SharedUploadPage() {
             <h1 className="text-2xl text-primary">Gửi ảnh cho tiệm</h1>
             <p className="mt-1 text-sm text-muted-foreground">Nhập số điện thoại rồi chọn ảnh gốc. Ảnh vào album mang tên số đó.</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              JPG, PNG, WEBP, HEIC — mỗi ảnh tối đa {Math.round(limit / (1024 * 1024))}MB, tối đa {MAX_FILES} ảnh một lần.
+              JPG, PNG, WEBP, HEIC{limit === undefined ? "" : ` — ${photoLimitLabel(limit)}`}, tối đa {MAX_FILES} ảnh một lần.
             </p>
           </div>
           {donePhone ? (

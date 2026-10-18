@@ -5,8 +5,9 @@ import { CheckCircle2, Loader2, UploadCloud } from "lucide-react";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
-import { uploadTokenShape } from "@/domain/order-upload";
-import { acknowledgeCustomerPhotos, createUploadTicket, getUploadTarget } from "@/lib/orders.functions";
+import { photoLimitLabel, uploadTokenShape } from "@/domain/order-upload";
+import { putDriveFile } from "@/lib/drive-put";
+import { acknowledgeCustomerPhotos, createUploadTicket, finishOrderDriveUpload, getUploadTarget, prepareOrderDriveUpload } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/gui-anh/$token")({
   head: () => ({
@@ -19,7 +20,6 @@ export const Route = createFileRoute("/gui-anh/$token")({
 });
 
 const MAX_FILES = 30;
-const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const ACCEPT = ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*";
 
 type Row = {
@@ -52,14 +52,15 @@ function CustomerUploadPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const limit = target.data?.maxPhotoBytes ?? MAX_FILE_BYTES;
+  const limit = target.data ? target.data.maxPhotoBytes : undefined;
+  const direct = limit === null;
 
   function addFiles(list: FileList | null) {
     if (!list) return;
     const next: Row[] = [];
     for (const file of list) {
       if (rows.length + next.length >= MAX_FILES) break;
-      if (file.size > limit) {
+      if (limit != null && file.size > limit) {
         next.push({ key: crypto.randomUUID(), file, status: "error", message: "Ảnh lớn hơn mức cho phép." });
         continue;
       }
@@ -82,7 +83,7 @@ function CustomerUploadPage() {
     let failed = false;
     try {
       for (const row of pending) {
-        if (row.file.size > limit) {
+        if (limit != null && row.file.size > limit) {
           failed = true;
           continue;
         }
@@ -98,13 +99,23 @@ function CustomerUploadPage() {
               sizeBytes: row.file.size,
             },
           });
-          const body = new FormData();
-          body.set("orderId", info.orderId);
-          body.set("accessToken", token);
-          body.set("fileId", ticket.fileId);
-          body.set("file", row.file);
-          const uploaded = await fetch("/api/public/upload", { method: "POST", body });
-          if (!uploaded.ok) throw new Error(await uploaded.text());
+          if (direct) {
+            const session = await prepareOrderDriveUpload({
+              data: { orderId: info.orderId, accessToken: token, fileId: ticket.fileId },
+            });
+            const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime);
+            await finishOrderDriveUpload({
+              data: { orderId: info.orderId, accessToken: token, fileId: ticket.fileId, driveFileId },
+            });
+          } else {
+            const body = new FormData();
+            body.set("orderId", info.orderId);
+            body.set("accessToken", token);
+            body.set("fileId", ticket.fileId);
+            body.set("file", row.file);
+            const uploaded = await fetch("/api/public/upload", { method: "POST", body });
+            if (!uploaded.ok) throw new Error(await uploaded.text());
+          }
           setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "complete" } : item)));
         } catch (err) {
           const message = err instanceof Error ? err.message : "Không tải được ảnh.";
@@ -139,7 +150,7 @@ function CustomerUploadPage() {
                 {target.data.fileCount > 0 ? ` Đơn đã có ${target.data.fileCount} ảnh.` : ""}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                JPG, PNG, WEBP, HEIC — mỗi ảnh tối đa {Math.round(limit / (1024 * 1024))}MB, tối đa {MAX_FILES} ảnh.
+                JPG, PNG, WEBP, HEIC{limit === undefined ? "" : ` — ${photoLimitLabel(limit)}`}, tối đa {MAX_FILES} ảnh.
               </p>
             </div>
             {done ? (

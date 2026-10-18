@@ -99,6 +99,70 @@ async function ensureFolder(token: string, name: string, parentId: string): Prom
   return (await findFolder(token, name, parentId)) ?? createFolder(token, name, parentId);
 }
 
+const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
+
+async function folderFor(folders: readonly string[]): Promise<{ token: string; folderId: string }> {
+  return oneFolderAtATime(async () => {
+    const token = await accessToken();
+    let parent = "root";
+    for (const part of folders) parent = await ensureFolder(token, part, parent);
+    return { token, folderId: parent };
+  });
+}
+
+/** Phiên tải thẳng từ máy khách lên Drive. Máy chủ không giữ byte của ảnh. */
+export async function openDriveUpload(input: {
+  name: string;
+  mime: string;
+  sizeBytes: number;
+  folders: readonly string[];
+}): Promise<{ uploadUrl: string }> {
+  const { token, folderId } = await folderFor(input.folders);
+  const safeName = input.name.replace(/[\\/]/g, "-").slice(-120) || "anh.jpg";
+  const res = await fetch(`${UPLOAD_URL}?uploadType=resumable&fields=id`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json; charset=UTF-8",
+      "X-Upload-Content-Type": input.mime || "application/octet-stream",
+      "X-Upload-Content-Length": String(input.sizeBytes),
+    },
+    body: JSON.stringify({ name: safeName, parents: [folderId] }),
+  });
+  if (!res.ok) throw new Error(`Không mở phiên tải Drive (${res.status}).`);
+  const uploadUrl = res.headers.get("Location");
+  if (!uploadUrl?.startsWith("https://")) throw new Error("Drive không trả đường dẫn tải.");
+  return { uploadUrl };
+}
+
+export async function inspectDriveUpload(
+  fileId: string,
+  folders: readonly string[],
+): Promise<{ size: number; mime: string; inFolder: boolean; head: Uint8Array }> {
+  const { token, folderId } = await folderFor(folders);
+  const metaRes = await fetch(`${FILES_URL}/${encodeURIComponent(fileId)}?fields=id,size,mimeType,parents`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!metaRes.ok) throw new Error(`Không thấy ảnh trên Drive (${metaRes.status}).`);
+  const meta = (await metaRes.json()) as { size?: string; mimeType?: string; parents?: string[] };
+  const headRes = await fetch(`${FILES_URL}/${encodeURIComponent(fileId)}?alt=media`, {
+    headers: { Authorization: `Bearer ${token}`, Range: "bytes=0-31" },
+  });
+  if (!headRes.ok && headRes.status !== 206) throw new Error(`Không đọc được đầu ảnh (${headRes.status}).`);
+  const length = Number(headRes.headers.get("content-length") || 0);
+  if (headRes.status === 200 && length > 64) {
+    await headRes.body?.cancel();
+    throw new Error("Không đọc được đầu ảnh.");
+  }
+  const head = new Uint8Array(await headRes.arrayBuffer()).subarray(0, 32);
+  return {
+    size: Number(meta.size || 0),
+    mime: meta.mimeType || "",
+    inFolder: (meta.parents ?? []).includes(folderId),
+    head,
+  };
+}
+
 export async function uploadToDrive(input: {
   name: string;
   mime: string;

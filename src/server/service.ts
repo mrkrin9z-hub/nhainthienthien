@@ -25,7 +25,7 @@ import {
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed } from "@/domain/images";
-import { albumPhone, uploadTokenShape } from "@/domain/order-upload";
+import { albumPhone, photoTooBig, uploadTokenShape } from "@/domain/order-upload";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
 import { orderRevisionBlock } from "@/domain/order-edit";
 import { bytesStillShared, filesToPurge } from "@/domain/files";
@@ -66,7 +66,7 @@ import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
 import { listBackups, readBackup, writeManualBackup } from "@/server/store";
 import { clearProductPhoto, readProductPhoto, writeProductPhoto } from "@/server/photos";
 import { integrationStatus, saveIntegrationSecret } from "@/server/secrets";
-import { deleteFromDrive, downloadFromDrive, driveConnected, uploadToDrive } from "@/server/drive";
+import { deleteFromDrive, downloadFromDrive, driveConnected, inspectDriveUpload, openDriveUpload, uploadToDrive } from "@/server/drive";
 import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
 
 export type Actor = Pick<Staff, "id" | "name" | "email" | "role" | "mustChangePassword"> & {
@@ -591,7 +591,7 @@ export async function createAlbumTicket(input: { phone: string; fileName: string
   const phone = albumPhone(input.phone);
   if (!imageMimeAllowed(input.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
   const limit = await photoByteLimit();
-  if (limit !== null && input.sizeBytes > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (photoTooBig(input.sizeBytes, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
   const fileId = nid();
   const safe = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
   return mutate(async (state) => {
@@ -622,7 +622,7 @@ export async function createAlbumTicket(input: { phone: string; fileName: string
 export async function saveAlbumUpload(input: { albumId: string; phone: string; fileId: string; bytes: Uint8Array; mime: string }) {
   const phone = albumPhone(input.phone);
   const limit = await photoByteLimit();
-  if (limit !== null && input.bytes.byteLength > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (photoTooBig(input.bytes.byteLength, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
   if (!imageMimeAllowed(input.mime) || !imageBytesMatch(input.mime, input.bytes)) {
     throw new Error("Định dạng ảnh không được hỗ trợ.");
   }
@@ -642,6 +642,43 @@ export async function saveAlbumUpload(input: { albumId: string; phone: string; f
     file.size = input.bytes.byteLength;
     album.updatedAt = nowIso();
   });
+}
+
+export async function prepareAlbumDriveUpload(input: { albumId: string; phone: string; fileId: string }) {
+  if (!(await driveConnected())) throw new Error("Chưa kết nối Google Drive.");
+  const phone = albumPhone(input.phone);
+  const state = await readState();
+  const album = (state.albums ?? []).find((item) => item.id === input.albumId);
+  if (!album || album.phone !== phone) throw new Error("Không có quyền với album này.");
+  const file = album.files.find((item) => item.id === input.fileId && !item.deletedAt);
+  if (!file) throw new Error("Không thấy file của album.");
+  if (file.status === "complete") throw new Error("Ảnh này đã gửi.");
+  return openDriveUpload({ name: file.name, mime: file.mime, sizeBytes: file.size, folders: albumFolderParts(phone) });
+}
+
+export async function finishAlbumDriveUpload(input: { albumId: string; phone: string; fileId: string; driveFileId: string }) {
+  if (!(await driveConnected())) throw new Error("Chưa kết nối Google Drive.");
+  const phone = albumPhone(input.phone);
+  const state = await readState();
+  const album = (state.albums ?? []).find((item) => item.id === input.albumId);
+  if (!album || album.phone !== phone) throw new Error("Không có quyền với album này.");
+  const file = album.files.find((item) => item.id === input.fileId && !item.deletedAt);
+  if (!file) throw new Error("Không thấy file của album.");
+  if (file.status === "complete" && file.driveFileId === input.driveFileId) return { ok: true as const };
+  const seen = await acceptDriveImage(input.driveFileId, albumFolderParts(phone), file.mime);
+  await mutate(async (next) => {
+    const current = findAlbum(next, input.albumId);
+    if (current.phone !== phone) throw new Error("Không có quyền với album này.");
+    const saved = current.files.find((item) => item.id === input.fileId && !item.deletedAt);
+    if (!saved) throw new Error("Không thấy file của album.");
+    saved.driveFileId = input.driveFileId;
+    saved.storage = "drive";
+    saved.path = input.driveFileId;
+    saved.status = "complete";
+    saved.size = seen;
+    current.updatedAt = nowIso();
+  });
+  return { ok: true as const };
 }
 
 export async function listPhotoAlbums(actor: Actor) {
@@ -717,7 +754,7 @@ export async function createUploadTicket(input: {
 }) {
   if (!imageMimeAllowed(input.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
   const limit = await photoByteLimit();
-  if (limit !== null && input.sizeBytes > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (photoTooBig(input.sizeBytes, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
   const fileId = nid();
   const safe = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
   const storagePath = `orders/${input.orderId}/originals/${fileId}-${safe}`;
@@ -812,7 +849,7 @@ export async function saveDirectUpload(input: {
   mime: string;
 }) {
   const limit = await photoByteLimit();
-  if (limit !== null && input.bytes.byteLength > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (photoTooBig(input.bytes.byteLength, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
   if (!imageMimeAllowed(input.mime) || !imageBytesMatch(input.mime, input.bytes)) {
     throw new Error("Định dạng ảnh không được hỗ trợ.");
   }
@@ -837,6 +874,69 @@ export async function saveDirectUpload(input: {
     file.status = "complete";
     file.size = input.bytes.byteLength;
   });
+}
+
+export async function prepareOrderDriveUpload(input: { orderId: string; accessToken: string; fileId: string }) {
+  if (!(await driveConnected())) throw new Error("Chưa kết nối Google Drive.");
+  const state = await readState();
+  const order = await orderByToken(state, input.orderId, input.accessToken);
+  if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+  const file = order.files.find((item) => item.id === input.fileId && !item.deletedAt);
+  if (!file) throw new Error("Không thấy file của đơn.");
+  if (file.status === "complete") throw new Error("Ảnh này đã gửi.");
+  const customer = state.customers.find((item) => item.id === order.customerId);
+  return openDriveUpload({
+    name: file.name,
+    mime: file.mime,
+    sizeBytes: file.size,
+    folders: driveFolderParts({
+      code: order.code,
+      customerName: customer?.name ?? "",
+      createdAt: order.createdAt,
+      source: order.source,
+      channel: order.channel,
+    }),
+  });
+}
+
+export async function finishOrderDriveUpload(input: { orderId: string; accessToken: string; fileId: string; driveFileId: string }) {
+  if (!(await driveConnected())) throw new Error("Chưa kết nối Google Drive.");
+  const state = await readState();
+  const order = await orderByToken(state, input.orderId, input.accessToken);
+  if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+  const file = order.files.find((item) => item.id === input.fileId && !item.deletedAt);
+  if (!file) throw new Error("Không thấy file của đơn.");
+  if (file.status === "complete" && file.driveFileId === input.driveFileId) return { ok: true as const };
+  const customer = state.customers.find((item) => item.id === order.customerId);
+  const folders = driveFolderParts({
+    code: order.code,
+    customerName: customer?.name ?? "",
+    createdAt: order.createdAt,
+    source: order.source,
+    channel: order.channel,
+  });
+  const seen = await acceptDriveImage(input.driveFileId, folders, file.mime);
+  await mutate(async (next) => {
+    const current = await orderByToken(next, input.orderId, input.accessToken);
+    const saved = current.files.find((item) => item.id === input.fileId && !item.deletedAt);
+    if (!saved) throw new Error("Không thấy file của đơn.");
+    saved.driveFileId = input.driveFileId;
+    saved.storage = "drive";
+    saved.path = input.driveFileId;
+    saved.status = "complete";
+    saved.size = seen;
+  });
+  return { ok: true as const };
+}
+
+async function acceptDriveImage(driveFileId: string, folders: readonly string[], mime: string): Promise<number> {
+  if (!/^[A-Za-z0-9_-]{8,200}$/.test(driveFileId)) throw new Error("Mã ảnh trên Drive không đúng.");
+  const seen = await inspectDriveUpload(driveFileId, folders);
+  if (!seen.inFolder || seen.size < 1 || !imageBytesMatch(mime, seen.head)) {
+    await deleteFromDrive(driveFileId).catch(() => undefined);
+    throw new Error("Định dạng ảnh không được hỗ trợ.");
+  }
+  return seen.size;
 }
 
 export async function markFileStatus(input: {

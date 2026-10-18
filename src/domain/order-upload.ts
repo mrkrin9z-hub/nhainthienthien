@@ -14,6 +14,16 @@ export function albumPhone(raw: string): string {
   return phone;
 }
 
+/** null là Drive đã nối: không chặn dung lượng. Số dương là trần khi chưa có Drive. */
+export function photoTooBig(sizeBytes: number, limit: number | null): boolean {
+  return limit !== null && sizeBytes > limit;
+}
+
+export function photoLimitLabel(limit: number | null): string {
+  if (limit === null) return "không giới hạn dung lượng";
+  return `mỗi ảnh tối đa ${Math.round(limit / (1024 * 1024))}MB`;
+}
+
 /** Đường dẫn khách mở khi quét mã của một đơn. */
 export function customerUploadPath(token: string): string {
   if (!uploadTokenShape(token)) throw new Error("Mã gửi ảnh không hợp lệ.");

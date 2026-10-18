@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { albumFolderParts } from "./drive-path.ts";
 import { bytesStillShared } from "./files.ts";
-import { albumPhone, customerUploadPath, SHARED_UPLOAD_PATH, uploadTokenShape } from "./order-upload.ts";
+import { albumPhone, customerUploadPath, photoLimitLabel, photoTooBig, SHARED_UPLOAD_PATH, uploadTokenShape } from "./order-upload.ts";
 import type { OrderFile, ShopState } from "./types.ts";
 
 test("mã gửi ảnh là 32 ký tự hex và ra đúng đường dẫn", () => {
@@ -22,6 +22,14 @@ test("album lấy tên là số điện thoại", () => {
   assert.equal(albumPhone("+84 901 234 567"), "0901234567");
   assert.deepEqual(albumFolderParts("0901234567"), ["Album khách", "0901234567"]);
   assert.throws(() => albumPhone("123"), /chưa đúng/);
+});
+
+test("Drive đã nối thì không chặn dung lượng ảnh", () => {
+  assert.equal(photoTooBig(2 * 1024 * 1024 * 1024, null), false);
+  assert.equal(photoTooBig(11 * 1024 * 1024, 10 * 1024 * 1024), true);
+  assert.equal(photoTooBig(10 * 1024 * 1024, 10 * 1024 * 1024), false);
+  assert.equal(photoLimitLabel(null), "không giới hạn dung lượng");
+  assert.equal(photoLimitLabel(10 * 1024 * 1024), "mỗi ảnh tối đa 10MB");
 });
 
 test("ảnh gắn đơn vẫn giữ byte khi album còn file", () => {
