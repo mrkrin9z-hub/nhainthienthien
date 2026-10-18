@@ -1,4 +1,4 @@
-import type { ShopState } from "./types.ts";
+import type { OrderFile, ShopState } from "./types.ts";
 
 const DAY = 86400000;
 
@@ -50,4 +50,17 @@ export function filesToPurge(state: ShopState, now = Date.now()): PurgeTarget[] 
     }
   }
   return rows;
+}
+
+/** Cùng một file có thể nằm trên đơn và trong album. Chỉ xóa byte khi không còn bản nào sống. */
+export function bytesStillShared(state: ShopState, file: OrderFile): boolean {
+  const pools = [...state.orders.map((order) => order.files), ...(state.albums ?? []).map((album) => album.files)];
+  return pools.some((files) =>
+    files.some(
+      (item) =>
+        item !== file &&
+        !item.deletedAt &&
+        (item.id === file.id || (item.storage === file.storage && item.path !== "" && item.path === file.path)),
+    ),
+  );
 }

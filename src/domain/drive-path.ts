@@ -14,6 +14,11 @@ export function driveCustomerPart(name: string): string {
   return (clean || "Khách").slice(0, 60);
 }
 
+/** `Album khách / <số điện thoại>`. */
+export function albumFolderParts(phone: string): [string, string] {
+  return ["Album khách", phone];
+}
+
 /** `Đơn web / YYYY-MM / <mã> - <khách>`, tháng theo giờ Việt Nam. */
 export function driveFolderParts(order: {
   code: string;

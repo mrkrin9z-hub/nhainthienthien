@@ -409,6 +409,15 @@ export type Audit = {
   after: unknown;
 };
 
+export type PhotoAlbum = {
+  id: string;
+  phone: string;
+  createdAt: string;
+  updatedAt: string;
+  orderId: string | null;
+  files: OrderFile[];
+};
+
 export type ShopState = {
   version: number;
   settings: Settings;
@@ -420,6 +429,7 @@ export type ShopState = {
   boms: BomLine[];
   customers: Customer[];
   orders: Order[];
+  albums?: PhotoAlbum[];
   reprints: Reprint[];
   movements: Movement[];
   counts: StockCount[];

@@ -67,6 +67,25 @@ export const getOrderDetail = createServerFn({ method: "GET" })
     return getOrder(await actor(), data.code);
   });
 
+export const getPhotoAlbums = createServerFn({ method: "GET" }).handler(async () => {
+  const { listPhotoAlbums } = await import("@/server/service");
+  return listPhotoAlbums(await actor());
+});
+
+export const getPhotoAlbum = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ albumId: z.string().uuid() }).parse(data))
+  .handler(async ({ data }) => {
+    const { getPhotoAlbum: load } = await import("@/server/service");
+    return load(await actor(), data.albumId);
+  });
+
+export const linkPhotoAlbum = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ albumId: z.string().uuid(), code: z.string().trim().min(4).max(30) }).parse(data))
+  .handler(async ({ data }) => {
+    const { linkAlbumToOrder } = await import("@/server/service");
+    return linkAlbumToOrder(await actor(), data.albumId, data.code);
+  });
+
 export const orderUploadLink = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), rotate: z.boolean().optional().default(false) }).parse(data))
   .handler(async ({ data }) => {

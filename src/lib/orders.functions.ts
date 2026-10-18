@@ -91,6 +91,20 @@ export type OrderLookupResult = {
   history: { to: string; at: string; note: string | null }[];
 };
 
+const albumTicketSchema = z.object({
+  phone: z.string().trim().min(8).max(20),
+  fileName: z.string().min(1).max(200),
+  mimeType: z.string().min(3).max(100),
+  sizeBytes: z.number().int().min(1).max(50 * 1024 * 1024),
+});
+
+export const createAlbumTicket = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => albumTicketSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { createAlbumTicket: ticket } = await import("@/server/service");
+    return ticket(data);
+  });
+
 const uploadTargetSchema = z.object({
   token: z.string().regex(/^[a-f0-9]{32}$/),
 });

@@ -25,15 +25,15 @@ import {
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed } from "@/domain/images";
-import { uploadTokenShape } from "@/domain/order-upload";
+import { albumPhone, uploadTokenShape } from "@/domain/order-upload";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
 import { orderRevisionBlock } from "@/domain/order-edit";
-import { filesToPurge } from "@/domain/files";
+import { bytesStillShared, filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
 import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type PlannedItem } from "@/domain/marketplace";
 import { applyRestore, restoreSummary } from "@/domain/restore";
-import { driveFolderParts } from "@/domain/drive-path";
+import { albumFolderParts, driveFolderParts } from "@/domain/drive-path";
 import { defaultCarrier } from "@/domain/jt";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
 import { publicContact } from "@/domain/public-contact";
@@ -48,6 +48,7 @@ import type {
   Order,
   OrderFile,
   OrderStatus,
+  PhotoAlbum,
   Role,
   ShopState,
   Sku,
@@ -574,6 +575,131 @@ export async function publicUploadTarget(token: string) {
   };
 }
 
+function albumsOf(state: ShopState): PhotoAlbum[] {
+  state.albums ??= [];
+  return state.albums;
+}
+
+function findAlbum(state: ShopState, albumId: string): PhotoAlbum {
+  const album = albumsOf(state).find((item) => item.id === albumId);
+  if (!album) throw new Error("Không thấy album.");
+  return album;
+}
+
+/** Khách gửi ảnh vào album mang tên số điện thoại. Cùng số thì vào cùng album. */
+export async function createAlbumTicket(input: { phone: string; fileName: string; mimeType: string; sizeBytes: number }) {
+  const phone = albumPhone(input.phone);
+  if (!imageMimeAllowed(input.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
+  const limit = await photoByteLimit();
+  if (limit !== null && input.sizeBytes > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
+  const fileId = nid();
+  const safe = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
+  return mutate(async (state) => {
+    const albums = albumsOf(state);
+    let album = albums.find((item) => item.phone === phone);
+    if (!album) {
+      album = { id: nid(), phone, createdAt: nowIso(), updatedAt: nowIso(), orderId: null, files: [] };
+      albums.unshift(album);
+    }
+    album.files.push({
+      id: fileId,
+      name: input.fileName,
+      mime: input.mimeType,
+      size: input.sizeBytes,
+      status: "uploading",
+      kind: "original",
+      storage: "local",
+      path: `albums/${phone}/${fileId}-${safe}`,
+      driveFileId: null,
+      createdAt: nowIso(),
+      deletedAt: null,
+    });
+    album.updatedAt = nowIso();
+    return { albumId: album.id, fileId, phone };
+  });
+}
+
+export async function saveAlbumUpload(input: { albumId: string; phone: string; fileId: string; bytes: Uint8Array; mime: string }) {
+  const phone = albumPhone(input.phone);
+  const limit = await photoByteLimit();
+  if (limit !== null && input.bytes.byteLength > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (!imageMimeAllowed(input.mime) || !imageBytesMatch(input.mime, input.bytes)) {
+    throw new Error("Định dạng ảnh không được hỗ trợ.");
+  }
+  await mutate(async (state) => {
+    const album = findAlbum(state, input.albumId);
+    if (album.phone !== phone) throw new Error("Không có quyền với album này.");
+    const file = album.files.find((item) => item.id === input.fileId);
+    if (!file) throw new Error("Không thấy file của album.");
+    await putPhoto(
+      file,
+      { orderId: `albums/${phone}`, code: phone, customerName: phone, createdAt: album.createdAt, source: "web", channel: "tai_tiem" },
+      input.bytes,
+      input.mime,
+      albumFolderParts(phone),
+    );
+    file.status = "complete";
+    file.size = input.bytes.byteLength;
+    album.updatedAt = nowIso();
+  });
+}
+
+export async function listPhotoAlbums(actor: Actor) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  const state = await readState();
+  return (state.albums ?? [])
+    .slice()
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map((album) => ({
+      id: album.id,
+      phone: album.phone,
+      fileCount: album.files.filter((file) => !file.deletedAt && file.status === "complete").length,
+      updatedAt: album.updatedAt,
+      orderId: album.orderId,
+      orderCode: state.orders.find((order) => order.id === album.orderId)?.code ?? "",
+    }));
+}
+
+export async function getPhotoAlbum(actor: Actor, albumId: string) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  const state = await readState();
+  const album = (state.albums ?? []).find((item) => item.id === albumId);
+  if (!album) throw new Error("Không thấy album.");
+  const order = state.orders.find((item) => item.id === album.orderId);
+  return {
+    id: album.id,
+    phone: album.phone,
+    updatedAt: album.updatedAt,
+    orderId: album.orderId,
+    orderCode: order?.code ?? "",
+    files: album.files
+      .filter((file) => !file.deletedAt && file.status === "complete")
+      .map((file) => ({ id: file.id, name: file.name, mime: file.mime, size: file.size, createdAt: file.createdAt })),
+  };
+}
+
+/** Gắn ảnh trong album vào một đơn đã có. Ảnh vẫn nằm trong album. */
+export async function linkAlbumToOrder(actor: Actor, albumId: string, code: string) {
+  assertRole(actor, ["owner", "sale"]);
+  return mutate(async (state) => {
+    const album = findAlbum(state, albumId);
+    const order = state.orders.find((item) => item.code.toUpperCase() === code.trim().toUpperCase());
+    if (!order) throw new Error("Không thấy đơn.");
+    if (order.status === "huy") throw new Error("Đơn đã hủy. Chọn đơn khác.");
+    const ready = album.files.filter((file) => !file.deletedAt && file.status === "complete");
+    if (!ready.length) throw new Error("Album chưa có ảnh.");
+    for (const file of ready) {
+      if (!order.files.some((item) => item.id === file.id)) order.files.push({ ...file });
+    }
+    album.orderId = order.id;
+    album.updatedAt = nowIso();
+    order.updatedAt = nowIso();
+    order.history.push({ at: nowIso(), from: order.status, to: order.status, by: actor.id, note: `Gắn album ${album.phone}` });
+    audit(state, actor.id, "album.link", order.id, null, { phone: album.phone, code: order.code });
+    return { orderCode: order.code, phone: album.phone, fileCount: ready.length };
+  });
+}
+
 const KV_UPLOAD_MAX = 10 * 1024 * 1024;
 
 /** null khi Drive của chủ đã kết nối. Chưa kết nối thì KV hoặc đĩa local, mỗi ảnh 10MB. */
@@ -619,13 +745,14 @@ async function putPhoto(
   folder: { orderId: string; code: string; customerName: string; createdAt: string; source: string; channel: string },
   bytes: Uint8Array,
   mime: string,
+  folders?: readonly string[],
 ) {
   if (await driveConnected()) {
     file.driveFileId = await uploadToDrive({
       name: file.name,
       mime: mime || file.mime,
       bytes,
-      folders: driveFolderParts(folder),
+      folders: folders ?? driveFolderParts(folder),
     });
     file.storage = "drive";
     file.path = file.driveFileId;
@@ -2021,8 +2148,8 @@ export async function purgeExpiredFiles(now = Date.now()): Promise<number> {
       const order = state.orders.find((item) => item.id === target.orderId);
       const file = order?.files.find((item) => item.id === target.fileId);
       if (!file || file.deletedAt) continue;
-      await removePhoto(file);
       file.deletedAt = new Date(now).toISOString();
+      if (!bytesStillShared(state, file)) await removePhoto(file);
       removed += 1;
     }
     return removed;
@@ -2036,7 +2163,7 @@ export async function deleteStoredFile(actor: Actor, fileId: string) {
       const file = order.files.find((item) => item.id === fileId);
       if (!file) continue;
       file.deletedAt = nowIso();
-      await removePhoto(file);
+      if (!bytesStillShared(state, file)) await removePhoto(file);
       audit(state, actor.id, "file.delete", file.id, { name: file.name }, { deletedAt: file.deletedAt });
       return;
     }
@@ -2046,8 +2173,9 @@ export async function deleteStoredFile(actor: Actor, fileId: string) {
 
 export async function fileForStaff(actor: Actor, fileId: string): Promise<{ name: string; mime: string; bytes?: Uint8Array; redirect?: string }> {
   const state = await readState();
-  for (const order of state.orders) {
-    const file = order.files.find((item) => item.id === fileId && !item.deletedAt);
+  const pools = [...state.orders.map((order) => order.files), ...(state.albums ?? []).map((album) => album.files)];
+  for (const files of pools) {
+    const file = files.find((item) => item.id === fileId && !item.deletedAt);
     if (!file) continue;
     if (file.storage === "local") {
       if (!(await usesDisk())) throw new Error("File nằm trên đĩa local, không đọc được trên Workers.");
