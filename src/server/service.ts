@@ -53,6 +53,7 @@ import type {
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL } from "@/domain/types";
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
+import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
 import { getRequest } from "@tanstack/react-start/server";
 
@@ -808,6 +809,15 @@ export async function createManualOrder(
       order.depositPaid = Math.round(input.depositPaid);
       order.depositMethod = input.depositMethod.trim() || "Tiền mặt";
       order.depositBy = actor.id;
+      order.payments = [
+        {
+          id: nid(),
+          at: order.createdAt,
+          amount: order.depositPaid,
+          method: order.depositMethod,
+          by: actor.id,
+        },
+      ];
     }
     state.orders.unshift(order);
     audit(state, actor.id, "order.create", order.id, null, { code: order.code, channel: order.channel });
@@ -853,9 +863,22 @@ export async function addDeposit(actor: Actor, input: { orderId: string; amount:
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
     const before = order.depositPaid;
-    order.depositPaid = Math.round(order.depositPaid + input.amount);
-    order.depositMethod = input.method.trim();
-    order.depositBy = actor.id;
+    const next = appendCollection(
+      order,
+      {
+        id: nid(),
+        at: nowIso(),
+        amount: Math.round(input.amount),
+        method: input.method.trim() || "Tiền mặt",
+        by: actor.id,
+      },
+      nid(),
+    );
+    order.payments = next.payments;
+    order.depositPaid = next.depositPaid;
+    order.depositMethod = next.depositMethod;
+    order.depositBy = next.depositBy;
+    order.updatedAt = nowIso();
     audit(state, actor.id, "order.deposit", order.id, { depositPaid: before }, { depositPaid: order.depositPaid, method: input.method });
   });
 }
@@ -1433,19 +1456,141 @@ export async function saveMonthlyFixed(actor: Actor, month: string, rows: { key:
   });
 }
 
-export async function addExpense(actor: Actor, input: { month: string; name: string; amount: number; note: string }) {
+export async function addExpense(
+  actor: Actor,
+  input: { month: string; name: string; amount: number; note: string; category?: string; wallet?: string; date?: string },
+) {
   assertRole(actor, ["owner"]);
-  if (!input.name.trim() || !Number.isFinite(input.amount)) throw new Error("Chi phí chưa đủ.");
+  const name = input.name.trim();
+  const amount = Math.round(input.amount);
+  if (!name || !Number.isFinite(amount) || amount <= 0) throw new Error("Chi phí chưa đủ.");
+  const category = EXPENSE_CATEGORIES.some((item) => item.id === input.category) ? input.category! : "khac";
+  const wallet = input.wallet === "chuyen_khoan" ? "chuyen_khoan" : "tien_mat";
+  let at = nowIso();
+  let month = input.month;
+  if (input.date) {
+    const stamp = expenseStamp(input.date);
+    at = stamp.at;
+    month = stamp.month;
+  }
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("Tháng chi chưa đúng.");
   await mutate(async (state) => {
-    state.expenses.unshift({
+    const row = {
       id: nid(),
-      month: input.month,
-      name: input.name.trim(),
-      amount: input.amount,
+      month,
+      name,
+      amount,
       note: input.note.trim(),
-      at: nowIso(),
+      at,
       by: actor.id,
-    });
+      category,
+      wallet,
+    };
+    state.expenses.unshift(row);
+    audit(state, actor.id, "cost.expense", row.id, null, { name, amount, wallet, category });
+  });
+}
+
+export async function deleteExpense(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const index = state.expenses.findIndex((row) => row.id === id);
+    if (index < 0) throw new Error("Không thấy khoản chi.");
+    const [row] = state.expenses.splice(index, 1);
+    if (!row) throw new Error("Không thấy khoản chi.");
+    audit(state, actor.id, "cost.expense", row.id, { name: row.name, amount: row.amount }, null);
+  });
+}
+
+export async function adjustWallet(actor: Actor, input: { wallet: "tien_mat" | "chuyen_khoan"; amount: number; note: string }) {
+  assertRole(actor, ["owner"]);
+  const amount = Math.round(input.amount);
+  if (!Number.isFinite(amount) || amount === 0) throw new Error("Số tiền điều chỉnh chưa đúng.");
+  if (input.wallet !== "tien_mat" && input.wallet !== "chuyen_khoan") throw new Error("Chọn ví tiền mặt hoặc chuyển khoản.");
+  await mutate(async (state) => {
+    const row = {
+      id: nid(),
+      at: nowIso(),
+      wallet: input.wallet,
+      amount,
+      note: input.note.trim(),
+      by: actor.id,
+    };
+    state.walletAdjusts = [row, ...(state.walletAdjusts ?? [])];
+    audit(state, actor.id, "wallet.adjust", row.id, null, { wallet: row.wallet, amount, note: row.note });
+  });
+}
+
+function cashOrders(state: ShopState): CashOrder[] {
+  return state.orders.map((order) => {
+    const row: CashOrder = {
+      id: order.id,
+      code: order.code,
+      customerName: customerName(state, order.customerId).name,
+      status: order.status,
+      total: order.total,
+      depositPaid: order.depositPaid,
+      depositMethod: order.depositMethod,
+      createdAt: order.createdAt,
+    };
+    if (order.payments && order.payments.length > 0) {
+      row.payments = order.payments.map((payment) => ({ at: payment.at, amount: payment.amount, method: payment.method }));
+    }
+    return row;
+  });
+}
+
+export async function moneyDesk(actor: Actor, month: string) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  const lines = buildLedger({
+    orders: cashOrders(state),
+    expenses: state.expenses,
+    adjusts: state.walletAdjusts ?? [],
+  });
+  const monthLines = lines.filter((line) => vnMonth(line.at) === month);
+  const expenses = state.expenses
+    .filter((row) => row.month === month)
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      amount: row.amount,
+      note: row.note,
+      at: row.at,
+      month: row.month,
+      category: row.category ?? "",
+      wallet: row.wallet ?? "",
+      categoryLabel: row.category ? categoryLabel(row.category) : "Chưa phân nhóm",
+      walletLabel: walletLabel(row.wallet ?? ""),
+    }))
+    .sort((a, b) => b.at.localeCompare(a.at));
+  return {
+    month,
+    cards: walletCards(lines, month),
+    lines: monthLines,
+    expenses,
+    report: expenseReport(state.expenses, month),
+    collected: monthLines.filter((line) => line.kind === "thu").reduce((sum, line) => sum + line.amount, 0),
+  };
+}
+
+export async function collectList(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  return ordersToCollect(cashOrders(state)).map((order) => {
+    const full = state.orders.find((item) => item.id === order.id);
+    return {
+      id: order.id,
+      code: order.code,
+      customerName: order.customerName,
+      status: order.status,
+      statusLabel: STATUS_LABEL[order.status as keyof typeof STATUS_LABEL] ?? order.status,
+      channelLabel: full ? CHANNEL_LABEL[full.channel] : "",
+      total: order.total,
+      depositPaid: order.depositPaid,
+      remain: remainOf(order),
+      createdAt: order.createdAt,
+    };
   });
 }
 

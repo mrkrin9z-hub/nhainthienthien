@@ -300,6 +300,8 @@ export type Order = {
   depositPaid: number;
   depositMethod: string;
   depositBy: string | null;
+  /** Từng lần thu. Đơn cũ chỉ có depositPaid thì ví đọc một khoản tại lúc tạo đơn. */
+  payments?: OrderPayment[];
   printDeducted: boolean;
   packDeducted: boolean;
   stockWarning: string;
@@ -366,6 +368,14 @@ export type Leave = {
   note: string;
 };
 
+export type OrderPayment = {
+  id: string;
+  at: string;
+  amount: number;
+  method: string;
+  by: string | null;
+};
+
 export type Expense = {
   id: string;
   month: string;
@@ -373,6 +383,17 @@ export type Expense = {
   amount: number;
   note: string;
   at: string;
+  by: string | null;
+  category?: string;
+  wallet?: string;
+};
+
+export type WalletAdjust = {
+  id: string;
+  at: string;
+  wallet: "tien_mat" | "chuyen_khoan";
+  amount: number;
+  note: string;
   by: string | null;
 };
 
@@ -405,6 +426,7 @@ export type ShopState = {
   punches: Punch[];
   leaves: Leave[];
   expenses: Expense[];
+  walletAdjusts?: WalletAdjust[];
   monthlyFixed: { month: string; key: string; amount: number }[];
   payrollLocks: PayrollLock[];
   audits: Audit[];

@@ -41,7 +41,7 @@ function ReportBody() {
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Báo cáo</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Doanh thu và lãi gộp lấy đơn đã xong. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh. Mặc định chi phí cố định 29.400.000đ/tháng. Chi phí phát sinh ghi ở Thu chi.
+          Doanh thu và lãi gộp lấy đơn đã xong. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh. Mặc định chi phí cố định 29.400.000đ/tháng. Chi phí phát sinh ghi ở Chi phí.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
