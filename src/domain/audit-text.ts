@@ -10,6 +10,7 @@ export const AUDIT_ACTIONS: { action: string; label: string }[] = [
   { action: "staff.password", label: "Đổi mật khẩu" },
   { action: "staff.update", label: "Tài khoản" },
   { action: "order.create", label: "Tạo đơn" },
+  { action: "order.revise", label: "Sửa đơn" },
   { action: "order.status", label: "Chuyển bước" },
   { action: "order.deposit", label: "Cọc" },
   { action: "order.import", label: "Nhập đơn sàn" },
@@ -179,6 +180,8 @@ function detailOf(item: Pick<Audit, "action" | "entity" | "before" | "after">, s
       return statusSentence(actor, orderCode(shop, item.entity), before, after);
     case "order.create":
       return `tạo đơn ${text(after?.code) || orderCode(shop, item.entity)}${channelBit(after?.channel)}`;
+    case "order.revise":
+      return `sửa đơn ${orderCode(shop, item.entity)}${after?.items ? `: ${text(after.items)}` : ""}`;
     case "order.import":
       return `nhập đơn sàn ${text(after?.code) || orderCode(shop, item.entity)}${after?.platform ? ` mã ${text(after.platform)}` : ""}${channelBit(after?.channel)}`;
     case "order.deposit":

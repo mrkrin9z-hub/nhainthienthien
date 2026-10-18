@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { OrderEditDialog } from "@/components/admin/order-edit-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,7 +30,8 @@ function OrderDetailPage() {
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const [deposit, setDeposit] = useState("");
   const [method, setMethod] = useState("chuyển khoản");
   const [override, setOverride] = useState(false);
@@ -50,11 +52,16 @@ function OrderDetailPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
-        {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
-          <Button asChild variant="outline" className="min-h-11">
-            <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {role !== "production" ? (
+            <Button className="min-h-11" onClick={() => setEditing(true)}>Sửa đơn</Button>
+          ) : null}
+          {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
+            <Button asChild variant="outline" className="min-h-11">
+              <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
       <p className="break-words text-sm">
         {data.customerName} · {data.phone} · {data.channelLabel} · {data.statusLabel}
@@ -225,13 +232,18 @@ function OrderDetailPage() {
       {role !== "production" ? (
         <section className="glass-card rounded-3xl p-4">
           <h2 className="font-bold text-primary">Ghi chú nội bộ</h2>
-          <Textarea className="mt-2" defaultValue={data.internalNote} onChange={(e) => setNote(e.target.value)} />
+          <Textarea className="mt-2" value={note ?? data.internalNote} onChange={(e) => setNote(e.target.value)} />
           <Button
             className="mt-2 min-h-11"
             variant="outline"
             onClick={async () => {
-              await saveNote({ data: { orderId: data.id, note: note || data.internalNote } });
-              toast.success("Đã lưu ghi chú");
+              try {
+                await saveNote({ data: { orderId: data.id, note: note ?? data.internalNote } });
+                toast.success("Đã lưu ghi chú");
+                await refresh();
+              } catch (error) {
+                toast.error((error as Error).message);
+              }
             }}
           >
             Lưu ghi chú
@@ -326,6 +338,28 @@ function OrderDetailPage() {
           Hồ sơ khách
         </Link>
       ) : null}
+      {editing && role !== "production" ? (
+        <OrderEditDialog
+          open
+          onOpenChange={setEditing}
+          owner={role === "owner"}
+          order={{
+            id: data.id,
+            code: data.code,
+            channel: data.channel,
+            customerName: data.customerName,
+            phone: data.phone,
+            address: data.address,
+            fulfillment: data.fulfillment,
+            customerNote: data.customerNote,
+            dueDate: data.dueDate,
+            status: data.status,
+            printDeducted: data.printDeducted,
+            packDeducted: data.packDeducted,
+            items: data.items,
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -365,17 +399,21 @@ function ShippingForm({
       <Button
         className="min-h-11"
         onClick={async () => {
-          await storeShipping({
-            data: {
-              orderId,
-              carrier,
-              tracking,
-              shipFee: shipFee === "" ? null : Number(shipFee),
-              codAmount: codAmount === "" ? null : Number(codAmount),
-            },
-          });
-          toast.success("Đã lưu giao hàng");
-          await onDone();
+          try {
+            await storeShipping({
+              data: {
+                orderId,
+                carrier,
+                tracking,
+                shipFee: shipFee === "" ? null : Number(shipFee),
+                codAmount: codAmount === "" ? null : Number(codAmount),
+              },
+            });
+            toast.success("Đã lưu giao hàng");
+            await onDone();
+          } catch (error) {
+            toast.error((error as Error).message);
+          }
         }}
       >
         Lưu giao hàng

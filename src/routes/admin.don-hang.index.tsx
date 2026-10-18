@@ -202,12 +202,18 @@ function OrdersPage() {
               <th className="px-4 py-3">Khách</th>
               <th className="px-4 py-3">Trạng thái</th>
               <th className="px-4 py-3">Kênh</th>
-              {production ? null : <th className="px-4 py-3">Tiền</th>}
+              {production ? null : <th className="px-4 py-3">Tổng</th>}
+              {production ? null : <th className="px-4 py-3">Đã thu</th>}
+              {production ? null : <th className="px-4 py-3">Còn lại</th>}
             </tr>
           </thead>
           <tbody>
             {pageRows.map((order) => (
-              <tr key={order.id} className="border-t">
+              <tr
+                key={order.id}
+                className="cursor-pointer border-t hover:bg-muted/40"
+                onClick={() => navigate({ to: "/admin/don-hang/$code", params: { code: order.code } })}
+              >
                 <td className="px-4 py-3 font-semibold">
                   <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="text-primary">
                     {order.code}
@@ -221,7 +227,11 @@ function OrdersPage() {
                 <td className="px-4 py-3"><StatusPill status={order.status} label={order.statusLabel} /></td>
                 <td className="px-4 py-3">{order.channelLabel}</td>
                 {production ? null : (
-                  <td className="px-4 py-3 font-semibold">{order.total == null ? `${order.fileCount} ảnh` : formatMaybe(order.total)}</td>
+                  <>
+                    <td className="px-4 py-3 font-semibold">{order.total == null ? "Chưa có giá" : formatMaybe(order.total)}</td>
+                    <td className="px-4 py-3">{formatMaybe(order.depositPaid)}</td>
+                    <td className="px-4 py-3 font-semibold">{order.remain == null ? "—" : formatMaybe(order.remain)}</td>
+                  </>
                 )}
               </tr>
             ))}
@@ -272,6 +282,8 @@ function OrderCard({
     channelLabel: string;
     itemSummary: string;
     total: number | null;
+    depositPaid?: number | null;
+    remain?: number | null;
     fileCount: number;
     late: boolean;
   };
@@ -290,7 +302,10 @@ function OrderCard({
       {order.late ? <p className="mt-1 text-sm font-semibold text-destructive">Trễ mốc</p> : null}
       <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm">
         <span className="text-muted-foreground">{order.channelLabel}</span>
-        <span className="font-semibold">{money && order.total != null ? formatMaybe(order.total) : `${order.fileCount} ảnh`}</span>
+        <span className="text-right font-semibold">
+          {money && order.total != null ? formatMaybe(order.total) : `${order.fileCount} ảnh`}
+          {money && order.remain != null ? <span className="block text-xs font-normal text-muted-foreground">Còn {formatMaybe(order.remain)}</span> : null}
+        </span>
       </div>
     </Link>
   );
