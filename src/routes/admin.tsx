@@ -21,6 +21,7 @@ import {
   Tags,
   Target,
   Truck,
+  UserCog,
   UserRound,
   Users,
   Wallet,
@@ -49,6 +50,7 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin": LayoutDashboard,
   "/admin/don-hang": ClipboardList,
   "/admin/don-moi": ClipboardList,
+  "/admin/san-xuat": ClipboardList,
   "/admin/giao-hang": Truck,
   "/admin/cod": Wallet,
   "/admin/nhap-don": ClipboardList,
@@ -58,6 +60,7 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin/kho": Package,
   "/admin/anh": Image,
   "/admin/cham-cong": Clock,
+  "/admin/nhan-vien": UserCog,
   "/admin/luong": Receipt,
   "/admin/tai-khoan": UserRound,
   "/admin/thu": HandCoins,
@@ -75,54 +78,24 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
 
 const GROUPS: { title: string; items: { to: string; label: string; roles: Role[] }[] }[] = [
   {
-    title: "Vận hành",
+    title: "Xưởng",
     items: [
       { to: "/admin", label: "Tổng quan", roles: ["owner", "sale", "production"] },
       { to: "/admin/don-hang", label: "Đơn hàng", roles: ["owner", "sale", "production"] },
-      { to: "/admin/don-moi", label: "Ghi đơn", roles: ["owner", "sale"] },
+      { to: "/admin/san-xuat", label: "Sản xuất", roles: ["owner", "sale", "production"] },
       { to: "/admin/giao-hang", label: "Giao hàng", roles: ["owner", "sale", "production"] },
-      { to: "/admin/cod", label: "Đối soát COD", roles: ["owner", "sale"] },
-      { to: "/admin/nhap-don", label: "Nhập đơn sàn", roles: ["owner", "sale"] },
-    ],
-  },
-  {
-    title: "Khách và hàng",
-    items: [
       { to: "/admin/khach", label: "Khách hàng", roles: ["owner", "sale"] },
-      { to: "/admin/nhac-khach", label: "Nhắc khách", roles: ["owner", "sale"] },
-      { to: "/admin/san-pham", label: "Sản phẩm web", roles: ["owner"] },
-      { to: "/admin/gia", label: "Bảng giá", roles: ["owner", "sale"] },
+      { to: "/admin/san-pham", label: "Sản phẩm", roles: ["owner"] },
+      { to: "/admin/gia", label: "Bảng giá theo khổ", roles: ["owner", "sale"] },
       { to: "/admin/kho", label: "Kho", roles: ["owner", "sale", "production"] },
-      { to: "/admin/anh", label: "Ảnh web", roles: ["owner", "sale"] },
-    ],
-  },
-  {
-    title: "Nhân sự",
-    items: [
-      { to: "/admin/cham-cong", label: "Chấm công", roles: ["owner", "sale", "production"] },
-      { to: "/admin/luong", label: "Lương", roles: ["owner", "sale", "production"] },
-      { to: "/admin/tai-khoan", label: "Tài khoản", roles: ["owner", "sale", "production"] },
-    ],
-  },
-  {
-    title: "Tài chính",
-    items: [
-      { to: "/admin/thu", label: "Thu tiền", roles: ["owner", "sale"] },
-      { to: "/admin/chi-phi", label: "Chi phí", roles: ["owner"] },
-      { to: "/admin/vi", label: "Ví tiền", roles: ["owner"] },
-      { to: "/admin/bao-cao-chi", label: "Báo cáo chi", roles: ["owner"] },
       { to: "/admin/loi-nhuan", label: "Thu chi", roles: ["owner"] },
+      { to: "/admin/thu", label: "Thu chi", roles: ["sale"] },
+      { to: "/admin/nhan-vien", label: "Nhân viên", roles: ["owner"] },
       { to: "/admin/bao-cao", label: "Báo cáo", roles: ["owner"] },
-      { to: "/admin/kpi", label: "KPI", roles: ["owner", "sale"] },
-    ],
-  },
-  {
-    title: "Hệ thống",
-    items: [
       { to: "/admin/nhat-ky", label: "Nhật ký", roles: ["owner"] },
-      { to: "/admin/sao-luu", label: "Sao lưu", roles: ["owner"] },
-      { to: "/admin/ket-noi", label: "Kết nối", roles: ["owner"] },
       { to: "/admin/cai-dat", label: "Cài đặt", roles: ["owner"] },
+      { to: "/admin/cham-cong", label: "Chấm công", roles: ["sale", "production"] },
+      { to: "/admin/tai-khoan", label: "Tài khoản", roles: ["sale", "production"] },
     ],
   },
 ];
@@ -199,7 +172,7 @@ function AdminLayout() {
             const label = item.to === "/admin/luong" && role !== "owner" ? "Lương của tôi" : item.label;
             return (
               <Link
-                key={item.to}
+                key={`${item.to}-${item.label}`}
                 to={item.to}
                 aria-current={active ? "page" : undefined}
                 className={`flex min-h-9 items-center gap-2 rounded px-2 text-[13px] ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"}`}

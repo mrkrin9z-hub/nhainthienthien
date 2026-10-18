@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { RotateCcw, UserX } from "lucide-react";
 
 import { RoleGate } from "@/components/role-gate";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ALL_TONE, CHANNEL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { CustomerLinks } from "@/components/admin/sections";
@@ -80,25 +82,46 @@ function CustomersBody() {
         />
       </div>
       <p className="text-xs text-muted-foreground">Hiển thị {shown.length} khách</p>
-      <ul className="space-y-2">
-        {shown.map((customer) => (
-          <li key={customer.id}>
-            <Link to="/admin/khach/$id" params={{ id: customer.id }} className="block rounded-2xl border border-border/70 bg-card p-4">
-              <p className="font-semibold text-primary">
-                {customer.name}
-                {customer.repeat ? <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">Quay lại</span> : null}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {customer.phone} · {customer.orderCount} đơn · {customer.totalSpent === null ? "Chưa có doanh số" : formatMaybe(customer.totalSpent)}
-                {customer.spentIncomplete ? " (thiếu giá một số đơn)" : ""}
-              </p>
-              {customer.channels.length ? <p className="text-sm">{customer.channels.join(", ")}</p> : null}
-              {customer.tags.length ? <p className="text-sm">{customer.tags.join(" · ")}</p> : null}
-            </Link>
-          </li>
-        ))}
-        {customers.data && shown.length === 0 ? <li className="text-sm text-muted-foreground">{rows.length === 0 ? "Chưa có khách." : "Không có khách khớp bộ lọc."}</li> : null}
-      </ul>
+      <div className="overflow-hidden rounded-md border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Khách</TableHead>
+              <TableHead>Điện thoại</TableHead>
+              <TableHead>Kênh</TableHead>
+              <TableHead className="text-right">Đơn</TableHead>
+              <TableHead className="text-right">Doanh số</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {shown.map((customer) => (
+              <TableRow key={customer.id}>
+                <TableCell>
+                  <Link to="/admin/khach/$id" params={{ id: customer.id }} className="font-medium text-primary">
+                    {customer.name}
+                  </Link>
+                  {customer.repeat ? <Badge variant="secondary" className="ml-2 text-[10px]">Quay lại</Badge> : null}
+                  {customer.tags.length ? <p className="text-xs text-muted-foreground">{customer.tags.join(" · ")}</p> : null}
+                </TableCell>
+                <TableCell>{customer.phone}</TableCell>
+                <TableCell className="text-xs">{customer.channels.join(", ") || "—"}</TableCell>
+                <TableCell className="text-right">{customer.orderCount}</TableCell>
+                <TableCell className="text-right">
+                  {customer.totalSpent === null ? "—" : formatMaybe(customer.totalSpent)}
+                  {customer.spentIncomplete ? <span className="block text-[11px] text-muted-foreground">Thiếu giá</span> : null}
+                </TableCell>
+              </TableRow>
+            ))}
+            {customers.data && shown.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                  {rows.length === 0 ? "Chưa có khách." : "Không có khách khớp bộ lọc."}
+                </TableCell>
+              </TableRow>
+            ) : null}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

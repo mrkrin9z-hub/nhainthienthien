@@ -22,10 +22,12 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(orders, /Dạng cột/);
   assert.match(orders, /Danh sách/);
   const form = readFileSync(new URL("../routes/admin.don-moi.tsx", import.meta.url), "utf8");
-  assert.match(form, /Thông tin khách hàng/);
-  assert.match(form, /Danh sách sản phẩm/);
-  assert.match(form, /lg:grid-cols-3/);
-  assert.match(form, /Lưu đơn hàng/);
+  assert.match(form, /Tạo đơn mới/);
+  assert.match(form, /Dòng sản phẩm/);
+  assert.match(form, /Lưu đơn/);
+  assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Thêm nhân viên/);
+  assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Phân quyền/);
+  assert.match(readFileSync(new URL("../routes/admin.san-xuat.tsx", import.meta.url), "utf8"), /Lệnh sản xuất/);
   const money = readFileSync(new URL("../components/admin/sections.tsx", import.meta.url), "utf8");
   assert.match(money, /Thu tiền/);
   assert.match(money, /Chi phí/);

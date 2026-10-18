@@ -200,7 +200,9 @@
 }
 
 .admin-desk .glass-card,
-.admin-desk .rounded-3xl {
+.admin-desk .rounded-3xl,
+.admin-desk .rounded-2xl,
+.admin-desk .rounded-xl {
   border-radius: 0.375rem;
   box-shadow: none;
 }
