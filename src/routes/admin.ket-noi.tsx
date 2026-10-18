@@ -6,19 +6,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getIntegrations, getMe, pullMarketplace, saveIntegration } from "@/lib/admin.functions";
+import { blankPickup, type CarrierPickup } from "@/domain/carriers";
+import { getCarrierDesk, getIntegrations, getMe, pullMarketplace, saveCarrierPickup, saveIntegration } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/ket-noi")({
   component: ConnectPage,
 });
 
-const FIELDS: { id: "meta" | "carrier"; label: string; hint: string }[] = [
+const FIELDS: { id: "meta"; label: string; hint: string }[] = [
   { id: "meta", label: "Meta / Facebook", hint: "Token trang hoặc ứng dụng, chưa đồng bộ đơn." },
-  {
-    id: "carrier",
-    label: "J&T Express",
-    hint: "Khóa API để sau. Chưa có khóa thì ghi vận đơn và phí bằng tay, vẫn in tem 100×150.",
-  },
 ];
 
 function ConnectPage() {
@@ -85,6 +81,7 @@ function ConnectPage() {
         <SecretField field={{ id: "shopee_partner_id", label: "Partner ID", hint: "Số partner_id của app." }} saved={Boolean(status.data?.shopee_partner_id)} inputType="text" />
         <SecretField field={{ id: "shopee_partner_key", label: "Partner key", hint: "Khóa ký. Không hiện lại sau khi lưu." }} saved={Boolean(status.data?.shopee_partner_key)} />
       </ShopCard>
+      <CarrierCards status={status.data} />
       {FIELDS.map((field) => (
         <div key={field.id} className="glass-card rounded-3xl p-4">
           <SecretField field={field} saved={Boolean(status.data?.[field.id])} />
@@ -241,6 +238,83 @@ function PullOrders({ channel }: { channel: "tiktok" | "shopee" }) {
     >
       {busy ? "Đang lấy đơn…" : "Lấy đơn ngay"}
     </Button>
+  );
+}
+
+function CarrierCards({
+  status,
+}: {
+  status?: {
+    ghn_token?: boolean;
+    ghn_shop_id?: boolean;
+    ghtk_token?: boolean;
+    ghtk_partner?: boolean;
+    jt_api_account?: boolean;
+    jt_private_key?: boolean;
+    jt_customer_code?: boolean;
+    jt_password?: boolean;
+  };
+}) {
+  return (
+    <section className="glass-card space-y-3 rounded-3xl p-4">
+      <h2 className="font-bold text-primary">Nhà vận chuyển</h2>
+      <p className="text-xs text-muted-foreground">
+        GHN, GHTK và J&T Express. Khóa chỉ được lưu, không hiện lại. Chưa lưu khóa thì không gọi hãng. Tạo vận đơn chỉ khi bấm nút trên đơn, không tự tạo. Đơn TikTok và Shopee giữ vận đơn của sàn.
+      </p>
+      <PickupForm />
+      <SecretField field={{ id: "ghn_token", label: "GHN Token", hint: "Lấy ở developer.ghn.vn, mục quản lý token." }} saved={Boolean(status?.ghn_token)} />
+      <SecretField field={{ id: "ghn_shop_id", label: "GHN Shop ID", hint: "Số ShopId của shop GHN." }} saved={Boolean(status?.ghn_shop_id)} inputType="text" />
+      <SecretField field={{ id: "ghtk_token", label: "GHTK Token", hint: "Lấy ở trang cấu hình API của GHTK." }} saved={Boolean(status?.ghtk_token)} />
+      <SecretField field={{ id: "ghtk_partner", label: "GHTK mã đối tác", hint: "Mã gửi ở header X-Client-Source." }} saved={Boolean(status?.ghtk_partner)} inputType="text" />
+      <SecretField field={{ id: "jt_api_account", label: "J&T apiAccount", hint: "Tài khoản trên open.jtexpress.vn." }} saved={Boolean(status?.jt_api_account)} inputType="text" />
+      <SecretField field={{ id: "jt_private_key", label: "J&T private key", hint: "Khóa ký. Không hiện lại sau khi lưu." }} saved={Boolean(status?.jt_private_key)} />
+      <SecretField field={{ id: "jt_customer_code", label: "J&T customer code", hint: "Mã khách do bưu cục cấp." }} saved={Boolean(status?.jt_customer_code)} inputType="text" />
+      <SecretField field={{ id: "jt_password", label: "J&T mật khẩu", hint: "Mật khẩu thường của mã khách. App tự băm khi gọi." }} saved={Boolean(status?.jt_password)} />
+    </section>
+  );
+}
+
+function PickupForm() {
+  const desk = useQuery({ queryKey: ["carrier-desk"], queryFn: () => getCarrierDesk() });
+  const queryClient = useQueryClient();
+  const [pickup, setPickup] = useState<CarrierPickup>(blankPickup());
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (desk.data && !ready) {
+      setPickup(desk.data.pickup);
+      setReady(true);
+    }
+  }, [desk.data, ready]);
+  function set(key: keyof CarrierPickup, value: string) {
+    setPickup((current) => ({ ...current, [key]: value }));
+  }
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        try {
+          await saveCarrierPickup({ data: pickup });
+          toast.success("Đã lưu địa chỉ lấy hàng");
+          await queryClient.invalidateQueries({ queryKey: ["carrier-desk"] });
+        } catch (error) {
+          toast.error((error as Error).message);
+        }
+      }}
+    >
+      <p className="text-sm font-semibold">Địa chỉ lấy hàng</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input id="pickup-name" className="min-h-12" placeholder="Tên người gửi" value={pickup.name} onChange={(event) => set("name", event.target.value)} />
+        <Input id="pickup-phone" className="min-h-12" placeholder="Số điện thoại lấy hàng" value={pickup.phone} onChange={(event) => set("phone", event.target.value)} />
+        <Input id="pickup-province" className="min-h-12" placeholder="Tỉnh/thành" value={pickup.province} onChange={(event) => set("province", event.target.value)} />
+        <Input id="pickup-district" className="min-h-12" placeholder="Quận/huyện, bỏ trống nếu địa chỉ 2 cấp" value={pickup.district} onChange={(event) => set("district", event.target.value)} />
+        <Input id="pickup-ward" className="min-h-12" placeholder="Phường/xã" value={pickup.ward} onChange={(event) => set("ward", event.target.value)} />
+      </div>
+      <Input id="pickup-address" className="min-h-12" placeholder="Địa chỉ lấy hàng" value={pickup.address} onChange={(event) => set("address", event.target.value)} />
+      <Button type="submit" variant="outline" className="min-h-11">
+        Lưu địa chỉ lấy hàng
+      </Button>
+    </form>
   );
 }
 
