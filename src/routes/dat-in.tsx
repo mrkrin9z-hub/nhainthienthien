@@ -263,7 +263,7 @@ function OrderPage() {
           </p>
           <div className="mt-6 flex justify-center gap-3">
             <Button asChild size="lg">
-              <Link to="/tra-cuu">Tra cứu đơn</Link>
+              <Link to="/tra-cuu" search={{ code: doneCode, phone }}>Tra cứu đơn</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
               <Link to="/">Về trang chủ</Link>
