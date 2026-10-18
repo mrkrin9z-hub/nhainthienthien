@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { OrderEditDialog } from "@/components/admin/order-edit-dialog";
 import { OrderQrDialog } from "@/components/admin/order-qr-dialog";
 import { WaybillBox } from "@/components/admin/waybill-box";
+import { canPreviewPhoto, PhotoViewer, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +41,7 @@ function OrderDetailPage() {
   const [override, setOverride] = useState(false);
   const [reason, setReason] = useState("");
   const [reopenReason, setReopenReason] = useState("");
+  const [openFile, setOpenFile] = useState<string | null>(null);
   const data = order.data;
   const role = me.data?.role;
   const closed = data?.status === "huy" || data?.status === "xong";
@@ -268,8 +270,20 @@ function OrderDetailPage() {
             </Button>
           ) : null}
         </div>
+        {data.files.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Chưa có file.</p> : null}
+        <ul className="mt-3 grid grid-cols-3 gap-2">
+          {data.files.filter((file) => canPreviewPhoto(file)).map((file) => (
+            <li key={file.id}>
+              <button type="button" className="block w-full overflow-hidden rounded-2xl border border-border bg-muted text-left" onClick={() => setOpenFile(file.id)}>
+                <img src={staffThumb(file.id)} alt={file.name} className="aspect-square w-full object-cover" />
+                <span className="block truncate px-2 pt-1 text-xs font-semibold">{file.name}</span>
+                <span className="block truncate px-2 pb-2 text-[11px] text-muted-foreground">{FILE_KIND[file.kind] ?? file.kind}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
         <ul className="mt-2 space-y-2 text-sm">
-          {data.files.map((file) => (
+          {data.files.filter((file) => !canPreviewPhoto(file)).map((file) => (
             <li key={file.id}>
               <a className="font-semibold text-primary" href={`/api/staff/file/${file.id}`}>
                 {file.name}
@@ -277,9 +291,16 @@ function OrderDetailPage() {
               <span className="text-muted-foreground"> · {FILE_KIND[file.kind] ?? file.kind}</span>
             </li>
           ))}
-          {data.files.length === 0 ? <li className="text-muted-foreground">Chưa có file.</li> : null}
         </ul>
       </section>
+      {openFile ? (
+        <PhotoViewer
+          src={staffThumb(openFile, true)}
+          name={data.files.find((file) => file.id === openFile)?.name ?? "Ảnh"}
+          downloadHref={`/api/staff/file/${openFile}`}
+          onClose={() => setOpenFile(null)}
+        />
+      ) : null}
       {qrOpen ? <OrderQrDialog open={qrOpen} onOpenChange={setQrOpen} orderId={data.id} code={data.code} /> : null}
 
       {role !== "production" ? (

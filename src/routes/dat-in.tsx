@@ -3,6 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, Minus, Plus, UploadCloud, X } from "lucide-react";
 
+import { LocalPhotoThumb } from "@/components/photo-thumb";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { Button } from "@/components/ui/button";
@@ -431,26 +432,15 @@ function OrderPage() {
                   />
                 </label>
 
-                <ul className="mt-4 space-y-2">
+                <ul className="mt-4 grid grid-cols-3 gap-2">
                   {files.map((f) => (
-                    <li
-                      key={f.key}
-                      className="flex items-center justify-between gap-3 rounded-2xl bg-muted/60 px-3 py-2 text-sm"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate">{f.file.name}</span>
-                        {f.message ? <span className="block text-xs text-destructive">{f.message}</span> : null}
-                      </span>
-                      <span className="flex shrink-0 items-center gap-2">
-                        {f.status === "uploading" ? (
-                          <Loader2 className="size-4 animate-spin text-primary" />
-                        ) : null}
-                        {f.status === "complete" ? (
-                          <CheckCircle2 className="size-4 text-accent" />
-                        ) : null}
-                        {f.status === "error" ? (
-                          <AlertCircle className="size-4 text-destructive" />
-                        ) : null}
+                    <li key={f.key} className="overflow-hidden rounded-2xl border border-border bg-card text-sm">
+                      <LocalPhotoThumb file={f.file} className="aspect-square w-full object-cover" />
+                      <span className="flex items-center gap-1 px-2 py-2">
+                        <span className="min-w-0 flex-1 truncate">{f.file.name}</span>
+                        {f.status === "uploading" ? <Loader2 className="size-4 shrink-0 animate-spin text-primary" /> : null}
+                        {f.status === "complete" ? <CheckCircle2 className="size-4 shrink-0 text-accent" /> : null}
+                        {f.status === "error" ? <AlertCircle className="size-4 shrink-0 text-destructive" /> : null}
                         <button
                           type="button"
                           aria-label="Xóa ảnh"
@@ -459,6 +449,7 @@ function OrderPage() {
                           <X className="size-4 text-muted-foreground" />
                         </button>
                       </span>
+                      {f.message ? <span className="block px-2 pb-2 text-xs text-destructive">{f.message}</span> : null}
                     </li>
                   ))}
                 </ul>

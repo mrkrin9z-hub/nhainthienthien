@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { CheckCircle2, Loader2, UploadCloud } from "lucide-react";
 
+import { LocalPhotoThumb } from "@/components/photo-thumb";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,11 +160,12 @@ function SharedUploadPage() {
               }}
             />
           </label>
-          <ul className="space-y-2 text-sm">
+          <ul className="grid grid-cols-3 gap-2 text-sm">
             {rows.map((row) => (
-              <li key={row.key} className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate">{row.file.name}</span>
-                <span className={row.status === "error" ? "shrink-0 text-destructive" : "shrink-0 text-muted-foreground"}>
+              <li key={row.key} className="overflow-hidden rounded-2xl border border-border bg-card">
+                <LocalPhotoThumb file={row.file} className="aspect-square w-full object-cover" />
+                <span className="block truncate px-2 pt-1 text-xs">{row.file.name}</span>
+                <span className={`block truncate px-2 pb-2 text-xs ${row.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
                   {row.status === "uploading" ? "Đang gửi" : row.status === "complete" ? "Đã nhận" : row.status === "error" ? row.message || "Lỗi" : "Chờ"}
                 </span>
               </li>

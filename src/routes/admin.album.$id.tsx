@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { canPreviewPhoto, PhotoViewer, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getMe, getPhotoAlbum, linkPhotoAlbum } from "@/lib/admin.functions";
@@ -18,6 +19,7 @@ function AlbumDetailPage() {
   const album = useQuery({ queryKey: ["album", id], queryFn: () => getPhotoAlbum({ data: { albumId: id } }) });
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
+  const [openFile, setOpenFile] = useState<string | null>(null);
   const data = album.data;
   const canLink = me.data?.role === "owner" || me.data?.role === "sale";
 
@@ -87,13 +89,27 @@ function AlbumDetailPage() {
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {data.files.map((file) => (
           <li key={file.id} className="glass-card overflow-hidden rounded-2xl">
-            <a href={`/api/staff/file/${file.id}`}>
-              <img src={`/api/staff/file/${file.id}`} alt={file.name} className="h-36 w-full object-cover" />
-              <span className="block truncate px-2 py-2 text-xs font-semibold">{file.name}</span>
-            </a>
+            {canPreviewPhoto(file) ? (
+              <button type="button" className="block w-full text-left" onClick={() => setOpenFile(file.id)}>
+                <img src={staffThumb(file.id)} alt={file.name} className="h-36 w-full object-cover" />
+                <span className="block truncate px-2 py-2 text-xs font-semibold">{file.name}</span>
+              </button>
+            ) : (
+              <a href={`/api/staff/file/${file.id}`} className="block truncate px-2 py-2 text-xs font-semibold">
+                {file.name}
+              </a>
+            )}
           </li>
         ))}
       </ul>
+      {openFile ? (
+        <PhotoViewer
+          src={staffThumb(openFile, true)}
+          name={data.files.find((file) => file.id === openFile)?.name ?? "Ảnh"}
+          downloadHref={`/api/staff/file/${openFile}`}
+          onClose={() => setOpenFile(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { albumFolderParts } from "./drive-path.ts";
+import { imagePreviewable } from "./images.ts";
 import { bytesStillShared } from "./files.ts";
 import { albumPhone, customerUploadPath, googleThumbSize, photoLimitLabel, photoTooBig, publicUploadCard, SHARED_UPLOAD_PATH, uploadTokenShape } from "./order-upload.ts";
 import type { OrderFile, ShopState } from "./types.ts";
@@ -15,6 +16,13 @@ test("mã gửi ảnh là 32 ký tự hex và ra đúng đường dẫn", () => 
   assert.equal(uploadTokenShape(`${token}zz`), false);
   assert.throws(() => customerUploadPath("khong-phai-ma"), /không hợp lệ/);
   assert.equal(SHARED_UPLOAD_PATH, "/gui-anh");
+});
+
+test("ảnh có khung xem trước, video thì không", () => {
+  assert.equal(imagePreviewable("goc.jpg", "image/jpeg"), true);
+  assert.equal(imagePreviewable("may.HEIC", ""), true);
+  assert.equal(imagePreviewable("dong-goi.mp4", "video/mp4"), false);
+  assert.equal(imagePreviewable("ghi-chu.txt", "text/plain"), false);
 });
 
 test("album lấy tên là số điện thoại", () => {
