@@ -38,6 +38,7 @@ export function OrderLinks() {
     { to: "/admin/don-hang", label: "Đơn hàng" },
     { to: "/admin/giao-hang", label: "Giao hàng" },
     ...(production ? [] : [
+      { to: "/admin/don-moi", label: "Ghi đơn" },
       { to: "/admin/cod", label: "Đối soát COD" },
       { to: "/admin/nhap-don", label: "Nhập đơn sàn" },
     ]),
@@ -86,11 +87,15 @@ export function StaffLinks() {
 
 export function MoneyLinks() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
-  if (me.data && me.data.role !== "owner") {
+  if (!me.data) return null;
+  if (me.data.role !== "owner") {
     return (
       <SectionLinks
         label="Tài chính"
-        items={[{ to: "/admin/kpi", label: "KPI" }]}
+        items={[
+          { to: "/admin/thu", label: "Thu tiền" },
+          { to: "/admin/kpi", label: "KPI" },
+        ]}
       />
     );
   }
@@ -98,6 +103,10 @@ export function MoneyLinks() {
     <SectionLinks
       label="Tài chính"
       items={[
+        { to: "/admin/thu", label: "Thu tiền" },
+        { to: "/admin/chi-phi", label: "Chi phí" },
+        { to: "/admin/vi", label: "Ví tiền" },
+        { to: "/admin/bao-cao-chi", label: "Báo cáo chi" },
         { to: "/admin/loi-nhuan", label: "Thu chi" },
         { to: "/admin/bao-cao", label: "Báo cáo" },
         { to: "/admin/kpi", label: "KPI" },

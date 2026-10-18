@@ -85,6 +85,8 @@ export const createDeskOrder = createServerFn({ method: "POST" })
         note: z.string().optional().default(""),
         dueDate: z.string().nullable().optional().default(null),
         marketplaceCode: z.string().optional().default(""),
+        depositPaid: z.number().int().min(0).max(100_000_000).optional().default(0),
+        depositMethod: z.string().optional().default(""),
         items: z.array(itemSchema).min(1),
       })
       .parse(data),
@@ -391,12 +393,60 @@ export const saveFixedMonth = createServerFn({ method: "POST" })
   });
 
 export const saveExpense = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ month: z.string(), name: z.string(), amount: z.number(), note: z.string().optional().default("") }).parse(data))
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        month: z.string(),
+        name: z.string(),
+        amount: z.number(),
+        note: z.string().optional().default(""),
+        category: z.enum(["mat_bang", "dien_nuoc", "vat_tu", "van_chuyen", "nhan_su", "sua_chua", "khac"]).optional(),
+        wallet: z.enum(["tien_mat", "chuyen_khoan"]).optional(),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
     const { addExpense } = await import("@/server/service");
     await addExpense(await actor(), data);
     return { ok: true };
   });
+
+export const removeExpense = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data }) => {
+    const { deleteExpense } = await import("@/server/service");
+    await deleteExpense(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const saveWalletAdjust = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        wallet: z.enum(["tien_mat", "chuyen_khoan"]),
+        amount: z.number().int().min(-100_000_000).max(100_000_000).refine((value) => value !== 0),
+        note: z.string().max(200).optional().default(""),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { adjustWallet } = await import("@/server/service");
+    await adjustWallet(await actor(), data);
+    return { ok: true };
+  });
+
+export const getMoneyDesk = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { moneyDesk } = await import("@/server/service");
+    return moneyDesk(await actor(), data.month);
+  });
+
+export const getCollectList = createServerFn({ method: "GET" }).handler(async () => {
+  const { collectList } = await import("@/server/service");
+  return collectList(await actor());
+});
 
 export const loadSettings = createServerFn({ method: "GET" }).handler(async () => {
   const { getSettings } = await import("@/server/service");

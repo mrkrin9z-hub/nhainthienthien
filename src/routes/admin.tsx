@@ -7,7 +7,9 @@ import {
   Bell,
   ClipboardList,
   Clock,
+  HandCoins,
   Image,
+  Landmark,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -58,6 +60,10 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin/cham-cong": Clock,
   "/admin/luong": Receipt,
   "/admin/tai-khoan": UserRound,
+  "/admin/thu": HandCoins,
+  "/admin/chi-phi": Receipt,
+  "/admin/vi": Landmark,
+  "/admin/bao-cao-chi": BarChart3,
   "/admin/loi-nhuan": Receipt,
   "/admin/bao-cao": BarChart3,
   "/admin/kpi": Target,
@@ -100,6 +106,10 @@ const GROUPS: { title: string; items: { to: string; label: string; roles: Role[]
   {
     title: "Tài chính",
     items: [
+      { to: "/admin/thu", label: "Thu tiền", roles: ["owner", "sale"] },
+      { to: "/admin/chi-phi", label: "Chi phí", roles: ["owner"] },
+      { to: "/admin/vi", label: "Ví tiền", roles: ["owner"] },
+      { to: "/admin/bao-cao-chi", label: "Báo cáo chi", roles: ["owner"] },
       { to: "/admin/loi-nhuan", label: "Thu chi", roles: ["owner"] },
       { to: "/admin/bao-cao", label: "Báo cáo", roles: ["owner"] },
       { to: "/admin/kpi", label: "KPI", roles: ["owner", "sale"] },
@@ -122,7 +132,7 @@ function pathActive(pathname: string, to: string) {
 }
 
 function pageTitle(pathname: string, role: Role): string {
-  if (pathname.startsWith("/admin/don-moi")) return "Ghi đơn";
+  if (pathname.startsWith("/admin/don-moi")) return "Tạo đơn hàng mới";
   if (pathname.startsWith("/admin/tem/")) return "Tem đơn";
   if (pathname.startsWith("/admin/don-hang/") && pathname !== "/admin/don-hang" && pathname !== "/admin/don-hang/") return "Chi tiết đơn";
   if (pathname.startsWith("/admin/khach/") && pathname !== "/admin/khach" && pathname !== "/admin/khach/") return "Hồ sơ khách";
