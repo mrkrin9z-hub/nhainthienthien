@@ -264,7 +264,7 @@ function OrderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-40 lg:pb-0">
+    <div className="min-h-screen bg-background pb-56 lg:pb-0">
       <SiteHeader />
       <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
         <h1 className="text-3xl font-extrabold text-primary md:text-4xl">Đặt in online</h1>
@@ -516,7 +516,7 @@ function OrderPage() {
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 p-3 backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-[4.5rem] z-40 border-t border-border bg-card p-3 lg:hidden">
         <Summary
           selected={selected}
           subtotal={subtotal}

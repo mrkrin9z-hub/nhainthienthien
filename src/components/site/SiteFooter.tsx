@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { BadgeCheck, Globe, MapPin, MessageCircle } from "lucide-react";
 
 import { LOGO_HORIZONTAL } from "@/lib/assets";
 import { BRAND } from "@/lib/brand";
@@ -12,48 +11,44 @@ export function SiteFooter() {
   const phone = showZalo ? config.data?.phone ?? "" : "";
   const zalo = showZalo ? config.data?.zalo ?? "" : "";
   return (
-    <footer className="mt-16 border-t border-border bg-card/60">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-3 md:px-6">
-        <div>
-          <img src={LOGO_HORIZONTAL} alt={BRAND.name} className="h-11 w-auto" />
-          <p className="mt-3 text-sm text-muted-foreground">
+    <footer className="mt-20 border-t border-border bg-card pb-24 md:pb-0">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-4 md:px-6">
+        <div className="md:col-span-2">
+          <img src={LOGO_HORIZONTAL} alt={BRAND.name} className="h-10 w-auto" />
+          <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
             {BRAND.slogan} {BRAND.message}
           </p>
         </div>
         <div className="space-y-2 text-sm">
-          <h3 className="text-base font-bold text-primary">Liên hệ</h3>
-          {showZalo ? (
-            <p className="flex items-center gap-2">
-              <MessageCircle className="size-4 text-accent" />
-              <a href={zalo} className="font-semibold hover:text-primary">
-                Zalo {phone}
-              </a>
-            </p>
-          ) : null}
-          <p className="flex items-center gap-2">
-            <MapPin className="size-4 text-accent" /> {BRAND.region}
-          </p>
-          <p className="flex items-center gap-2">
-            <Globe className="size-4 text-accent" /> {BRAND.website}
-          </p>
+          <h2 className="font-sans text-xs font-bold tracking-[0.16em] text-primary uppercase">Gian hàng</h2>
+          <Link to="/san-pham" className="block text-foreground/80 hover:text-primary">
+            Sản phẩm và giá
+          </Link>
+          <Link to="/dat-in" className="block text-foreground/80 hover:text-primary">
+            Đặt in
+          </Link>
+          <Link to="/huong-dan" className="block text-foreground/80 hover:text-primary">
+            Hướng dẫn
+          </Link>
         </div>
         <div className="space-y-2 text-sm">
-          <h3 className="text-base font-bold text-primary">Liên kết</h3>
-          <Link to="/san-pham" className="block hover:text-primary">
-            Sản phẩm & bảng giá
+          <h2 className="font-sans text-xs font-bold tracking-[0.16em] text-primary uppercase">Đơn hàng</h2>
+          <Link to="/tra-cuu" className="block text-foreground/80 hover:text-primary">
+            Tra cứu đơn
           </Link>
-          <Link to="/huong-dan" className="block hover:text-primary">
-            Hướng dẫn đặt in
+          <Link to="/lien-he" className="block text-foreground/80 hover:text-primary">
+            Liên hệ
           </Link>
-          <Link to="/tra-cuu" className="block hover:text-primary">
-            Tra cứu đơn hàng
-          </Link>
+          {showZalo ? (
+            <a href={zalo} className="block font-semibold text-primary">
+              Zalo {phone}
+            </a>
+          ) : null}
+          <p className="text-muted-foreground">{BRAND.website}</p>
         </div>
       </div>
       <div className="border-t border-border py-4 text-center text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <BadgeCheck className="size-3.5 text-accent" /> © {new Date().getFullYear()} {BRAND.name}
-        </span>
+        © {new Date().getFullYear()} {BRAND.name}
       </div>
     </footer>
   );

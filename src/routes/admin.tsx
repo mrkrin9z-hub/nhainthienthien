@@ -1,6 +1,28 @@
 import { createFileRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import {
+  Archive,
+  BarChart3,
+  Bell,
+  ClipboardList,
+  Clock,
+  Image,
+  LayoutDashboard,
+  Menu,
+  Package,
+  Plug,
+  Receipt,
+  ScrollText,
+  Settings,
+  Tags,
+  Target,
+  Truck,
+  UserRound,
+  Users,
+  Wallet,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +41,29 @@ export const Route = createFileRoute("/admin")({
   }),
   component: AdminLayout,
 });
+
+const ICONS: Record<string, typeof LayoutDashboard> = {
+  "/admin": LayoutDashboard,
+  "/admin/don-hang": ClipboardList,
+  "/admin/giao-hang": Truck,
+  "/admin/cod": Wallet,
+  "/admin/nhap-don": ClipboardList,
+  "/admin/khach": Users,
+  "/admin/nhac-khach": Bell,
+  "/admin/gia": Tags,
+  "/admin/kho": Package,
+  "/admin/anh": Image,
+  "/admin/cham-cong": Clock,
+  "/admin/luong": Receipt,
+  "/admin/tai-khoan": UserRound,
+  "/admin/loi-nhuan": Receipt,
+  "/admin/bao-cao": BarChart3,
+  "/admin/kpi": Target,
+  "/admin/nhat-ky": ScrollText,
+  "/admin/sao-luu": Archive,
+  "/admin/ket-noi": Plug,
+  "/admin/cai-dat": Settings,
+};
 
 const GROUPS: { title: string; items: { to: string; label: string; roles: Role[] }[] }[] = [
   {
@@ -88,56 +133,62 @@ function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-background md:pl-64">
+    <div className="min-h-screen bg-muted/50 md:pl-60">
       {menuOpen ? (
-        <button type="button" className="fixed inset-0 z-40 bg-black/50 md:hidden" aria-label="Đóng menu" onClick={() => setMenuOpen(false)} />
+        <button type="button" className="fixed inset-0 z-40 bg-foreground/30 md:hidden" aria-label="Đóng menu" onClick={() => setMenuOpen(false)} />
       ) : null}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[#12182b] text-white transition-transform md:w-64 md:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card text-foreground transition-transform md:w-60 md:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <div className="border-b border-white/10 px-4 py-4">
-          <div className="rounded-xl bg-white px-3 py-2">
-            <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="h-8 w-auto max-w-full object-contain" />
-          </div>
-          <p className="mt-3 text-sm font-semibold">{me.data.name}</p>
-          <p className="text-xs text-white/60">Nhận đơn → Thiết kế → In → Giao → Xong</p>
+        <div className="flex items-center justify-between border-b border-border px-4 py-4">
+          <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="h-8 w-auto max-w-[10rem] object-contain" />
+          <button type="button" className="flex size-10 items-center justify-center rounded-full md:hidden" aria-label="Đóng" onClick={() => setMenuOpen(false)}>
+            <X className="size-5" />
+          </button>
         </div>
-        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
           {GROUPS.map((group) => {
             const items = group.items.filter((item) => item.roles.includes(role));
             if (items.length === 0) return null;
             return (
               <div key={group.title}>
-                <p className="px-3 text-[11px] font-bold tracking-wide text-white/40 uppercase">{group.title}</p>
-                <div className="mt-1 space-y-1">
-                  {items.map((item) => (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      activeOptions={{ exact: item.to === "/admin" }}
-                      activeProps={{ className: "bg-white/15 text-white" }}
-                      className="flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-white/75"
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      {item.to === "/admin/luong" && role !== "owner" ? "Lương của tôi" : item.label}
-                    </Link>
-                  ))}
+                <p className="px-3 font-sans text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">{group.title}</p>
+                <div className="mt-1 space-y-0.5">
+                  {items.map((item) => {
+                    const Icon = ICONS[item.to] ?? LayoutDashboard;
+                    return (
+                      <Link
+                        key={item.to}
+                        to={item.to}
+                        activeOptions={{ exact: item.to === "/admin" }}
+                        activeProps={{ className: "bg-primary/10 text-primary" }}
+                        className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-foreground/75"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        <Icon className="size-4 shrink-0" />
+                        {item.to === "/admin/luong" && role !== "owner" ? "Lương của tôi" : item.label}
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
         </nav>
-        <div className="border-t border-white/10 p-3">
-          <Button variant="outline" className="min-h-11 w-full border-white/20 bg-transparent text-white" onClick={() => void logout()}>
+        <div className="border-t border-border p-3">
+          <p className="truncate px-2 text-sm font-semibold">{me.data.name}</p>
+          <p className="px-2 text-xs text-muted-foreground">Nhận đơn → Thiết kế → In → Giao</p>
+          <Button variant="outline" className="mt-3 min-h-11 w-full" onClick={() => void logout()}>
             Đăng xuất
           </Button>
         </div>
       </aside>
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b bg-background/95 px-4 py-3 md:hidden">
-        <button type="button" className="min-h-11 min-w-11 rounded-xl border text-lg font-bold" aria-label="Mở menu" onClick={() => setMenuOpen(true)}>
-          ☰
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-card px-4">
+        <button type="button" className="flex size-11 items-center justify-center rounded-full border md:hidden" aria-label="Mở menu" onClick={() => setMenuOpen(true)}>
+          <Menu className="size-5" />
         </button>
-        <p className="min-w-0 truncate text-sm font-bold text-primary">{me.data.name}</p>
+        <p className="min-w-0 truncate font-sans text-sm font-bold tracking-wide text-primary uppercase">Quản trị</p>
+        <p className="ml-auto truncate text-sm text-muted-foreground">{me.data.name}</p>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 md:px-8">
         {me.data.mustChangePassword ? (
@@ -201,21 +252,11 @@ function AdminLogin({ onDone }: { onDone: () => void }) {
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="grid min-h-screen md:grid-cols-2">
-      <section className="hidden flex-col justify-between bg-[#12182b] p-10 text-white md:flex">
-        <p className="text-sm font-bold tracking-[0.2em]">NHÀ IN THIÊN THIÊN</p>
-        <div>
-          <h2 className="text-3xl font-extrabold leading-tight">Một sổ cho cả quy trình in.</h2>
-          <ol className="mt-6 space-y-3 text-sm text-white/80">
-            <li>1. Nhận đơn tại quầy, trên web hoặc từ file sàn.</li>
-            <li>2. Thiết kế, gửi khách duyệt.</li>
-            <li>3. In, đóng gói, rồi giao.</li>
-            <li>4. Xong. Chủ xem lãi. Sale xem hoa hồng của mình.</li>
-          </ol>
-        </div>
-        <p className="text-xs text-white/50">Chủ, sale và sản xuất — mỗi người một tài khoản.</p>
-      </section>
-      <div className="flex items-center justify-center bg-background px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-10">
+      <div className="w-full max-w-md">
+      <p className="text-center font-sans text-xs font-bold tracking-[0.18em] text-primary uppercase">Nhà In Thiên Thiên</p>
+      <h1 className="mt-3 text-center text-4xl text-primary">Một sổ cho cả quy trình in.</h1>
+      <div className="mt-6 flex items-center justify-center">
       <form
         className="glass-card w-full max-w-md rounded-3xl p-6"
         onSubmit={async (event) => {
@@ -262,6 +303,7 @@ function AdminLogin({ onDone }: { onDone: () => void }) {
           </Button>
         </div>
       </form>
+      </div>
       </div>
     </div>
   );

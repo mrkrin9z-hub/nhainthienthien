@@ -8,12 +8,10 @@ import {
   Heart,
   MessageCircle,
   ShieldCheck,
-  Sparkles,
   Truck,
   UploadCloud,
 } from "lucide-react";
 
-import { LOGO_SQUARE } from "@/lib/assets";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { Button } from "@/components/ui/button";
@@ -99,6 +97,7 @@ function ShopCard({ product }: { product: CatalogProduct }) {
         src={catalogImage(product.slug, product.cover_path)}
         alt={`Ảnh mẫu ${product.name}`}
         loading="lazy"
+        decoding="async"
         width={800}
         height={600}
         className="aspect-[16/10] w-full object-cover"
@@ -146,24 +145,19 @@ function HomePage() {
       <SiteHeader />
       <main className="pb-24 md:pb-0">
         {/* Hero */}
-        <section className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-10 md:grid-cols-2 md:px-6 md:py-16">
-          <div className="min-w-0">
-            <span className="inline-flex items-center gap-2 rounded-full bg-accent/15 px-3 py-1 text-xs font-bold uppercase tracking-wide text-accent">
-              <Sparkles className="size-3.5 shrink-0" /> {BRAND.message}
-            </span>
-            <h1 className="mt-4 text-[2rem] font-extrabold leading-[1.15] text-primary sm:text-4xl md:text-5xl">
-              {BRAND.slogan}
+        <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 md:grid-cols-2 md:px-6 md:py-20">
+          <div className="rise min-w-0">
+            <p className="font-sans text-xs font-bold tracking-[0.18em] text-primary uppercase">{BRAND.message}</p>
+            <h1 className="mt-4 text-4xl leading-[1.15] text-primary sm:text-5xl md:text-6xl">
+              In đẹp
+              <span className="mt-1 block italic text-foreground/80">từng khoảnh khắc.</span>
             </h1>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground md:text-lg">
-              Chọn sản phẩm, gửi ảnh, rồi mới nhập số điện thoại. In tại xưởng ở {BRAND.region}.
+            <p className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground md:text-lg">
+              Chọn sản phẩm, gửi ảnh, rồi mới nhập số điện thoại. Giá lấy từ bảng tại tiệm.
             </p>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button
-                asChild
-                size="lg"
-                className="min-h-12 w-full bg-accent text-accent-foreground hover:bg-accent/90 sm:w-auto"
-              >
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button asChild size="lg" className="min-h-12 w-full rounded-full bg-primary text-primary-foreground sm:w-auto">
                 <a href="#gian-hang">
                   Xem gian hàng <ArrowRight className="size-4" />
                 </a>
@@ -184,17 +178,16 @@ function HomePage() {
 
           </div>
 
-          <div className="glass-card rounded-3xl p-6">
-            <img src={LOGO_SQUARE} alt="Logo Nhà In Thiên Thiên" className="mx-auto h-24 w-24 object-contain" />
-            <p className="mt-4 text-center text-sm font-bold uppercase tracking-wide text-accent">In tại xưởng</p>
-            <ul className="mt-4 space-y-2 text-sm text-foreground">
-              <li>Ảnh ép gỗ tráng gương bo viền</li>
-              <li>Ảnh thờ và giấy khen</li>
-              <li>Nam châm dán xe, nam châm tủ lạnh</li>
-            </ul>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              {config.data?.hours || "08:00 – 20:00"} · {BRAND.region}
-            </p>
+          <div className="rise overflow-hidden rounded-[2rem] bg-secondary">
+            <img
+              src={catalogImage(products[0]?.slug ?? "trang-guong", products[0]?.cover_path)}
+              alt="Ảnh mẫu in tại xưởng"
+              width={800}
+              height={1000}
+              fetchPriority="high"
+              decoding="async"
+              className="aspect-[4/5] w-full object-cover"
+            />
           </div>
         </section>
 
@@ -321,28 +314,6 @@ function HomePage() {
         </section>
       </main>
 
-      {/* Thanh CTA cố định trên mobile */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-4 py-2.5 backdrop-blur md:hidden">
-        <div className="flex items-center gap-2">
-          {showZalo ? (
-            <Button asChild variant="outline" className="min-h-12 flex-1">
-              <a href={zalo}>
-                <MessageCircle className="size-4" /> Zalo
-              </a>
-            </Button>
-          ) : null}
-          <Button
-            asChild
-            className="min-h-12 flex-[1.6] bg-accent text-accent-foreground hover:bg-accent/90"
-          >
-            <a href="#gian-hang">
-              <UploadCloud className="size-4" /> Chọn sản phẩm
-            </a>
-          </Button>
-        </div>
-      </div>
-
-      <div className="h-16 md:hidden" />
       <SiteFooter />
     </div>
   );

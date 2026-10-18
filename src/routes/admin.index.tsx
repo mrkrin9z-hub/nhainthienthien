@@ -135,9 +135,9 @@ function DashboardPage() {
 
 function Card({ label, value }: { label: string; value: string }) {
   return (
-    <div className="glass-card rounded-3xl p-4">
-      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-extrabold text-primary">{value}</p>
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <p className="font-sans text-xs font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight text-primary">{value}</p>
     </div>
   );
 }

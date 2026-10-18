@@ -133,7 +133,7 @@ function ProductsPage() {
       ) : null}
 
       {lines.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-[4.5rem] z-40 border-t border-border bg-card md:bottom-0">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6">
             <div className="max-h-24 overflow-auto text-sm">
               {lines.map((l) => (
