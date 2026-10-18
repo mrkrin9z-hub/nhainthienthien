@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { GoodsLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,9 +32,10 @@ function PricePage() {
   if (me.data?.role === "production") return <p className="text-lg font-semibold text-primary">Chỉ chủ và sale xem bảng giá.</p>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      <GoodsLinks />
       <div>
-        <h1 className="text-2xl font-extrabold text-primary">Bảng giá theo kênh</h1>
+        <h1 className="text-2xl font-semibold text-primary">Bảng giá theo kênh</h1>
         <p className="text-sm text-muted-foreground">
           Web khách lấy giá kênh Tại tiệm / Web. Ô trống là chưa có số — không tự đặt giá.
         </p>
@@ -69,22 +71,18 @@ function PricePage() {
           ))}
         </div>
       ) : null}
-      <div className="overflow-x-auto rounded-3xl border border-border bg-card">
-        <table className="w-full min-w-[640px] text-sm">
-          <thead className="text-left text-muted-foreground">
-            <tr>
-              <th className="px-3 py-3">Mã</th>
-              <th className="px-3 py-3">Quy cách</th>
-              <th className="px-3 py-3">Giá</th>
-              <th className="px-3 py-3">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(board.data?.rows ?? []).map((row) => (
-              <PriceRow key={`${row.skuId}-${channel}`} row={row} channel={channel} owner={owner} />
-            ))}
-          </tbody>
-        </table>
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="hidden grid-cols-[7rem_minmax(0,1.4fr)_8rem_minmax(0,1fr)] gap-2 border-b bg-muted/50 px-3 py-3 text-xs font-semibold text-muted-foreground md:grid">
+          <span>Mã</span>
+          <span>Quy cách</span>
+          <span>Giá</span>
+          <span>Trạng thái</span>
+        </div>
+        <div className="divide-y">
+          {(board.data?.rows ?? []).map((row) => (
+            <PriceRow key={`${row.skuId}-${channel}`} row={row} channel={channel} owner={owner} />
+          ))}
+        </div>
       </div>
       {owner ? <Calculator skus={board.data?.rows ?? []} /> : <p className="text-sm text-muted-foreground">Máy tính giá vốn và lãi chỉ chủ xem.</p>}
       {owner ? <BomEditor skus={board.data?.rows ?? []} /> : null}
@@ -131,47 +129,45 @@ function PriceRow({
     }
   }
 
+  const pack = row.code.endsWith("-GOI") ? (
+    <div className="mt-1 flex items-center gap-2">
+      <Input className="h-10 w-24" placeholder="Số miếng" value={pieces} onChange={(e) => setPieces(e.target.value)} disabled={!owner} />
+      {owner ? (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={async () => {
+            await savePieces({ data: { skuId: row.skuId, pieces: pieces.trim() === "" ? null : Number(pieces) } });
+            toast.success("Đã lưu số miếng gói");
+          }}
+        >
+          Lưu gói
+        </Button>
+      ) : null}
+    </div>
+  ) : null;
+
   return (
-    <tr className="border-t border-border">
-      <td className="px-3 py-3 font-semibold">{row.code}</td>
-      <td className="px-3 py-3">
-        {row.name}
-        {row.code.endsWith("-GOI") ? (
-          <div className="mt-1 flex items-center gap-2">
-            <Input className="h-10 w-24" placeholder="Số miếng" value={pieces} onChange={(e) => setPieces(e.target.value)} disabled={!owner} />
-            {owner ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  await savePieces({ data: { skuId: row.skuId, pieces: pieces.trim() === "" ? null : Number(pieces) } });
-                  toast.success("Đã lưu số miếng gói");
-                }}
-              >
-                Lưu gói
-              </Button>
-            ) : null}
-          </div>
+    <article className="grid gap-3 p-3 md:grid-cols-[7rem_minmax(0,1.4fr)_8rem_minmax(0,1fr)] md:items-center md:gap-2 md:px-3">
+      <p className="font-semibold md:text-sm">{row.code}</p>
+      <div className="text-sm">
+        <p>{row.name}</p>
+        {pack}
+      </div>
+      <Input className="h-11 md:w-full" inputMode="numeric" value={price} placeholder="Chưa có" disabled={!owner} aria-label={`Giá ${row.name}`} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
+      <div className="flex gap-2">
+        <select className="min-h-11 min-w-0 flex-1 rounded-xl border bg-background px-2" value={status} disabled={!owner} aria-label={`Trạng thái ${row.name}`} onChange={(e) => setStatus(e.target.value)}>
+          <option value="dang_ban">Đang bán</option>
+          <option value="nhap">Chưa có giá</option>
+          <option value="cho_duyet">Chờ duyệt</option>
+        </select>
+        {owner ? (
+          <Button className="min-h-11 shrink-0" onClick={save}>
+            Lưu
+          </Button>
         ) : null}
-      </td>
-      <td className="px-3 py-3">
-        <Input className="h-11 w-32" inputMode="numeric" value={price} placeholder="Chưa có" disabled={!owner} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
-      </td>
-      <td className="px-3 py-3">
-        <div className="flex gap-2">
-          <select className="min-h-11 rounded-xl border bg-background px-2" value={status} disabled={!owner} onChange={(e) => setStatus(e.target.value)}>
-            <option value="dang_ban">Đang bán</option>
-            <option value="nhap">Chưa có giá</option>
-            <option value="cho_duyet">Chờ duyệt</option>
-          </select>
-          {owner ? (
-            <Button className="min-h-11" onClick={save}>
-              Lưu
-            </Button>
-          ) : null}
-        </div>
-      </td>
-    </tr>
+      </div>
+    </article>
   );
 }
 

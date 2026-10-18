@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { ALL_TONE, CHANNEL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
 import { ClearFilters, FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
+import { OrderLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL, type OrderStatus } from "@/domain/types";
 import { formatMaybe } from "@/lib/brand";
@@ -65,6 +66,7 @@ function DeliveryPage() {
   if (rows.isError) return <p className="font-semibold text-destructive">{(rows.error as Error).message}</p>;
   return (
     <div className="space-y-3">
+      <OrderLinks />
       <PageToolbar
         title="Giao hàng"
         hint="Đơn giao tận nơi và đơn Facebook, TikTok, Shopee. Tem 100×150 chỉ in cho đơn tại tiệm và Facebook."

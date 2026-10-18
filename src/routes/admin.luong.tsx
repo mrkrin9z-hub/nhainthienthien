@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { StaffLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { vnMonth } from "@/domain/calc";
@@ -27,7 +28,8 @@ function PayrollPage() {
   if (payroll.isError) return <p className="font-semibold text-destructive">{(payroll.error as Error).message}</p>;
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-extrabold text-primary">{owner ? "Lương tháng" : "Lương của tôi"}</h1>
+      <StaffLinks />
+      <h1 className="text-2xl font-semibold text-primary">{owner ? "Lương tháng" : "Lương của tôi"}</h1>
       {owner ? (
         <p className="text-sm text-muted-foreground">
           Sale phương án A: 8.000.000đ cứng (thử việc 85%). Hoa hồng bậc 3% / 5% / 7% trên doanh thu đã thu trong tháng. Cách tính (toàn tiệm hoặc theo đơn) ở Cài đặt. Sản xuất 11.000.000đ, không thưởng sản phẩm. Mức trừ đi trễ và nghỉ để trống cho đến khi chủ nhập.

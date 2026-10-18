@@ -24,74 +24,63 @@ function DashboardPage() {
       await punchClock({ data: { action } });
       toast.success(action === "in" ? "Đã vào ca" : "Đã ra ca");
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      await queryClient.invalidateQueries({ queryKey: ["attendance"] });
     } catch (error) {
       toast.error((error as Error).message);
     }
   }
 
+  const hello = greeting();
+  const since = data.clockedInAt ? new Date(data.clockedInAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "";
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight text-primary sm:text-2xl">Xin chào, {data.name}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Giờ làm 8:00–18:00. Chấm công trên điện thoại, không cần vị trí hay ảnh.</p>
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{hello}</p>
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-primary sm:text-2xl">{data.name}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {data.clockedIn ? `Đang trong ca${since ? ` từ ${since}` : ""}.` : "Chưa vào ca."} Giờ làm 8:00–18:00. Bấm trên điện thoại, không cần vị trí hay ảnh.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-50 sm:flex-none"
+              onClick={() => clock("in")}
+              disabled={data.clockedIn}
+            >
+              <LogIn className="size-4" />
+              Vào ca
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border bg-background px-4 text-sm font-medium active:scale-[0.97] disabled:opacity-50 sm:flex-none"
+              onClick={() => clock("out")}
+              disabled={!data.clockedIn}
+            >
+              <LogOut className="size-4" />
+              Ra ca
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-50 sm:flex-none"
-            onClick={() => clock("in")}
-            disabled={data.clockedIn}
-          >
-            <LogIn className="size-4" />
-            Vào ca
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border bg-background px-4 text-sm font-medium active:scale-[0.97] disabled:opacity-50 sm:flex-none"
-            onClick={() => clock("out")}
-            disabled={!data.clockedIn}
-          >
-            <LogOut className="size-4" />
-            Ra ca
-          </button>
-        </div>
-      </div>
-
-      {"revenueToday" in data ? (
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Card label="Doanh thu hôm nay" value={formatMaybe(data.revenueToday)} icon={Wallet} tone="bg-blue-500/10 text-blue-700" />
-          <Card label="Doanh thu tháng" value={formatMaybe(data.revenueMonth)} icon={CalendarDays} tone="bg-emerald-500/10 text-emerald-700" />
-          <Card label="Hòa vốn tháng" value={data.breakevenPercent === null ? "—" : `${data.breakevenPercent}%`} icon={Target} tone="bg-amber-500/10 text-amber-700" />
-          <Card label="Hôm nay còn thiếu" value={formatMaybe(data.todayGap)} icon={CircleAlert} tone="bg-orange-500/10 text-orange-700" />
-          <Card label="Lãi gộp tháng" value={data.grossIncomplete ? "Chưa đủ số" : formatMaybe(data.gross)} icon={TrendingUp} tone="bg-teal-500/10 text-teal-700" />
-          <Card label="Lợi nhuận tháng" value={data.profit === null ? "Chưa đủ số" : formatMaybe(data.profit)} icon={PiggyBank} tone="bg-violet-500/10 text-violet-700" />
-        </section>
-      ) : null}
-
-      {"kpiPercent" in data ? (
-        <section className="glass-card rounded-3xl p-5">
-          <h2 className="text-lg font-bold text-primary">KPI và hoa hồng của bạn</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {data.commissionBasis === "handled"
-              ? "Hoa hồng theo doanh thu đơn bạn xử lý. Không hiện giá vốn hay lãi."
-              : "Hoa hồng theo doanh thu toàn tiệm. Không hiện số doanh thu, giá vốn hay lãi."}
-          </p>
-          <p className="mt-3 text-3xl font-extrabold text-accent">{data.kpiPercent === null ? "—" : `${data.kpiPercent}% KPI`}</p>
-          <p className="mt-1 text-base font-semibold">Hoa hồng tạm tính: {formatMaybe(data.commission)}</p>
-        </section>
-      ) : null}
+      </section>
 
       <section>
-        <h2 className="text-lg font-bold text-primary">Quy trình đơn</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Nhận đơn, thiết kế, chờ khách duyệt, in, đóng gói, giao, rồi xong. Đơn hủy không tự mở lại.</p>
-        <div className="mt-3 flex gap-1.5 overflow-x-auto scrollbar-none pb-1" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className="mb-2 flex items-end justify-between gap-3">
+          <h2 className="text-sm font-semibold text-primary">Đơn theo bước</h2>
+          <Link to="/admin/don-hang" className="text-sm font-semibold text-primary">Mở bảng đơn</Link>
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1" style={{ WebkitOverflowScrolling: "touch" }}>
           {data.byStatus.map((row) => {
             const tone = STATUS_TONE[row.status] ?? { color: "#4B5563", icon: Target };
             const Icon = tone.icon;
             return (
-              <div
+              <Link
                 key={row.status}
+                to="/admin/don-hang"
+                search={{ status: row.status }}
                 className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold"
                 style={{ borderColor: "transparent", backgroundColor: `${tone.color}18`, color: tone.color }}
               >
@@ -103,54 +92,92 @@ function DashboardPage() {
                 >
                   {row.count}
                 </span>
-              </div>
+              </Link>
             );
           })}
         </div>
       </section>
 
-      {"queue" in data ? (
-        <OrderBlock title="Đơn cần in / ép / đóng gói" rows={data.queue} />
+      {"revenueToday" in data ? (
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <Card label="Doanh thu hôm nay" value={formatMaybe(data.revenueToday)} hint="Đơn đã xong" icon={Wallet} tone="bg-blue-500/10 text-blue-700" />
+          <Card label="Doanh thu tháng" value={formatMaybe(data.revenueMonth)} hint={data.breakevenPercent === null ? "Chưa đặt mốc hòa vốn" : `${data.breakevenPercent}% mốc hòa vốn`} icon={CalendarDays} tone="bg-emerald-500/10 text-emerald-700" />
+          <Card label="Hôm nay còn thiếu" value={formatMaybe(data.todayGap)} hint="So với mốc hòa vốn ngày" icon={CircleAlert} tone="bg-orange-500/10 text-orange-700" />
+          <Card label="Lãi gộp tháng" value={data.grossIncomplete ? "Chưa đủ số" : formatMaybe(data.gross)} hint="Giá bán trừ vật tư, mực, phí kênh" icon={TrendingUp} tone="bg-teal-500/10 text-teal-700" />
+          <Card label="Lợi nhuận tháng" value={data.profit === null ? "Chưa đủ số" : formatMaybe(data.profit)} hint="Lãi gộp trừ chi phí" icon={PiggyBank} tone="bg-violet-500/10 text-violet-700" />
+        </section>
       ) : null}
-      {"orders" in data ? <OrderBlock title="Đơn cần xử lý" rows={data.orders} /> : null}
 
-      <section className="glass-card rounded-3xl p-5">
-        <h2 className="text-lg font-bold text-primary">Đơn trễ mốc sàn</h2>
-        {data.late.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Không có đơn trễ 14:00 / 18:00.</p> : <OrderList rows={data.late} />}
-      </section>
+      {"kpiPercent" in data ? (
+        <section className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
+          <h2 className="text-lg font-semibold text-primary">KPI và hoa hồng của bạn</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {data.commissionBasis === "handled"
+              ? "Hoa hồng theo doanh thu đơn bạn xử lý. Không hiện giá vốn hay lãi."
+              : "Hoa hồng theo doanh thu toàn tiệm. Không hiện số doanh thu, giá vốn hay lãi."}
+          </p>
+          <p className="mt-3 text-3xl font-semibold text-primary">{data.kpiPercent === null ? "—" : `${data.kpiPercent}% KPI`}</p>
+          <p className="mt-1 text-base font-semibold">Hoa hồng tạm tính: {formatMaybe(data.commission)}</p>
+          <Link to="/admin/kpi" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary">Xem KPI tháng</Link>
+        </section>
+      ) : null}
 
-      <section className="glass-card rounded-3xl p-5">
-        <h2 className="text-lg font-bold text-primary">Vật tư sắp hết</h2>
-        {data.lowStock.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">Chưa đặt mức tối thiểu, hoặc chưa có vật tư dưới mức.</p>
-        ) : (
-          <ul className="mt-3 space-y-2 text-sm">
-            {data.lowStock.map((item) => (
-              <li key={item.id} className="rounded-xl bg-destructive/10 px-3 py-2 font-semibold text-destructive">
-                {item.name}: {item.stock} {item.unit} (tối thiểu {item.min})
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="glass-card rounded-3xl p-5">
-        <h2 className="text-lg font-bold text-primary">Đang trong ca</h2>
-        {data.onShift.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">Chưa ai bấm vào ca.</p>
-        ) : (
-          <ul className="mt-2 text-sm">
-            {data.onShift.map((person) => (
-              <li key={person.id}>{person.name}</li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.8fr)]">
+        <div className="space-y-4">
+          {"queue" in data ? <OrderBlock title="Việc in, ép, đóng gói" rows={data.queue} /> : null}
+          {"orders" in data ? <OrderBlock title="Đơn mới nhất" rows={data.orders} /> : null}
+        </div>
+        <div className="space-y-4">
+          <section className="rounded-2xl border border-border/70 bg-card p-4">
+            <h2 className="font-semibold text-primary">Đơn trễ mốc sàn</h2>
+            {data.late.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Không có đơn trễ 14:00 / 18:00.</p> : <OrderList rows={data.late} />}
+          </section>
+          <section className="rounded-2xl border border-border/70 bg-card p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold text-primary">Vật tư sắp hết</h2>
+              <Link to="/admin/kho" className="text-sm font-semibold text-primary">Kho</Link>
+            </div>
+            {data.lowStock.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">Chưa đặt mức tối thiểu, hoặc chưa có vật tư dưới mức.</p>
+            ) : (
+              <ul className="mt-3 space-y-2 text-sm">
+                {data.lowStock.map((item) => (
+                  <li key={item.id} className="rounded-xl bg-destructive/10 px-3 py-2 font-semibold text-destructive">
+                    {item.name}: {item.stock} {item.unit} (tối thiểu {item.min})
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section className="rounded-2xl border border-border/70 bg-card p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold text-primary">Đang trong ca</h2>
+              <Link to="/admin/cham-cong" className="text-sm font-semibold text-primary">Bảng công</Link>
+            </div>
+            {data.onShift.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">Chưa ai bấm vào ca.</p>
+            ) : (
+              <ul className="mt-2 space-y-1 text-sm">
+                {data.onShift.map((person) => (
+                  <li key={person.id}>{person.name}</li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
 
-function Card({ label, value, icon: Icon, tone }: { label: string; value: string; icon: LucideIcon; tone: string }) {
+function greeting() {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
+  if (hour < 11) return "Chào buổi sáng";
+  if (hour < 18) return "Chào buổi chiều";
+  return "Chào buổi tối";
+}
+
+function Card({ label, value, hint, icon: Icon, tone }: { label: string; value: string; hint?: string; icon: LucideIcon; tone: string }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-card p-4">
       <div className="flex items-start justify-between gap-2">
@@ -160,13 +187,14 @@ function Card({ label, value, icon: Icon, tone }: { label: string; value: string
         </span>
       </div>
       <p className="mt-3 text-xl font-semibold tracking-tight text-primary sm:text-2xl">{value}</p>
+      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
 
 function OrderBlock({ title, rows }: { title: string; rows: { code: string; itemSummary: string; statusLabel: string; late: boolean }[] }) {
   return (
-    <section className="glass-card rounded-3xl p-5">
+    <section className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-primary">{title}</h2>
         <Link to="/admin/don-hang" className="text-sm font-semibold text-accent">

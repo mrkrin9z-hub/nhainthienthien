@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { StaffLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +25,8 @@ function AccountPage() {
   if (!me.data) return <p className="text-muted-foreground">Đang tải…</p>;
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-extrabold text-primary">Tài khoản của tôi</h1>
+      <StaffLinks />
+      <h1 className="text-2xl font-semibold text-primary">Tài khoản của tôi</h1>
       <p className="text-sm text-muted-foreground">
         {me.data.email}
         {me.data.totpEnabled ? " · xác thực 2 lớp đang bật" : " · chưa bật xác thực 2 lớp"}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { PageToolbar } from "@/components/admin/page-toolbar";
+import { GoodsLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PackageSearch } from "lucide-react";
@@ -34,6 +35,7 @@ function StockPage() {
 
   return (
     <div className="space-y-4">
+      <GoodsLinks />
       <PageToolbar
         title="Kho"
         hint="Tồn đầu kỳ đang là 0. Đếm thực tế rồi nhập. Giá túi, carton, tem để trống."

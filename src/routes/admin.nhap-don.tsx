@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { OrderLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ function ImportBody() {
 
   return (
     <div className="space-y-6">
+      <OrderLinks />
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Nhập đơn sàn</h1>
         <p className="mt-1 text-sm text-muted-foreground">

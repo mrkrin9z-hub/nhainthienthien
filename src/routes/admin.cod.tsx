@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
 import { PageToolbar } from "@/components/admin/page-toolbar";
+import { OrderLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,7 @@ function CodBody() {
   });
   return (
     <div className="space-y-4">
+      <OrderLinks />
       <PageToolbar
         title="Đối soát COD"
         search={q}

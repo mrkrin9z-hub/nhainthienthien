@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { MoneyLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,10 +37,11 @@ function ReportBody() {
 
   return (
     <div className="space-y-4">
+      <MoneyLinks />
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Báo cáo</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Doanh thu và lãi gộp lấy đơn đã xong. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh. Mặc định chi phí cố định 29.400.000đ/tháng. Chi phí phát sinh ghi ở trang Chi phí và lợi nhuận.
+          Doanh thu và lãi gộp lấy đơn đã xong. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh. Mặc định chi phí cố định 29.400.000đ/tháng. Chi phí phát sinh ghi ở Thu chi.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

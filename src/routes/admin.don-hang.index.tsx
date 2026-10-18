@@ -1,15 +1,19 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { AlarmClock, Download, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlarmClock, Columns3, Download, List, Plus } from "lucide-react";
 
 import { ClearFilters, FilterSheet, PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
+import { OrderLinks } from "@/components/admin/sections";
 import { ALL_TONE, CHANNEL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
 import { formatMaybe } from "@/lib/brand";
 import { downloadExcel, getMe, getOrders } from "@/lib/admin.functions";
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL, type OrderStatus } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-hang/")({
+  validateSearch: (search: Record<string, unknown>): { status: string } => ({
+    status: typeof search.status === "string" && search.status ? search.status : "all",
+  }),
   component: OrdersPage,
 });
 
@@ -19,11 +23,23 @@ const PRODUCTION_FLOW: OrderStatus[] = ["in", "dong_goi", "giao"];
 function OrdersPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const orders = useQuery({ queryKey: ["orders"], queryFn: () => getOrders() });
+  const navigate = useNavigate();
+  const { status } = Route.useSearch();
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("all");
   const [channel, setChannel] = useState("all");
   const [lateOnly, setLateOnly] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [view, setView] = useState<"list" | "board">("list");
+  useEffect(() => {
+    if (window.localStorage.getItem("admin-orders-view") === "board") setView("board");
+  }, []);
+  function setStatus(next: string) {
+    void navigate({ to: "/admin/don-hang", search: { status: next } });
+  }
+  function chooseView(next: "list" | "board") {
+    setView(next);
+    window.localStorage.setItem("admin-orders-view", next);
+  }
   const production = me.data?.role === "production";
   const rows = orders.data?.orders ?? [];
   const flow = production ? PRODUCTION_FLOW : SALE_FLOW;
@@ -97,8 +113,15 @@ function OrdersPage() {
     );
   }
 
+  const columns = (status === "all" ? flow : flow.filter((item) => item === status)).map((item) => ({
+    status: item,
+    label: STATUS_LABEL[item] ?? item,
+    rows: shown.filter((order) => order.status === item),
+  }));
+
   return (
     <div className="space-y-3">
+      <OrderLinks />
       <PageToolbar
         title="Đơn hàng"
         hint={production ? "Chỉ hiện đơn đang In, Đóng gói hoặc Giao." : undefined}
@@ -109,6 +132,7 @@ function OrdersPage() {
         onFilter={() => setSheet(true)}
         actions={
           <>
+            <ToolbarButton label={view === "board" ? "Danh sách" : "Dạng cột"} icon={view === "board" ? List : Columns3} onClick={() => chooseView(view === "board" ? "list" : "board")} />
             {production ? null : (
               <ToolbarButton
                 label="Xuất Excel"
@@ -135,7 +159,31 @@ function OrdersPage() {
         }
       />
       <FilterChips label="Trạng thái đơn" value={status} chips={statusChips} onChange={setStatus} />
-      <p className="text-xs text-muted-foreground">Hiển thị {shown.length} đơn</p>
+      <p className="text-xs text-muted-foreground">{view === "board" ? "Dạng cột" : "Danh sách"} · {shown.length} đơn</p>
+      {view === "board" ? (
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x" style={{ WebkitOverflowScrolling: "touch" }}>
+          {columns.map((column) => {
+            const tone = STATUS_TONE[column.status];
+            return (
+              <section key={column.status} className="w-[min(100%,18.5rem)] shrink-0 snap-start">
+                <header className="mb-2 flex items-center gap-2 px-1">
+                  <span className="size-2.5 rounded-full" style={{ backgroundColor: tone?.color ?? "#6B7280" }} />
+                  <h2 className="text-sm font-semibold">{column.label}</h2>
+                  <span className="text-xs text-muted-foreground">{column.rows.length}</span>
+                </header>
+                <div className="space-y-2">
+                  {column.rows.map((order) => (
+                    <OrderCard key={order.id} order={order} money={!production} />
+                  ))}
+                  {column.rows.length === 0 ? <p className="rounded-2xl border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">Không có đơn</p> : null}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      ) : null}
+      {view === "list" ? (
+      <>
       <div className="grid gap-2 md:hidden">
         {shown.map((order) => (
           <OrderCard key={order.id} order={order} money={!production} />
@@ -183,6 +231,8 @@ function OrdersPage() {
               : "Chưa có đơn. Đơn trên web sẽ hiện ở đây sau khi khách gửi ảnh."
             : "Không có đơn hàng nào phù hợp bộ lọc."}
         </p>
+      ) : null}
+      </>
       ) : null}
       <FilterSheet open={sheet} onClose={() => setSheet(false)} title="Bộ lọc đơn hàng">
         {extraFilters()}

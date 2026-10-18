@@ -79,6 +79,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     )
     .map((person) => ({ id: person.id, name: person.name, role: person.role }));
   const mineOpen = state.punches.find((punch) => punch.staffId === actor.id && !punch.outAt) ?? null;
+  const clockedInAt = mineOpen?.inAt ?? null;
   if (actor.role === "production") {
     return {
       role: actor.role,
@@ -91,6 +92,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
       lowStock,
       onShift: onShift.filter((person) => person.id === actor.id),
       clockedIn: Boolean(mineOpen),
+      clockedInAt,
     };
   }
   if (actor.role === "sale") {
@@ -104,6 +106,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
       lowStock,
       onShift,
       clockedIn: Boolean(mineOpen),
+      clockedInAt,
       orders: visible.slice(0, 12).map((order) => orderSummary(state, order, actor.role)),
       kpiPercent: target > 0 ? Math.round((pay.revenue / target) * 1000) / 10 : null,
       commission: pay.commission,
@@ -146,6 +149,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     lowStock,
     onShift,
     clockedIn: Boolean(mineOpen),
+    clockedInAt,
     revenueToday,
     revenueMonth,
     breakevenPercent: state.settings.breakevenMonth ? Math.round((revenueMonth / state.settings.breakevenMonth) * 1000) / 10 : null,

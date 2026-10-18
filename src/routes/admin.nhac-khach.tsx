@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
 import { PageToolbar } from "@/components/admin/page-toolbar";
+import { CustomerLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { getReminders } from "@/lib/admin.functions";
@@ -41,6 +42,7 @@ function RemindBody() {
   });
   return (
     <div className="space-y-3">
+      <CustomerLinks />
       <PageToolbar
         title="Nhắc khách"
         hint="Khách có đơn cuối đã lâu, hoặc ngày giỗ / ngày đặc biệt sắp tới. Chép tin nhắn rồi gửi tay. Phần mềm không tự gửi."
