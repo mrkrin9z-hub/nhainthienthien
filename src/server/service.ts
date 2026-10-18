@@ -52,6 +52,7 @@ import { defaultCarrier } from "@/domain/jt";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
 import { publicContact } from "@/domain/public-contact";
 import { applyPriceDrafts, parsePriceRows, type PriceDraft } from "@/domain/price-sheet";
+import { applyShelfOffers, cloneChannelPrices, type ShelfOffer } from "@/domain/catalog-sync";
 import { rowsFromUpload } from "@/domain/sheet";
 import { buildWebProduct, type WebProductInput } from "@/domain/web-product";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
@@ -2763,6 +2764,36 @@ export async function importMarketplaceOrders(actor: Actor, channel: Marketplace
     duplicateCount: plan.duplicates.length,
     cancelled: plan.cancelled,
   };
+}
+
+export async function importShelf(actor: Actor, offers: ShelfOffer[]) {
+  assertRole(actor, ["owner"]);
+  return mutate(async (state) => {
+    if (!state.skuMaps) state.skuMaps = [];
+    const result = applyShelfOffers(
+      { groups: state.groups, skus: state.skus, prices: state.prices, skuMaps: state.skuMaps },
+      offers,
+    );
+    audit(state, actor.id, "catalog.sync", offers[0]?.channel ?? "san", null, {
+      created: result.created,
+      priced: result.priced,
+      mapped: result.mapped,
+      skipped: result.skipped.length,
+    });
+    return { created: result.created, priced: result.priced, mapped: result.mapped, skipped: result.skipped.slice(0, 8) };
+  });
+}
+
+export async function cloneShelfPrices(
+  actor: Actor,
+  input: { groupId: string; from: "tiktok" | "shopee"; to: "tai_tiem" | "facebook"; overwrite: boolean },
+) {
+  assertRole(actor, ["owner"]);
+  return mutate(async (state) => {
+    const result = cloneChannelPrices(state, input);
+    audit(state, actor.id, "catalog.clone", input.groupId, null, { ...input, ...result });
+    return result;
+  });
 }
 
 export async function marketplaceSyncStatus(actor: Actor) {

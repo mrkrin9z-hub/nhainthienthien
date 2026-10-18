@@ -1,4 +1,12 @@
 import {
+  applyShelfOffers,
+  offersFromShopeeItem,
+  offersFromTiktokProduct,
+  shopeeListPage,
+  tiktokSearchPage,
+  type ShelfOffer,
+} from "@/domain/catalog-sync";
+import {
   LOOKBACK_SEC,
   PULL_GAP_MS,
   SHOPEE_API,
@@ -21,7 +29,7 @@ import {
 } from "@/domain/marketplace-api";
 import type { ParsedLine } from "@/domain/marketplace";
 import { readIntegrationSecret, saveIntegrationSecret } from "@/server/secrets";
-import { importMarketplaceOrders, setIntegration, type Actor } from "@/server/service";
+import { importMarketplaceOrders, importShelf, setIntegration, type Actor } from "@/server/service";
 
 type Dict = Record<string, unknown>;
 type Channel = "tiktok" | "shopee";
@@ -189,22 +197,30 @@ async function refreshShopee(partnerId: string, partnerKey: string, link: Shopee
   return next;
 }
 
-async function liveTiktok(): Promise<{ appKey: string; appSecret: string; link: TiktokLink }> {
+async function liveTiktok(touchOrders = true): Promise<{ appKey: string; appSecret: string; link: TiktokLink }> {
   const appKey = (await readIntegrationSecret("tiktok_app_key")).trim();
   const appSecret = (await readIntegrationSecret("tiktok_app_secret")).trim();
   const link = parseTiktokLink(await readIntegrationSecret("tiktok_shop"));
   if (!appKey || !appSecret || !link) throw new Error(MISSING.tiktok);
+  if (!touchOrders) {
+    const fresh = tokenFresh(link.expireAt, Date.now()) ? link : await refreshTiktok(appKey, appSecret, link);
+    return { appKey, appSecret, link: fresh };
+  }
   const stamped = { ...link, pulledAt: Date.now() };
   await saveIntegrationSecret("tiktok_shop", JSON.stringify(stamped));
   const fresh = tokenFresh(stamped.expireAt, Date.now()) ? stamped : await refreshTiktok(appKey, appSecret, stamped);
   return { appKey, appSecret, link: fresh };
 }
 
-async function liveShopee(): Promise<{ partnerId: string; partnerKey: string; link: ShopeeLink }> {
+async function liveShopee(touchOrders = true): Promise<{ partnerId: string; partnerKey: string; link: ShopeeLink }> {
   const partnerId = (await readIntegrationSecret("shopee_partner_id")).trim();
   const partnerKey = (await readIntegrationSecret("shopee_partner_key")).trim();
   const link = parseShopeeLink(await readIntegrationSecret("shopee_shop"));
   if (!partnerId || !partnerKey || !link) throw new Error(MISSING.shopee);
+  if (!touchOrders) {
+    const fresh = tokenFresh(link.expireAt, Date.now()) ? link : await refreshShopee(partnerId, partnerKey, link);
+    return { partnerId, partnerKey, link: fresh };
+  }
   const stamped = { ...link, pulledAt: Date.now() };
   await saveIntegrationSecret("shopee_shop", JSON.stringify(stamped));
   const fresh = tokenFresh(stamped.expireAt, Date.now()) ? stamped : await refreshShopee(partnerId, partnerKey, stamped);
@@ -277,9 +293,100 @@ async function fetchShopeeLines(): Promise<ParsedLine[]> {
   return linesFromShopeeOrders(orders);
 }
 
+const PAGE = 10;
+
+async function fetchTiktokOffers(): Promise<{ offers: ShelfOffer[]; next: string }> {
+  const { appKey, appSecret, link } = await liveTiktok(false);
+  const query: Record<string, string> = { shop_cipher: link.shopCipher, page_size: String(PAGE) };
+  if (link.catalogToken) query.page_token = link.catalogToken;
+  const data = await tiktokCall({
+    appKey,
+    appSecret,
+    accessToken: link.accessToken,
+    path: "/product/202309/products/search",
+    query,
+    body: JSON.stringify({ status: "ACTIVATE" }),
+  });
+  const page = tiktokSearchPage(data);
+  const offers: ShelfOffer[] = [];
+  for (const id of page.ids) {
+    const detail = await tiktokCall({
+      appKey,
+      appSecret,
+      accessToken: link.accessToken,
+      path: `/product/202309/products/${id}`,
+      query: { shop_cipher: link.shopCipher },
+    });
+    offers.push(...offersFromTiktokProduct(detail));
+  }
+  const saved: TiktokLink = { ...link, catalogAt: page.next ? link.catalogAt : Date.now(), catalogToken: page.next };
+  await saveIntegrationSecret("tiktok_shop", JSON.stringify(saved));
+  return { offers, next: page.next };
+}
+
+async function fetchShopeeOffers(): Promise<{ offers: ShelfOffer[]; next: string }> {
+  const { partnerId, partnerKey, link } = await liveShopee(false);
+  const offset = /^\d{1,8}$/.test(link.catalogToken) ? link.catalogToken : "0";
+  const listed = await shopeeCall({
+    partnerId,
+    partnerKey,
+    path: "/api/v2/product/get_item_list",
+    accessToken: link.accessToken,
+    shopId: link.shopId,
+    query: { offset, page_size: String(PAGE), item_status: "NORMAL" },
+  });
+  const page = shopeeListPage(asRecord(listed.response));
+  const offers: ShelfOffer[] = [];
+  if (page.ids.length) {
+    const info = await shopeeCall({
+      partnerId,
+      partnerKey,
+      path: "/api/v2/product/get_item_base_info",
+      accessToken: link.accessToken,
+      shopId: link.shopId,
+      query: { item_id_list: page.ids.join(",") },
+    });
+    const items = Array.isArray(asRecord(info.response)?.item_list) ? (asRecord(info.response)?.item_list as unknown[]) : [];
+    for (const raw of items) {
+      const item = asRecord(raw);
+      if (!item) continue;
+      if (item.has_model === true) {
+        const itemId = text(item.item_id);
+        if (!/^\d{1,20}$/.test(itemId)) continue;
+        const models = await shopeeCall({
+          partnerId,
+          partnerKey,
+          path: "/api/v2/product/get_model_list",
+          accessToken: link.accessToken,
+          shopId: link.shopId,
+          query: { item_id: itemId },
+        });
+        offers.push(...offersFromShopeeItem(item, asRecord(models.response)));
+      } else {
+        offers.push(...offersFromShopeeItem(item, null));
+      }
+    }
+  }
+  const next = page.nextOffset === null ? "" : String(page.nextOffset);
+  const saved: ShopeeLink = { ...link, catalogAt: next ? link.catalogAt : Date.now(), catalogToken: next };
+  await saveIntegrationSecret("shopee_shop", JSON.stringify(saved));
+  return { offers, next };
+}
+
+export async function pullCatalogNow(actor: Actor, channel: Channel) {
+  const batch = channel === "tiktok" ? await fetchTiktokOffers() : await fetchShopeeOffers();
+  const applied = await importShelf(actor, batch.offers);
+  return { ...applied, more: Boolean(batch.next) };
+}
+
 export async function pullMarketplaceNow(actor: Actor, channel: Channel) {
   const lines = channel === "tiktok" ? await fetchTiktokLines() : await fetchShopeeLines();
   return importMarketplaceOrders(actor, channel, lines);
+}
+
+function catalogDue(link: { catalogAt: number; catalogToken: string }, now: number): boolean {
+  if (link.catalogToken) return true;
+  return now - link.catalogAt >= PULL_GAP_MS;
 }
 
 export async function pullDueMarketplace(actor: Actor) {
@@ -297,6 +404,23 @@ export async function pullDueMarketplace(actor: Actor) {
   if (shopee && now - shopee.pulledAt >= PULL_GAP_MS) {
     try {
       await pullMarketplaceNow(actor, "shopee");
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : "Shopee");
+    }
+  }
+  if (actor.role !== "owner") return;
+  const tiktokNow = parseTiktokLink(await readIntegrationSecret("tiktok_shop"));
+  if (tiktokNow && catalogDue(tiktokNow, now)) {
+    try {
+      await pullCatalogNow(actor, "tiktok");
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : "TikTok Shop");
+    }
+  }
+  const shopeeNow = parseShopeeLink(await readIntegrationSecret("shopee_shop"));
+  if (shopeeNow && catalogDue(shopeeNow, now)) {
+    try {
+      await pullCatalogNow(actor, "shopee");
     } catch (error) {
       console.error(error instanceof Error ? error.message : "Shopee");
     }
@@ -340,6 +464,8 @@ export async function connectTiktok(actor: Actor, code: string) {
     shopCipher: shop.cipher,
     shopId: shop.id,
     pulledAt: 0,
+    catalogAt: 0,
+    catalogToken: "",
   };
   await setIntegration(actor, "tiktok_shop", JSON.stringify(link));
 }
@@ -364,6 +490,8 @@ export async function connectShopee(actor: Actor, code: string, shopId: string) 
     expireAt: expireAtFromApi(num(row.expire_in), Date.now()),
     shopId,
     pulledAt: 0,
+    catalogAt: 0,
+    catalogToken: "",
   };
   await setIntegration(actor, "shopee_shop", JSON.stringify(link));
 }

@@ -13,6 +13,10 @@ export type TiktokLink = {
   shopCipher: string;
   shopId: string;
   pulledAt: number;
+  /** Lần kéo sản phẩm gần nhất. */
+  catalogAt: number;
+  /** Trang kế. Rỗng nghĩa là vòng sau kéo lại từ đầu. */
+  catalogToken: string;
 };
 
 export type ShopeeLink = {
@@ -21,6 +25,8 @@ export type ShopeeLink = {
   expireAt: number;
   shopId: string;
   pulledAt: number;
+  catalogAt: number;
+  catalogToken: string;
 };
 
 type Dict = Record<string, unknown>;
@@ -127,6 +133,8 @@ export function parseTiktokLink(raw: string): TiktokLink | null {
       shopCipher,
       shopId: text(row.shopId),
       pulledAt: linkNumber(row.pulledAt),
+      catalogAt: linkNumber(row.catalogAt),
+      catalogToken: text(row.catalogToken).slice(0, 400),
     };
   } catch {
     return null;
@@ -148,6 +156,8 @@ export function parseShopeeLink(raw: string): ShopeeLink | null {
       expireAt: linkNumber(row.expireAt),
       shopId,
       pulledAt: linkNumber(row.pulledAt),
+      catalogAt: linkNumber(row.catalogAt),
+      catalogToken: text(row.catalogToken).slice(0, 40),
     };
   } catch {
     return null;
