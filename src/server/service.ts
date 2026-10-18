@@ -1013,31 +1013,14 @@ export async function acknowledgeCustomerPhotos(input: { orderId: string; access
 }
 
 export async function lookupOrder(code: string, phone: string) {
+  const { lookupByPhone } = await import("@/domain/order-lookup");
   const state = await readState();
-  const phoneNormalized = normalizePhone(phone);
-  const order = state.orders.find((item) => item.code.toUpperCase() === code.trim().toUpperCase());
-  const customer = order ? state.customers.find((item) => item.id === order.customerId) : undefined;
-  if (!order || !customer || customer.phoneNormalized !== phoneNormalized) {
-    throw new Error("Không tìm thấy đơn hàng khớp mã đơn và số điện thoại.");
-  }
-  return {
-    code: order.code,
-    status: order.status,
-    createdAt: order.createdAt,
-    total: order.total,
-    fulfillment: order.fulfillment,
-    address: order.address || null,
-    note: order.customerNote || null,
-    customerName: customer.name,
-    items: order.items.map((item) => ({
-      name: item.name,
-      variant: item.skuCode,
-      quantity: item.quantity,
-      lineTotal: item.lineTotal,
-    })),
-    fileCount: order.files.filter((file) => !file.deletedAt).length,
-    history: order.history.map((item) => ({ to: item.to, at: item.at, note: item.note })),
-  };
+  return lookupByPhone({
+    phone,
+    code,
+    customers: state.customers,
+    orders: state.orders,
+  });
 }
 
 async function pullDueQuiet(actor: Actor) {

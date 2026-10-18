@@ -73,22 +73,26 @@ export const submitOrder = createServerFn({ method: "POST" })
   });
 
 const lookupSchema = z.object({
-  code: z.string().trim().min(4).max(30),
+  code: z.string().trim().max(30).refine((value) => value === "" || value.length >= 4, "Mã đơn chưa đúng."),
   phone: z.string().trim().min(8).max(20),
 });
 
 export type OrderLookupResult = {
-  code: string;
-  status: string;
-  createdAt: string;
-  total: number | null;
-  fulfillment: string;
-  address: string | null;
-  note: string | null;
   customerName: string;
-  items: { name: string; variant: string; quantity: number; lineTotal: number | null }[];
-  fileCount: number;
-  history: { to: string; at: string; note: string | null }[];
+  focus: string;
+  orders: {
+    code: string;
+    status: string;
+    createdAt: string;
+    total: number | null;
+    fulfillment: string;
+    address: string | null;
+    note: string | null;
+    customerName: string;
+    items: { name: string; variant: string; quantity: number; lineTotal: number | null }[];
+    fileCount: number;
+    history: { to: string; at: string; note: string }[];
+  }[];
 };
 
 const albumTicketSchema = z.object({
