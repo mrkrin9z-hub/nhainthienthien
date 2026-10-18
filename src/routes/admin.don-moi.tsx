@@ -8,7 +8,6 @@ import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { createDeskOrder, getCustomers, getMe, getSkuOptions } from "@/lib/admin.functions";
 import { formatMaybe, formatVnd } from "@/lib/brand";
@@ -127,7 +126,7 @@ function NewOrderBody() {
 
   return (
     <form
-      className="mx-auto max-w-3xl space-y-4"
+      className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3"
       onSubmit={async (event) => {
         event.preventDefault();
         const items = priced
@@ -167,17 +166,18 @@ function NewOrderBody() {
         }
       }}
     >
-      <div>
-        <Link to="/admin/don-hang" className="text-sm text-muted-foreground">
-          Quay lại đơn hàng
-        </Link>
-        <h1 className="text-2xl font-bold">Tạo đơn mới</h1>
-        <p className="text-sm text-muted-foreground">Khách, kênh và dòng sản phẩm. Giá lấy theo kênh. Sale không sửa giá. Trạng thái lúc tạo là Nhận đơn.</p>
-      </div>
+      <div className="space-y-4 xl:col-span-2">
+        <div>
+          <Link to="/admin/don-hang" className="text-sm text-muted-foreground">
+            Quay lại đơn hàng
+          </Link>
+          <h1 className="text-2xl font-bold">Tạo đơn mới</h1>
+          <p className="text-sm text-muted-foreground">Khách, kênh và dòng sản phẩm. Giá lấy theo kênh. Sale không sửa giá. Trạng thái lúc tạo là Nhận đơn.</p>
+        </div>
 
-      <div className="space-y-4 rounded-md border bg-card p-4">
-          <div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <section className="space-y-4 rounded-md border bg-card p-4">
+          <h2 className="text-base font-semibold">Thông tin khách hàng</h2>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Field label="Kênh">
                 <select className={control} value={channel} onChange={(event) => changeChannel(event.target.value as Channel)}>
                   {(Object.keys(CHANNEL_LABEL) as Channel[]).map((item) => (
@@ -243,7 +243,7 @@ function NewOrderBody() {
               <Field label="Hẹn giao">
                 <Input className="min-h-11" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
               </Field>
-              <div className={fulfillment === "delivery" ? "md:col-span-2" : ""}>
+              <div className={channel === "tiktok" || channel === "shopee" ? "" : "md:col-span-2"}>
                 <Field label="Địa chỉ">
                   <Input className="min-h-11" value={address} required={fulfillment === "delivery"} onChange={(event) => setAddress(event.target.value)} />
                 </Field>
@@ -258,49 +258,62 @@ function NewOrderBody() {
                   <Textarea value={note} placeholder="Ghi chú cho đơn hàng..." onChange={(event) => setNote(event.target.value)} />
                 </Field>
               </div>
-            </div>
           </div>
+        </section>
 
-          <div className="border-t pt-3">
-            <div className="mb-2 flex items-center justify-between">
-              <Label>Dòng sản phẩm</Label>
-              <Button type="button" size="sm" variant="outline" onClick={() => setLines((current) => [...current, blankLine()])}>
-                <Plus className="mr-1 size-3" />
-                Thêm
-              </Button>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Sản phẩm</TableHead>
-                  <TableHead className="w-32">Đơn giá</TableHead>
-                  <TableHead className="w-24">SL</TableHead>
-                  <TableHead className="w-32 text-right">Thành tiền</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-              {priced.map((line, index) => (
-                <ProductLine
-                  key={line.key}
-                  index={index}
-                  line={line}
-                  catalog={catalog}
-                  owner={owner}
-                  canRemove={lines.length > 1}
-                  onQuery={(query) => patchLine(line.key, { query })}
-                  onSku={(skuId) => chooseSku(line.key, skuId)}
-                  onQty={(quantity) => patchLine(line.key, { quantity })}
-                  onPrice={(unitPrice) => patchLine(line.key, { unitPrice, priceTouched: true })}
-                  onRemove={() => setLines((current) => current.filter((item) => item.key !== line.key))}
-                />
-              ))}
-              </TableBody>
-            </Table>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Thu lần 1">
+        <section className="rounded-md border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold">Danh sách sản phẩm</h2>
+            <Button type="button" size="sm" variant="outline" onClick={() => setLines((current) => [...current, blankLine()])}>
+              <Plus className="mr-1 size-3" />
+              Thêm sản phẩm
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {priced.map((line, index) => (
+              <ProductLine
+                key={line.key}
+                index={index}
+                line={line}
+                catalog={catalog}
+                owner={owner}
+                canRemove={lines.length > 1}
+                onQuery={(query) => patchLine(line.key, { query })}
+                onSku={(skuId) => chooseSku(line.key, skuId)}
+                onQty={(quantity) => patchLine(line.key, { quantity })}
+                onPrice={(unitPrice) => patchLine(line.key, { unitPrice, priceTouched: true })}
+                onRemove={() => setLines((current) => current.filter((item) => item.key !== line.key))}
+              />
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <aside className="space-y-3 rounded-md border bg-card p-4 xl:sticky xl:top-4">
+        <h2 className="text-base font-semibold">Thanh toán</h2>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Tạm tính</span>
+            <span className="font-semibold">{total === null ? "Chưa đủ giá" : formatVnd(total)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Đã thu</span>
+            <span className="font-medium">{formatVnd(paidAmount)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">{remain !== null && remain < 0 ? "Dư tiền" : "Còn lại"}</span>
+            <span className="font-semibold">{remain === null ? "—" : formatVnd(Math.abs(remain))}</span>
+          </div>
+        </div>
+        <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+          <p className="text-sm font-medium">Thu tiền lần 1</p>
+          <div className="flex items-end gap-2">
+            <div className="min-w-0 flex-1">
+              <Field label="Số tiền">
                 <Input inputMode="numeric" placeholder="Số tiền" value={deposit} onChange={(event) => setDeposit(event.target.value.replace(/[^\d]/g, ""))} />
               </Field>
+            </div>
+            <div className="w-36 shrink-0">
               <Field label="Nguồn thu">
                 <select className={control} value={method} onChange={(event) => setMethod(event.target.value)}>
                   <option>Tiền mặt</option>
@@ -308,22 +321,15 @@ function NewOrderBody() {
                 </select>
               </Field>
             </div>
-            <div className="mt-2 flex justify-end gap-4 text-sm">
-              <span className="text-muted-foreground">Tạm tính</span>
-              <span className="font-semibold">{total === null ? "Chưa đủ giá" : formatVnd(total)}</span>
-              <span className="text-muted-foreground">{remain !== null && remain < 0 ? "Dư" : "Còn lại"}</span>
-              <span className="font-semibold">{remain === null ? "—" : formatVnd(Math.abs(remain))}</span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {channel === "facebook" ? "Đơn Facebook có thể cần cọc trước khi in." : "Cọc có thể để trống, ghi thêm được sau khi mở đơn."}
-            </p>
           </div>
-          <div className="flex justify-end border-t pt-3">
-            <Button type="submit" disabled={saving}>
-              {saving ? "Đang lưu..." : "Lưu đơn"}
-            </Button>
-          </div>
-      </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          {channel === "facebook" ? "Đơn Facebook có thể cần cọc trước khi in." : "Cọc có thể để trống, ghi thêm được sau khi mở đơn."}
+        </p>
+        <Button type="submit" className="w-full" disabled={saving}>
+          {saving ? "Đang lưu..." : "Lưu đơn"}
+        </Button>
+      </aside>
     </form>
   );
 }
@@ -375,57 +381,64 @@ function ProductLine({
   const selected = line.sku;
 
   return (
-    <TableRow>
-      <TableCell>
-        <div className="space-y-1">
-        <Input className="min-h-11" placeholder="Tìm mã hoặc tên" value={line.query} onChange={(event) => onQuery(event.target.value)} aria-label={`Tìm sản phẩm dòng ${index + 1}`} />
-        <select className={control} value={line.skuId} aria-label={`Sản phẩm dòng ${index + 1}`} onChange={(event) => onSku(event.target.value)}>
-          <option value="">Chọn sản phẩm</option>
-          {[...groups.entries()].map(([name, items]) => (
-            <optgroup key={name} label={name}>
-              {items.map((sku) => (
-                <option key={sku.id} value={sku.id}>
-                  {sku.label}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-        </div>
-      </TableCell>
-      <TableCell>
-        {owner ? (
-          <Input
-            className="min-h-11 md:text-right"
-            inputMode="numeric"
-            aria-label={`Đơn giá ${selected?.name ?? index + 1}`}
-            placeholder={line.listed === null ? "Chưa có giá" : String(line.listed)}
-            value={line.unitPrice}
-            onChange={(event) => onPrice(event.target.value.replace(/[^\d]/g, ""))}
-          />
-        ) : (
-          <p className="text-sm">{line.unit === null ? "Chưa có giá" : formatVnd(line.unit)}</p>
-        )}
-      </TableCell>
-      <TableCell>
-        <Input
-          className="w-20 text-center"
-          type="number"
-          min={1}
-          max={500}
-          aria-label={`Số lượng dòng ${index + 1}`}
-          value={line.quantity}
-          onChange={(event) => onQty(Math.min(500, Math.max(1, Number(event.target.value) || 1)))}
-        />
-      </TableCell>
-      <TableCell className="text-right text-sm font-medium">{line.sku ? formatMaybe(line.lineTotal) : "—"}</TableCell>
-      <TableCell>
+    <div className="rounded-lg border p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-medium text-muted-foreground">Dòng {index + 1}</p>
         {canRemove ? (
           <Button type="button" size="icon" variant="ghost" aria-label="Xóa dòng" onClick={onRemove}>
             <Trash2 className="size-3" />
           </Button>
         ) : null}
-      </TableCell>
-    </TableRow>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Field label="Tìm sản phẩm">
+          <Input className="min-h-11" placeholder="Tìm mã hoặc tên" value={line.query} onChange={(event) => onQuery(event.target.value)} aria-label={`Tìm sản phẩm dòng ${index + 1}`} />
+        </Field>
+        <Field label="Sản phẩm">
+          <select className={control} value={line.skuId} aria-label={`Sản phẩm dòng ${index + 1}`} onChange={(event) => onSku(event.target.value)}>
+            <option value="">Chọn sản phẩm</option>
+            {[...groups.entries()].map(([name, items]) => (
+              <optgroup key={name} label={name}>
+                {items.map((sku) => (
+                  <option key={sku.id} value={sku.id}>
+                    {sku.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+        <Field label="Đơn giá">
+          {owner ? (
+            <Input
+              className="min-h-11"
+              inputMode="numeric"
+              aria-label={`Đơn giá ${selected?.name ?? index + 1}`}
+              placeholder={line.listed === null ? "Chưa có giá" : String(line.listed)}
+              value={line.unitPrice}
+              onChange={(event) => onPrice(event.target.value.replace(/[^\d]/g, ""))}
+            />
+          ) : (
+            <p className="flex min-h-11 items-center text-sm">{line.unit === null ? "Chưa có giá" : formatVnd(line.unit)}</p>
+          )}
+        </Field>
+        <Field label="Số lượng">
+          <Input
+            className="min-h-11 text-center"
+            type="number"
+            min={1}
+            max={500}
+            aria-label={`Số lượng dòng ${index + 1}`}
+            value={line.quantity}
+            onChange={(event) => onQty(Math.min(500, Math.max(1, Number(event.target.value) || 1)))}
+          />
+        </Field>
+        <Field label="Thành tiền">
+          <p className="flex min-h-11 items-center text-sm font-semibold">{line.sku ? formatMaybe(line.lineTotal) : "—"}</p>
+        </Field>
+      </div>
+    </div>
   );
 }

@@ -174,6 +174,50 @@ export const savePrice = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const priceMap = z.object({
+  tai_tiem: z.number().int().min(1000).max(100_000_000).optional(),
+  facebook: z.number().int().min(1000).max(100_000_000).optional(),
+  tiktok: z.number().int().min(1000).max(100_000_000).optional(),
+  shopee: z.number().int().min(1000).max(100_000_000).optional(),
+});
+
+export const createPriceSize = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        groupId: z.string().min(1),
+        widthCm: z.number().int().min(1).max(200),
+        heightCm: z.number().int().min(1).max(200),
+        sheets: z.number().int().min(1).max(100),
+        prices: priceMap,
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { createPriceSize: create } = await import("@/server/service");
+    const prices: Partial<Record<"tai_tiem" | "facebook" | "tiktok" | "shopee", number>> = {};
+    if (data.prices.tai_tiem !== undefined) prices.tai_tiem = data.prices.tai_tiem;
+    if (data.prices.facebook !== undefined) prices.facebook = data.prices.facebook;
+    if (data.prices.tiktok !== undefined) prices.tiktok = data.prices.tiktok;
+    if (data.prices.shopee !== undefined) prices.shopee = data.prices.shopee;
+    return create(await actor(), { ...data, prices });
+  });
+
+export const importPriceSheet = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        groupId: z.string().min(1),
+        filename: z.string().min(1).max(180),
+        base64: z.string().min(1).max(6_000_000),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { importPriceSheet: load } = await import("@/server/service");
+    return load(await actor(), data);
+  });
+
 export const savePieces = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ skuId: z.string(), pieces: z.number().int().positive().nullable() }).parse(data))
   .handler(async ({ data }) => {
