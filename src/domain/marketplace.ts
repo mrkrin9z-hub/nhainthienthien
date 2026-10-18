@@ -4,7 +4,7 @@ export type MarketplaceChannel = "tiktok" | "shopee";
 
 /**
  * Cột file xuất Seller Center. Khớp gần đúng: không phân biệt hoa thường, dấu, khoảng trắng.
- * Tên dài được ưu tiên, rồi tên nằm trong tiêu đề. API sau này trả cùng một bảng này.
+ * Tên dài được ưu tiên, rồi tên nằm trong tiêu đề. API TikTok/Shopee đổ về cùng PlannedOrder này.
  */
 const FIELD_ALIASES = {
   orderId: ["order id", "order sn", "order number", "ordersn", "ma don hang", "ma don"],
