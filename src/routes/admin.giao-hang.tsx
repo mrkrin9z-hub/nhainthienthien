@@ -106,7 +106,7 @@ function DeliveryPage() {
             {order.recipientName && order.recipientName !== order.customerName ? <p>Khách trong sổ: {order.customerName}</p> : null}
             {order.address ? <p>{order.address}</p> : null}
             <p className="text-muted-foreground">{order.channelLabel} · {order.itemSummary}</p>
-            <p>Hãng: {order.carrier || "chưa ghi"} · Vận đơn: {order.tracking || "chưa có"}</p>
+            <p>Hãng: {order.carrier || "chưa ghi"} · Vận đơn: {order.tracking || "chưa có"}{order.carrierStatus ? ` · ${order.carrierStatus}` : ""}</p>
             {money ? (
               <p>Phí ship: {order.shipFee === null ? "chưa có" : formatMaybe(order.shipFee)} · COD: {order.codAmount === null ? "không" : formatMaybe(order.codAmount)}</p>
             ) : null}

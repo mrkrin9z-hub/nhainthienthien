@@ -750,6 +750,62 @@ export const storeShipping = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const waybillInput = z.object({
+  orderId: z.string().min(1),
+  carrier: z.enum(["ghn", "ghtk", "jt"]),
+  province: z.string().max(80),
+  district: z.string().max(80),
+  ward: z.string().max(80),
+  address: z.string().max(500),
+  weightGrams: z.number().int(),
+  codAmount: z.number().int(),
+});
+
+export const getCarrierDesk = createServerFn({ method: "GET" }).handler(async () => {
+  const { carrierDesk } = await import("@/server/service");
+  return carrierDesk(await actor());
+});
+
+export const saveCarrierPickup = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        name: z.string().max(80),
+        phone: z.string().max(20),
+        address: z.string().max(250),
+        province: z.string().max(80),
+        district: z.string().max(80),
+        ward: z.string().max(80),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveCarrierPickup: save } = await import("@/server/service");
+    await save(await actor(), data);
+    return { ok: true };
+  });
+
+export const createCarrierWaybill = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => waybillInput.parse(data))
+  .handler(async ({ data }) => {
+    const { openCarrierWaybill } = await import("@/server/service");
+    return openCarrierWaybill(await actor(), data);
+  });
+
+export const quoteCarrierFee = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => waybillInput.parse(data))
+  .handler(async ({ data }) => {
+    const { quoteCarrierFee: quote } = await import("@/server/service");
+    return quote(await actor(), data);
+  });
+
+export const refreshCarrierWaybill = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { refreshCarrierWaybill: refresh } = await import("@/server/service");
+    return refresh(await actor(), data.orderId);
+  });
+
 export const setCodReceived = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ orderId: z.string(), received: z.boolean() }).parse(data))
   .handler(async ({ data }) => {

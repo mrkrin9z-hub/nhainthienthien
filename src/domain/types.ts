@@ -139,6 +139,15 @@ export type Settings = {
   remindMessage?: string;
   fixedCosts: { key: string; name: string; amount: number; note: string }[];
   rentFromJune2027: number;
+  /** Địa chỉ lấy hàng cho GHN, GHTK, J&T. Không phải khóa. */
+  carrierPickup?: {
+    name: string;
+    phone: string;
+    address: string;
+    province: string;
+    district: string;
+    ward: string;
+  };
 };
 
 export type Staff = {
@@ -257,6 +266,8 @@ export type OrderShipping = {
   shipFee: number | null;
   codAmount: number | null;
   codReceivedAt: string | null;
+  /** Trạng thái đọc từ hãng. Không tạo vận đơn. */
+  carrierStatus?: string;
 };
 
 export type SkuMap = {

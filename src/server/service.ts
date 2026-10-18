@@ -34,6 +34,20 @@ import { applyMarketplaceProfile, customerCard, customerCards, customerReminders
 import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type ParsedLine, type PlannedItem, type PlannedOrder } from "@/domain/marketplace";
 import { applyRestore, restoreSummary } from "@/domain/restore";
 import { albumFolderParts, driveFolderParts } from "@/domain/drive-path";
+import {
+  CARRIER_NAME,
+  carrierIdFromName,
+  clampCod,
+  clampWeight,
+  ghnAuth,
+  ghtkAuth,
+  jtAuth,
+  pickupReady,
+  readPickup,
+  waybillBlock,
+  type CarrierId,
+  type WaybillDraft,
+} from "@/domain/carriers";
 import { defaultCarrier } from "@/domain/jt";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
 import { publicContact } from "@/domain/public-contact";
@@ -65,7 +79,8 @@ import { getRequest } from "@tanstack/react-start/server";
 import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
 import { listBackups, readBackup, writeManualBackup } from "@/server/store";
 import { clearProductPhoto, readProductPhoto, writeProductPhoto } from "@/server/photos";
-import { integrationStatus, saveIntegrationSecret } from "@/server/secrets";
+import { createGhnWaybill, createGhtkWaybill, createJtWaybill, quoteGhtkFee, trackGhn, trackGhtk, trackJt } from "@/server/carriers";
+import { integrationStatus, readIntegrationSecret, saveIntegrationSecret } from "@/server/secrets";
 import { deleteFromDrive, downloadDriveThumbnail, downloadFromDrive, driveConnected, inspectDriveUpload, openDriveUpload, uploadToDrive } from "@/server/drive";
 import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
 
@@ -2799,15 +2814,201 @@ export async function saveOrderShipping(
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
     const previous = orderShipping(order);
+    const tracking = input.tracking.trim();
     order.shipping = {
       carrier: input.carrier.trim(),
-      tracking: input.tracking.trim(),
+      tracking,
       shipFee: input.shipFee,
       codAmount: input.codAmount,
       codReceivedAt: previous.codReceivedAt,
+      ...(tracking === previous.tracking && previous.carrierStatus ? { carrierStatus: previous.carrierStatus } : {}),
     };
     audit(state, actor.id, "order.shipping", order.id, previous, order.shipping);
   });
+}
+
+export async function carrierDesk(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const status = await integrationStatus();
+  const state = await readState();
+  return {
+    ghn: Boolean(status.ghn_token && status.ghn_shop_id),
+    ghtk: Boolean(status.ghtk_token && status.ghtk_partner),
+    jt: Boolean(status.jt_api_account && status.jt_private_key && status.jt_customer_code && status.jt_password),
+    pickup: readPickup(state.settings.carrierPickup),
+  };
+}
+
+export async function saveCarrierPickup(
+  actor: Actor,
+  input: { name: string; phone: string; address: string; province: string; district: string; ward: string },
+) {
+  assertRole(actor, ["owner"]);
+  const pickup = readPickup(input);
+  if (!pickupReady(pickup)) throw new Error("Địa chỉ lấy hàng cần tên, số điện thoại, địa chỉ, tỉnh và phường.");
+  await mutate(async (state) => {
+    state.settings.carrierPickup = pickup;
+    audit(state, actor.id, "settings.pickup", "carrier", null, { name: pickup.name, province: pickup.province });
+  });
+}
+
+export async function openCarrierWaybill(
+  actor: Actor,
+  input: {
+    orderId: string;
+    carrier: CarrierId;
+    province: string;
+    district: string;
+    ward: string;
+    address: string;
+    weightGrams: number;
+    codAmount: number;
+  },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const order = state.orders.find((item) => item.id === input.orderId);
+  if (!order) throw new Error("Không tìm thấy đơn.");
+  const blocked = waybillBlock({
+    channel: order.channel,
+    status: order.status,
+    fulfillment: order.fulfillment,
+    tracking: orderShipping(order).tracking,
+  });
+  if (blocked) throw new Error(blocked);
+  const pickup = readPickup(state.settings.carrierPickup);
+  if (!pickupReady(pickup)) throw new Error("Chủ cần ghi địa chỉ lấy hàng ở trang Kết nối.");
+  const draft = waybillDraft(order, customerName(state, order.customerId), input);
+  const hit =
+    input.carrier === "ghn"
+      ? await createGhnWaybill(await loadGhn(), pickup, draft)
+      : input.carrier === "ghtk"
+        ? await createGhtkWaybill(await loadGhtk(), pickup, draft)
+        : await createJtWaybill(await loadJt(), pickup, draft);
+  await mutate(async (next) => {
+    const fresh = next.orders.find((item) => item.id === order.id);
+    if (!fresh) throw new Error("Không tìm thấy đơn.");
+    const previous = orderShipping(fresh);
+    if (previous.tracking && previous.tracking !== hit.tracking) throw new Error("Đơn vừa được ghi mã vận đơn khác.");
+    fresh.shipping = {
+      carrier: CARRIER_NAME[input.carrier],
+      tracking: hit.tracking,
+      shipFee: hit.fee === null ? previous.shipFee : hit.fee,
+      codAmount: draft.cod,
+      codReceivedAt: previous.codReceivedAt,
+      carrierStatus: hit.status.slice(0, 160),
+    };
+    fresh.updatedAt = nowIso();
+    audit(next, actor.id, "order.shipping", fresh.id, previous, fresh.shipping);
+  });
+  return { tracking: hit.tracking, fee: hit.fee, status: hit.status };
+}
+
+export async function quoteCarrierFee(
+  actor: Actor,
+  input: {
+    orderId: string;
+    carrier: CarrierId;
+    province: string;
+    district: string;
+    ward: string;
+    address: string;
+    weightGrams: number;
+    codAmount: number;
+  },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  if (input.carrier !== "ghtk") throw new Error("Chỉ GHTK báo phí trước khi tạo vận đơn.");
+  const state = await readState();
+  const order = state.orders.find((item) => item.id === input.orderId);
+  if (!order) throw new Error("Không tìm thấy đơn.");
+  if (order.channel === "tiktok" || order.channel === "shopee") throw new Error("Đơn sàn lấy phí từ sàn.");
+  if (!shipsOut(order)) throw new Error("Đơn này không giao đi.");
+  const pickup = readPickup(state.settings.carrierPickup);
+  if (!pickupReady(pickup)) throw new Error("Chủ cần ghi địa chỉ lấy hàng ở trang Kết nối.");
+  const draft = waybillDraft(order, customerName(state, order.customerId), input);
+  const fee = await quoteGhtkFee(await loadGhtk(), pickup, draft);
+  return { fee };
+}
+
+export async function refreshCarrierWaybill(actor: Actor, orderId: string) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const order = state.orders.find((item) => item.id === orderId);
+  if (!order) throw new Error("Không tìm thấy đơn.");
+  const ship = orderShipping(order);
+  const carrier = carrierIdFromName(ship.carrier);
+  if (!carrier) throw new Error("Hãng này chưa có API trạng thái.");
+  if (!ship.tracking) throw new Error("Đơn chưa có mã vận đơn.");
+  const hit =
+    carrier === "ghn"
+      ? await trackGhn(await loadGhn(), ship.tracking)
+      : carrier === "ghtk"
+        ? await trackGhtk(await loadGhtk(), ship.tracking)
+        : await trackJt(await loadJt(), ship.tracking);
+  const status = (hit.status || "Chưa có trạng thái").slice(0, 160);
+  await mutate(async (next) => {
+    const fresh = next.orders.find((item) => item.id === order.id);
+    if (!fresh) throw new Error("Không tìm thấy đơn.");
+    const previous = orderShipping(fresh);
+    fresh.shipping = { ...previous, carrierStatus: status };
+    fresh.updatedAt = nowIso();
+    audit(next, actor.id, "order.shipping", fresh.id, previous, fresh.shipping);
+  });
+  return { status };
+}
+
+async function loadGhn() {
+  const auth = ghnAuth(await readIntegrationSecret("ghn_token"), await readIntegrationSecret("ghn_shop_id"));
+  if (!auth) throw new Error("Chưa lưu đủ khóa GHN.");
+  return auth;
+}
+
+async function loadGhtk() {
+  const auth = ghtkAuth(await readIntegrationSecret("ghtk_token"), await readIntegrationSecret("ghtk_partner"));
+  if (!auth) throw new Error("Chưa lưu đủ khóa GHTK.");
+  return auth;
+}
+
+async function loadJt() {
+  const auth = jtAuth({
+    apiAccount: await readIntegrationSecret("jt_api_account"),
+    privateKey: await readIntegrationSecret("jt_private_key"),
+    customerCode: await readIntegrationSecret("jt_customer_code"),
+    password: await readIntegrationSecret("jt_password"),
+  });
+  if (!auth) throw new Error("Chưa lưu đủ khóa J&T.");
+  return auth;
+}
+
+function waybillDraft(
+  order: Order,
+  customer: { name: string; phone: string },
+  input: { province: string; district: string; ward: string; address: string; weightGrams: number; codAmount: number },
+): WaybillDraft {
+  const name = (order.recipientName || customer.name).trim();
+  if (name.length < 2) throw new Error("Đơn chưa có tên người nhận.");
+  const phone = customer.phone.trim();
+  if (phone.startsWith("masked:") || phone.replace(/\D/g, "").length < 8) throw new Error("Đơn chưa có số điện thoại người nhận.");
+  const address = (input.address || order.address).trim();
+  if (address.length < 4) throw new Error("Đơn chưa có địa chỉ giao.");
+  if (input.province.trim().length < 2 || input.ward.trim().length < 2) throw new Error("Cần tỉnh/thành và phường/xã.");
+  const items = order.items.map((item) => ({ name: item.name, quantity: item.quantity }));
+  return {
+    code: order.code,
+    name: name.slice(0, 120),
+    phone,
+    address: address.slice(0, 500),
+    province: input.province.trim().slice(0, 80),
+    district: input.district.trim().slice(0, 80),
+    ward: input.ward.trim().slice(0, 80),
+    weightGrams: clampWeight(input.weightGrams),
+    cod: clampCod(input.codAmount),
+    value: Math.max(0, Math.round(order.total ?? 0)),
+    content: items.map((item) => `${item.quantity}× ${item.name}`).join(", ").slice(0, 500) || "Ảnh in",
+    note: order.customerNote,
+    items,
+  };
 }
 
 export async function markCodReceived(actor: Actor, orderId: string, received: boolean) {
@@ -2841,6 +3042,7 @@ export async function deliveryBoard(actor: Actor) {
       itemSummary: order.items.map((item) => `${item.quantity}× ${item.name}`).join(", "),
       carrier: ship.carrier,
       tracking: ship.tracking,
+      carrierStatus: ship.carrierStatus ?? "",
       shipFee: money ? ship.shipFee : null,
       codAmount: money ? ship.codAmount : null,
       codReceivedAt: money ? ship.codReceivedAt : null,

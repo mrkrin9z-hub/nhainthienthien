@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { OrderEditDialog } from "@/components/admin/order-edit-dialog";
 import { OrderQrDialog } from "@/components/admin/order-qr-dialog";
+import { WaybillBox } from "@/components/admin/waybill-box";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,10 +85,15 @@ function OrderDetailPage() {
           channel={data.channel}
           source={data.source}
           fulfillment={data.fulfillment}
+          status={data.status}
+          address={data.address}
           onDone={refresh}
         />
       ) : (
-        <p className="text-sm">Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}</p>
+        <p className="text-sm">
+          Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}
+          {data.shipping?.carrierStatus ? ` · ${data.shipping.carrierStatus}` : ""}
+        </p>
       )}
 
       <section className="glass-card rounded-3xl p-4">
@@ -380,13 +386,17 @@ function ShippingForm({
   channel,
   source,
   fulfillment,
+  status,
+  address,
   onDone,
 }: {
   orderId: string;
-  shipping?: { carrier: string; tracking: string; shipFee: number | null; codAmount: number | null };
+  shipping?: { carrier: string; tracking: string; shipFee: number | null; codAmount: number | null; carrierStatus?: string };
   channel: string;
   source: string;
   fulfillment: string;
+  status: string;
+  address: string;
   onDone: () => Promise<void>;
 }) {
   const jt = jtOrder({ channel, source, fulfillment });
@@ -399,7 +409,7 @@ function ShippingForm({
       <h2 className="font-bold text-primary">Giao hàng</h2>
       {jt ? (
         <p className="text-xs text-muted-foreground">
-          Đơn web giao tận nơi và đơn Facebook đi J&T Express. Chưa có khóa thì ghi mã vận đơn và phí bằng tay. Tem in khổ 100×150.
+          Đơn web giao tận nơi và đơn Facebook mặc định J&T Express. Có khóa thì bấm Tạo vận đơn. Chưa có khóa thì ghi mã và phí bằng tay. Tem in khổ 100×150.
         </p>
       ) : null}
       <Input className="min-h-12" placeholder="Hãng vận chuyển" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
@@ -428,6 +438,18 @@ function ShippingForm({
       >
         Lưu giao hàng
       </Button>
+      <WaybillBox
+        orderId={orderId}
+        channel={channel}
+        status={status}
+        fulfillment={fulfillment}
+        address={address}
+        carrier={carrier}
+        tracking={tracking}
+        carrierStatus={shipping?.carrierStatus ?? ""}
+        codAmount={codAmount === "" ? null : Number(codAmount)}
+        onDone={onDone}
+      />
     </section>
   );
 }

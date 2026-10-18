@@ -20,17 +20,31 @@ export type JtCapability = {
 };
 
 /**
- * Không gọi API J&T. Chưa có khóa thì ghi vận đơn và phí bằng tay.
- * Đã lưu khóa thì vẫn chờ hợp đồng API của hãng, tem 100×150 in được ngay.
+ * Chưa có khóa thì ghi vận đơn và phí bằng tay.
+ * Đã lưu khóa thì nút Tạo vận đơn trên đơn mới gọi J&T. Không tự tạo.
+ * J&T không có API báo phí riêng; phí về cùng lúc tạo vận đơn.
  */
 export function jtCapabilities(keysConnected: boolean): JtCapability[] {
-  const wait = keysConnected
-    ? "Đã lưu khóa. Phần này chờ hợp đồng API của J&T, chưa gọi mạng."
-    : "Chưa có khóa. Ghi bằng tay trên đơn.";
+  const wait = "Chưa có khóa. Ghi bằng tay trên đơn.";
   return [
-    { id: "waybill", label: "Tạo vận đơn", available: false, reason: wait },
-    { id: "quote", label: "Báo phí", available: false, reason: wait },
-    { id: "track", label: "Đồng bộ trạng thái", available: false, reason: wait },
+    {
+      id: "waybill",
+      label: "Tạo vận đơn",
+      available: keysConnected,
+      reason: keysConnected ? "Bấm Tạo vận đơn trên đơn. Không tự tạo." : wait,
+    },
+    {
+      id: "quote",
+      label: "Báo phí",
+      available: false,
+      reason: keysConnected ? "J&T báo phí khi tạo vận đơn, không có API báo phí riêng." : wait,
+    },
+    {
+      id: "track",
+      label: "Đồng bộ trạng thái",
+      available: keysConnected,
+      reason: keysConnected ? "Bấm Cập nhật trạng thái trên đơn đã có mã." : wait,
+    },
     { id: "label", label: "In tem 100×150", available: true, reason: "In từ trình duyệt, không cần khóa." },
   ];
 }
@@ -84,7 +98,7 @@ export function jtPlan(
     mode: "ready",
     fee,
     tracking,
-    note: "Đã lưu khóa J&T. Tạo vận đơn, báo phí và đồng bộ trạng thái chờ hợp đồng API của hãng. Trước đó vẫn ghi mã và phí bằng tay.",
+    note: "Đã lưu khóa J&T. Bấm Tạo vận đơn trên đơn để lấy mã và phí. Không tự tạo. Trước đó vẫn ghi mã và phí bằng tay.",
     label: JT_LABEL_MM,
   };
 }
