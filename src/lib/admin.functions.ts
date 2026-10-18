@@ -67,6 +67,13 @@ export const getOrderDetail = createServerFn({ method: "GET" })
     return getOrder(await actor(), data.code);
   });
 
+export const orderUploadLink = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), rotate: z.boolean().optional().default(false) }).parse(data))
+  .handler(async ({ data }) => {
+    const { orderUploadLink: link } = await import("@/server/service");
+    return link(await actor(), data.orderId, data.rotate);
+  });
+
 const itemSchema = z.object({
   skuId: z.string().min(2),
   quantity: z.number().int().min(1).max(500),

@@ -91,6 +91,24 @@ export type OrderLookupResult = {
   history: { to: string; at: string; note: string | null }[];
 };
 
+const uploadTargetSchema = z.object({
+  token: z.string().regex(/^[a-f0-9]{32}$/),
+});
+
+export const getUploadTarget = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => uploadTargetSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { publicUploadTarget } = await import("@/server/service");
+    return publicUploadTarget(data.token);
+  });
+
+export const acknowledgeCustomerPhotos = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => submitSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { acknowledgeCustomerPhotos: acknowledge } = await import("@/server/service");
+    return acknowledge(data);
+  });
+
 export const lookupOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => lookupSchema.parse(data))
   .handler(async ({ data }): Promise<OrderLookupResult> => {
