@@ -13,6 +13,8 @@ export type CatalogVariant = {
   recommended_width_px: number | null;
   recommended_height_px: number | null;
   sort_order: number;
+  /** Số tấm trong một lần mua. 1 là bán lẻ, lớn hơn là gói. */
+  sheets: number;
 };
 
 export type CatalogProduct = {

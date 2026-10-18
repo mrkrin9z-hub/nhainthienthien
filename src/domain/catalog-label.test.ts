@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { sizeSummary } from "./catalog-label.ts";
+import { matchingSheet, sheetOptionLabel, sizeChoices, sizeSummary } from "./catalog-label.ts";
 
 test("đếm khổ, không đếm từng mức giá", () => {
   const size = (width: number, height: number) => ({ width, height });
@@ -23,5 +23,38 @@ test("đếm khổ, không đếm từng mức giá", () => {
     const source = read(file);
     assert.match(source, /sizeSummary\(/, file);
     assert.doesNotMatch(source, /variants\.length\} (kích thước|quy cách)/, file);
+    assert.match(source, /sizeChoices\(/, file);
+    assert.match(source, /Chọn số tấm/, file);
   }
+});
+
+test("chọn khổ trước, số tấm của khổ đó xếp sau", () => {
+  const variant = (width: number, height: number, sheets: number, sort: number) => ({
+    id: `${width}x${height}-${sheets}`,
+    name: sheets === 1 ? `${width}×${height} cm` : `${width}×${height} cm · ${sheets} tấm`,
+    width,
+    height,
+    sheets,
+    sort_order: sort,
+  });
+  const mixed = [
+    variant(15, 21, 2, 4),
+    variant(13, 18, 5, 3),
+    variant(13, 18, 1, 1),
+    variant(15, 21, 1, 2),
+  ];
+  const choices = sizeChoices(mixed);
+  assert.deepEqual(
+    choices.map((choice) => choice.label),
+    ["13×18 cm", "15×21 cm"],
+  );
+  assert.deepEqual(
+    choices[0]?.variants.map((item) => item.sheets),
+    [1, 5],
+  );
+  assert.equal(sheetOptionLabel(1), "1 tấm");
+  assert.equal(sheetOptionLabel(5), "5 tấm");
+  assert.equal(matchingSheet(choices[1]?.variants ?? [], 5)?.id, "15x21-1");
+  assert.equal(matchingSheet(choices[1]?.variants ?? [], 2)?.id, "15x21-2");
+  assert.equal(sizeChoices([{ id: "album", name: "Thiết kế theo yêu cầu", width: null, height: null, sheets: 1, sort_order: 1 }])[0]?.label, "Thiết kế theo yêu cầu");
 });

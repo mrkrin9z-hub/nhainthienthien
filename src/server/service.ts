@@ -315,6 +315,7 @@ export async function publicCatalog() {
             recommended_width_px: sku.widthCm ? Math.round((sku.widthCm / 2.54) * 300) : null,
             recommended_height_px: sku.heightCm ? Math.round((sku.heightCm / 2.54) * 300) : null,
             sort_order: sku.sort,
+            sheets: sku.sheets,
           };
         }),
     }))

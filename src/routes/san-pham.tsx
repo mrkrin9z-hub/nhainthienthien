@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Check, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
+import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { ChoiceChip } from "@/components/site/choice-chip";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import {
   type CatalogProduct,
   type CatalogVariant,
 } from "@/lib/catalog.functions";
-import { sizeSummary } from "@/domain/catalog-label";
+import { matchingSheet, sheetOptionLabel, sizeChoices, sizeSummary } from "@/domain/catalog-label";
 import { catalogImage } from "@/lib/product-images";
 import { formatVnd } from "@/lib/brand";
 
@@ -96,8 +97,8 @@ function ProductsPage() {
           Sản phẩm & bảng giá
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">
-          Xem ảnh mẫu và giá của từng kích thước ngay tại đây. Bấm vào sản phẩm để chọn size, số
-          lượng rồi đặt mua.
+          Xem ảnh mẫu và giá của từng kích thước ngay tại đây. Bấm vào sản phẩm, chọn khổ, rồi chọn
+          số tấm và số lượng.
         </p>
 
         <div className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
@@ -232,14 +233,27 @@ function VariantSheet({
   onClose: () => void;
   onAdd: (variantId: string, qty: number, label: string) => void;
 }) {
-  const [variantId, setVariantId] = useState(product.variants[0]?.id ?? "");
+  const choices = useMemo(() => sizeChoices(product.variants), [product]);
+  const [sizeKey, setSizeKey] = useState(choices[0]?.key ?? "");
+  const [variantId, setVariantId] = useState(choices[0]?.variants[0]?.id ?? "");
   const [qty, setQty] = useState(1);
 
-  const variant = product.variants.find((v) => v.id === variantId) ?? product.variants[0];
+  const choice = choices.find((item) => item.key === sizeKey) ?? choices[0];
+  const variant = choice?.variants.find((item) => item.id === variantId) ?? choice?.variants[0];
   const price = variant ? variantPrice(variant) : null;
+  const showOptions = (choice?.variants.length ?? 0) > 1;
+
+  function pickSize(key: string) {
+    const next = choices.find((item) => item.key === key);
+    if (!next) return;
+    const kept = matchingSheet(next.variants, variant?.sheets ?? null);
+    setSizeKey(key);
+    if (kept) setVariantId(kept.id);
+    setQty(1);
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 backdrop-blur-sm sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center">
       <div className="max-h-[88vh] w-full overflow-auto rounded-t-3xl border border-border bg-card p-4 sm:max-w-lg sm:rounded-3xl sm:p-6">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
           <img
@@ -273,32 +287,43 @@ function VariantSheet({
         </p>
 
         <p className="mt-5 text-sm font-semibold text-foreground">Chọn kích thước</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {product.variants.map((v) => {
-            const active = v.id === variant?.id;
-            const p = variantPrice(v);
+        <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Chọn kích thước">
+          {choices.map((item) => {
+            const only = item.variants.length === 1 ? item.variants[0] : undefined;
+            const onlyPrice = only ? variantPrice(only) : null;
             return (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => setVariantId(v.id)}
-                className={`min-h-11 rounded-2xl border px-3 py-2 text-left text-sm transition ${
-                  active
-                    ? "border-accent bg-accent/10 text-accent"
-                    : "border-border bg-card/70 text-foreground/80 hover:border-accent/50"
-                }`}
-              >
-                <span className="flex items-center gap-1.5 font-medium">
-                  {active ? <Check className="size-3.5" /> : null}
-                  {v.name}
-                </span>
-                <span className="block text-xs font-semibold">
-                  {p === null ? "Liên hệ" : formatVnd(p)}
-                </span>
-              </button>
+              <ChoiceChip
+                key={item.key}
+                active={item.key === choice?.key}
+                title={item.label}
+                {...(only
+                  ? { detail: onlyPrice === null ? "Liên hệ" : formatVnd(onlyPrice) }
+                  : {})}
+                onClick={() => pickSize(item.key)}
+              />
             );
           })}
         </div>
+
+        {showOptions && choice ? (
+          <>
+            <p className="mt-4 text-sm font-semibold text-foreground">Chọn số tấm</p>
+            <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Chọn số tấm">
+              {choice.variants.map((item) => {
+                const itemPrice = variantPrice(item);
+                return (
+                  <ChoiceChip
+                    key={item.id}
+                    active={item.id === variant?.id}
+                    title={sheetOptionLabel(item.sheets)}
+                    detail={itemPrice === null ? "Liên hệ" : formatVnd(itemPrice)}
+                    onClick={() => setVariantId(item.id)}
+                  />
+                );
+              })}
+            </div>
+          </>
+        ) : null}
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <span className="text-sm text-muted-foreground">Số lượng</span>
