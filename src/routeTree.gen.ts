@@ -43,6 +43,7 @@ import { Route as AdminSaoLuuRouteImport } from './routes/admin.sao-luu'
 import { Route as AdminTaiKhoanRouteImport } from './routes/admin.tai-khoan'
 import { Route as AdminThuRouteImport } from './routes/admin.thu'
 import { Route as AdminViRouteImport } from './routes/admin.vi'
+import { Route as GuiAnhTokenRouteImport } from './routes/gui-anh.$token'
 import { Route as AdminDonHangIndexRouteImport } from './routes/admin.don-hang.index'
 import { Route as AdminDonHangCodeRouteImport } from './routes/admin.don-hang.$code'
 import { Route as AdminKhachIndexRouteImport } from './routes/admin.khach.index'
@@ -226,6 +227,11 @@ const AdminViRoute = AdminViRouteImport.update({
   path: '/vi',
   getParentRoute: () => AdminRoute,
 } as any)
+const GuiAnhTokenRoute = GuiAnhTokenRouteImport.update({
+  id: '/gui-anh/$token',
+  path: '/gui-anh/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminDonHangIndexRoute = AdminDonHangIndexRouteImport.update({
   id: '/don-hang/',
   path: '/don-hang/',
@@ -322,6 +328,7 @@ export interface FileRoutesByFullPath {
   '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/thu': typeof AdminThuRoute
   '/admin/vi': typeof AdminViRoute
+  '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
@@ -369,6 +376,7 @@ export interface FileRoutesByTo {
   '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/thu': typeof AdminThuRoute
   '/admin/vi': typeof AdminViRoute
+  '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/admin': typeof AdminIndexRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
@@ -418,6 +426,7 @@ export interface FileRoutesById {
   '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/thu': typeof AdminThuRoute
   '/admin/vi': typeof AdminViRoute
+  '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
@@ -468,6 +477,7 @@ export interface FileRouteTypes {
     | '/admin/tai-khoan'
     | '/admin/thu'
     | '/admin/vi'
+    | '/gui-anh/$token'
     | '/admin/'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
@@ -515,6 +525,7 @@ export interface FileRouteTypes {
     | '/admin/tai-khoan'
     | '/admin/thu'
     | '/admin/vi'
+    | '/gui-anh/$token'
     | '/admin'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
@@ -563,6 +574,7 @@ export interface FileRouteTypes {
     | '/admin/tai-khoan'
     | '/admin/thu'
     | '/admin/vi'
+    | '/gui-anh/$token'
     | '/admin/'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
@@ -587,6 +599,7 @@ export interface RootRouteChildren {
   LienHeRoute: typeof LienHeRoute
   SanPhamRoute: typeof SanPhamRoute
   TraCuuRoute: typeof TraCuuRoute
+  GuiAnhTokenRoute: typeof GuiAnhTokenRoute
   ApiAdminProductPhotoRoute: typeof ApiAdminProductPhotoRoute
   ApiPublicCleanupFilesRoute: typeof ApiPublicCleanupFilesRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
@@ -836,6 +849,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminViRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/gui-anh/$token': {
+      id: '/gui-anh/$token'
+      path: '/gui-anh/$token'
+      fullPath: '/gui-anh/$token'
+      preLoaderRoute: typeof GuiAnhTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/don-hang/': {
       id: '/admin/don-hang/'
       path: '/don-hang'
@@ -1002,6 +1022,7 @@ const rootRouteChildren: RootRouteChildren = {
   LienHeRoute: LienHeRoute,
   SanPhamRoute: SanPhamRoute,
   TraCuuRoute: TraCuuRoute,
+  GuiAnhTokenRoute: GuiAnhTokenRoute,
   ApiAdminProductPhotoRoute: ApiAdminProductPhotoRoute,
   ApiPublicCleanupFilesRoute: ApiPublicCleanupFilesRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,

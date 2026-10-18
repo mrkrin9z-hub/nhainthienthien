@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { OrderEditDialog } from "@/components/admin/order-edit-dialog";
+import { OrderQrDialog } from "@/components/admin/order-qr-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +33,7 @@ function OrderDetailPage() {
   const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
   const [note, setNote] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [deposit, setDeposit] = useState("");
   const [method, setMethod] = useState("chuyển khoản");
   const [override, setOverride] = useState(false);
@@ -252,7 +254,14 @@ function OrderDetailPage() {
       ) : null}
 
       <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Ảnh khách</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold text-primary">Ảnh khách</h2>
+          {role !== "production" && data.status !== "huy" ? (
+            <Button type="button" variant="outline" className="min-h-11" onClick={() => setQrOpen(true)}>
+              Mã QR gửi khách
+            </Button>
+          ) : null}
+        </div>
         <ul className="mt-2 space-y-2 text-sm">
           {data.files.map((file) => (
             <li key={file.id}>
@@ -265,6 +274,7 @@ function OrderDetailPage() {
           {data.files.length === 0 ? <li className="text-muted-foreground">Chưa có file.</li> : null}
         </ul>
       </section>
+      {qrOpen ? <OrderQrDialog open={qrOpen} onOpenChange={setQrOpen} orderId={data.id} code={data.code} /> : null}
 
       {role !== "production" ? (
         <section className="glass-card rounded-3xl p-4">

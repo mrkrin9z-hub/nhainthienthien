@@ -25,6 +25,7 @@ import {
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed } from "@/domain/images";
+import { uploadTokenShape } from "@/domain/order-upload";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
 import { orderRevisionBlock } from "@/domain/order-edit";
 import { filesToPurge } from "@/domain/files";
@@ -521,8 +522,56 @@ export async function createWebOrder(input: {
 
 async function orderByToken(state: ShopState, orderId: string, accessToken: string) {
   const order = state.orders.find((item) => item.id === orderId);
-  if (!order || order.accessTokenHash !== (await sha256(accessToken))) throw new Error("Không có quyền với đơn hàng này.");
+  if (!order || !order.accessTokenHash || order.accessTokenHash !== (await sha256(accessToken))) {
+    throw new Error("Không có quyền với đơn hàng này.");
+  }
   return order;
+}
+
+async function orderByUploadToken(state: ShopState, token: string) {
+  if (!uploadTokenShape(token)) throw new Error("Mã không còn dùng được.");
+  const hash = await sha256(token);
+  const order = state.orders.find((item) => item.accessTokenHash === hash);
+  if (!order) throw new Error("Mã không còn dùng được.");
+  if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+  return order;
+}
+
+function freshUploadToken(): string {
+  return crypto.randomUUID().replaceAll("-", "");
+}
+
+/** Mã QR của một đơn. Giữ mã cũ trừ khi chủ hoặc sale đổi mã. */
+export async function orderUploadLink(actor: Actor, orderId: string, rotate = false) {
+  assertRole(actor, ["owner", "sale"]);
+  return mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) throw new Error("Không thấy đơn.");
+    if (order.status === "huy") throw new Error("Đơn đã hủy, không gửi mã.");
+    const creating = !uploadTokenShape(order.accessToken);
+    if (creating || rotate) {
+      const token = freshUploadToken();
+      order.accessToken = token;
+      order.accessTokenHash = await sha256(token);
+      order.updatedAt = nowIso();
+      audit(state, actor.id, "order.upload_link", order.id, null, { code: order.code, rotated: rotate && !creating });
+    }
+    return { token: order.accessToken, code: order.code };
+  });
+}
+
+/** Thông tin khách được thấy khi mở mã của đơn. Không có giá, số điện thoại, địa chỉ. */
+export async function publicUploadTarget(token: string) {
+  const state = await readState();
+  const order = await orderByUploadToken(state, token);
+  const customer = state.customers.find((item) => item.id === order.customerId);
+  return {
+    orderId: order.id,
+    code: order.code,
+    customerName: customer?.name ?? "",
+    fileCount: order.files.filter((file) => !file.deletedAt && file.status === "complete").length,
+    maxPhotoBytes: await photoByteLimit(),
+  };
 }
 
 const KV_UPLOAD_MAX = 10 * 1024 * 1024;
@@ -699,6 +748,40 @@ export async function submitWebOrder(input: { orderId: string; accessToken: stri
       note: allDone ? "Khách gửi ảnh thành công" : "Còn file lỗi khi tải lên",
     });
     return { status: next, allDone };
+  });
+}
+
+/** Khách bấm gửi xong trên trang mã QR. Đơn đang mở giữ nguyên bước. */
+export async function acknowledgeCustomerPhotos(input: { orderId: string; accessToken: string }) {
+  return mutate(async (state) => {
+    const order = await orderByToken(state, input.orderId, input.accessToken);
+    if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+    const done = order.files.filter((file) => !file.deletedAt && file.status === "complete");
+    if (!done.length) throw new Error("Chưa có ảnh nào được tải lên.");
+    if (order.status === "draft_upload" || order.status === "upload_error") {
+      const allDone = order.files.filter((file) => !file.deletedAt).every((file) => file.status === "complete");
+      const next = allDone ? "nhan_don" : "upload_error";
+      const from = order.status;
+      order.status = next;
+      order.updatedAt = nowIso();
+      order.history.push({
+        at: nowIso(),
+        from,
+        to: next,
+        by: null,
+        note: allDone ? "Khách gửi ảnh qua mã" : "Còn file lỗi khi tải lên",
+      });
+      return { code: order.code, fileCount: done.length, status: next };
+    }
+    order.updatedAt = nowIso();
+    order.history.push({
+      at: nowIso(),
+      from: order.status,
+      to: order.status,
+      by: null,
+      note: "Khách gửi ảnh qua mã",
+    });
+    return { code: order.code, fileCount: done.length, status: order.status };
   });
 }
 
