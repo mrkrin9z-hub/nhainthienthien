@@ -76,7 +76,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showAnhThe: false,
   showAlbum: false,
   groupListed: {
-    ep_go: true,
+    ep_go: false,
     anh_tho: true,
     giay_khen: true,
     nam_cham_xe: true,
@@ -152,16 +152,6 @@ function material(
 function groups(): Group[] {
   return [
     {
-      id: "ep_go",
-      name: "Ảnh ép gỗ tráng gương",
-      slug: "anh-ep-go",
-      category: "Ảnh gỗ",
-      description: "Ảnh ép gỗ tráng gương khổ 40×60, 50×75 và 60×90, bán lẻ và combo. Khổ nhỏ hơn nằm ở ảnh ép gỗ tráng gương bo viền.",
-      turnaround: "1–2 ngày",
-      sort: 1,
-      gate: null,
-    },
-    {
       id: "anh_tho",
       name: "Ảnh thờ ép gỗ",
       slug: "anh-tho",
@@ -177,7 +167,7 @@ function groups(): Group[] {
       slug: "giay-khen",
       category: "Ảnh gỗ",
       description: "Giấy khen ép gỗ tráng gương, khổ A5 (15×21), A4 (20×30) và A3 (30×45).",
-      turnaround: "1–2 ngày",
+      turnaround: "",
       sort: 3,
       gate: null,
     },
@@ -187,7 +177,7 @@ function groups(): Group[] {
       slug: "nam-cham-xe",
       category: "Nam châm",
       description: "Ảnh ép lụa nam châm dán xe. Size 9×19 và 17×22.",
-      turnaround: "1–2 ngày",
+      turnaround: "",
       sort: 4,
       gate: null,
     },
@@ -197,7 +187,7 @@ function groups(): Group[] {
       slug: "nam-cham-tu-lanh",
       category: "Nam châm",
       description: "Nam châm tủ lạnh tráng gương 6×9, Bản Đặc Biệt. Tại xưởng có bán lẻ một tấm. Kênh khác chỉ bán theo gói.",
-      turnaround: "1–2 ngày",
+      turnaround: "",
       sort: 5,
       gate: null,
     },
@@ -205,10 +195,10 @@ function groups(): Group[] {
       id: "trang_guong",
       name: "Ảnh ép gỗ tráng gương bo viền",
       slug: "trang-guong",
-      category: "Ảnh trang trí",
-      description: "Để bàn với khổ từ 20×30 trở xuống có chân dựng. Từ 30×45 có móc treo tường.",
-      turnaround: "1–2 ngày",
-      sort: 6,
+      category: "Ảnh gỗ",
+      description: "Khổ 13×18 đến 60×90. Để bàn với khổ từ 20×30 trở xuống có chân dựng. Từ 30×45 có móc treo tường.",
+      turnaround: "",
+      sort: 1,
       gate: null,
     },
     {
@@ -217,7 +207,7 @@ function groups(): Group[] {
       slug: "thoi-khoa-bieu",
       category: "Ảnh gỗ",
       description: "Thời khóa biểu ép gỗ tráng gương khổ 20×30.",
-      turnaround: "1–2 ngày",
+      turnaround: "",
       sort: 7,
       gate: null,
     },
@@ -227,7 +217,7 @@ function groups(): Group[] {
       slug: "anh-lua-6x9",
       category: "Ảnh lụa",
       description: "Ảnh lụa 6×9, bán theo gói.",
-      turnaround: "1–2 ngày",
+      turnaround: "",
       sort: 8,
       gate: null,
     },
@@ -265,7 +255,7 @@ type Spec = {
 };
 
 const SPECS: Spec[] = [
-  { groupId: "ep_go", prefix: "EG", sizes: SIZES, combos: [1, 2, 3, 4, 5], kind: "wood" },
+  { groupId: "trang_guong", prefix: "EG", sizes: SIZES, combos: [1, 2, 3, 4, 5], kind: "wood" },
   {
     groupId: "anh_tho",
     prefix: "AT",

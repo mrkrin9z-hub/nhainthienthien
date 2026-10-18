@@ -18,7 +18,7 @@ const CHANNELS: Channel[] = ["tai_tiem", "facebook", "tiktok", "shopee"];
 
 function PricePage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
-  const [groupId, setGroupId] = useState("ep_go");
+  const [groupId, setGroupId] = useState("trang_guong");
   const [channel, setChannel] = useState<Channel>("tai_tiem");
   const allowed = me.data?.role === "owner" || me.data?.role === "sale";
   const board = useQuery({

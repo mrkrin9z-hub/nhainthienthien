@@ -14,6 +14,7 @@ import {
   vnYmd,
   minutesLate,
   groupIsListed,
+  isMergedWoodAlias,
   priceOf,
   quoteSku,
   isProductionStep,
@@ -297,6 +298,7 @@ export async function publicCatalog() {
       sort_order: group.sort,
       variants: state.skus
         .filter((sku) => sku.groupId === group.id)
+        .filter((sku) => !isMergedWoodAlias(sku))
         .filter((sku) => walkInListed(priceOf(state.prices, sku.id, "tai_tiem")?.status))
         .sort((a, b) => a.sort - b.sort)
         .map((sku) => {

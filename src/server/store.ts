@@ -138,7 +138,7 @@ async function loadRaw(where: Where): Promise<ShopState> {
   return loadFromDisk();
 }
 
-/** Tắt Zalo của sổ cũ một lần, rồi ghi lại. Lần sau không đụng ô chủ đã chọn. */
+/** Chạy migration sổ một lần rồi ghi lại. Lần sau không đụng phần chủ đã sửa. */
 async function loadWhere(where: Where): Promise<ShopState> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const state = await loadRaw(where);

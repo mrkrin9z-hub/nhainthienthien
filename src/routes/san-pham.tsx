@@ -24,7 +24,7 @@ export const Route = createFileRoute("/san-pham")({
       {
         name: "description",
         content:
-          "Xem ảnh mẫu và giá từng kích thước: ảnh ép gỗ, ảnh ép gỗ tráng gương bo viền, ảnh thờ, giấy khen và nam châm. Chọn size, chọn số lượng và đặt mua ngay.",
+          "Xem ảnh mẫu và giá từng kích thước: ảnh ép gỗ tráng gương bo viền, ảnh thờ, giấy khen và nam châm. Chọn size, chọn số lượng và đặt mua ngay.",
       },
       { property: "og:title", content: "Sản phẩm & bảng giá in ảnh — Nhà In Thiên Thiên" },
       {
@@ -199,7 +199,9 @@ function ProductTile({ product, onOpen }: { product: CatalogProduct; onOpen: () 
         <h2 className="line-clamp-2 text-sm font-bold text-foreground sm:text-base">
           {product.name}
         </h2>
-        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{product.turnaround_text}</p>
+        {product.turnaround_text ? (
+          <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{product.turnaround_text}</p>
+        ) : null}
         <p className="mt-2 text-base font-extrabold text-accent sm:text-lg">
           {from === null ? null : (
             <span className="mr-1 text-[11px] font-medium text-muted-foreground">từ</span>
@@ -266,7 +268,7 @@ function VariantSheet({
         </div>
 
         <p className="mt-3 text-sm text-muted-foreground">
-          {product.description} • {product.turnaround_text}
+          {product.turnaround_text ? `${product.description} • ${product.turnaround_text}` : product.description}
         </p>
 
         <p className="mt-5 text-sm font-semibold text-foreground">Chọn kích thước</p>

@@ -225,6 +225,7 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   const offered = new Set(offers.map((row) => row.code));
   assert.equal(offered.has("TG-13x18-C1"), true);
   assert.equal(offered.has("EG-13x18-C1"), false);
+  assert.equal(offered.has("EG-40x60-C1"), false);
   assert.equal(offered.has("NCT-6x9-1"), true);
   assert.equal(offered.has("LUA-6x9-10"), false);
   assert.deepEqual(
@@ -275,7 +276,7 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(bag, 1);
   const tape = formulaQty("tape", state.skus[0]!, state.settings);
   assert.equal(tape, 0.05);
-  assert.equal(state.settings.groupListed.ep_go, true);
+  assert.equal(state.settings.groupListed.ep_go, false);
   assert.equal(state.settings.groupListed.trang_guong, true);
   assert.equal(state.settings.groupListed.anh_the, false);
   assert.equal(state.settings.groupListed.lua, false);
@@ -376,23 +377,50 @@ test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của 
   }
 });
 
-test("ảnh tráng gương đổi tên thành ảnh ép gỗ tráng gương bo viền, ảnh ép gỗ giữ riêng", async () => {
+test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và định mức giữ nguyên", async () => {
   const seeded = await buildSeed();
-  const gloss = seeded.groups.find((group) => group.id === "trang_guong");
-  const wood = seeded.groups.find((group) => group.id === "ep_go");
-  assert.equal(gloss?.name, "Ảnh ép gỗ tráng gương bo viền");
-  assert.equal(gloss?.slug, "trang-guong");
-  assert.equal(wood?.name, "Ảnh ép gỗ tráng gương");
-  assert.equal(wood?.id, "ep_go");
-  assert.match(wood?.description ?? "", /ảnh ép gỗ tráng gương bo viền/);
+  const cards = seeded.groups.filter((group) => group.name === "Ảnh ép gỗ tráng gương bo viền");
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.id, "trang_guong");
+  assert.equal(cards[0]?.slug, "trang-guong");
+  assert.equal(cards[0]?.turnaround, "");
+  assert.equal(seeded.groups.some((group) => group.id === "ep_go"), false);
+  assert.ok(seeded.groups.every((group) => group.turnaround !== "1–2 ngày"));
+  const eg = seeded.skus.find((sku) => sku.code === "EG-40x60-C1");
+  const tg = seeded.skus.find((sku) => sku.code === "TG-40x60-C1");
+  assert.equal(eg?.id, "EG-40x60-C1");
+  assert.equal(eg?.groupId, "trang_guong");
+  assert.equal(tg?.groupId, "trang_guong");
+  assert.equal(seeded.boms.some((row) => row.skuId === "EG-40x60-C1" && row.materialId === "go-40x60"), true);
+  assert.equal(seeded.boms.some((row) => row.skuId === "TG-40x60-C1" && row.materialId === "go-40x60"), false);
+  const walkIn: Record<string, number> = {
+    "13x18": 35000,
+    "15x21": 39000,
+    "20x30": 59000,
+    "30x45": 89000,
+    "40x60": 149000,
+    "50x75": 239000,
+    "60x90": 349000,
+  };
+  for (const [size, amount] of Object.entries(walkIn)) {
+    const row = seeded.prices.find((price) => price.skuId === `TG-${size}-C1` && price.channel === "tai_tiem");
+    assert.equal(row?.price, amount, size);
+  }
+  const offers = walkInPublicOffers(seeded);
+  for (const size of Object.keys(walkIn)) assert.equal(offers.some((row) => row.code === `TG-${size}-C1`), true, size);
+  assert.equal(offers.some((row) => row.code.startsWith("EG-")), false);
+  assert.equal(offers.filter((row) => row.groupId === "trang_guong").length > 0, true);
+  assert.equal(applyStoreMigrations(seeded), false);
 
   const legacy = {
-    settings: { showZalo: false, zaloDefaultMigrated: true },
+    settings: { showZalo: false, zaloDefaultMigrated: true, groupListed: { ep_go: true, trang_guong: true } },
     groups: [
       {
         id: "trang_guong",
         name: "Ảnh tráng gương bo viền",
-        description: "Để bàn.",
+        description: "Để bàn với khổ từ 20×30 trở xuống có chân dựng. Từ 30×45 có móc treo tường.",
+        category: "Ảnh trang trí",
+        sort: 6,
         turnaround: "1–2 ngày",
       },
       {
@@ -401,42 +429,54 @@ test("ảnh tráng gương đổi tên thành ảnh ép gỗ tráng gương bo v
         description: "Khổ nhỏ hơn nằm ở ảnh tráng gương.",
         turnaround: "1–2 ngày",
       },
+      { id: "anh_tho", name: "Ảnh thờ ép gỗ", description: "x", turnaround: "Theo đơn" },
     ],
+    skus: [
+      { id: "EG-40x60-C1", code: "EG-40x60-C1", groupId: "ep_go" },
+      { id: "TG-13x18-C1", code: "TG-13x18-C1", groupId: "trang_guong" },
+    ],
+    boms: [{ id: "EG-40x60-C1:go-40x60:print", skuId: "EG-40x60-C1", materialId: "go-40x60" }],
+    skuMaps: [{ channel: "tiktok" as const, externalSku: "EG-40", skuId: "EG-40x60-C1" }],
     orders: [
       {
         items: [
-          { name: "Ảnh tráng gương bo viền — 13×18 cm" },
-          { name: "Ảnh tráng gương - 20×30 cm" },
-          { name: "Ảnh ép gỗ tráng gương — 40×60 cm" },
+          { skuId: "EG-40x60-C1", name: "Ảnh ép gỗ tráng gương — 40×60 cm" },
+          { skuId: "TG-13x18-C1", name: "Ảnh tráng gương bo viền — 13×18 cm" },
+          { skuId: "TG-20x30-C1", name: "Ảnh tráng gương - 20×30 cm" },
         ],
       },
     ],
   };
   assert.equal(applyStoreMigrations(legacy), true);
-  assert.equal(legacy.groups[0]?.name, "Ảnh ép gỗ tráng gương bo viền");
-  assert.equal(legacy.groups[1]?.name, "Ảnh ép gỗ tráng gương");
-  assert.equal(legacy.groups[1]?.description, "Khổ nhỏ hơn nằm ở ảnh ép gỗ tráng gương bo viền.");
-  assert.equal(legacy.orders[0]?.items[0]?.name, "Ảnh ép gỗ tráng gương bo viền — 13×18 cm");
-  assert.equal(legacy.orders[0]?.items[1]?.name, "Ảnh ép gỗ tráng gương bo viền - 20×30 cm");
-  assert.equal(legacy.orders[0]?.items[2]?.name, "Ảnh ép gỗ tráng gương — 40×60 cm");
+  assert.equal(legacy.groups.some((group) => group.id === "ep_go"), false);
+  assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.name, "Ảnh ép gỗ tráng gương bo viền");
+  assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.category, "Ảnh gỗ");
+  assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.turnaround, "");
+  assert.match(legacy.groups.find((group) => group.id === "trang_guong")?.description ?? "", /13×18 đến 60×90/);
+  assert.equal(legacy.groups.find((group) => group.id === "anh_tho")?.turnaround, "Theo đơn");
+  assert.equal(legacy.skus[0]?.groupId, "trang_guong");
+  assert.equal(legacy.skus[0]?.id, "EG-40x60-C1");
+  assert.equal(legacy.boms[0]?.skuId, "EG-40x60-C1");
+  assert.equal(legacy.boms[0]?.materialId, "go-40x60");
+  assert.equal(legacy.skuMaps[0]?.skuId, "EG-40x60-C1");
+  assert.equal(legacy.orders[0]?.items[0]?.skuId, "EG-40x60-C1");
+  assert.equal(legacy.orders[0]?.items[0]?.name, "Ảnh ép gỗ tráng gương bo viền — 40×60 cm");
+  assert.equal(legacy.orders[0]?.items[1]?.name, "Ảnh ép gỗ tráng gương bo viền — 13×18 cm");
+  assert.equal(legacy.orders[0]?.items[2]?.name, "Ảnh ép gỗ tráng gương bo viền - 20×30 cm");
+  assert.equal(legacy.settings.groupListed.ep_go, false);
   assert.equal(applyStoreMigrations(legacy), false);
 
-  const shortName = {
-    settings: { zaloDefaultMigrated: true },
-    groups: [{ id: "trang_guong", name: "Ảnh tráng gương", description: "x", turnaround: "1–2 ngày" }],
-  };
-  assert.equal(applyStoreMigrations(shortName), true);
-  assert.equal(shortName.groups[0]?.name, "Ảnh ép gỗ tráng gương bo viền");
-
   const renamedByOwner = {
-    settings: { zaloDefaultMigrated: true },
-    groups: [{ id: "trang_guong", name: "Tên chủ đã sửa", description: "x", turnaround: "1–2 ngày" }],
+    settings: { zaloDefaultMigrated: true, groupListed: { ep_go: false, trang_guong: true } },
+    groups: [{ id: "trang_guong", name: "Tên chủ đã sửa", description: "x", turnaround: "3 ngày" }],
+    skus: [{ id: "EG-40x60-C1", code: "EG-40x60-C1", groupId: "trang_guong" }],
   };
   assert.equal(applyStoreMigrations(renamedByOwner), false);
   assert.equal(renamedByOwner.groups[0]?.name, "Tên chủ đã sửa");
+  assert.equal(renamedByOwner.groups[0]?.turnaround, "3 ngày");
 
   const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
   for (const file of ["../routes/index.tsx", "../routes/huong-dan.tsx", "../routes/san-pham.tsx", "./seed.ts", "../../README.md"]) {
-    assert.doesNotMatch(read(file), /Ảnh tráng gương|ảnh tráng gương/, file);
+    assert.doesNotMatch(read(file), /Ảnh tráng gương|ảnh tráng gương|1–2 ngày/, file);
   }
 });
