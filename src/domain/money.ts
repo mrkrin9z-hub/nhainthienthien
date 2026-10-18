@@ -43,7 +43,7 @@ export function walletOfMethod(method: string): WalletId {
   return "tien_mat";
 }
 
-export type CashPayment = { at: string; amount: number; method: string };
+export type CashPayment = { at: string; amount: number; method: string; by?: string | null };
 
 export type CashOrder = {
   id: string;
@@ -53,6 +53,7 @@ export type CashOrder = {
   total: number | null;
   depositPaid: number;
   depositMethod: string;
+  depositBy?: string | null;
   createdAt: string;
   payments?: CashPayment[];
 };
@@ -66,6 +67,7 @@ export type CashExpense = {
   month: string;
   category?: string;
   wallet?: string;
+  by?: string | null;
 };
 
 export type CashAdjust = {
@@ -83,12 +85,14 @@ export type LedgerLine = {
   amount: number;
   kind: "thu" | "chi" | "dieu_chinh";
   label: string;
+  /** Người thu hoặc người ghi chi. Trống là khoản cũ chưa gắn. */
+  holder: string;
 };
 
 export function depositEvents(order: CashOrder): CashPayment[] {
   if (order.payments && order.payments.length > 0) return order.payments.filter((row) => row.amount > 0);
   if (order.depositPaid > 0) {
-    return [{ at: order.createdAt, amount: order.depositPaid, method: order.depositMethod || "Tiền mặt" }];
+    return [{ at: order.createdAt, amount: order.depositPaid, method: order.depositMethod || "Tiền mặt", by: order.depositBy ?? null }];
   }
   return [];
 }
@@ -119,6 +123,7 @@ export function buildLedger(input: { orders: CashOrder[]; expenses: CashExpense[
         amount: payment.amount,
         kind: "thu",
         label: `Thu đơn ${order.code}${order.customerName ? ` · ${order.customerName}` : ""}`,
+        holder: payment.by ?? "",
       });
     });
   }
@@ -131,6 +136,7 @@ export function buildLedger(input: { orders: CashOrder[]; expenses: CashExpense[
       amount: -Math.abs(expense.amount),
       kind: "chi",
       label: expense.name,
+      holder: expense.by ?? "",
     });
   }
   for (const adjust of input.adjusts) {
@@ -143,6 +149,7 @@ export function buildLedger(input: { orders: CashOrder[]; expenses: CashExpense[
       amount: adjust.amount,
       kind: "dieu_chinh",
       label: adjust.note || "Điều chỉnh ví",
+      holder: "",
     });
   }
   return lines.sort((a, b) => b.at.localeCompare(a.at));
@@ -196,6 +203,47 @@ export function expenseStamp(ymd: string): { at: string; month: string } {
   const at = new Date(`${ymd}T12:00:00+07:00`);
   if (Number.isNaN(at.getTime())) throw new Error("Ngày chi chưa đúng.");
   return { at: at.toISOString(), month: vnMonth(at) };
+}
+
+export type HolderBalance = {
+  staffId: string;
+  name: string;
+  tien_mat: number;
+  chuyen_khoan: number;
+};
+
+/** Tiền thu cộng vào ví người bấm thu. Chi trừ ví người ghi chi. */
+export function holderBalances(input: {
+  orders: CashOrder[];
+  expenses: CashExpense[];
+  staff: { id: string; name: string }[];
+}): HolderBalance[] {
+  const totals = new Map<string, { tien_mat: number; chuyen_khoan: number }>();
+  const touch = (id: string) => {
+    const key = id || "";
+    const row = totals.get(key) ?? { tien_mat: 0, chuyen_khoan: 0 };
+    totals.set(key, row);
+    return row;
+  };
+  for (const order of input.orders) {
+    for (const payment of depositEvents(order)) {
+      touch(payment.by ?? "")[walletOfMethod(payment.method)] += payment.amount;
+    }
+  }
+  for (const expense of input.expenses) {
+    if (expense.wallet !== "tien_mat" && expense.wallet !== "chuyen_khoan") continue;
+    touch(expense.by ?? "")[expense.wallet] -= Math.abs(expense.amount);
+  }
+  const names = new Map(input.staff.map((person) => [person.id, person.name]));
+  return [...totals.entries()]
+    .filter(([, amounts]) => amounts.tien_mat !== 0 || amounts.chuyen_khoan !== 0)
+    .map(([staffId, amounts]) => ({
+      staffId,
+      name: staffId ? (names.get(staffId) ?? "Người đã nghỉ") : "Chưa gắn người",
+      tien_mat: amounts.tien_mat,
+      chuyen_khoan: amounts.chuyen_khoan,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "vi"));
 }
 
 export function walletCards(lines: LedgerLine[], month: string) {
