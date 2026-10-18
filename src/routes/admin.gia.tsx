@@ -5,10 +5,11 @@ import { toast } from "sonner";
 
 import { GoodsLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMaybe } from "@/lib/brand";
-import { getBom, getMe, getPriceBoard, runQuote, runRecalc, saveBomQty, savePieces, savePrice } from "@/lib/admin.functions";
+import { createPriceSize, getBom, getMe, getPriceBoard, importPriceSheet, runQuote, runRecalc, saveBomQty, savePieces, savePrice } from "@/lib/admin.functions";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/gia")({
@@ -28,18 +29,48 @@ function PricePage() {
     enabled: allowed,
   });
   const owner = me.data?.role === "owner";
+  const [createOpen, setCreateOpen] = useState(false);
+  const [excelOpen, setExcelOpen] = useState(false);
   if (me.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
   if (me.data?.role === "production") return <p className="text-lg font-semibold text-primary">Chỉ chủ và sale xem bảng giá.</p>;
 
   return (
     <div className="space-y-4">
       <GoodsLinks />
-      <div>
-        <h1 className="text-2xl font-semibold text-primary">Bảng giá theo kênh</h1>
-        <p className="text-sm text-muted-foreground">
-          Web khách lấy giá kênh Tại tiệm / Web. Ô trống là chưa có số — không tự đặt giá.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-primary">Bảng giá theo kênh</h1>
+          <p className="text-sm text-muted-foreground">
+            Web khách lấy giá kênh Tại tiệm / Web. Ô trống là chưa có số — không tự đặt giá.
+          </p>
+        </div>
+        {owner ? (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="min-h-11" onClick={() => setExcelOpen(true)}>
+              Tạo từ Excel
+            </Button>
+            <Button className="min-h-11" onClick={() => setCreateOpen(true)}>
+              Tạo
+            </Button>
+          </div>
+        ) : null}
       </div>
+      {owner ? (
+        <>
+          <CreatePriceDialog
+            groupId={groupId}
+            groupName={(board.data?.groups ?? []).find((group) => group.id === groupId)?.name ?? ""}
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+          />
+          <ExcelPriceDialog
+            groupId={groupId}
+            groupName={(board.data?.groups ?? []).find((group) => group.id === groupId)?.name ?? ""}
+            open={excelOpen}
+            onOpenChange={setExcelOpen}
+          />
+        </>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         {(board.data?.groups ?? []).map((group) => (
           <button
@@ -168,6 +199,189 @@ function PriceRow({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function CreatePriceDialog({
+  groupId,
+  groupName,
+  open,
+  onOpenChange,
+}: {
+  groupId: string;
+  groupName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [width, setWidth] = useState("");
+  const [height, setHeight] = useState("");
+  const [sheets, setSheets] = useState("1");
+  const [walkIn, setWalkIn] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [tiktok, setTiktok] = useState("");
+  const [shopee, setShopee] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function digits(value: string) {
+    return value.replace(/[^\d]/g, "");
+  }
+
+  async function save() {
+    if (!width || !height || !sheets || !walkIn) {
+      toast.error("Nhập rộng, cao, số tấm và giá tại tiệm.");
+      return;
+    }
+    const prices: Partial<Record<Channel, number>> = {};
+    if (walkIn) prices.tai_tiem = Number(walkIn);
+    if (facebook) prices.facebook = Number(facebook);
+    if (tiktok) prices.tiktok = Number(tiktok);
+    if (shopee) prices.shopee = Number(shopee);
+    setSaving(true);
+    try {
+      const result = await createPriceSize({
+        data: {
+          groupId,
+          widthCm: Number(width),
+          heightCm: Number(height),
+          sheets: Number(sheets),
+          prices,
+        },
+      });
+      toast.success(result.created ? "Đã tạo khổ giá" : "Khổ này đã có, đã cập nhật giá");
+      onOpenChange(false);
+      setWidth("");
+      setHeight("");
+      setSheets("1");
+      setWalkIn("");
+      setFacebook("");
+      setTiktok("");
+      setShopee("");
+      await queryClient.invalidateQueries({ queryKey: ["prices"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Tạo khổ giá{groupName ? ` · ${groupName}` : ""}</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="text-sm font-semibold">
+            Rộng (cm)
+            <Input className="mt-1 min-h-11" inputMode="numeric" value={width} onChange={(event) => setWidth(digits(event.target.value))} />
+          </label>
+          <label className="text-sm font-semibold">
+            Cao (cm)
+            <Input className="mt-1 min-h-11" inputMode="numeric" value={height} onChange={(event) => setHeight(digits(event.target.value))} />
+          </label>
+          <label className="text-sm font-semibold">
+            Số tấm
+            <Input className="mt-1 min-h-11" inputMode="numeric" value={sheets} onChange={(event) => setSheets(digits(event.target.value))} />
+          </label>
+          <label className="text-sm font-semibold">
+            Giá tại tiệm
+            <Input className="mt-1 min-h-11" inputMode="numeric" value={walkIn} onChange={(event) => setWalkIn(digits(event.target.value))} />
+          </label>
+          <label className="text-sm font-semibold">
+            Facebook
+            <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chưa có" value={facebook} onChange={(event) => setFacebook(digits(event.target.value))} />
+          </label>
+          <label className="text-sm font-semibold">
+            TikTok
+            <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chưa có" value={tiktok} onChange={(event) => setTiktok(digits(event.target.value))} />
+          </label>
+          <label className="text-sm font-semibold sm:col-span-2">
+            Shopee
+            <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chưa có" value={shopee} onChange={(event) => setShopee(digits(event.target.value))} />
+          </label>
+        </div>
+        <DialogFooter>
+          <Button className="min-h-11" disabled={saving} onClick={() => void save()}>
+            Tạo
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ExcelPriceDialog({
+  groupId,
+  groupName,
+  open,
+  onOpenChange,
+}: {
+  groupId: string;
+  groupName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [file, setFile] = useState<{ name: string; base64: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function readFile(next: File) {
+    const bytes = new Uint8Array(await next.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    setFile({ name: next.name, base64: btoa(binary) });
+  }
+
+  async function save() {
+    if (!file) return;
+    setSaving(true);
+    try {
+      const result = await importPriceSheet({ data: { groupId, filename: file.name, base64: file.base64 } });
+      toast.success(`Đã tạo ${result.created} khổ, cập nhật ${result.updated} giá`);
+      setFile(null);
+      onOpenChange(false);
+      await queryClient.invalidateQueries({ queryKey: ["prices"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setFile(null);
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Tạo từ Excel{groupName ? ` · ${groupName}` : ""}</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Dòng đầu là tiêu đề. Cột: Rộng, Cao, Số tấm, Giá tại tiệm. Có thể thêm Facebook, TikTok, Shopee hoặc Mã. Mã đã có thì chỉ sửa giá, không đổi tên.
+        </p>
+        <Label htmlFor="price-excel">File CSV hoặc Excel</Label>
+        <Input
+          id="price-excel"
+          className="min-h-11"
+          type="file"
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          onChange={(event) => {
+            const next = event.target.files?.[0];
+            if (next) void readFile(next);
+          }}
+        />
+        <DialogFooter>
+          <Button className="min-h-11" disabled={!file || saving} onClick={() => void save()}>
+            Tạo
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

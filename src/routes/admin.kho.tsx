@@ -6,7 +6,9 @@ import { toast } from "sonner";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { GoodsLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PackageSearch } from "lucide-react";
 import { formatMaybe } from "@/lib/brand";
 import { approvePrice, countStock, downloadExcel, getInventory, getMe, markInkOpened, receiveStock, saveMaterial } from "@/lib/admin.functions";
@@ -23,6 +25,7 @@ function StockPage() {
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
   const materials = (stock.data?.materials ?? []).filter((material) => {
     if (lowOnly && !material.low) return false;
     const needle = q.trim().toLowerCase();
@@ -32,6 +35,8 @@ function StockPage() {
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["stock"] });
   }
+
+  const opened = (stock.data?.materials ?? []).find((material) => material.id === openId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -71,40 +76,79 @@ function StockPage() {
           ) : null}
         </div>
       </div>
-      <div className="space-y-3">
-        {materials.map((material) => (
-          <article key={material.id} className={`rounded-3xl border p-4 ${material.low ? "border-destructive bg-destructive/10" : "glass-card"}`}>
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <h2 className="font-bold text-primary">{material.name}</h2>
-                <p className="text-sm text-muted-foreground">{material.buyLabel}</p>
-              </div>
-              <p className="text-xl font-extrabold">
-                {material.stock} {material.unit}
-              </p>
-            </div>
-            <p className="mt-1 text-sm">
-              30 ngày qua dùng {material.avgDaily} {material.unit}/ngày
-              {material.daysLeft === null ? " · chưa đủ nhịp để tính số ngày còn." : ` · còn khoảng ${material.daysLeft} ngày.`}
-            </p>
-            {material.reorder ? (
-              <p className="mt-1 text-sm font-semibold text-destructive">Nên đặt hàng: còn dưới {material.leadTimeDays} ngày chờ hàng.</p>
+      <p className="text-sm text-muted-foreground">Chọn một dòng để nhập kho, kiểm tồn hoặc sửa mức tối thiểu.</p>
+      <div className="overflow-hidden rounded-md border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vật tư</TableHead>
+              <TableHead className="text-right">Tồn</TableHead>
+              <TableHead className="hidden text-right sm:table-cell">30 ngày</TableHead>
+              <TableHead className="text-right">Trạng thái</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {materials.map((material) => (
+              <TableRow key={material.id} className="cursor-pointer" onClick={() => setOpenId(material.id)}>
+                <TableCell>
+                  <p className="font-semibold">{material.name}</p>
+                  <p className="text-xs text-muted-foreground">{material.buyLabel}</p>
+                </TableCell>
+                <TableCell className="text-right font-semibold">
+                  {material.stock} {material.unit}
+                </TableCell>
+                <TableCell className="hidden text-right sm:table-cell">
+                  {material.avgDaily} {material.unit}/ngày
+                </TableCell>
+                <TableCell className={`text-right ${material.low || material.reorder ? "font-semibold text-destructive" : "text-muted-foreground"}`}>
+                  {material.low || material.reorder ? "Sắp hết" : "Đủ"}
+                </TableCell>
+              </TableRow>
+            ))}
+            {stock.data && materials.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                  Không có vật tư khớp.
+                </TableCell>
+              </TableRow>
             ) : null}
-            {owner ? (
-              <p className="mt-1 text-sm">
-                Giá mua: {material.packPrice === null ? "chưa có" : formatMaybe(material.packPrice)}
-                {material.pendingPrice !== null ? ` · chờ duyệt ${formatMaybe(material.pendingPrice)}` : ""}
-              </p>
-            ) : null}
-            {owner && material.pendingPrice !== null ? (
-              <Button className="mt-2 min-h-12" onClick={() => approvePrice({ data: { materialId: material.id } }).then(refresh)}>
-                Duyệt giá mua
-              </Button>
-            ) : null}
-            <MaterialForms material={material} owner={owner} canIn={canIn} onDone={refresh} />
-          </article>
-        ))}
+          </TableBody>
+        </Table>
       </div>
+      <Dialog open={opened !== null} onOpenChange={(open) => { if (!open) setOpenId(null); }}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          {opened ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{opened.name}</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">{opened.buyLabel}</p>
+              <p className="text-xl font-extrabold">
+                {opened.stock} {opened.unit}
+              </p>
+              <p className="text-sm">
+                30 ngày qua dùng {opened.avgDaily} {opened.unit}/ngày
+                {opened.daysLeft === null ? " · chưa đủ nhịp để tính số ngày còn." : ` · còn khoảng ${opened.daysLeft} ngày.`}
+              </p>
+              {opened.reorder ? (
+                <p className="text-sm font-semibold text-destructive">Nên đặt hàng: còn dưới {opened.leadTimeDays} ngày chờ hàng.</p>
+              ) : null}
+              {owner ? (
+                <p className="text-sm">
+                  Giá mua: {opened.packPrice === null ? "chưa có" : formatMaybe(opened.packPrice)}
+                  {opened.pendingPrice !== null ? ` · chờ duyệt ${formatMaybe(opened.pendingPrice)}` : ""}
+                </p>
+              ) : null}
+              {owner && opened.pendingPrice !== null ? (
+                <Button className="min-h-12" onClick={() => approvePrice({ data: { materialId: opened.id } }).then(refresh)}>
+                  Duyệt giá mua
+                </Button>
+              ) : null}
+              <MaterialForms key={opened.id} material={opened} owner={owner} canIn={canIn} onDone={refresh} />
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Nhập xuất gần đây</h2>
         <ul className="mt-2 space-y-1 text-sm">
