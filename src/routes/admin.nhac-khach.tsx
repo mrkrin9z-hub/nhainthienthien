@@ -5,6 +5,7 @@ import { Bell, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 
 import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { CustomerLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
@@ -40,6 +41,7 @@ function RemindBody() {
     if (!needle) return true;
     return `${customer.name} ${customer.phone} ${customer.reasons.join(" ")}`.toLowerCase().includes(needle);
   });
+  const list = useListPage(shown, `${q}|${kind}`);
   return (
     <div className="space-y-3">
       <CustomerLinks />
@@ -52,8 +54,9 @@ function RemindBody() {
       />
       <FilterChips label="Lý do nhắc" value={kind} chips={chips} onChange={setKind} />
       {reminders.isError ? <p className="font-semibold text-destructive">{(reminders.error as Error).message}</p> : null}
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="khách" onPage={list.setPage} />
       <ul className="space-y-3">
-        {shown.map((customer) => (
+        {list.slice.map((customer) => (
           <li key={customer.id} className="space-y-2 rounded-2xl border border-border/70 bg-card p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>

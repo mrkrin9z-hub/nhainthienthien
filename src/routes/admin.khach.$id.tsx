@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,13 @@ function CustomerBody() {
   const [tags, setTags] = useState<string | null>(null);
   const [label, setLabel] = useState("Ngày giỗ");
   const [when, setWhen] = useState("");
+  const [orderQ, setOrderQ] = useState("");
+  const orders = (customer.data?.orders ?? []).filter((order) => {
+    const needle = orderQ.trim().toLowerCase();
+    if (!needle) return true;
+    return `${order.code} ${order.statusLabel} ${order.channelLabel} ${order.itemSummary}`.toLowerCase().includes(needle);
+  });
+  const orderList = useListPage(orders, orderQ);
   if (!customer.data) return <p className="text-muted-foreground">{customer.isError ? (customer.error as Error).message : "Đang tải…"}</p>;
   const data = customer.data;
   const dates = data.specialDates ?? [];
@@ -134,8 +142,10 @@ function CustomerBody() {
         Lưu ghi chú
       </Button>
       <h2 className="text-lg font-bold text-primary">Đơn đã đặt</h2>
+      <Input value={orderQ} onChange={(event) => setOrderQ(event.target.value)} placeholder="Tìm mã đơn, trạng thái…" aria-label="Tìm đơn của khách" className="h-11" />
+      <ListPager page={orderList.page} pages={orderList.pages} total={orderList.total} start={orderList.start} count={orderList.slice.length} noun="đơn" onPage={orderList.setPage} />
       <ul className="space-y-2">
-        {data.orders.map((order) => (
+        {orderList.slice.map((order) => (
           <li key={order.id}>
             <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="glass-card block rounded-3xl p-4">
               <p className="font-bold">{order.code}</p>

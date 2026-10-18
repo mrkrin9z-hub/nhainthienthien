@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { MoneyLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,13 @@ function ExpenseReportPage() {
 
 function ReportBody() {
   const [month, setMonth] = useState(vnMonth());
+  const [q, setQ] = useState("");
   const desk = useQuery({ queryKey: ["money", month], queryFn: () => getMoneyDesk({ data: { month } }) });
+  const expenses = (desk.data?.expenses ?? []).filter((row) => {
+    const needle = q.trim().toLowerCase();
+    return !needle || `${row.name} ${row.categoryLabel} ${row.note}`.toLowerCase().includes(needle);
+  });
+  const list = useListPage(expenses, `${month}|${q}`);
   const data = desk.data;
   const report = data?.report;
   const maxCategory = Math.max(1, ...(report?.byCategory.map((row) => row.amount) ?? [1]));
@@ -68,8 +75,12 @@ function ReportBody() {
           </section>
           <section className="glass-card rounded-3xl p-4">
             <h2 className="font-bold text-primary">Khoản trong tháng</h2>
+            <Input className="mt-2 min-h-11" placeholder="Tìm khoản chi" aria-label="Tìm khoản chi trong báo cáo" value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className="mt-2">
+              <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="khoản" onPage={list.setPage} />
+            </div>
             <ul className="mt-2 space-y-2 text-sm">
-              {data.expenses.map((row) => (
+              {list.slice.map((row) => (
                 <li key={row.id} className="flex flex-wrap justify-between gap-2">
                   <span>
                     {row.name}

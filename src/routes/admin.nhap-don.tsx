@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { OrderLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,13 @@ function ImportBody() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [externalSku, setExternalSku] = useState("");
   const [skuId, setSkuId] = useState("");
+  const [mapQuery, setMapQuery] = useState("");
+  const mapRows = (maps.data?.maps ?? []).filter((row) => {
+    if (row.channel !== channel) return false;
+    const needle = mapQuery.trim().toLowerCase();
+    return !needle || `${row.externalSku} ${row.skuCode}`.toLowerCase().includes(needle);
+  });
+  const mapPage = useListPage(mapRows, `${channel}|${mapQuery}`);
 
   async function readFile(next: File) {
     const bytes = new Uint8Array(await next.arrayBuffer());
@@ -163,8 +171,10 @@ function ImportBody() {
             Lưu map
           </Button>
         </div>
+        <Input className="min-h-11" placeholder="Tìm mã sàn hoặc mã tiệm" aria-label="Tìm map SKU" value={mapQuery} onChange={(e) => setMapQuery(e.target.value)} />
+        <ListPager page={mapPage.page} pages={mapPage.pages} total={mapPage.total} start={mapPage.start} count={mapPage.slice.length} noun="map" onPage={mapPage.setPage} />
         <ul className="space-y-2 text-sm">
-          {(maps.data?.maps ?? []).filter((row) => row.channel === channel).map((row) => (
+          {mapPage.slice.map((row) => (
             <li key={`${row.channel}-${row.externalSku}`} className="flex flex-wrap items-center justify-between gap-2">
               <span>{row.externalSku} → {row.skuCode}</span>
               <Button variant="outline" className="min-h-11" onClick={() => deleteSkuMap({ data: { channel: row.channel, externalSku: row.externalSku } }).then(() => queryClient.invalidateQueries({ queryKey: ["sku-maps"] }))}>

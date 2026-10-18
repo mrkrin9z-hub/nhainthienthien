@@ -3,6 +3,8 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -45,7 +47,24 @@ export function StaffDesk() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(empty);
-  const rows = (settings.data?.staff ?? []) as Person[];
+  const [q, setQ] = useState("");
+  const [role, setRole] = useState("all");
+  const staff = (settings.data?.staff ?? []) as Person[];
+  const rows = staff.filter((person) => {
+    if (role !== "all" && person.role !== role) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || `${person.name} ${person.email}`.toLowerCase().includes(needle);
+  });
+  const roleChips: FilterChip[] = [
+    { id: "all", label: "Mọi vai trò", count: staff.length, ...ALL_TONE },
+    ...ROLES.map((item) => ({
+      id: item.role,
+      label: ROLE_LABEL[item.role],
+      count: staff.filter((person) => person.role === item.role).length,
+      color: "#1D4ED8",
+    })),
+  ];
+  const list = useListPage(rows, `${q}|${role}`);
   const editing = Boolean(form.id);
 
   function openNew() {
@@ -69,10 +88,15 @@ export function StaffDesk() {
 
   return (
     <div className="space-y-3">
-      <Button size="sm" onClick={openNew}>
-        <Plus className="mr-1 size-4" />
-        Thêm nhân viên
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button size="sm" onClick={openNew}>
+          <Plus className="mr-1 size-4" />
+          Thêm nhân viên
+        </Button>
+        <Input className="min-h-11 max-w-xs" placeholder="Tìm tên hoặc email" aria-label="Tìm nhân viên" value={q} onChange={(event) => setQ(event.target.value)} />
+      </div>
+      <FilterChips label="Vai trò" value={role} chips={roleChips} onChange={setRole} />
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="người" onPage={list.setPage} />
       <div className="overflow-hidden rounded-md border bg-card">
         <Table>
           <TableHeader>
@@ -84,7 +108,7 @@ export function StaffDesk() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((person) => (
+            {list.slice.map((person) => (
               <TableRow key={person.id} className="cursor-pointer" onClick={() => openEdit(person)}>
                 <TableCell>{person.name}</TableCell>
                 <TableCell className="text-xs">{person.email}</TableCell>

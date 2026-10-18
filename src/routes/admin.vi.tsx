@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { MoneyLinks } from "@/components/admin/sections";
 import { WalletToggle } from "@/components/admin/wallet-toggle";
 import { RoleGate } from "@/components/role-gate";
@@ -41,10 +42,18 @@ function WalletBody() {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [filter, setFilter] = useState<"all" | WalletId>("all");
+  const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const queryClient = useQueryClient();
   const desk = useQuery({ queryKey: ["money", month], queryFn: () => getMoneyDesk({ data: { month } }) });
-  const lines = (desk.data?.lines ?? []).filter((line) => filter === "all" || line.wallet === filter);
+  const lines = (desk.data?.lines ?? []).filter((line) => {
+    if (filter !== "all" && line.wallet !== filter) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || `${line.label} ${line.holderName ?? ""}`.toLowerCase().includes(needle);
+  });
+  const page = useListPage(lines, `${month}|${filter}|${q}`);
+  const holders = desk.data?.holders ?? [];
+  const holderPage = useListPage(holders, month);
 
   return (
     <div className="space-y-4">
@@ -69,9 +78,10 @@ function WalletBody() {
       </section>
       <section className="space-y-2">
         <h2 className="font-bold text-primary">Ví người thu</h2>
-        {desk.data && (desk.data.holders ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Chưa có tiền gắn với người thu.</p> : null}
+        {desk.data && holders.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có tiền gắn với người thu.</p> : null}
+        <ListPager page={holderPage.page} pages={holderPage.pages} total={holderPage.total} start={holderPage.start} count={holderPage.slice.length} noun="ví người" onPage={holderPage.setPage} />
         <div className="grid gap-3 sm:grid-cols-2">
-          {(desk.data?.holders ?? []).map((holder) => (
+          {holderPage.slice.map((holder) => (
             <article key={holder.staffId || "none"} className="rounded-md border bg-card p-4">
               <h3 className="font-bold">{holder.name}</h3>
               <p className="mt-1 text-sm">Tiền mặt {formatVnd(holder.tien_mat)}</p>
@@ -84,15 +94,18 @@ function WalletBody() {
         <section className="order-2 space-y-3 lg:order-1 lg:col-span-2">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-bold text-primary">Danh sách giao dịch</h2>
+            <Input className="min-h-11 max-w-xs" placeholder="Tìm giao dịch" aria-label="Tìm giao dịch" value={q} onChange={(e) => setQ(e.target.value)} />
             <select className="min-h-11 rounded-xl border border-input bg-background px-3 text-sm" aria-label="Lọc ví" value={filter} onChange={(e) => setFilter(e.target.value as "all" | WalletId)}>
               <option value="all">Cả hai ví</option>
               <option value="tien_mat">Tiền mặt</option>
               <option value="chuyen_khoan">Chuyển khoản</option>
             </select>
           </div>
-          {desk.data && lines.length === 0 ? <p className="glass-card rounded-3xl p-4 text-sm">Chưa có giao dịch trong tháng này.</p> : null}
+          {desk.data && (desk.data.lines ?? []).length === 0 ? <p className="glass-card rounded-3xl p-4 text-sm">Chưa có giao dịch trong tháng này.</p> : null}
+          {desk.data && (desk.data.lines ?? []).length > 0 && lines.length === 0 ? <p className="glass-card rounded-3xl p-4 text-sm">Không có giao dịch khớp bộ lọc.</p> : null}
+          <ListPager page={page.page} pages={page.pages} total={page.total} start={page.start} count={page.slice.length} noun="giao dịch" onPage={page.setPage} />
           <ul className="space-y-2">
-            {lines.map((line) => (
+            {page.slice.map((line) => (
               <li key={line.id} className="glass-card flex flex-wrap items-center gap-3 rounded-3xl p-4">
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">{line.label}</p>

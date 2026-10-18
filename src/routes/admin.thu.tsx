@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ALL_TONE, CHANNEL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { MoneyLinks } from "@/components/admin/sections";
 import { WalletToggle } from "@/components/admin/wallet-toggle";
 import { RoleGate } from "@/components/role-gate";
@@ -12,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import type { WalletId } from "@/domain/money";
 import { walletLabel } from "@/domain/money";
 import { formatMaybe, formatVnd } from "@/lib/brand";
+import { CHANNEL_LABEL, CHANNELS } from "@/domain/types";
 import { getCollectList, recordDeposit } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/thu")({
@@ -39,13 +42,27 @@ function CollectPage() {
 
 function CollectBody() {
   const [query, setQuery] = useState("");
+  const [channel, setChannel] = useState("all");
   const [open, setOpen] = useState<CollectRow | null>(null);
   const list = useQuery({ queryKey: ["collect"], queryFn: () => getCollectList() });
   const needle = query.trim().toLowerCase();
-  const rows = (list.data?.rows ?? []).filter((row) => {
+  const source = list.data?.rows ?? [];
+  const rows = source.filter((row) => {
+    if (channel !== "all" && row.channelLabel !== CHANNEL_LABEL[channel as keyof typeof CHANNEL_LABEL]) return false;
     if (!needle) return true;
     return row.code.toLowerCase().includes(needle) || row.customerName.toLowerCase().includes(needle);
   });
+  const channelChips: FilterChip[] = [
+    { id: "all", label: "Mọi kênh", count: source.length, ...ALL_TONE },
+    ...CHANNELS.map((id) => ({
+      id,
+      label: CHANNEL_LABEL[id],
+      count: source.filter((row) => row.channelLabel === CHANNEL_LABEL[id]).length,
+      color: CHANNEL_TONE[id]?.color ?? "#6B7280",
+      icon: CHANNEL_TONE[id]?.icon,
+    })),
+  ];
+  const page = useListPage(rows, `${query}|${channel}`);
   const me = list.data?.me;
 
   return (
@@ -68,11 +85,14 @@ function CollectBody() {
         </section>
       ) : null}
       <Input className="min-h-12 max-w-md" placeholder="Tìm mã đơn hoặc tên khách" value={query} onChange={(e) => setQuery(e.target.value)} />
+      <FilterChips label="Kênh đơn" value={channel} chips={channelChips} onChange={setChannel} />
+      <ListPager page={page.page} pages={page.pages} total={page.total} start={page.start} count={page.slice.length} noun="đơn cần thu" onPage={page.setPage} />
       {list.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {list.isError ? <p className="font-semibold text-destructive">{(list.error as Error).message}</p> : null}
-      {list.data && rows.length === 0 ? <p className="rounded-md border bg-card p-4 text-sm">Không còn đơn cần thu.</p> : null}
+      {list.data && source.length === 0 ? <p className="rounded-md border bg-card p-4 text-sm">Không còn đơn cần thu.</p> : null}
+      {list.data && source.length > 0 && rows.length === 0 ? <p className="rounded-md border bg-card p-4 text-sm">Không có đơn khớp bộ lọc.</p> : null}
       <ul className="divide-y overflow-hidden rounded-md border bg-card">
-        {rows.map((row) => (
+        {page.slice.map((row) => (
           <li key={row.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
             <div className="min-w-0 flex-1">
               <Link to="/admin/don-hang/$code" params={{ code: row.code }} className="font-extrabold text-primary">

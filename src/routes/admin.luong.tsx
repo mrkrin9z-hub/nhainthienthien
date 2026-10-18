@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { StaffLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +24,25 @@ function monthNow() {
 function PayrollPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const [month, setMonth] = useState(monthNow());
+  const [q, setQ] = useState("");
+  const [role, setRole] = useState("all");
   const payroll = useQuery({ queryKey: ["payroll", month], queryFn: () => getPayroll({ data: { month } }) });
+  const source = payroll.data?.rows ?? [];
+  const rows = source.filter((row) => {
+    if (role !== "all" && row.role !== role) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || row.name.toLowerCase().includes(needle);
+  });
+  const chips: FilterChip[] = [
+    { id: "all", label: "Mọi vai trò", count: source.length, ...ALL_TONE },
+    ...(["owner", "sale", "production"] as Role[]).map((id) => ({
+      id,
+      label: ROLE_LABEL[id],
+      count: source.filter((row) => row.role === id).length,
+      color: "#1D4ED8",
+    })),
+  ];
+  const list = useListPage(rows, `${month}|${q}|${role}`);
   const owner = me.data?.role === "owner";
   if (me.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
   if (payroll.isError) return <p className="font-semibold text-destructive">{(payroll.error as Error).message}</p>;
@@ -38,7 +58,8 @@ function PayrollPage() {
         <p className="text-sm text-muted-foreground">Chỉ hiện lương của tài khoản đang đăng nhập.</p>
       )}
       <div className="flex flex-wrap gap-2">
-        <Input className="min-h-12 max-w-xs" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+        <Input className="min-h-12 max-w-xs" type="month" aria-label="Tháng lương" value={month} onChange={(e) => setMonth(e.target.value)} />
+        <Input className="min-h-12 max-w-xs" placeholder="Tìm tên" aria-label="Tìm người nhận lương" value={q} onChange={(e) => setQ(e.target.value)} />
         {owner ? (
           <>
             <Button className="min-h-12" onClick={() => closePayroll({ data: { month } }).then(() => toast.success("Đã chốt lương"))}>
@@ -63,8 +84,10 @@ function PayrollPage() {
         ) : null}
       </div>
       {payroll.data?.locked ? <p className="text-sm font-semibold">Tháng này đã chốt.</p> : null}
+      <FilterChips label="Vai trò" value={role} chips={chips} onChange={setRole} />
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="người" onPage={list.setPage} />
       <div className="grid gap-3">
-        {(payroll.data?.rows ?? []).map((row) => (
+        {list.slice.map((row) => (
           <article key={row.staffId} className="glass-card rounded-3xl p-4">
             <h2 className="text-lg font-bold text-primary">
               {row.name} · {ROLE_LABEL[row.role as Role]}
