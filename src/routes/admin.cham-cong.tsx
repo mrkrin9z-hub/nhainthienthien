@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { StaffLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { vnMonth } from "@/domain/calc";
@@ -23,13 +24,27 @@ function ClockPage() {
   const sheet = useQuery({ queryKey: ["attendance", month], queryFn: () => getAttendance({ data: { month } }) });
   const owner = me.data?.role === "owner";
 
+  const people = sheet.data?.people ?? [];
+  const punches = people.flatMap((person) => person.punches);
+  const openCount = punches.filter((punch) => !punch.outAt).length;
+  const lateCount = punches.filter((punch) => punch.lateMinutes > 0).length;
+  const leaves = sheet.data?.leaves ?? [];
+
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-extrabold text-primary">Chấm công</h1>
-      <p className="text-sm text-muted-foreground">
-        Ca {sheet.data?.workStart ?? "08:00"}–{sheet.data?.workEnd ?? "18:00"}. Ngày nghỉ tuần:{" "}
-        {(sheet.data?.weeklyOff ?? []).length === 0 ? "chưa đặt (hợp đồng ghi làm hằng ngày, chủ sửa trong Cài đặt)." : sheet.data?.weeklyOff.join(", ")}
-      </p>
+      <StaffLinks />
+      <div>
+        <h1 className="text-2xl font-semibold text-primary">Chấm công</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Ca {sheet.data?.workStart ?? "08:00"}–{sheet.data?.workEnd ?? "18:00"}. Ngày nghỉ tuần:{" "}
+          {(sheet.data?.weeklyOff ?? []).length === 0 ? "chưa đặt (hợp đồng ghi làm hằng ngày, chủ sửa trong Cài đặt)." : sheet.data?.weeklyOff.join(", ")}
+        </p>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <Summary label="Lượt bấm" value={String(punches.length)} />
+        <Summary label="Đang trong ca" value={String(openCount)} />
+        <Summary label="Lượt đi trễ" value={String(lateCount)} />
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <Button
           className="min-h-14 flex-1 bg-accent text-accent-foreground text-base"
@@ -37,6 +52,7 @@ function ClockPage() {
             await punchClock({ data: { action: "in" } });
             toast.success("Đã vào ca");
             await queryClient.invalidateQueries({ queryKey: ["attendance"] });
+            await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
           }}
         >
           Vào ca
@@ -48,15 +64,31 @@ function ClockPage() {
             await punchClock({ data: { action: "out" } });
             toast.success("Đã ra ca");
             await queryClient.invalidateQueries({ queryKey: ["attendance"] });
+            await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
           }}
         >
           Ra ca
         </Button>
       </div>
       <Input className="min-h-12 max-w-xs" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-      {(sheet.data?.people ?? []).map((person) => (
-        <section key={person.id} className="glass-card rounded-3xl p-4">
-          <h2 className="font-bold text-primary">{person.name}</h2>
+      {people.map((person) => {
+        const mine = leaves.filter((leave) => leave.staffId === person.id);
+        return (
+        <section key={person.id} className="rounded-2xl border border-border/70 bg-card p-4">
+          <h2 className="font-semibold text-primary">{person.name}</h2>
+          <p className="text-sm text-muted-foreground">
+            {person.punches.length} lượt · {person.punches.filter((punch) => punch.lateMinutes > 0).length} lần trễ
+            {person.punches.some((punch) => !punch.outAt) ? " · đang trong ca" : ""}
+          </p>
+          {mine.length ? (
+            <ul className="mt-2 space-y-1 text-sm">
+              {mine.map((leave) => (
+                <li key={leave.id} className="rounded-xl bg-muted px-3 py-2">
+                  Nghỉ {leave.date}{leave.note ? ` · ${leave.note}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <ul className="mt-2 space-y-2 text-sm">
             {person.punches.map((punch) => (
               <PunchRow key={punch.id} punch={punch} owner={owner} />
@@ -72,7 +104,17 @@ function ClockPage() {
             />
           ) : null}
         </section>
-      ))}
+        );
+      })}
+    </div>
+  );
+}
+
+function Summary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-card p-3">
+      <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-primary">{value}</p>
     </div>
   );
 }

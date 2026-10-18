@@ -6,6 +6,7 @@ import { RotateCcw, UserX } from "lucide-react";
 import { RoleGate } from "@/components/role-gate";
 import { ALL_TONE, CHANNEL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
 import { PageToolbar } from "@/components/admin/page-toolbar";
+import { CustomerLinks } from "@/components/admin/sections";
 import { formatMaybe } from "@/lib/brand";
 import { getCustomers } from "@/lib/admin.functions";
 import { CHANNEL_LABEL, CHANNELS, type Channel } from "@/domain/types";
@@ -55,6 +56,12 @@ function CustomersBody() {
 
   return (
     <div className="space-y-3">
+      <CustomerLinks />
+      <div className="grid grid-cols-3 gap-2">
+        <Stat label="Đang hiện" value={String(shown.length)} />
+        <Stat label="Quay lại" value={String(shown.filter((row) => row.repeat).length)} />
+        <Stat label="Một đơn" value={String(shown.filter((row) => row.orderCount <= 1).length)} />
+      </div>
       <PageToolbar
         title="Khách hàng"
         hint="Cùng một số điện thoại thật là một khách. Số bị che chỉ gộp khi cùng tài khoản sàn, hoặc trùng cả tên và địa chỉ."
@@ -92,6 +99,15 @@ function CustomersBody() {
         ))}
         {customers.data && shown.length === 0 ? <li className="text-sm text-muted-foreground">{rows.length === 0 ? "Chưa có khách." : "Không có khách khớp bộ lọc."}</li> : null}
       </ul>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-card p-3">
+      <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-primary">{value}</p>
     </div>
   );
 }

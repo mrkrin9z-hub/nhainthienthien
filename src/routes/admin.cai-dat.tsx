@@ -15,6 +15,33 @@ export const Route = createFileRoute("/admin/cai-dat")({
   component: SettingsPage,
 });
 
+const FIELD_GROUPS: { title: string; hint: string; keys: string[] }[] = [
+  {
+    title: "Giá vốn",
+    hint: "Mực, hao hụt và ngưỡng lãi. Ô được phép trống thì để trống — hệ thống không tự bịa số.",
+    keys: ["inkPercent", "marginYellowPercent", "marginRedPercent", "wasteRate"],
+  },
+  {
+    title: "Phí sàn",
+    hint: "Phí, thuế và hoa hồng theo kênh. Máy tính giá ở Bảng giá dùng các số này.",
+    keys: [
+      "tiktokFeePercent", "tiktokExtraPercent", "tiktokFixed", "tiktokTaxPercent", "tiktokCommissionPercent", "tiktokAffiliatePercent",
+      "shopeeFeePercent", "shopeeExtraPercent", "shopeeInfra", "shopeePiship", "shopeeTaxPercent", "shopeeCommissionPercent", "shopeeAffiliatePercent",
+      "fbTaxPercent", "fbCommissionPercent", "fbAdsPercent", "fbCodPercent", "fbShipping",
+    ],
+  },
+  {
+    title: "Lương và công",
+    hint: "Lương cứng, thử việc, ân hạn và mức trừ. Mức trừ để trống thì chưa trừ.",
+    keys: ["walkinCommissionPercent", "saleBase", "saleProbationPercent", "productionBase", "lateDeductionPerMinute", "absenceDeductionPerDay", "lateGraceMinutes"],
+  },
+  {
+    title: "Vận hành",
+    hint: "Cọc, hòa vốn, định mức kho và nhắc khách. Chi phí cố định từng tháng sửa ở Báo cáo.",
+    keys: ["depositMinTotal", "depositPercent", "breakevenMonth", "breakevenDay", "tapeOrdersPerRoll", "magnetPiecesPerSheet", "fileRetentionDays", "videoRetentionDays", "rentFromJune2027", "repeatCustomerOrders", "remindAfterDays"],
+  },
+];
+
 const NUMBER_FIELDS: { key: string; label: string; nullable?: boolean }[] = [
   { key: "inkPercent", label: "Mực (% giá bán)" },
   { key: "marginYellowPercent", label: "Ngưỡng vàng lãi gộp (%)" },
@@ -71,6 +98,7 @@ function SettingsBody() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => loadSettings() });
   const files = useQuery({ queryKey: ["due-files"], queryFn: () => dueFiles() });
   const [draft, setDraft] = useState<Record<string, string> | null>(null);
+  const [tab, setTab] = useState<"so" | "cua" | "tk" | "file">("so");
   const data = settings.data;
   const values = draft ?? (data ? Object.fromEntries(NUMBER_FIELDS.map((field) => {
     const raw = (data.settings as Record<string, unknown>)[field.key];
@@ -85,25 +113,59 @@ function SettingsBody() {
   if (settings.isError) return <p className="font-semibold text-destructive">{(settings.error as Error).message}</p>;
   if (!data || !values) return <p className="text-muted-foreground">Đang tải cài đặt…</p>;
 
+  const tabs = [
+    { id: "so" as const, label: "Số liệu" },
+    { id: "cua" as const, label: "Cửa hàng" },
+    { id: "tk" as const, label: "Tài khoản" },
+    { id: "file" as const, label: "Ảnh và nhật ký" },
+  ];
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-extrabold text-primary">Cài đặt</h1>
-      <section className="glass-card space-y-3 rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Số liệu</h2>
-        <p className="text-sm text-muted-foreground">Để trống ô nào được phép trống thì hệ thống không tự bịa số. Chi phí cố định mặc định 29.400.000đ/tháng; số từng tháng sửa ở Báo cáo.</p>
-        <div className="grid gap-3 md:grid-cols-2">
-          {NUMBER_FIELDS.map((field) => (
-            <label key={field.key} className="text-sm font-semibold">
-              {field.label}
-              <Input
-                className="mt-1 min-h-11"
-                value={values[field.key] ?? ""}
-                placeholder={field.nullable ? "Chưa có" : ""}
-                onChange={(e) => setDraft({ ...values, [field.key]: e.target.value })}
-              />
-            </label>
-          ))}
-        </div>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold text-primary">Cài đặt</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Số phí, giờ làm, sản phẩm đang hiện và tài khoản. Lưu một lần cho tab Số liệu và Cửa hàng.</p>
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none" role="tablist" aria-label="Mục cài đặt">
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-3 text-sm font-semibold ${tab === item.id ? "border-primary bg-primary text-primary-foreground" : "bg-card"}`}
+            onClick={() => setTab(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div className={tab === "so" ? "space-y-4" : "hidden"}>
+        {FIELD_GROUPS.map((group) => (
+          <section key={group.title} className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
+            <h2 className="font-semibold text-primary">{group.title}</h2>
+            <p className="text-sm text-muted-foreground">{group.hint}</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              {group.keys.map((key) => {
+                const field = NUMBER_FIELDS.find((item) => item.key === key);
+                if (!field) return null;
+                return (
+                  <label key={field.key} className="text-sm font-semibold">
+                    {field.label}
+                    <Input
+                      className="mt-1 min-h-11"
+                      value={values[field.key] ?? ""}
+                      placeholder={field.nullable ? "Chưa có" : ""}
+                      onChange={(e) => setDraft({ ...values, [field.key]: e.target.value })}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+      <section className={tab === "cua" ? "space-y-3 rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
         <label className="block text-sm font-semibold">
           Zalo
           <Input className="mt-1 min-h-11" defaultValue={data.settings.zaloPhone} id="zalo" />
@@ -155,6 +217,8 @@ function SettingsBody() {
           Mẫu tin nhắc khách. Chỗ trống: {"{ten}"} {"{so_don}"} {"{ngay}"} {"{dip}"} {"{so_dt}"}. Không tự gửi.
           <textarea id="remindMessage" className="mt-1 min-h-24 w-full rounded-xl border bg-card px-3 py-2" defaultValue={data.settings.remindMessage || DEFAULT_REMIND_MESSAGE} />
         </label>
+      </section>
+      {tab === "so" || tab === "cua" ? (
         <Button
           className="min-h-12 bg-accent text-accent-foreground"
           onClick={async () => {
@@ -189,10 +253,10 @@ function SettingsBody() {
         >
           Lưu cài đặt
         </Button>
-      </section>
+      ) : null}
 
-      <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Tài khoản</h2>
+      <section className={tab === "tk" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
+        <h2 className="font-semibold text-primary">Tài khoản</h2>
         <ul className="mt-2 space-y-1 text-sm">
           {data.staff.map((person) => (
             <li key={person.id}>
@@ -204,8 +268,8 @@ function SettingsBody() {
         <StaffForm />
       </section>
 
-      <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Ảnh đến hạn xóa</h2>
+      <section className={tab === "file" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
+        <h2 className="font-semibold text-primary">Ảnh đến hạn xóa</h2>
         <p className="text-sm text-muted-foreground">Web chỉ liệt kê. Chủ bấm xóa, không tự xóa im lặng.</p>
         <ul className="mt-2 space-y-2 text-sm">
           {(files.data ?? []).map((file) => (
@@ -230,8 +294,8 @@ function SettingsBody() {
         </ul>
       </section>
 
-      <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Nhật ký sửa</h2>
+      <section className={tab === "file" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
+        <h2 className="font-semibold text-primary">Nhật ký sửa</h2>
         <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
           {data.audits.map((item) => (
             <li key={item.id}>

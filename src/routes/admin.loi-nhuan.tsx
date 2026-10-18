@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { MoneyLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { vnMonth } from "@/domain/calc";
@@ -35,8 +36,9 @@ function ProfitBody() {
 
   return (
     <div className="space-y-4">
+      <MoneyLinks />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-extrabold text-primary">Chi phí và lợi nhuận</h1>
+        <h1 className="text-2xl font-semibold text-primary">Thu chi</h1>
         <Button
           variant="outline"
           className="min-h-11"

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MoreHorizontal,
   Package,
   Plug,
   Receipt,
@@ -115,9 +116,46 @@ const GROUPS: { title: string; items: { to: string; label: string; roles: Role[]
   },
 ];
 
+function pathActive(pathname: string, to: string) {
+  if (to === "/admin") return pathname === "/admin" || pathname === "/admin/";
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+function pageTitle(pathname: string, role: Role): string {
+  if (pathname.startsWith("/admin/don-moi")) return "Ghi đơn";
+  if (pathname.startsWith("/admin/tem/")) return "Tem đơn";
+  if (pathname.startsWith("/admin/don-hang/") && pathname !== "/admin/don-hang" && pathname !== "/admin/don-hang/") return "Chi tiết đơn";
+  if (pathname.startsWith("/admin/khach/") && pathname !== "/admin/khach" && pathname !== "/admin/khach/") return "Hồ sơ khách";
+  const items = GROUPS.flatMap((group) => group.items).filter((item) => item.roles.includes(role));
+  const match = items
+    .filter((item) => pathActive(pathname, item.to))
+    .sort((a, b) => b.to.length - a.to.length)[0];
+  if (!match) return "Quản trị";
+  if (match.to === "/admin/luong" && role !== "owner") return "Lương của tôi";
+  return match.label;
+}
+
+function dailyTabs(role: Role): { to: string; label: string; icon: typeof LayoutDashboard }[] {
+  if (role === "production") {
+    return [
+      { to: "/admin", label: "Tổng quan", icon: LayoutDashboard },
+      { to: "/admin/don-hang", label: "Đơn", icon: ClipboardList },
+      { to: "/admin/giao-hang", label: "Giao", icon: Truck },
+      { to: "/admin/cham-cong", label: "Công", icon: Clock },
+    ];
+  }
+  return [
+    { to: "/admin", label: "Tổng quan", icon: LayoutDashboard },
+    { to: "/admin/don-hang", label: "Đơn", icon: ClipboardList },
+    { to: "/admin/khach", label: "Khách", icon: Users },
+    { to: "/admin/cham-cong", label: "Công", icon: Clock },
+  ];
+}
+
 function AdminLayout() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -134,10 +172,13 @@ function AdminLayout() {
     router.navigate({ to: "/admin" });
   }
 
+  const title = pageTitle(pathname, role);
+  const tabs = dailyTabs(role);
+
   return (
-    <div className="min-h-screen bg-muted/50 md:pl-60">
+    <div className="min-h-screen bg-muted/40 md:pl-60">
       {menuOpen ? (
-        <button type="button" className="fixed inset-0 z-40 bg-black/40 md:hidden" aria-label="Đóng menu" onClick={() => setMenuOpen(false)} />
+        <button type="button" className="fixed inset-0 z-40 bg-foreground/40 md:hidden" aria-label="Đóng menu" onClick={() => setMenuOpen(false)} />
       ) : null}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card pt-[env(safe-area-inset-top)] text-foreground transition-transform md:w-60 md:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
@@ -158,17 +199,18 @@ function AdminLayout() {
                 <div className="mt-1 space-y-0.5">
                   {items.map((item) => {
                     const Icon = ICONS[item.to] ?? LayoutDashboard;
+                    const active = pathActive(pathname, item.to);
+                    const label = item.to === "/admin/luong" && role !== "owner" ? "Lương của tôi" : item.label;
                     return (
                       <Link
                         key={item.to}
                         to={item.to}
-                        activeOptions={{ exact: item.to === "/admin" }}
-                        activeProps={{ className: "bg-primary/10 text-primary" }}
-                        className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-foreground/75"
+                        aria-current={active ? "page" : undefined}
+                        className={`flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold ${active ? "bg-primary/10 text-primary" : "text-foreground/75"}`}
                         onClick={() => setMenuOpen(false)}
                       >
                         <Icon className="size-4 shrink-0" />
-                        {item.to === "/admin/luong" && role !== "owner" ? "Lương của tôi" : item.label}
+                        {label}
                       </Link>
                     );
                   })}
@@ -179,23 +221,20 @@ function AdminLayout() {
         </nav>
         <div className="border-t border-border p-3">
           <p className="truncate px-2 text-sm font-semibold">{me.data.name}</p>
-          <p className="px-2 text-xs text-muted-foreground">Nhận đơn → Thiết kế → In → Giao</p>
+          <p className="px-2 text-xs text-muted-foreground">{role === "owner" ? "Chủ tiệm" : role === "sale" ? "Sale" : "Sản xuất"}</p>
           <Button variant="outline" className="mt-3 min-h-11 w-full" onClick={() => void logout()}>
             <LogOut className="size-4" />
             Đăng xuất
           </Button>
         </div>
       </aside>
-      <header className="sticky top-0 z-30 border-b border-border bg-card px-3 pt-[env(safe-area-inset-top)] sm:px-4">
+      <header className="sticky top-0 z-30 border-b border-border bg-card px-4 pt-[env(safe-area-inset-top)]">
         <div className="flex h-14 items-center gap-2">
-          <button type="button" className="flex size-11 items-center justify-center rounded-full border md:hidden" aria-label="Mở menu" onClick={() => setMenuOpen(true)}>
-            <Menu className="size-5" />
-          </button>
-          <p className="min-w-0 truncate font-sans text-sm font-bold tracking-wide text-primary uppercase">Quản trị</p>
+          <p className="min-w-0 truncate text-base font-semibold text-primary">{title}</p>
           <p className="ml-auto truncate text-sm text-muted-foreground">{me.data.name}</p>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-3 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-4 md:px-8 md:py-6">
+      <main className="mx-auto max-w-6xl px-3 py-4 pb-28 sm:px-4 md:px-8 md:py-6 md:pb-8">
         {me.data.mustChangePassword ? (
           <ForcePasswordChange
             onDone={() => {
@@ -206,6 +245,36 @@ function AdminLayout() {
           <Outlet />
         )}
       </main>
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Việc hằng ngày">
+        <div className="grid grid-cols-5">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = pathActive(pathname, tab.to);
+            return (
+              <Link
+                key={tab.to}
+                to={tab.to}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold ${active ? "text-primary" : "text-muted-foreground"}`}
+                onClick={() => setMenuOpen(false)}
+              >
+                <Icon className="size-5" />
+                {tab.label}
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold ${menuOpen ? "text-primary" : "text-muted-foreground"}`}
+            aria-label="Mở toàn bộ menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <MoreHorizontal className="size-5" /> : <Menu className="size-5" />}
+            Thêm
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { GoodsLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { productImage } from "@/lib/product-images";
@@ -26,7 +27,8 @@ function PhotosBody() {
   if (photos.isError) return <p className="font-semibold text-destructive">{(photos.error as Error).message}</p>;
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-extrabold text-primary">Ảnh sản phẩm</h1>
+      <GoodsLinks />
+      <h1 className="text-2xl font-semibold text-primary">Ảnh sản phẩm</h1>
       <p className="text-sm text-muted-foreground">
         Ảnh đang hiện là ảnh mẫu. Tải JPG, PNG hoặc WEBP (tối đa 2MB) để thay. Xóa ảnh tải lên thì web trở lại ảnh mẫu.
       </p>
