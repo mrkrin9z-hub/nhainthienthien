@@ -9,7 +9,7 @@ import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { deleteSkuMap, getSkuMaps, importMarketplace, previewMarketplace, storeSkuMap } from "@/lib/admin.functions";
+import { deleteSkuMap, getMarketplaceSync, getSkuMaps, importMarketplace, previewMarketplace, pullMarketplace, storeSkuMap } from "@/lib/admin.functions";
 import { EXPECTED_COLUMNS } from "@/domain/marketplace";
 import { formatMaybe } from "@/lib/brand";
 
@@ -59,9 +59,10 @@ function ImportBody() {
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Nhập đơn sàn</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Tải file xuất từ TikTok Shop hoặc Shopee Seller Center (CSV hoặc XLSX). Dòng mô tả dưới tiêu đề bị bỏ. Số điện thoại bị che vẫn nhập, ghi SĐT bị ẩn. Đơn Đã hủy không vào sổ. Tiền trên đơn là tiền sàn; giá niêm yết chỉ để đối chiếu. Đơn vào trạng thái Nhận đơn, kho trừ khi chuyển sang In và Giao như đơn thường.
+          Đơn API đổ vào cùng sổ này. File Excel vẫn dùng khi cần đơn cũ hơn 7 ngày. Dòng mô tả dưới tiêu đề bị bỏ. Số điện thoại bị che vẫn nhập, ghi SĐT bị ẩn. Đơn Đã hủy không vào sổ. Tiền trên đơn là tiền sàn; giá niêm yết chỉ để đối chiếu. Đơn vào trạng thái Nhận đơn, kho trừ khi chuyển sang In và Giao như đơn thường.
         </p>
       </div>
+      <ApiPull />
       <section className="glass-card space-y-2 rounded-3xl p-4 text-sm">
         <h2 className="font-bold text-primary">Cột cần có</h2>
         <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
@@ -185,5 +186,41 @@ function ImportBody() {
         </ul>
       </section>
     </div>
+  );
+}
+
+function ApiPull() {
+  const sync = useQuery({ queryKey: ["marketplace-sync"], queryFn: () => getMarketplaceSync() });
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState<"tiktok" | "shopee" | null>(null);
+  async function pull(channel: "tiktok" | "shopee") {
+    setBusy(channel);
+    try {
+      const result = await pullMarketplace({ data: { channel } });
+      toast.success(`Đã đổ ${result.codes.length} đơn. Bỏ qua ${result.duplicateCount} đơn đã có.`);
+      if (result.issueCount) toast.message(`${result.issueCount} dòng chưa vào sổ vì chưa map SKU hoặc thiếu số.`);
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+  return (
+    <section className="glass-card space-y-3 rounded-3xl p-4">
+      <h2 className="font-bold text-primary">Lấy đơn từ API</h2>
+      <p className="text-sm text-muted-foreground">
+        Chủ nối shop ở Kết nối. Khi đã nối, mở trang này hoặc danh sách đơn sẽ tự lấy đơn 7 ngày. Bấm lại nếu cần ngay. Đơn trùng mã sàn bị bỏ qua.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button className="min-h-12" disabled={!sync.data?.tiktok || busy !== null} onClick={() => pull("tiktok")}>
+          {busy === "tiktok" ? "Đang lấy TikTok…" : "Lấy đơn TikTok"}
+        </Button>
+        <Button className="min-h-12" disabled={!sync.data?.shopee || busy !== null} onClick={() => pull("shopee")}>
+          {busy === "shopee" ? "Đang lấy Shopee…" : "Lấy đơn Shopee"}
+        </Button>
+      </div>
+      {sync.data && !sync.data.tiktok && !sync.data.shopee ? <p className="text-sm text-muted-foreground">Chưa nối shop nào. File Excel phía dưới vẫn nhập được.</p> : null}
+    </section>
   );
 }

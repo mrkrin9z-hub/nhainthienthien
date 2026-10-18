@@ -663,6 +663,18 @@ export const saveIntegration = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const getMarketplaceSync = createServerFn({ method: "GET" }).handler(async () => {
+  const { marketplaceSyncStatus } = await import("@/server/service");
+  return marketplaceSyncStatus(await actor());
+});
+
+export const pullMarketplace = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ channel: z.enum(["tiktok", "shopee"]) }).parse(data))
+  .handler(async ({ data }) => {
+    const { pullMarketplaceNow } = await import("@/server/marketplace-sync");
+    return pullMarketplaceNow(await actor(), data.channel);
+  });
+
 export const previewRestore = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ key: z.string().min(8) }).parse(data))
   .handler(async ({ data }) => {

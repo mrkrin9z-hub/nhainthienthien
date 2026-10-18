@@ -31,7 +31,7 @@ import { orderRevisionBlock } from "@/domain/order-edit";
 import { bytesStillShared, filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
-import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type PlannedItem } from "@/domain/marketplace";
+import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type ParsedLine, type PlannedItem, type PlannedOrder } from "@/domain/marketplace";
 import { applyRestore, restoreSummary } from "@/domain/restore";
 import { albumFolderParts, driveFolderParts } from "@/domain/drive-path";
 import { defaultCarrier } from "@/domain/jt";
@@ -1040,11 +1040,23 @@ export async function lookupOrder(code: string, phone: string) {
   };
 }
 
+async function pullDueQuiet(actor: Actor) {
+  if (actor.role !== "owner" && actor.role !== "sale") return;
+  try {
+    const { pullDueMarketplace } = await import("@/server/marketplace-sync");
+    await pullDueMarketplace(actor);
+  } catch {
+    // Sàn lỗi thì sổ đang có vẫn mở. Lần mở sau sẽ lấy lại.
+  }
+}
+
 export async function dashboard(actor: Actor) {
+  await pullDueQuiet(actor);
   return visibleToRole(actor.role, buildDashboard(await readState(), actor));
 }
 
 export async function listOrders(actor: Actor) {
+  await pullDueQuiet(actor);
   const state = await readState();
   return visibleToRole(actor.role, {
     orders: state.orders
@@ -2618,17 +2630,15 @@ export async function previewMarketplaceFile(
   return { columns: EXPECTED_COLUMNS, ...plan };
 }
 
-export async function importMarketplaceFile(
-  actor: Actor,
-  input: { channel: MarketplaceChannel; filename: string; base64: string },
-) {
-  assertRole(actor, ["owner", "sale"]);
-  const preview = await marketplacePlan(await readState(), input.channel, input.filename, input.base64);
-  const codes = await mutate(async (state) => {
+async function commitMarketplaceOrders(actor: Actor, channel: MarketplaceChannel, orders: PlannedOrder[], note: string) {
+  if (!orders.length) return [];
+  return mutate(async (state) => {
     const made: string[] = [];
-    for (const planned of preview.orders) {
+    for (const planned of orders) {
       const taken = state.orders.some(
-        (order) => order.channel === input.channel && order.marketplaceCode === planned.platformOrderId,
+        (order) =>
+          (order.channel === channel && order.marketplaceCode === planned.platformOrderId) ||
+          order.idempotencyKey === `${channel}:${planned.platformOrderId}`,
       );
       if (taken) continue;
       const customer = upsertCustomer(state, {
@@ -2638,13 +2648,13 @@ export async function importMarketplaceFile(
         platformBuyer: planned.platformBuyer,
         fromMarketplace: true,
       });
-      const items = marketplaceItems(state, input.channel, planned.items);
+      const items = marketplaceItems(state, channel, planned.items);
       const totals = sumItems(items);
-      const notes = [`Nhập từ file ${input.channel}`, ...planned.flags];
+      const notes = [note, ...planned.flags];
       const order: Order = {
         id: nid(),
         code: nextCode(state),
-        channel: input.channel,
+        channel,
         source: "manual",
         customerId: customer.id,
         status: planned.status,
@@ -2656,7 +2666,7 @@ export async function importMarketplaceFile(
         marketplaceCode: planned.platformOrderId,
         recipientName: planned.buyer,
         shipping: {
-          carrier: planned.carrier.trim() || defaultCarrier({ channel: input.channel, source: "manual", fulfillment: "delivery" }),
+          carrier: planned.carrier.trim() || defaultCarrier({ channel, source: "manual", fulfillment: "delivery" }),
           tracking: planned.tracking,
           shipFee: planned.shipFee,
           codAmount: planned.codAmount,
@@ -2674,25 +2684,60 @@ export async function importMarketplaceFile(
         stockWarning: "",
         accessTokenHash: "",
         accessToken: "",
-        idempotencyKey: `${input.channel}:${planned.platformOrderId}`,
+        idempotencyKey: `${channel}:${planned.platformOrderId}`,
         createdAt: planned.createdAt ?? nowIso(),
         updatedAt: nowIso(),
         completedAt: null,
         files: [],
-        history: [{ at: nowIso(), from: null, to: "nhan_don", by: actor.id, note: "Nhập từ file sàn" }],
+        history: [{ at: nowIso(), from: null, to: "nhan_don", by: actor.id, note }],
       };
       refreshDeposit(state, order);
       state.orders.unshift(order);
       audit(state, actor.id, "order.import", order.id, null, {
         code: order.code,
         platform: planned.platformOrderId,
-        channel: input.channel,
+        channel,
       });
       made.push(order.code);
     }
     return made;
   });
+}
+
+export async function importMarketplaceFile(
+  actor: Actor,
+  input: { channel: MarketplaceChannel; filename: string; base64: string },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const preview = await marketplacePlan(await readState(), input.channel, input.filename, input.base64);
+  const codes = await commitMarketplaceOrders(actor, input.channel, preview.orders, "Nhập từ file sàn");
   return { codes, issues: preview.issues, duplicates: preview.duplicates, cancelled: preview.cancelled };
+}
+
+export async function importMarketplaceOrders(actor: Actor, channel: MarketplaceChannel, lines: ParsedLine[]) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const maps = (state.skuMaps ?? []).filter((row) => row.channel === channel);
+  const existingIds = state.orders.filter((order) => order.channel === channel && order.marketplaceCode).map((order) => order.marketplaceCode);
+  const plan = planMarketplaceImport({ lines, maps, existingIds });
+  const codes = await commitMarketplaceOrders(actor, channel, plan.orders, "Đổ từ API sàn");
+  return {
+    codes,
+    issues: plan.issues.slice(0, 30),
+    issueCount: plan.issues.length,
+    duplicates: plan.duplicates.slice(0, 30),
+    duplicateCount: plan.duplicates.length,
+    cancelled: plan.cancelled,
+  };
+}
+
+export async function marketplaceSyncStatus(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const { parseShopeeLink, parseTiktokLink } = await import("@/domain/marketplace-api");
+  const { readIntegrationSecret } = await import("@/server/secrets");
+  const tiktok = parseTiktokLink(await readIntegrationSecret("tiktok_shop"));
+  const shopee = parseShopeeLink(await readIntegrationSecret("shopee_shop"));
+  return { tiktok: Boolean(tiktok), shopee: Boolean(shopee) };
 }
 
 export async function listSkuMaps(actor: Actor) {
