@@ -15,8 +15,9 @@ test("cài đặt chia nhóm nhưng không bỏ sót ô số", () => {
 
 test("admin có việc hằng ngày và đơn dạng cột", () => {
   const shell = readFileSync(new URL("../routes/admin.tsx", import.meta.url), "utf8");
-  assert.match(shell, /aria-label="Việc hằng ngày"/);
-  assert.match(shell, /Thêm/);
+  assert.match(shell, /admin-desk/);
+  assert.match(shell, /Thiên Thiên/);
+  assert.match(shell, /aria-label="Mục quản trị"/);
   const orders = readFileSync(new URL("../routes/admin.don-hang.index.tsx", import.meta.url), "utf8");
   assert.match(orders, /Dạng cột/);
   assert.match(orders, /Danh sách/);
