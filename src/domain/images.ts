@@ -8,6 +8,15 @@ export function imageMimeAllowed(mime: string): boolean {
   return IMAGE_MIME.includes(cleanMime(mime));
 }
 
+const IMAGE_EXT = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
+
+/** Ảnh thì có khung xem trước. Video và file khác giữ tên để tải. */
+export function imagePreviewable(name: string, mime = ""): boolean {
+  if (imageMimeAllowed(mime)) return true;
+  const lower = name.toLowerCase();
+  return IMAGE_EXT.some((ext) => lower.endsWith(ext));
+}
+
 function starts(bytes: Uint8Array, signature: number[]): boolean {
   if (bytes.length < signature.length) return false;
   return signature.every((value, index) => bytes[index] === value);

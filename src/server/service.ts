@@ -24,7 +24,7 @@ import {
 } from "@/domain/calc";
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { workbookXml, type Sheet } from "@/domain/excel";
-import { imageBytesMatch, imageMimeAllowed } from "@/domain/images";
+import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/images";
 import { albumPhone, photoTooBig, publicUploadCard, uploadTokenShape } from "@/domain/order-upload";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
 import { orderRevisionBlock } from "@/domain/order-edit";
@@ -2308,12 +2308,21 @@ export async function deleteStoredFile(actor: Actor, fileId: string) {
   });
 }
 
-export async function fileForStaff(actor: Actor, fileId: string): Promise<{ name: string; mime: string; bytes?: Uint8Array; redirect?: string }> {
+export async function fileForStaff(
+  actor: Actor,
+  fileId: string,
+  preview: 480 | 1600 | null = null,
+): Promise<{ name: string; mime: string; bytes?: Uint8Array; redirect?: string }> {
   const state = await readState();
   const pools = [...state.orders.map((order) => order.files), ...(state.albums ?? []).map((album) => album.files)];
   for (const files of pools) {
     const file = files.find((item) => item.id === fileId && !item.deletedAt);
     if (!file) continue;
+    if (preview && !imagePreviewable(file.name, file.mime)) throw new Error("Không phải ảnh.");
+    if (file.storage === "drive" && file.driveFileId && preview) {
+      const photo = await downloadDriveThumbnail(file.driveFileId, preview);
+      return { name: file.name, mime: photo.mime, bytes: photo.bytes };
+    }
     if (file.storage === "local") {
       if (!(await usesDisk())) throw new Error("File nằm trên đĩa local, không đọc được trên Workers.");
       const { readFile } = await import("node:fs/promises");

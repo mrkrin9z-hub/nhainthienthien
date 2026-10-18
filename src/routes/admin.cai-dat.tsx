@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ListPager, useListPage } from "@/components/admin/list-page";
+import { canPreviewPhoto, PhotoViewer, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,6 +103,7 @@ function SettingsBody() {
   const [tab, setTab] = useState<"so" | "cua" | "tk" | "file">("so");
   const [fileQ, setFileQ] = useState("");
   const [auditQ, setAuditQ] = useState("");
+  const [openFile, setOpenFile] = useState<string | null>(null);
   const data = settings.data;
   const due = (files.data ?? []).filter((file) => {
     const needle = fileQ.trim().toLowerCase();
@@ -286,8 +288,15 @@ function SettingsBody() {
         <ul className="mt-2 space-y-2 text-sm">
           {fileList.slice.map((file) => (
             <li key={file.fileId} className="flex items-center justify-between gap-2">
-              <span>
-                {file.orderCode} · {file.name} · {file.ageDays} ngày
+              <span className="flex min-w-0 items-center gap-2">
+                {canPreviewPhoto(file) ? (
+                  <button type="button" className="shrink-0 overflow-hidden rounded-xl border border-border" onClick={() => setOpenFile(file.fileId)} aria-label={`Xem ${file.name}`}>
+                    <img src={staffThumb(file.fileId)} alt="" className="size-14 object-cover" />
+                  </button>
+                ) : null}
+                <span className="min-w-0 truncate">
+                  {file.orderCode} · {file.name} · {file.ageDays} ngày
+                </span>
               </span>
               <Button
                 size="sm"
@@ -304,6 +313,14 @@ function SettingsBody() {
           ))}
           {fileList.total === 0 ? <li>{(files.data ?? []).length === 0 ? "Chưa có file đến hạn." : "Không có ảnh khớp bộ lọc."}</li> : null}
         </ul>
+        {openFile ? (
+          <PhotoViewer
+            src={staffThumb(openFile, true)}
+            name={fileList.slice.find((file) => file.fileId === openFile)?.name ?? "Ảnh"}
+            downloadHref={`/api/staff/file/${openFile}`}
+            onClose={() => setOpenFile(null)}
+          />
+        ) : null}
       </section>
 
       <section className={tab === "file" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
