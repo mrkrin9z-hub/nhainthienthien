@@ -33,6 +33,8 @@ export const AUDIT_ACTIONS: { action: string; label: string }[] = [
   { action: "backup.restore", label: "Khôi phục" },
   { action: "secret.update", label: "Khóa kết nối" },
   { action: "photo.product", label: "Ảnh sản phẩm" },
+  { action: "product.create", label: "Thêm sản phẩm" },
+  { action: "product.list", label: "Hiện sản phẩm" },
 ];
 
 const SETTING_LABEL: Record<string, string> = {
@@ -231,6 +233,10 @@ function detailOf(item: Pick<Audit, "action" | "entity" | "before" | "after">, s
       return `${after?.set === false ? "xóa" : "lưu"} khóa kết nối ${SECRET_LABEL[item.entity] ?? "kênh ngoài"}`;
     case "photo.product":
       return `${after?.cleared ? "xóa ảnh sản phẩm" : "đổi ảnh sản phẩm"} ${groupName(shop, item.entity)}`;
+    case "product.create":
+      return `thêm sản phẩm ${text(after?.name)} lên trang chủ`;
+    case "product.list":
+      return `${after?.listed ? "hiện" : "ẩn"} ${text(after?.name)} trên trang chủ`;
     default:
       return `ghi việc ${auditActionLabel(item.action)}`;
   }

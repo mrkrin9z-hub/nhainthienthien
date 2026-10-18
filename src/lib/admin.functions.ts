@@ -616,6 +616,46 @@ export const getGroupPhotos = createServerFn({ method: "GET" }).handler(async ()
   return listGroupPhotos(await actor());
 });
 
+export const getWebProducts = createServerFn({ method: "GET" }).handler(async () => {
+  const { listWebProducts } = await import("@/server/service");
+  return listWebProducts(await actor());
+});
+
+export const createWebProduct = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        name: z.string().min(2).max(80),
+        category: z.string().min(2).max(40),
+        description: z.string().max(400),
+        turnaround: z.string().max(80),
+        sizes: z
+          .array(
+            z.object({
+              widthCm: z.number().int().positive(),
+              heightCm: z.number().int().positive(),
+              sheets: z.number().int().positive(),
+              price: z.number().int().positive(),
+            }),
+          )
+          .min(1)
+          .max(40),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { createWebProduct: create } = await import("@/server/service");
+    return create(await actor(), data);
+  });
+
+export const setWebProductListed = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ groupId: z.string().min(1), listed: z.boolean() }).parse(data))
+  .handler(async ({ data }) => {
+    const { setWebProductListed: setListed } = await import("@/server/service");
+    await setListed(await actor(), data.groupId, data.listed);
+    return { ok: true };
+  });
+
 export const clearGroupPhoto = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ slug: z.string() }).parse(data))
   .handler(async ({ data }) => {

@@ -35,6 +35,7 @@ import { driveFolderParts } from "@/domain/drive-path";
 import { defaultCarrier } from "@/domain/jt";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
 import { publicContact } from "@/domain/public-contact";
+import { buildWebProduct, type WebProductInput } from "@/domain/web-product";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
@@ -2199,6 +2200,64 @@ export async function codBoard(actor: Actor, month: string) {
     expected: carriers.reduce((sum, row) => sum + row.expected, 0),
     received: carriers.reduce((sum, row) => sum + row.received, 0),
   };
+}
+
+export async function listWebProducts(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  return state.groups
+    .slice()
+    .sort((a, b) => a.sort - b.sort)
+    .map((group) => {
+      const skus = state.skus.filter((sku) => sku.groupId === group.id && !isMergedWoodAlias(sku));
+      const prices = skus
+        .map((sku) => priceOf(state.prices, sku.id, "tai_tiem")?.price)
+        .filter((price): price is number => typeof price === "number");
+      return {
+        id: group.id,
+        name: group.name,
+        slug: group.slug,
+        category: group.category,
+        description: group.description,
+        listed: groupIsListed(state.settings, group),
+        variants: skus.length,
+        from: prices.length ? Math.min(...prices) : null,
+      };
+    });
+}
+
+export async function createWebProduct(actor: Actor, input: WebProductInput) {
+  assertRole(actor, ["owner"]);
+  return mutate(async (state) => {
+    const built = buildWebProduct(input, {
+      slugs: state.groups.map((group) => group.slug),
+      ids: state.groups.map((group) => group.id),
+      codes: state.skus.map((sku) => sku.code),
+      sorts: state.groups.map((group) => group.sort),
+    });
+    state.groups.push(built.group);
+    state.skus.push(...built.skus);
+    state.prices.push(...built.prices);
+    state.settings.groupListed = { ...state.settings.groupListed, [built.group.id]: true };
+    audit(state, actor.id, "product.create", built.group.id, null, {
+      name: built.group.name,
+      slug: built.group.slug,
+      sizes: built.skus.length,
+    });
+    return { id: built.group.id, slug: built.group.slug, name: built.group.name };
+  });
+}
+
+export async function setWebProductListed(actor: Actor, groupId: string, listed: boolean) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const group = state.groups.find((item) => item.id === groupId);
+    if (!group) throw new Error("Không thấy sản phẩm.");
+    if (listed && group.gate === "anh_the") state.settings.showAnhThe = true;
+    if (listed && group.gate === "album") state.settings.showAlbum = true;
+    state.settings.groupListed = { ...state.settings.groupListed, [group.id]: listed };
+    audit(state, actor.id, "product.list", group.id, null, { name: group.name, listed });
+  });
 }
 
 export async function listGroupPhotos(actor: Actor) {

@@ -82,6 +82,7 @@ const GROUPS: { title: string; items: { to: string; label: string; roles: Role[]
     items: [
       { to: "/admin/khach", label: "Khách hàng", roles: ["owner", "sale"] },
       { to: "/admin/nhac-khach", label: "Nhắc khách", roles: ["owner", "sale"] },
+      { to: "/admin/san-pham", label: "Sản phẩm web", roles: ["owner"] },
       { to: "/admin/gia", label: "Bảng giá", roles: ["owner", "sale"] },
       { to: "/admin/kho", label: "Kho", roles: ["owner", "sale", "production"] },
       { to: "/admin/anh", label: "Ảnh web", roles: ["owner", "sale"] },
