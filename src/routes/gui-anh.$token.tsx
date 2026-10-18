@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { CheckCircle2, Loader2, UploadCloud } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Loader2, UploadCloud, X } from "lucide-react";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
+import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { photoLimitLabel, uploadTokenShape } from "@/domain/order-upload";
+import { formatMaybe } from "@/lib/brand";
 import { putDriveFile } from "@/lib/drive-put";
 import { acknowledgeCustomerPhotos, createUploadTicket, finishOrderDriveUpload, getUploadTarget, prepareOrderDriveUpload } from "@/lib/orders.functions";
 
@@ -21,6 +23,29 @@ export const Route = createFileRoute("/gui-anh/$token")({
 
 const MAX_FILES = 30;
 const ACCEPT = ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*";
+
+const STATUS_LABEL: Record<string, string> = {
+  draft_upload: "Đang gửi ảnh",
+  upload_error: "Lỗi tải ảnh",
+  nhan_don: "Đã nhận đơn",
+  thiet_ke: "Đang thiết kế",
+  cho_duyet: "Chờ khách duyệt",
+  in: "Đang in",
+  dong_goi: "Đang đóng gói",
+  giao: "Đang giao",
+  xong: "Hoàn tất",
+  huy: "Đã hủy",
+};
+
+function formatWhen(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("vi-VN", { hour12: false });
+}
+
+function channelLabel(channel: string): string {
+  return CHANNEL_LABEL[channel as Channel] ?? channel;
+}
 
 type Row = {
   key: string;
@@ -52,6 +77,7 @@ function CustomerUploadPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openPhoto, setOpenPhoto] = useState<string | null>(null);
   const limit = target.data ? target.data.maxPhotoBytes : undefined;
   const direct = limit === null;
 
@@ -125,6 +151,7 @@ function CustomerUploadPage() {
       }
       const result = await acknowledgeCustomerPhotos({ data: { orderId: info.orderId, accessToken: token } });
       setDone(result.code);
+      await target.refetch();
       if (failed) setError("Một số ảnh chưa lên. Chọn lại ảnh lỗi rồi gửi tiếp.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chưa gửi được.");
@@ -133,6 +160,18 @@ function CustomerUploadPage() {
     }
   }
 
+  const info = target.data;
+  const opened = info?.photos.find((photo) => photo.id === openPhoto) ?? null;
+
+  useEffect(() => {
+    if (!opened) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpenPhoto(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [opened]);
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
@@ -140,18 +179,81 @@ function CustomerUploadPage() {
         {!valid ? <p className="font-semibold text-destructive">Mã không còn dùng được.</p> : null}
         {valid && target.isLoading ? <p className="text-muted-foreground">Đang mở đơn…</p> : null}
         {valid && target.isError ? <p className="font-semibold text-destructive">{(target.error as Error).message}</p> : null}
-        {target.data ? (
-          <section className="glass-card space-y-4 rounded-3xl p-5">
+        {info ? (
+          <section className="glass-card space-y-5 rounded-3xl p-5">
             <div>
-              <h1 className="text-2xl text-primary">Gửi ảnh cho đơn {target.data.code}</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {target.data.customerName ? `${target.data.customerName}. ` : ""}
-                Chọn ảnh gốc từ máy. Ảnh vào đúng đơn này.
-                {target.data.fileCount > 0 ? ` Đơn đã có ${target.data.fileCount} ảnh.` : ""}
-              </p>
+              <h1 className="text-2xl text-primary">Gửi ảnh cho đơn {info.code}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Ảnh vào đúng đơn này. Ảnh đã gửi nằm bên dưới.</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 JPG, PNG, WEBP, HEIC{limit === undefined ? "" : ` — ${photoLimitLabel(limit)}`}, tối đa {MAX_FILES} ảnh.
               </p>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Khách hàng</h2>
+                <p className="mt-1 font-semibold text-foreground">{info.customerName || "Khách"}</p>
+                {info.phone ? <p className="text-muted-foreground">{info.phone}</p> : null}
+              </div>
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Đơn hàng</h2>
+                <p className="mt-1 font-semibold text-foreground">{info.code}</p>
+                <p className="text-muted-foreground">
+                  {STATUS_LABEL[info.status] ?? info.status}
+                  {info.createdAt ? ` · ${formatWhen(info.createdAt)}` : ""}
+                </p>
+                <p className="text-muted-foreground">
+                  {channelLabel(info.channel)} · {info.fulfillment === "delivery" ? "Giao tận nơi" : "Nhận tại xưởng"}
+                </p>
+                {info.marketplaceCode ? <p className="text-muted-foreground">Mã trên sàn: {info.marketplaceCode}</p> : null}
+                {info.address ? <p className="text-muted-foreground">{info.address}</p> : null}
+                {info.customerNote ? <p className="text-muted-foreground">Ghi chú: {info.customerNote}</p> : null}
+              </div>
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Sản phẩm</h2>
+                <ul className="mt-1 space-y-2">
+                  {info.items.map((item, index) => (
+                    <li key={`${item.variant}-${index}`} className="flex items-start justify-between gap-3">
+                      <span>
+                        <span className="block font-semibold text-foreground">{item.name}</span>
+                        <span className="text-muted-foreground">
+                          {item.variant} × {item.quantity}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-semibold text-primary">{item.lineTotal === null ? "Liên hệ" : formatMaybe(item.lineTotal)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 flex justify-between border-t border-border pt-2 font-bold text-foreground">
+                  <span>Tạm tính</span>
+                  <span className="text-accent">{formatMaybe(info.total) === "—" ? "Liên hệ" : formatMaybe(info.total)}</span>
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Ảnh đã gửi ({info.photos.length})</h2>
+              {info.photos.length ? (
+                <ul className="mt-2 grid grid-cols-3 gap-2">
+                  {info.photos.map((photo) => (
+                    <li key={photo.id}>
+                      <button type="button" className="block w-full overflow-hidden rounded-2xl border border-border bg-muted" onClick={() => setOpenPhoto(photo.id)}>
+                        <img
+                          src={`/api/public/order-photo/${token}/${photo.id}`}
+                          alt={photo.name}
+                          className="aspect-square w-full object-cover"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                        <span className="block truncate px-2 py-1 text-left text-xs text-muted-foreground">{photo.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">Chưa có ảnh trong đơn.</p>
+              )}
             </div>
             {done ? (
               <p className="flex items-center gap-2 font-semibold text-primary">
@@ -191,6 +293,23 @@ function CustomerUploadPage() {
           </section>
         ) : null}
       </main>
+      {opened ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label={opened.name}>
+          <button
+            type="button"
+            className="absolute right-4 top-4 flex size-11 items-center justify-center rounded-full bg-background text-foreground"
+            onClick={() => setOpenPhoto(null)}
+            aria-label="Đóng"
+          >
+            <X className="size-5" />
+          </button>
+          <img
+            src={`/api/public/order-photo/${token}/${opened.id}?view=1`}
+            alt={opened.name}
+            className="max-h-[85vh] max-w-full rounded-2xl object-contain"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

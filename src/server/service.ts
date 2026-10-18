@@ -25,7 +25,7 @@ import {
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed } from "@/domain/images";
-import { albumPhone, photoTooBig, uploadTokenShape } from "@/domain/order-upload";
+import { albumPhone, photoTooBig, publicUploadCard, uploadTokenShape } from "@/domain/order-upload";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
 import { orderRevisionBlock } from "@/domain/order-edit";
 import { bytesStillShared, filesToPurge } from "@/domain/files";
@@ -66,7 +66,7 @@ import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
 import { listBackups, readBackup, writeManualBackup } from "@/server/store";
 import { clearProductPhoto, readProductPhoto, writeProductPhoto } from "@/server/photos";
 import { integrationStatus, saveIntegrationSecret } from "@/server/secrets";
-import { deleteFromDrive, downloadFromDrive, driveConnected, inspectDriveUpload, openDriveUpload, uploadToDrive } from "@/server/drive";
+import { deleteFromDrive, downloadDriveThumbnail, downloadFromDrive, driveConnected, inspectDriveUpload, openDriveUpload, uploadToDrive } from "@/server/drive";
 import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
 
 export type Actor = Pick<Staff, "id" | "name" | "email" | "role" | "mustChangePassword"> & {
@@ -561,18 +561,45 @@ export async function orderUploadLink(actor: Actor, orderId: string, rotate = fa
   });
 }
 
-/** Thông tin khách được thấy khi mở mã của đơn. Không có giá, số điện thoại, địa chỉ. */
+/** Thẻ khách thấy khi mở mã của đơn: người đặt, sản phẩm, ảnh gốc đã gửi. */
 export async function publicUploadTarget(token: string) {
   const state = await readState();
   const order = await orderByUploadToken(state, token);
   const customer = state.customers.find((item) => item.id === order.customerId);
   return {
-    orderId: order.id,
-    code: order.code,
-    customerName: customer?.name ?? "",
-    fileCount: order.files.filter((file) => !file.deletedAt && file.status === "complete").length,
+    ...publicUploadCard({ order, customer }),
     maxPhotoBytes: await photoByteLimit(),
   };
+}
+
+/** Ảnh gốc của đúng đơn. Ảnh trên Drive lấy bản nhỏ Google tạo, không gửi file gốc. */
+export async function publicOrderPhoto(token: string, fileId: string, width: 480 | 1600): Promise<{ bytes: Uint8Array; mime: string }> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fileId)) {
+    throw new Error("Không thấy ảnh.");
+  }
+  const state = await readState();
+  const order = await orderByUploadToken(state, token);
+  const file = order.files.find((item) => item.id === fileId && !item.deletedAt && item.status === "complete" && item.kind === "original");
+  if (!file) throw new Error("Không thấy ảnh.");
+  if (file.storage === "drive" && file.driveFileId) return downloadDriveThumbnail(file.driveFileId, width);
+  if (file.storage === "kv") {
+    const kv = await shopKv();
+    const buf = kv ? await kv.get(file.path || `upload:${file.id}`, "arrayBuffer") : null;
+    if (!buf) throw new Error("Không thấy ảnh.");
+    return { bytes: new Uint8Array(buf), mime: file.mime || "image/jpeg" };
+  }
+  if (file.storage === "local") {
+    if (!(await usesDisk()) || file.path.split(/[/\\]/).includes("..")) throw new Error("Không thấy ảnh.");
+    const { readFile } = await import("node:fs/promises");
+    return { bytes: new Uint8Array(await readFile(path.join(process.cwd(), file.path))), mime: file.mime || "image/jpeg" };
+  }
+  if (file.storage === "r2") {
+    const bucket = await orderFiles();
+    const object = bucket ? await bucket.get(file.path) : null;
+    if (!object) throw new Error("Không thấy ảnh.");
+    return { bytes: new Uint8Array(await object.arrayBuffer()), mime: file.mime || "image/jpeg" };
+  }
+  throw new Error("Không thấy ảnh.");
 }
 
 function albumsOf(state: ShopState): PhotoAlbum[] {
