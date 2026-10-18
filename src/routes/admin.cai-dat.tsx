@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RoleGate } from "@/components/role-gate";
-import { dueFiles, loadSettings, removeFile, runRecalc, storeSettings, storeStaff } from "@/lib/admin.functions";
+import { StaffDesk } from "@/components/admin/staff-desk";
+import { dueFiles, loadSettings, removeFile, runRecalc, storeSettings } from "@/lib/admin.functions";
 import { DEFAULT_REMIND_DAYS, DEFAULT_REMIND_MESSAGE, DEFAULT_REPEAT_ORDERS } from "@/domain/crm";
-import { ROLE_LABEL, type Role } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/cai-dat")({
   component: SettingsPage,
@@ -116,7 +116,7 @@ function SettingsBody() {
   const tabs = [
     { id: "so" as const, label: "Số liệu" },
     { id: "cua" as const, label: "Cửa hàng" },
-    { id: "tk" as const, label: "Tài khoản" },
+    { id: "tk" as const, label: "Người dùng & quyền" },
     { id: "file" as const, label: "Ảnh và nhật ký" },
   ];
 
@@ -255,17 +255,12 @@ function SettingsBody() {
         </Button>
       ) : null}
 
-      <section className={tab === "tk" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
-        <h2 className="font-semibold text-primary">Tài khoản</h2>
-        <ul className="mt-2 space-y-1 text-sm">
-          {data.staff.map((person) => (
-            <li key={person.id}>
-              {person.name} · {person.email} · {ROLE_LABEL[person.role as Role]}
-              {person.probation ? " · thử việc" : ""}
-            </li>
-          ))}
-        </ul>
-        <StaffForm />
+      <section className={tab === "tk" ? "space-y-3" : "hidden"}>
+        <div>
+          <h2 className="text-lg font-bold">Người dùng và quyền</h2>
+          <p className="text-sm text-muted-foreground">Mỗi người một vai trò. Bấm dòng để đổi quyền hoặc mật khẩu.</p>
+        </div>
+        <StaffDesk />
       </section>
 
       <section className={tab === "file" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
@@ -305,43 +300,5 @@ function SettingsBody() {
         </ul>
       </section>
     </div>
-  );
-}
-
-function StaffForm() {
-  const queryClient = useQueryClient();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("sale");
-  const [password, setPassword] = useState("");
-  return (
-    <form
-      className="mt-4 grid gap-2"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        await storeStaff({ data: { name, email, role, password } });
-        toast.success("Đã tạo tài khoản");
-        setName("");
-        setEmail("");
-        setPassword("");
-        await queryClient.invalidateQueries({ queryKey: ["settings"] });
-      }}
-    >
-      <Label>Tên</Label>
-      <Input className="min-h-11" value={name} onChange={(e) => setName(e.target.value)} required />
-      <Label>Email</Label>
-      <Input className="min-h-11" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      <Label>Vai trò</Label>
-      <select className="min-h-11 rounded-xl border bg-background px-3" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-        <option value="owner">Chủ</option>
-        <option value="sale">Sale</option>
-        <option value="production">Sản xuất</option>
-      </select>
-      <Label>Mật khẩu tạm</Label>
-      <Input className="min-h-11" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      <Button type="submit" className="min-h-11">
-        Tạo tài khoản
-      </Button>
-    </form>
   );
 }

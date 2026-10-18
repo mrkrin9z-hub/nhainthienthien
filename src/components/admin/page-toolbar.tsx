@@ -31,13 +31,13 @@ export function PageToolbar({
 }) {
   const showSearch = onSearch != null;
   return (
-    <div className="space-y-3 rounded-2xl border border-border/70 bg-card p-3 shadow-xs sm:p-4">
-      <div className="flex items-center gap-1.5">
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-semibold tracking-tight text-primary sm:text-xl">{title}</h1>
-          {hint ? <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">{hint}</p> : null}
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold">{title}</h1>
+          {hint ? <p className="text-sm text-muted-foreground">{hint}</p> : null}
         </div>
-        {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
+        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
       {showSearch || onFilter ? (
         <div className="flex items-center gap-1.5">
@@ -87,10 +87,8 @@ export function PageToolbar({
 
 const actionClass = (primary?: boolean) =>
   cn(
-    "touch-manipulation inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full text-sm font-medium transition-transform active:scale-[0.97]",
-    primary
-      ? "h-11 gap-1.5 bg-primary px-3 text-primary-foreground shadow-sm sm:h-9"
-      : "size-11 border bg-background sm:h-9 sm:w-auto sm:gap-1.5 sm:px-2.5",
+    "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-sm font-medium",
+    primary ? "bg-primary text-primary-foreground" : "border border-input bg-background",
   );
 
 export function ToolbarButton({
@@ -109,7 +107,7 @@ export function ToolbarButton({
   return (
     <button type="button" className={actionClass(primary)} aria-label={label} title={label} onClick={onClick} disabled={disabled}>
       <Icon className="size-4 shrink-0" />
-      <span className={primary ? "text-xs leading-none font-medium sm:text-sm" : "hidden text-sm leading-none sm:inline"}>{label}</span>
+      <span>{label}</span>
     </button>
   );
 }
@@ -123,12 +121,12 @@ export function ToolbarLink({
   label: string;
   icon: LucideIcon;
   primary?: boolean;
-  to: "/admin/don-moi";
+  to: "/admin/don-moi" | "/admin/nhap-don" | "/admin/cod";
 }) {
   return (
     <Link to={to} className={actionClass(primary)} aria-label={label} title={label}>
       <Icon className="size-4 shrink-0" />
-      <span className={primary ? "text-xs leading-none font-medium sm:text-sm" : "hidden text-sm leading-none sm:inline"}>{label}</span>
+      <span>{label}</span>
     </Link>
   );
 }

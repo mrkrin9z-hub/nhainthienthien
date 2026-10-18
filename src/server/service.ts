@@ -1728,9 +1728,15 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
 export async function saveStaff(actor: Actor, input: { id?: string; name: string; email: string; role: Role; password?: string; probation?: boolean; hiredAt?: string | null; active?: boolean }) {
   assertRole(actor, ["owner"]);
   await mutate(async (state) => {
+    if (input.password && input.password.trim().length < 8) throw new Error("Mật khẩu cần ít nhất 8 ký tự.");
     if (input.id) {
       const person = state.staff.find((item) => item.id === input.id);
       if (!person) throw new Error("Không thấy tài khoản.");
+      const nextActive = input.active === undefined ? person.active : input.active;
+      const leavingOwner = person.role === "owner" && person.active && (input.role !== "owner" || !nextActive);
+      if (leavingOwner && !state.staff.some((item) => item.id !== person.id && item.active && item.role === "owner")) {
+        throw new Error("Cần ít nhất một chủ đang làm.");
+      }
       person.name = input.name.trim();
       person.email = input.email.trim().toLowerCase();
       person.role = input.role;

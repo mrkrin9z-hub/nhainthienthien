@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { AlarmClock, Columns3, Download, List, Plus } from "lucide-react";
+import { AlarmClock, Columns3, Download, FileSpreadsheet, List, Plus, Wallet } from "lucide-react";
 
 import { ClearFilters, FilterSheet, PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
 import { OrderLinks } from "@/components/admin/sections";
@@ -149,7 +149,9 @@ function OrdersPage() {
                 }}
               />
             )}
-            {production ? null : <ToolbarLink label="Ghi đơn" icon={Plus} primary to="/admin/don-moi" />}
+            {production ? null : <ToolbarLink label="Tạo đơn" icon={Plus} primary to="/admin/don-moi" />}
+            {production ? null : <ToolbarLink label="Nhập Excel" icon={FileSpreadsheet} to="/admin/nhap-don" />}
+            {production ? null : <ToolbarLink label="Đối soát COD" icon={Wallet} to="/admin/cod" />}
           </>
         }
         below={
