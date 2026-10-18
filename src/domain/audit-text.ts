@@ -27,6 +27,8 @@ export const AUDIT_ACTIONS: { action: string; label: string }[] = [
   { action: "customer.update", label: "Khách" },
   { action: "punch.edit", label: "Sửa giờ công" },
   { action: "cost.fixed", label: "Chi phí cố định" },
+  { action: "cost.expense", label: "Chi phí" },
+  { action: "wallet.adjust", label: "Điều chỉnh ví" },
   { action: "settings.update", label: "Cài đặt" },
   { action: "file.delete", label: "Xóa file" },
   { action: "backup.manual", label: "Sao lưu" },
@@ -209,6 +211,11 @@ function detailOf(item: Pick<Audit, "action" | "entity" | "before" | "after">, s
       return `sửa giờ công của ${personLabel(punchStaff(shop, item.entity), shop)}: vào ${hm(before?.inAt)} → ${hm(after?.inAt)}, ra ${hm(before?.outAt)} → ${hm(after?.outAt)}`;
     case "cost.fixed":
       return `sửa chi phí cố định ${costLabel(shop, item.entity)}: ${dong(before?.amount)} → ${dong(after?.amount)}`;
+    case "cost.expense":
+      if (!after) return `xóa chi phí ${text(before?.name)}: ${dong(before?.amount)}`;
+      return `ghi chi phí ${text(after.name)}: ${dong(after.amount)}${walletBit(after.wallet)}`;
+    case "wallet.adjust":
+      return `điều chỉnh ví ${walletName(after?.wallet)}: ${dong(after?.amount)}${after?.note ? ` (${text(after.note)})` : ""}`;
     case "settings.update":
       return `sửa cài đặt: ${settingsBits(item.before, item.after, shop)}`;
     case "staff.update":
@@ -416,6 +423,17 @@ function tagsBit(value: unknown): string {
 function hm(value: unknown): string {
   if (typeof value !== "string" || !value) return "chưa có";
   return vnParts(value).hm || "chưa có";
+}
+
+function walletName(value: unknown): string {
+  if (value === "chuyen_khoan") return "chuyển khoản";
+  if (value === "tien_mat") return "tiền mặt";
+  return "chưa rõ nguồn";
+}
+
+function walletBit(value: unknown): string {
+  const name = walletName(value);
+  return name === "chưa rõ nguồn" ? "" : ` từ ${name}`;
 }
 
 function dong(value: unknown): string {

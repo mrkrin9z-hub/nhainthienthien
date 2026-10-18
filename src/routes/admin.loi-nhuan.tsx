@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { vnMonth } from "@/domain/calc";
 import { formatMaybe } from "@/lib/brand";
-import { downloadExcel, getMe, getProfit, saveExpense, saveFixedMonth } from "@/lib/admin.functions";
+import { downloadExcel, getMe, getProfit, saveFixedMonth } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/loi-nhuan")({
   component: ProfitPage,
@@ -29,9 +29,6 @@ function ProfitBody() {
   const [month, setMonth] = useState(monthNow());
   const queryClient = useQueryClient();
   const report = useQuery({ queryKey: ["profit", month], queryFn: () => getProfit({ data: { month } }) });
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
   const data = report.data;
 
   return (
@@ -95,24 +92,11 @@ function ProfitBody() {
             />
           </section>
           <section className="glass-card rounded-3xl p-4">
-            <h2 className="font-bold text-primary">Chi phí phát sinh</h2>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Input className="min-h-11 w-40" placeholder="Tên khoản" value={name} onChange={(e) => setName(e.target.value)} />
-              <Input className="min-h-11 w-32" placeholder="Số tiền" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              <Input className="min-h-11 w-40" placeholder="Ghi chú hóa đơn" value={note} onChange={(e) => setNote(e.target.value)} />
-              <Button
-                className="min-h-11"
-                onClick={async () => {
-                  await saveExpense({ data: { month, name, amount: Number(amount), note } });
-                  setName("");
-                  setAmount("");
-                  setNote("");
-                  toast.success("Đã thêm");
-                  await queryClient.invalidateQueries({ queryKey: ["profit", month] });
-                }}
-              >
-                Thêm
-              </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-bold text-primary">Chi phí phát sinh</h2>
+              <Link to="/admin/chi-phi" className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-sm font-semibold">
+                Nhập chi phí
+              </Link>
             </div>
             <ul className="mt-3 text-sm">
               {data.extras.map((row) => (
