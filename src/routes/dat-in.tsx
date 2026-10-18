@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { sizeSummary } from "@/domain/catalog-label";
 import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
 import { createOrder, createUploadTicket, markFileStatus, submitOrder } from "@/lib/orders.functions";
 import { formatVnd } from "@/lib/brand";
@@ -313,7 +314,7 @@ function OrderPage() {
                           <span className="block text-[11px] font-bold uppercase tracking-wide text-accent">{product.category}</span>
                           <span className="block font-extrabold leading-tight text-foreground">{product.name}</span>
                           <span className="block text-xs text-muted-foreground">
-                            {from.length ? `Từ ${formatVnd(Math.min(...from))}` : "Liên hệ"} · {product.variants.length} quy cách
+                            {from.length ? `Từ ${formatVnd(Math.min(...from))}` : "Liên hệ"} · {sizeSummary(product.variants)}
                           </span>
                         </span>
                         <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${open ? "bg-accent text-accent-foreground" : "bg-muted text-foreground/70"}`}>

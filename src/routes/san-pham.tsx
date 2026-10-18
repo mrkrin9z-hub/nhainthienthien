@@ -13,6 +13,7 @@ import {
   type CatalogProduct,
   type CatalogVariant,
 } from "@/lib/catalog.functions";
+import { sizeSummary } from "@/domain/catalog-label";
 import { catalogImage } from "@/lib/product-images";
 import { formatVnd } from "@/lib/brand";
 
@@ -209,7 +210,7 @@ function ProductTile({ product, onOpen }: { product: CatalogProduct; onOpen: () 
           {from === null ? "Liên hệ" : formatVnd(from)}
         </p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {product.variants.length} kích thước
+          {sizeSummary(product.variants)}
         </p>
         <Button
           onClick={onOpen}
