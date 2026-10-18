@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { sizeSummary } from "@/domain/catalog-label";
+import { sheetOptionLabel, sizeChoices, sizeSummary } from "@/domain/catalog-label";
+import { ChoiceChip } from "@/components/site/choice-chip";
 import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
 import { createOrder, createUploadTicket, markFileStatus, submitOrder } from "@/lib/orders.functions";
 import { formatVnd } from "@/lib/brand";
@@ -324,42 +325,7 @@ function OrderPage() {
                       {open ? (
                         <div className="border-t border-border px-3 pb-3">
                           <p className="py-3 text-sm text-muted-foreground">{product.description}</p>
-                          <ul className="divide-y divide-border">
-                            {product.variants.map((variant) => {
-                              const qty = quantities[variant.id] ?? 0;
-                              return (
-                                <li key={variant.id} className="flex items-center gap-3 py-3">
-                                  <div className="min-w-0 flex-1">
-                                    <p className="font-semibold leading-tight text-foreground">{variant.name}</p>
-                                    <p className="text-sm text-accent">
-                                      {variant.requires_quote || variant.price === null
-                                        ? "Liên hệ báo giá"
-                                        : formatVnd(variant.sale_price ?? variant.price)}
-                                    </p>
-                                  </div>
-                                  <div className="flex shrink-0 items-center gap-1">
-                                    <button
-                                      type="button"
-                                      aria-label="Giảm"
-                                      onClick={() => setQty(variant.id, qty - 1)}
-                                      className="flex size-11 items-center justify-center rounded-xl bg-muted"
-                                    >
-                                      <Minus className="size-4" />
-                                    </button>
-                                    <span className="w-8 text-center font-bold">{qty}</span>
-                                    <button
-                                      type="button"
-                                      aria-label="Tăng"
-                                      onClick={() => setQty(variant.id, qty + 1)}
-                                      className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"
-                                    >
-                                      <Plus className="size-4" />
-                                    </button>
-                                  </div>
-                                </li>
-                              );
-                            })}
-                          </ul>
+                          <ProductOptions product={product} quantities={quantities} setQty={setQty} />
                         </div>
                       ) : null}
                     </div>
@@ -534,6 +500,89 @@ function OrderPage() {
       <div className="hidden lg:block">
         <SiteFooter />
       </div>
+    </div>
+  );
+}
+
+function ProductOptions({
+  product,
+  quantities,
+  setQty,
+}: {
+  product: CatalogProduct;
+  quantities: Record<string, number>;
+  setQty: (variantId: string, next: number) => void;
+}) {
+  const choices = useMemo(() => sizeChoices(product.variants), [product]);
+  const [sizeKey, setSizeKey] = useState(() => {
+    const picked = choices.find((choice) => choice.variants.some((variant) => (quantities[variant.id] ?? 0) > 0));
+    return picked?.key ?? choices[0]?.key ?? "";
+  });
+  const choice = choices.find((item) => item.key === sizeKey) ?? choices[0];
+  const showOptions = (choice?.variants.length ?? 0) > 1;
+  if (!choice) return null;
+
+  return (
+    <div>
+      <p className="text-sm font-semibold text-foreground">Chọn kích thước</p>
+      <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Chọn kích thước">
+        {choices.map((item) => {
+          const picked = item.variants.reduce((sum, variant) => sum + (quantities[variant.id] ?? 0), 0);
+          const only = item.variants.length === 1 ? item.variants[0] : undefined;
+          const onlyPrice = only && !only.requires_quote ? (only.sale_price ?? only.price) : null;
+          return (
+            <ChoiceChip
+              key={item.key}
+              active={item.key === choice.key}
+              title={item.label}
+              {...(only
+                ? { detail: onlyPrice == null ? "Liên hệ" : formatVnd(onlyPrice) }
+                : picked > 0
+                  ? { detail: `Đã chọn ${picked}` }
+                  : {})}
+              onClick={() => setSizeKey(item.key)}
+            />
+          );
+        })}
+      </div>
+      {showOptions ? <p className="mt-4 text-sm font-semibold text-foreground">Chọn số tấm</p> : null}
+      <ul className={showOptions ? "mt-2 space-y-2" : "mt-3 space-y-2"}>
+        {choice.variants.map((variant) => {
+          const qty = quantities[variant.id] ?? 0;
+          const amount = variant.requires_quote ? null : (variant.sale_price ?? variant.price);
+          return (
+            <li key={variant.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border px-3 py-2">
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-foreground">
+                  {showOptions ? sheetOptionLabel(variant.sheets) : variant.name}
+                </span>
+                <span className="block text-xs font-semibold text-accent">
+                  {amount == null ? "Liên hệ báo giá" : formatVnd(amount)}
+                </span>
+              </span>
+              <div className="flex shrink-0 items-center rounded-full border border-border">
+                <button
+                  type="button"
+                  aria-label={`Giảm ${showOptions ? sheetOptionLabel(variant.sheets) : variant.name}`}
+                  className="grid size-11 place-items-center text-muted-foreground"
+                  onClick={() => setQty(variant.id, qty - 1)}
+                >
+                  <Minus className="size-4" />
+                </button>
+                <span className="w-8 text-center text-sm font-bold">{qty}</span>
+                <button
+                  type="button"
+                  aria-label={`Tăng ${showOptions ? sheetOptionLabel(variant.sheets) : variant.name}`}
+                  className="grid size-11 place-items-center text-muted-foreground"
+                  onClick={() => setQty(variant.id, qty + 1)}
+                >
+                  <Plus className="size-4" />
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
