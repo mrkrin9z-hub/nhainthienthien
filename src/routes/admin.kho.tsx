@@ -3,8 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { PageToolbar } from "@/components/admin/page-toolbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PackageSearch } from "lucide-react";
 import { formatMaybe } from "@/lib/brand";
 import { approvePrice, countStock, downloadExcel, getInventory, getMe, markInkOpened, receiveStock, saveMaterial } from "@/lib/admin.functions";
 
@@ -18,6 +20,13 @@ function StockPage() {
   const owner = me.data?.role === "owner";
   const canIn = me.data?.role === "owner" || me.data?.role === "sale";
   const queryClient = useQueryClient();
+  const [q, setQ] = useState("");
+  const [lowOnly, setLowOnly] = useState(false);
+  const materials = (stock.data?.materials ?? []).filter((material) => {
+    if (lowOnly && !material.low) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || material.name.toLowerCase().includes(needle);
+  });
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["stock"] });
@@ -25,11 +34,23 @@ function StockPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-primary">Kho</h1>
-          <p className="text-sm text-muted-foreground">Tồn đầu kỳ đang là 0. Đếm thực tế rồi nhập. Giá túi, carton, tem để trống.</p>
-        </div>
+      <PageToolbar
+        title="Kho"
+        hint="Tồn đầu kỳ đang là 0. Đếm thực tế rồi nhập. Giá túi, carton, tem để trống."
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Tìm vật tư…"
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          aria-pressed={lowOnly}
+          className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-sm font-semibold active:scale-95 ${lowOnly ? "border-destructive bg-destructive text-white" : "bg-card"}`}
+          onClick={() => setLowOnly((value) => !value)}
+        >
+          <PackageSearch className="size-4" />
+          Sắp hết
+        </button>
         <div className="flex gap-2">
           <Button className="min-h-12" variant="outline" onClick={() => markInkOpened().then(() => refresh()).then(() => toast.success("Đã trừ 1 lọ mực"))}>
             Mở lọ mực mới
@@ -49,7 +70,7 @@ function StockPage() {
         </div>
       </div>
       <div className="space-y-3">
-        {(stock.data?.materials ?? []).map((material) => (
+        {materials.map((material) => (
           <article key={material.id} className={`rounded-3xl border p-4 ${material.low ? "border-destructive bg-destructive/10" : "glass-card"}`}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>

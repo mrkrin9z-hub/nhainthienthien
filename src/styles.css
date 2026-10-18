@@ -179,3 +179,10 @@
 @utility bg-brand-gradient {
   background-image: var(--gradient-brand);
 }
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

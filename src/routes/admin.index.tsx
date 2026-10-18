@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { LucideIcon } from "lucide-react";
+import { CalendarDays, CircleAlert, LogIn, LogOut, PiggyBank, Target, TrendingUp, Wallet } from "lucide-react";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { STATUS_TONE } from "@/components/admin/filter-chips";
 import { formatMaybe } from "@/lib/brand";
 import { getDashboard, punchClock } from "@/lib/admin.functions";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/")({
   component: DashboardPage,
@@ -30,29 +31,41 @@ function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-primary md:text-3xl">Xin chào, {data.name}</h1>
-          <p className="text-sm text-muted-foreground">Giờ làm 8:00–18:00. Chấm công trên điện thoại, không cần vị trí hay ảnh.</p>
+      <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4 sm:p-5 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-primary sm:text-2xl">Xin chào, {data.name}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Giờ làm 8:00–18:00. Chấm công trên điện thoại, không cần vị trí hay ảnh.</p>
         </div>
-        <div className="flex w-full gap-2 sm:w-auto">
-          <Button className="min-h-14 flex-1 bg-accent text-accent-foreground text-base" onClick={() => clock("in")} disabled={data.clockedIn}>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-50 sm:flex-none"
+            onClick={() => clock("in")}
+            disabled={data.clockedIn}
+          >
+            <LogIn className="size-4" />
             Vào ca
-          </Button>
-          <Button className="min-h-14 flex-1 text-base" variant="outline" onClick={() => clock("out")} disabled={!data.clockedIn}>
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border bg-background px-4 text-sm font-medium active:scale-[0.97] disabled:opacity-50 sm:flex-none"
+            onClick={() => clock("out")}
+            disabled={!data.clockedIn}
+          >
+            <LogOut className="size-4" />
             Ra ca
-          </Button>
+          </button>
         </div>
       </div>
 
       {"revenueToday" in data ? (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Card label="Doanh thu hôm nay" value={formatMaybe(data.revenueToday)} />
-          <Card label="Doanh thu tháng" value={formatMaybe(data.revenueMonth)} />
-          <Card label="Hòa vốn tháng" value={data.breakevenPercent === null ? "—" : `${data.breakevenPercent}%`} />
-          <Card label="Hôm nay còn thiếu" value={formatMaybe(data.todayGap)} />
-          <Card label="Lãi gộp tháng" value={data.grossIncomplete ? "Chưa đủ số" : formatMaybe(data.gross)} />
-          <Card label="Lợi nhuận tháng" value={data.profit === null ? "Chưa đủ số" : formatMaybe(data.profit)} />
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Card label="Doanh thu hôm nay" value={formatMaybe(data.revenueToday)} icon={Wallet} tone="bg-blue-500/10 text-blue-700" />
+          <Card label="Doanh thu tháng" value={formatMaybe(data.revenueMonth)} icon={CalendarDays} tone="bg-emerald-500/10 text-emerald-700" />
+          <Card label="Hòa vốn tháng" value={data.breakevenPercent === null ? "—" : `${data.breakevenPercent}%`} icon={Target} tone="bg-amber-500/10 text-amber-700" />
+          <Card label="Hôm nay còn thiếu" value={formatMaybe(data.todayGap)} icon={CircleAlert} tone="bg-orange-500/10 text-orange-700" />
+          <Card label="Lãi gộp tháng" value={data.grossIncomplete ? "Chưa đủ số" : formatMaybe(data.gross)} icon={TrendingUp} tone="bg-teal-500/10 text-teal-700" />
+          <Card label="Lợi nhuận tháng" value={data.profit === null ? "Chưa đủ số" : formatMaybe(data.profit)} icon={PiggyBank} tone="bg-violet-500/10 text-violet-700" />
         </section>
       ) : null}
 
@@ -72,23 +85,27 @@ function DashboardPage() {
       <section>
         <h2 className="text-lg font-bold text-primary">Quy trình đơn</h2>
         <p className="mt-1 text-sm text-muted-foreground">Nhận đơn, thiết kế, chờ khách duyệt, in, đóng gói, giao, rồi xong. Đơn hủy không tự mở lại.</p>
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {data.byStatus
-            .filter((row) => row.status !== "huy")
-            .map((row) => (
-              <div key={row.status} className="glass-panel min-w-28 shrink-0 rounded-2xl px-4 py-3">
-                <p className="text-xs font-semibold text-muted-foreground">{row.label}</p>
-                <p className="text-2xl font-extrabold text-primary">{row.count}</p>
+        <div className="mt-3 flex gap-1.5 overflow-x-auto scrollbar-none pb-1" style={{ WebkitOverflowScrolling: "touch" }}>
+          {data.byStatus.map((row) => {
+            const tone = STATUS_TONE[row.status] ?? { color: "#4B5563", icon: Target };
+            const Icon = tone.icon;
+            return (
+              <div
+                key={row.status}
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold"
+                style={{ borderColor: "transparent", backgroundColor: `${tone.color}18`, color: tone.color }}
+              >
+                <Icon className="size-3.5" />
+                <span>{row.label}</span>
+                <span
+                  className="inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold"
+                  style={{ backgroundColor: `${tone.color}28`, color: tone.color }}
+                >
+                  {row.count}
+                </span>
               </div>
-            ))}
-          {data.byStatus
-            .filter((row) => row.status === "huy")
-            .map((row) => (
-              <div key={row.status} className="min-w-28 shrink-0 rounded-2xl bg-destructive/10 px-4 py-3">
-                <p className="text-xs font-semibold text-destructive">{row.label}</p>
-                <p className="text-2xl font-extrabold text-destructive">{row.count}</p>
-              </div>
-            ))}
+            );
+          })}
         </div>
       </section>
 
@@ -133,11 +150,16 @@ function DashboardPage() {
   );
 }
 
-function Card({ label, value }: { label: string; value: string }) {
+function Card({ label, value, icon: Icon, tone }: { label: string; value: string; icon: LucideIcon; tone: string }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <p className="font-sans text-xs font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-primary">{value}</p>
+    <div className="rounded-2xl border border-border/70 bg-card p-4">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-sans text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
+        <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${tone}`}>
+          <Icon className="size-4" />
+        </span>
+      </div>
+      <p className="mt-3 text-xl font-semibold tracking-tight text-primary sm:text-2xl">{value}</p>
     </div>
   );
 }

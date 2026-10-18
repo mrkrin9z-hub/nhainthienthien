@@ -9,6 +9,7 @@ import {
   Clock,
   Image,
   LayoutDashboard,
+  LogOut,
   Menu,
   Package,
   Plug,
@@ -135,10 +136,10 @@ function AdminLayout() {
   return (
     <div className="min-h-screen bg-muted/50 md:pl-60">
       {menuOpen ? (
-        <button type="button" className="fixed inset-0 z-40 bg-foreground/30 md:hidden" aria-label="Đóng menu" onClick={() => setMenuOpen(false)} />
+        <button type="button" className="fixed inset-0 z-40 bg-black/40 md:hidden" aria-label="Đóng menu" onClick={() => setMenuOpen(false)} />
       ) : null}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card text-foreground transition-transform md:w-60 md:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card pt-[env(safe-area-inset-top)] text-foreground transition-transform md:w-60 md:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-4">
           <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="h-8 w-auto max-w-[10rem] object-contain" />
@@ -179,18 +180,21 @@ function AdminLayout() {
           <p className="truncate px-2 text-sm font-semibold">{me.data.name}</p>
           <p className="px-2 text-xs text-muted-foreground">Nhận đơn → Thiết kế → In → Giao</p>
           <Button variant="outline" className="mt-3 min-h-11 w-full" onClick={() => void logout()}>
+            <LogOut className="size-4" />
             Đăng xuất
           </Button>
         </div>
       </aside>
-      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-card px-4">
-        <button type="button" className="flex size-11 items-center justify-center rounded-full border md:hidden" aria-label="Mở menu" onClick={() => setMenuOpen(true)}>
-          <Menu className="size-5" />
-        </button>
-        <p className="min-w-0 truncate font-sans text-sm font-bold tracking-wide text-primary uppercase">Quản trị</p>
-        <p className="ml-auto truncate text-sm text-muted-foreground">{me.data.name}</p>
+      <header className="sticky top-0 z-30 border-b border-border bg-card px-3 pt-[env(safe-area-inset-top)] sm:px-4">
+        <div className="flex h-14 items-center gap-2">
+          <button type="button" className="flex size-11 items-center justify-center rounded-full border md:hidden" aria-label="Mở menu" onClick={() => setMenuOpen(true)}>
+            <Menu className="size-5" />
+          </button>
+          <p className="min-w-0 truncate font-sans text-sm font-bold tracking-wide text-primary uppercase">Quản trị</p>
+          <p className="ml-auto truncate text-sm text-muted-foreground">{me.data.name}</p>
+        </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6 md:px-8">
+      <main className="mx-auto max-w-6xl px-3 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-4 md:px-8 md:py-6">
         {me.data.mustChangePassword ? (
           <ForcePasswordChange
             onDone={() => {
