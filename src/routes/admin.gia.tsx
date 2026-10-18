@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMaybe } from "@/lib/brand";
-import { createPriceSize, getBom, getMe, getPriceBoard, importPriceSheet, runQuote, runRecalc, saveBomQty, savePieces, savePrice } from "@/lib/admin.functions";
+import { cloneShelf, createPriceSize, getBom, getMe, getPriceBoard, importPriceSheet, pullCatalog, runQuote, runRecalc, saveBomQty, savePieces, savePrice } from "@/lib/admin.functions";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/gia")({
@@ -57,7 +57,7 @@ function PricePage() {
       <GoodsLinks />
       <PageToolbar
         title="Bảng giá theo kênh"
-        hint="Web khách lấy giá kênh Tại tiệm / Web. Ô trống là chưa có số — không tự đặt giá."
+        hint="Web khách lấy giá kênh Tại tiệm / Web. Giá TikTok và Shopee lấy từ sàn. Kênh lẻ và Facebook nhập riêng, hoặc nhân bản từ sàn."
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm mã hoặc quy cách…"
@@ -114,6 +114,7 @@ function PricePage() {
           </button>
         ))}
       </div>
+      {owner ? <ShelfTools groupId={groupId} channel={channel} /> : null}
       {(board.data?.warnings ?? []).length > 0 ? (
         <div className="rounded-2xl bg-accent/40 px-4 py-3 text-sm font-semibold text-foreground">
           {(board.data?.warnings ?? []).map((warning) => (
@@ -138,6 +139,67 @@ function PricePage() {
       </div>
       {owner ? <Calculator skus={board.data?.rows ?? []} /> : <p className="text-sm text-muted-foreground">Máy tính giá vốn và lãi chỉ chủ xem.</p>}
       {owner ? <BomEditor skus={board.data?.rows ?? []} /> : null}
+    </div>
+  );
+}
+
+function ShelfTools({ groupId, channel }: { groupId: string; channel: Channel }) {
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState("");
+  const [overwrite, setOverwrite] = useState(false);
+  const market = channel === "tiktok" || channel === "shopee";
+
+  async function pull(source: "tiktok" | "shopee") {
+    setBusy(source);
+    try {
+      const result = await pullCatalog({ data: { channel: source } });
+      const extra = result.more ? " Còn trang sau, bấm lại." : "";
+      toast.success(`${result.created} mã mới, ${result.priced} giá cập nhật.${extra}`);
+      if (result.skipped.length) toast.message(result.skipped[0] ?? "");
+      await queryClient.invalidateQueries({ queryKey: ["prices"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function copy(from: "tiktok" | "shopee") {
+    if (channel !== "tai_tiem" && channel !== "facebook") return;
+    setBusy(from);
+    try {
+      const result = await cloneShelf({ data: { groupId, from, to: channel, overwrite } });
+      toast.success(`Đã nhân bản ${result.copied} giá. Giữ nguyên ${result.kept} ô đã có số.`);
+      await queryClient.invalidateQueries({ queryKey: ["prices"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  if (market) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" className="min-h-11" disabled={busy !== ""} onClick={() => pull(channel)}>
+          {busy === channel ? "Đang lấy sản phẩm…" : "Lấy sản phẩm từ sàn"}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button type="button" variant="outline" className="min-h-11" disabled={busy !== ""} onClick={() => copy("tiktok")}>
+        {busy === "tiktok" ? "Đang nhân bản…" : "Nhân bản giá TikTok"}
+      </Button>
+      <Button type="button" variant="outline" className="min-h-11" disabled={busy !== ""} onClick={() => copy("shopee")}>
+        {busy === "shopee" ? "Đang nhân bản…" : "Nhân bản giá Shopee"}
+      </Button>
+      <label className="flex min-h-11 items-center gap-2 text-sm">
+        <input type="checkbox" checked={overwrite} onChange={(event) => setOverwrite(event.target.checked)} />
+        Ghi đè giá đã nhập
+      </label>
     </div>
   );
 }

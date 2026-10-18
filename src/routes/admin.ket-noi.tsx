@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { blankPickup, type CarrierPickup } from "@/domain/carriers";
-import { getCarrierDesk, getIntegrations, getMe, pullMarketplace, saveCarrierPickup, saveIntegration } from "@/lib/admin.functions";
+import { getCarrierDesk, getIntegrations, getMe, pullCatalog, pullMarketplace, saveCarrierPickup, saveIntegration } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/ket-noi")({
   component: ConnectPage,
@@ -182,7 +182,7 @@ function ShopCard({
     <section className="glass-card space-y-3 rounded-3xl p-4">
       <h2 className="font-bold text-primary">{title}</h2>
       <p className="text-xs text-muted-foreground">
-        {steps} Đơn 7 ngày gần nhất tự đổ khi mở trang quản trị, hoặc bấm Lấy đơn. Đơn đã có cùng mã sàn không tạo thêm. Đơn chưa thanh toán và đơn hủy không vào. SKU sàn map ở Nhập đơn sàn. File Excel vẫn dùng được.
+        {steps} Đơn 7 ngày gần nhất tự đổ khi mở trang quản trị, hoặc bấm Lấy đơn. Đơn đã có cùng mã sàn không tạo thêm. Sản phẩm đang bán cũng đổ về: giá TikTok và Shopee trên web theo sàn, giá tại tiệm và Facebook giữ nguyên cho đến khi nhân bản ở bảng giá.
       </p>
       <p className="break-all text-xs text-muted-foreground">Redirect URL: {origin ? `${origin}${redirectPath}` : redirectPath}</p>
       {children}
@@ -190,6 +190,7 @@ function ShopCard({
       {connected ? (
         <div className="flex flex-wrap gap-2">
           <PullOrders channel={channel} />
+          <PullCatalog channel={channel} />
           <Button
             type="button"
             variant="outline"
@@ -211,6 +212,36 @@ function ShopCard({
         <p className="text-sm text-muted-foreground">Nhập khóa, bấm Lưu từng ô, rồi mới bấm Kết nối {title}.</p>
       )}
     </section>
+  );
+}
+
+function PullCatalog({ channel }: { channel: "tiktok" | "shopee" }) {
+  const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
+  const name = channel === "tiktok" ? "TikTok" : "Shopee";
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="min-h-11"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const result = await pullCatalog({ data: { channel } });
+          const extra = result.more ? " Còn trang sau, bấm lại để lấy tiếp." : "";
+          toast.success(`Đã lấy ${name}: ${result.created} mã mới, ${result.priced} giá cập nhật.${extra}`);
+          if (result.skipped.length) toast.message(result.skipped[0] ?? "");
+          await queryClient.invalidateQueries({ queryKey: ["prices"] });
+        } catch (error) {
+          toast.error((error as Error).message);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? "Đang lấy sản phẩm…" : "Lấy sản phẩm về web"}
+    </Button>
   );
 }
 

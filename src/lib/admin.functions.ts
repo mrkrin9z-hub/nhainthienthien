@@ -675,6 +675,29 @@ export const pullMarketplace = createServerFn({ method: "POST" })
     return pullMarketplaceNow(await actor(), data.channel);
   });
 
+export const pullCatalog = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ channel: z.enum(["tiktok", "shopee"]) }).parse(data))
+  .handler(async ({ data }) => {
+    const { pullCatalogNow } = await import("@/server/marketplace-sync");
+    return pullCatalogNow(await actor(), data.channel);
+  });
+
+export const cloneShelf = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        groupId: z.string().min(1),
+        from: z.enum(["tiktok", "shopee"]),
+        to: z.enum(["tai_tiem", "facebook"]),
+        overwrite: z.boolean(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { cloneShelfPrices } = await import("@/server/service");
+    return cloneShelfPrices(await actor(), data);
+  });
+
 export const previewRestore = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ key: z.string().min(8) }).parse(data))
   .handler(async ({ data }) => {
