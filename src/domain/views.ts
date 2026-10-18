@@ -38,6 +38,8 @@ export function orderSummary(state: ShopState, order: Order, role: Role) {
     address: order.address,
     itemSummary: order.items.map((item) => `${item.quantity}× ${item.name}`).join(", "),
     total: showMoney ? order.total : null,
+    depositPaid: showMoney ? order.depositPaid : null,
+    remain: showMoney && order.total !== null ? order.total - order.depositPaid : null,
     late: isLate(state, order),
     fileCount: order.files.filter((file) => !file.deletedAt && file.status === "complete").length,
     fulfillment: order.fulfillment,

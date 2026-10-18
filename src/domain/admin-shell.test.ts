@@ -2,6 +2,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import { orderRevisionBlock } from "./order-edit.ts";
+
+test("đơn đã trừ kho hoặc đã xong thì không sửa sản phẩm", () => {
+  assert.equal(orderRevisionBlock({ status: "nhan_don", printDeducted: false, packDeducted: false }, true), null);
+  assert.match(orderRevisionBlock({ status: "in", printDeducted: true, packDeducted: false }, true) ?? "", /đã trừ kho/);
+  assert.equal(orderRevisionBlock({ status: "in", printDeducted: true, packDeducted: false }, false), null);
+  assert.match(orderRevisionBlock({ status: "xong", printDeducted: false, packDeducted: false }, false) ?? "", /Mở lại đơn/);
+});
+
 test("cài đặt chia nhóm nhưng không bỏ sót ô số", () => {
   const src = readFileSync(new URL("../routes/admin.cai-dat.tsx", import.meta.url), "utf8");
   const groupBlock = src.slice(src.indexOf("const FIELD_GROUPS"), src.indexOf("const NUMBER_FIELDS"));

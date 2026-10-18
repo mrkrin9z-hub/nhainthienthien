@@ -26,6 +26,7 @@ import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed } from "@/domain/images";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
+import { orderRevisionBlock } from "@/domain/order-edit";
 import { filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
@@ -827,6 +828,70 @@ export async function createManualOrder(
   });
 }
 
+export async function reviseOrder(
+  actor: Actor,
+  input: {
+    orderId: string;
+    fullName: string;
+    phone: string;
+    address: string;
+    fulfillment: "pickup" | "delivery";
+    note: string;
+    dueDate: string | null;
+    items?: { skuId: string; quantity: number; unitPrice?: number | null }[];
+  },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const name = input.fullName.trim();
+  if (name.length < 2) throw new Error("Tên khách cần ít nhất 2 ký tự.");
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === input.orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    const changingItems = input.items != null;
+    const blocked = orderRevisionBlock(order, changingItems);
+    if (blocked) throw new Error(blocked);
+    const customer = upsertCustomer(state, { name, phone: input.phone, address: input.address });
+    const before = order.items.map((item) => `${item.quantity}× ${item.skuCode}`).join(", ");
+    order.customerId = customer.id;
+    order.address = input.address.trim();
+    order.customerNote = input.note.trim();
+    order.fulfillment = input.fulfillment;
+    order.dueDate = input.dueDate;
+    if (input.items) {
+      const items = input.items.map((item) => {
+        const sku = skuOrThrow(state, item.skuId);
+        const group = state.groups.find((row) => row.id === sku.groupId);
+        const listed = priceOf(state.prices, sku.id, order.channel)?.price ?? null;
+        const previous = order.items.find((row) => row.skuId === sku.id);
+        let unitPrice = listed;
+        if (item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== listed) {
+          const kept = previous?.unitPrice === item.unitPrice;
+          if (actor.role !== "owner" && !kept) throw new Error("Chỉ chủ tiệm sửa được giá bán.");
+          unitPrice = item.unitPrice;
+        }
+        return {
+          id: previous?.id ?? nid(),
+          skuId: sku.id,
+          name: previous ? previous.name : `${group?.name ?? "Sản phẩm"} — ${sku.name}`,
+          skuCode: sku.code,
+          quantity: item.quantity,
+          unitPrice,
+          lineTotal: unitPrice === null ? null : unitPrice * item.quantity,
+          ...(previous?.listUnitPrice !== undefined ? { listUnitPrice: previous.listUnitPrice } : {}),
+        };
+      });
+      const totals = sumItems(items);
+      order.items = items;
+      order.subtotal = totals.subtotal;
+      order.total = totals.total;
+      refreshDeposit(state, order);
+    }
+    order.updatedAt = nowIso();
+    const after = order.items.map((item) => `${item.quantity}× ${item.skuCode}`).join(", ");
+    audit(state, actor.id, "order.revise", order.id, { items: before }, { items: after, name });
+  });
+}
+
 export async function setOrderStatus(
   actor: Actor,
   input: { orderId: string; status: OrderStatus; note: string; ownerOverride?: boolean },
@@ -1236,6 +1301,7 @@ export async function saveCustomerNote(
   note: string,
   tags?: string[],
   specialDates?: SpecialDate[],
+  profile?: { name?: string; phone?: string; address?: string },
 ) {
   assertRole(actor, ["owner", "sale"]);
   await mutate(async (state) => {
@@ -1245,13 +1311,36 @@ export async function saveCustomerNote(
     const cleanDates = (specialDates ?? [])
       .map((date) => ({ label: date.label.trim(), month: date.month, day: date.day }))
       .filter((date) => date.label && date.month >= 1 && date.month <= 12 && date.day >= 1 && date.day <= 31);
+    const name = profile?.name?.trim();
+    if (profile?.name !== undefined && (!name || name.length < 2)) throw new Error("Tên khách cần ít nhất 2 ký tự.");
+    let phone = "";
+    let phoneNormalized = "";
+    if (profile?.phone !== undefined) {
+      const parsed = normalizeMarketplacePhone(profile.phone);
+      phoneNormalized = parsed.masked ? `masked:${parsed.phone}` : parsed.phone;
+      if (!parsed.masked && phoneNormalized.length < 8) throw new Error("Số điện thoại chưa đúng.");
+      const taken = state.customers.find((customer) => customer.phoneNormalized === phoneNormalized && !card.ids.includes(customer.id));
+      if (taken) throw new Error("Số này đang thuộc khách khác.");
+      phone = parsed.masked ? parsed.phone : profile.phone.trim();
+    }
+    const address = profile?.address?.trim();
     for (const customer of state.customers) {
       if (!card.ids.includes(customer.id)) continue;
       customer.note = note;
       if (tags) customer.tags = cleanTags;
       if (specialDates) customer.specialDates = cleanDates;
+      if (name) customer.name = name;
+      if (profile?.phone !== undefined) {
+        customer.phone = phone;
+        customer.phoneNormalized = phoneNormalized;
+      }
+      if (address !== undefined) {
+        customer.address = address;
+        const known = customer.addresses ?? [];
+        if (address && !known.includes(address)) customer.addresses = [...known, address];
+      }
     }
-    audit(state, actor.id, "customer.update", id, null, { note, tags: cleanTags });
+    audit(state, actor.id, "customer.update", id, null, { note, tags: cleanTags, name: name ?? card.name });
   });
 }
 

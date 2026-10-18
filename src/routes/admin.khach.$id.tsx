@@ -29,6 +29,9 @@ function CustomerBody() {
   const customer = useQuery({ queryKey: ["customer", id], queryFn: () => getCustomer({ data: { id } }) });
   const [note, setNote] = useState<string | null>(null);
   const [tags, setTags] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
   const [label, setLabel] = useState("Ngày giỗ");
   const [when, setWhen] = useState("");
   const [orderQ, setOrderQ] = useState("");
@@ -47,10 +50,20 @@ function CustomerBody() {
         {data.name}
         {data.repeat ? <span className="ml-2 rounded-full bg-accent px-2 py-0.5 text-sm font-bold text-accent-foreground">Quay lại</span> : null}
       </h1>
-      <p className="text-sm">
-        {data.phone}
-        {data.address ? ` · ${data.address}` : ""}
-      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm font-semibold">
+          Tên khách
+          <Input className="mt-1 min-h-12" value={name ?? data.name} onChange={(event) => setName(event.target.value)} />
+        </label>
+        <label className="block text-sm font-semibold">
+          Số điện thoại
+          <Input className="mt-1 min-h-12" value={phone ?? data.phone} onChange={(event) => setPhone(event.target.value)} />
+        </label>
+        <label className="block text-sm font-semibold sm:col-span-2">
+          Địa chỉ
+          <Input className="mt-1 min-h-12" value={address ?? data.address} onChange={(event) => setAddress(event.target.value)} />
+        </label>
+      </div>
       {data.addresses.length > 1 ? <p className="text-sm">Địa chỉ khác: {data.addresses.filter((item) => item !== data.address).join(" · ")}</p> : null}
       {data.platformBuyers.length ? <p className="text-sm">Tài khoản sàn: {data.platformBuyers.join(", ")}</p> : null}
       <p className="text-sm">
@@ -126,17 +139,27 @@ function CustomerBody() {
       <Button
         className="min-h-12"
         onClick={async () => {
-          await saveCustomer({
-            data: {
-              id,
-              note: note ?? data.note,
-              tags: (tags ?? data.tags.join(", ")).split(",").map((tag) => tag.trim()).filter(Boolean),
-              specialDates: dates,
-            },
-          });
-          toast.success("Đã lưu khách");
-          await queryClient.invalidateQueries({ queryKey: ["customer", id] });
-          await queryClient.invalidateQueries({ queryKey: ["customers"] });
+          try {
+            await saveCustomer({
+              data: {
+                id,
+                note: note ?? data.note,
+                tags: (tags ?? data.tags.join(", ")).split(",").map((tag) => tag.trim()).filter(Boolean),
+                specialDates: dates,
+                name: name ?? data.name,
+                phone: phone ?? data.phone,
+                address: address ?? data.address,
+              },
+            });
+            toast.success("Đã lưu khách");
+            setName(null);
+            setPhone(null);
+            setAddress(null);
+            await queryClient.invalidateQueries({ queryKey: ["customer", id] });
+            await queryClient.invalidateQueries({ queryKey: ["customers"] });
+          } catch (error) {
+            toast.error((error as Error).message);
+          }
         }}
       >
         Lưu ghi chú

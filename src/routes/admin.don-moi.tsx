@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createDeskOrder, getCustomers, getMe, getSkuOptions } from "@/lib/admin.functions";
 import { formatMaybe, formatVnd } from "@/lib/brand";
+import { isMergedWoodAlias } from "@/domain/calc";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-moi")({
@@ -59,7 +60,7 @@ function NewOrderBody() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const skus = useQuery({ queryKey: ["sku-options"], queryFn: () => getSkuOptions() });
   const owner = me.data?.role === "owner";
-  const catalog = (skus.data ?? []) as SkuOption[];
+  const catalog = ((skus.data ?? []) as SkuOption[]).filter((sku) => !isMergedWoodAlias(sku));
   const [channel, setChannel] = useState<Channel>("tai_tiem");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");

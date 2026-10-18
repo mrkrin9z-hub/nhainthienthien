@@ -96,6 +96,27 @@ export const createDeskOrder = createServerFn({ method: "POST" })
     return createManualOrder(await actor(), data);
   });
 
+export const reviseOrder = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        orderId: z.string().uuid(),
+        fullName: z.string().min(2),
+        phone: z.string().min(8),
+        address: z.string().optional().default(""),
+        fulfillment: z.enum(["pickup", "delivery"]),
+        note: z.string().optional().default(""),
+        dueDate: z.string().nullable().optional().default(null),
+        items: z.array(itemSchema).min(1).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { reviseOrder: revise } = await import("@/server/service");
+    await revise(await actor(), data);
+    return { ok: true };
+  });
+
 export const changeStatus = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -345,12 +366,18 @@ export const saveCustomer = createServerFn({ method: "POST" })
         note: z.string(),
         tags: z.array(z.string()).optional(),
         specialDates: z.array(z.object({ label: z.string(), month: z.number().int(), day: z.number().int() })).optional(),
+        name: z.string().optional(),
+        phone: z.string().optional(),
+        address: z.string().optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
     const { saveCustomerNote } = await import("@/server/service");
-    await saveCustomerNote(await actor(), data.id, data.note, data.tags, data.specialDates);
+    const profile = data.name !== undefined || data.phone !== undefined || data.address !== undefined
+      ? { ...(data.name !== undefined ? { name: data.name } : {}), ...(data.phone !== undefined ? { phone: data.phone } : {}), ...(data.address !== undefined ? { address: data.address } : {}) }
+      : undefined;
+    await saveCustomerNote(await actor(), data.id, data.note, data.tags, data.specialDates, profile);
     return { ok: true };
   });
 
