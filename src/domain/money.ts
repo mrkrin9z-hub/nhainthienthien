@@ -7,6 +7,10 @@ export const WALLETS = [
 
 export type WalletId = (typeof WALLETS)[number]["id"];
 
+/** Người giữ két sau khi nhân viên nộp tiền mặt. Không phải tài khoản đăng nhập. */
+export const SHOP_TILL_ID = "ket";
+export const SHOP_TILL_NAME = "Két tiệm";
+
 export const EXPENSE_CATEGORIES = [
   { id: "mat_bang", label: "Mặt bằng" },
   { id: "dien_nuoc", label: "Điện nước" },
@@ -212,11 +216,12 @@ export type HolderBalance = {
   chuyen_khoan: number;
 };
 
-/** Tiền thu cộng vào ví người bấm thu. Chi trừ ví người ghi chi. */
+/** Tiền thu cộng vào ví người bấm thu. Chi trừ ví người ghi chi. Nộp tiền mặt chuyển từ người thu sang két. */
 export function holderBalances(input: {
   orders: CashOrder[];
   expenses: CashExpense[];
   staff: { id: string; name: string }[];
+  handovers?: { fromId: string; amount: number }[];
 }): HolderBalance[] {
   const totals = new Map<string, { tien_mat: number; chuyen_khoan: number }>();
   const touch = (id: string) => {
@@ -234,16 +239,33 @@ export function holderBalances(input: {
     if (expense.wallet !== "tien_mat" && expense.wallet !== "chuyen_khoan") continue;
     touch(expense.by ?? "")[expense.wallet] -= Math.abs(expense.amount);
   }
+  for (const handover of input.handovers ?? []) {
+    const amount = Math.round(handover.amount);
+    if (!amount) continue;
+    touch(handover.fromId ?? "").tien_mat -= amount;
+    touch(SHOP_TILL_ID).tien_mat += amount;
+  }
   const names = new Map(input.staff.map((person) => [person.id, person.name]));
   return [...totals.entries()]
     .filter(([, amounts]) => amounts.tien_mat !== 0 || amounts.chuyen_khoan !== 0)
     .map(([staffId, amounts]) => ({
       staffId,
-      name: staffId ? (names.get(staffId) ?? "Người đã nghỉ") : "Chưa gắn người",
+      name: staffId === SHOP_TILL_ID ? SHOP_TILL_NAME : staffId ? (names.get(staffId) ?? "Người đã nghỉ") : "Chưa gắn người",
       tien_mat: amounts.tien_mat,
       chuyen_khoan: amounts.chuyen_khoan,
     }))
-    .sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    .sort((a, b) => {
+      if (a.staffId === SHOP_TILL_ID) return -1;
+      if (b.staffId === SHOP_TILL_ID) return 1;
+      return a.name.localeCompare(b.name, "vi");
+    });
+}
+
+/** Số nộp phải là tiền mặt đang giữ, từng đồng. */
+export function handoverError(input: { held: number; amount: number }): string | null {
+  if (!Number.isInteger(input.amount) || input.amount <= 0) return "Số tiền nộp chưa đúng.";
+  if (input.amount > input.held) return "Số tiền nộp lớn hơn tiền mặt đang giữ.";
+  return null;
 }
 
 export function walletCards(lines: LedgerLine[], month: string) {

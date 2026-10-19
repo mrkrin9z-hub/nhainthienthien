@@ -15,9 +15,19 @@ import { ROLE_LABEL, type Role } from "@/domain/types";
 import { loadSettings, storeStaff } from "@/lib/admin.functions";
 
 const ROLES: { role: Role; detail: string }[] = [
-  { role: "owner", detail: "Toàn bộ sổ: ví, chi phí, cài đặt, nhân viên, giá vốn." },
-  { role: "sale", detail: "Đơn, khách, giá bán, thu tiền, KPI. Không ví, không chi phí, không giá vốn." },
-  { role: "production", detail: "In, đóng gói, giao, kho, chấm công. Không thấy giá và doanh thu." },
+  { role: "owner", detail: "Toàn bộ sổ: ví, két, chi phí, cài đặt, nhân viên, giá vốn." },
+  { role: "sale", detail: "Đơn, khách, giá bán, thu tiền, nộp tiền mặt đang giữ, KPI." },
+  { role: "production", detail: "In, đóng gói, giao, kho, chấm công." },
+];
+
+const RIGHTS: { job: string; owner: boolean; sale: boolean; production: boolean }[] = [
+  { job: "Đơn hàng", owner: true, sale: true, production: true },
+  { job: "Khách hàng", owner: true, sale: true, production: false },
+  { job: "Sản xuất, kho, giao", owner: true, sale: true, production: true },
+  { job: "Bảng giá, thu tiền", owner: true, sale: true, production: false },
+  { job: "Nộp tiền mặt vào két", owner: true, sale: true, production: false },
+  { job: "Ví cửa hàng, chi phí, giá vốn", owner: true, sale: false, production: false },
+  { job: "Phân quyền, cài đặt", owner: true, sale: false, production: false },
 ];
 
 type Person = {
@@ -88,6 +98,32 @@ export function StaffDesk() {
 
   return (
     <div className="space-y-3">
+      <section className="rounded-md border bg-card p-4" aria-label="Bảng phân quyền">
+        <h2 className="font-bold">Phân quyền</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Ba vai trò của xưởng in. Mỗi người một vai. Sản xuất làm việc trên đơn và kho, giá bán nằm ở chủ và sale.</p>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[28rem] text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-2 pr-3 font-semibold">Việc</th>
+                <th className="px-3 py-2 font-semibold">Chủ</th>
+                <th className="px-3 py-2 font-semibold">Sale</th>
+                <th className="px-3 py-2 font-semibold">Sản xuất</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RIGHTS.map((row) => (
+                <tr key={row.job} className="border-b last:border-0">
+                  <td className="py-2 pr-3">{row.job}</td>
+                  <td className="px-3 py-2">{row.owner ? "Được" : "—"}</td>
+                  <td className="px-3 py-2">{row.sale ? "Được" : "—"}</td>
+                  <td className="px-3 py-2">{row.production ? "Được" : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button size="sm" onClick={openNew}>
           <Plus className="mr-1 size-4" />

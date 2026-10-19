@@ -62,6 +62,10 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Tạo giao dịch/);
   assert.match(readFileSync(new URL("../routes/admin.thu.tsx", import.meta.url), "utf8"), /Không còn đơn cần thu/);
   assert.match(readFileSync(new URL("../routes/admin.thu.tsx", import.meta.url), "utf8"), /Cộng vào ví của/);
+  assert.match(readFileSync(new URL("../routes/admin.thu.tsx", import.meta.url), "utf8"), /Nộp tiền mặt/);
+  assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Két tiệm/);
+  assert.match(shell, /label: "Thu tiền"/);
+  assert.match(shell, /label: "Ví tiền"/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Ví người thu/);
   assert.match(readFileSync(new URL("../routes/admin.bao-cao-chi.tsx", import.meta.url), "utf8"), /Báo cáo chi phí/);
   const prices = readFileSync(new URL("../routes/admin.gia.tsx", import.meta.url), "utf8");

@@ -10,9 +10,9 @@ import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { vnMonth, vnYmd } from "@/domain/calc";
-import type { WalletId } from "@/domain/money";
+import { SHOP_TILL_ID, type WalletId } from "@/domain/money";
 import { formatVnd } from "@/lib/brand";
-import { getMoneyDesk, saveWalletAdjust } from "@/lib/admin.functions";
+import { getMoneyDesk, handCashIn, saveWalletAdjust } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/vi")({
   component: WalletPage,
@@ -44,6 +44,10 @@ function WalletBody() {
   const [filter, setFilter] = useState<"all" | WalletId>("all");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
+  const [handAmount, setHandAmount] = useState("");
+  const [handNote, setHandNote] = useState("");
+  const [handFrom, setHandFrom] = useState("");
+  const [handBusy, setHandBusy] = useState(false);
   const queryClient = useQueryClient();
   const desk = useQuery({ queryKey: ["money", month], queryFn: () => getMoneyDesk({ data: { month } }) });
   const lines = (desk.data?.lines ?? []).filter((line) => {
@@ -52,15 +56,22 @@ function WalletBody() {
     return !needle || `${line.label} ${line.holderName ?? ""}`.toLowerCase().includes(needle);
   });
   const page = useListPage(lines, `${month}|${filter}|${q}`);
-  const holders = desk.data?.holders ?? [];
+  const holders = (desk.data?.holders ?? []).filter((holder) => holder.staffId !== SHOP_TILL_ID);
+  const till = (desk.data?.holders ?? []).find((holder) => holder.staffId === SHOP_TILL_ID);
+  const carriers = holders.filter((holder) => holder.staffId && holder.tien_mat > 0);
+  const handing = carriers.find((holder) => holder.staffId === handFrom) ?? carriers[0];
   const holderPage = useListPage(holders, month);
+  const handovers = desk.data?.handovers ?? [];
+  const handoverPage = useListPage(handovers, month);
 
   return (
     <div className="space-y-4">
       <MoneyLinks />
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Ví tiền</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Hai nguồn của cả tiệm. Phần dưới là ví từng người: thu cộng vào người bấm thu, chi trừ người ghi chi.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Ví cửa hàng là toàn bộ tiền đã ghi sổ. Két tiệm là tiền mặt nhân viên đã nộp. Phần còn lại vẫn nằm ở ví người thu. Chuyển khoản vào tài khoản thì ở ví chuyển khoản.
+        </p>
       </div>
       <Input className="min-h-12 max-w-xs" type="month" aria-label="Tháng ví" value={month} onChange={(e) => setMonth(e.target.value)} />
       {desk.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
@@ -76,8 +87,14 @@ function WalletBody() {
           </article>
         ))}
       </section>
+      <section className="glass-card rounded-3xl p-4">
+        <h2 className="font-bold text-primary">Két tiệm</h2>
+        <p className="mt-1 text-2xl font-extrabold">{formatVnd(till?.tien_mat ?? 0)}</p>
+        <p className="mt-1 text-sm text-muted-foreground">Tiền mặt nhân viên đã nộp về két.</p>
+      </section>
       <section className="space-y-2">
         <h2 className="font-bold text-primary">Ví người thu</h2>
+        <p className="text-sm text-muted-foreground">Tiền mặt ở đây là phần nhân viên còn đang giữ. Thu cộng vào người bấm thu, chi trừ người ghi chi.</p>
         {desk.data && holders.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có tiền gắn với người thu.</p> : null}
         <ListPager page={holderPage.page} pages={holderPage.pages} total={holderPage.total} start={holderPage.start} count={holderPage.slice.length} noun="ví người" onPage={holderPage.setPage} />
         <div className="grid gap-3 sm:grid-cols-2">
@@ -89,6 +106,83 @@ function WalletBody() {
             </article>
           ))}
         </div>
+        <form
+          className="glass-card space-y-3 rounded-3xl p-4"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const value = Math.round(Number(handAmount));
+            if (!handing || !value) {
+              toast.error("Chọn người đang giữ tiền mặt và số tiền nộp.");
+              return;
+            }
+            setHandBusy(true);
+            try {
+              await handCashIn({ data: { staffId: handing.staffId, amount: value, note: handNote } });
+              setHandAmount("");
+              setHandNote("");
+              toast.success("Đã ghi nhận nộp tiền mặt");
+              await queryClient.invalidateQueries({ queryKey: ["money", month] });
+              await queryClient.invalidateQueries({ queryKey: ["collect"] });
+            } catch (error) {
+              toast.error((error as Error).message);
+            } finally {
+              setHandBusy(false);
+            }
+          }}
+        >
+          <h3 className="font-bold text-primary">Ghi nhận nộp tiền</h3>
+          <p className="text-sm text-muted-foreground">Chủ ghi khi nhân viên đưa tiền mặt về két. Số này rời ví người thu và vào két tiệm.</p>
+          {carriers.length === 0 ? <p className="text-sm">Chưa có tiền mặt đang nằm ở nhân viên.</p> : null}
+          {carriers.length > 0 ? (
+            <>
+              <label className="block text-sm font-semibold">
+                Người đang giữ
+                <select
+                  className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                  aria-label="Người nộp tiền"
+                  value={handing?.staffId ?? ""}
+                  onChange={(event) => setHandFrom(event.target.value)}
+                >
+                  {carriers.map((holder) => (
+                    <option key={holder.staffId} value={holder.staffId}>
+                      {holder.name} · đang giữ {formatVnd(holder.tien_mat)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-semibold">
+                Số tiền nộp
+                <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={handAmount} onChange={(event) => setHandAmount(event.target.value.replace(/\D/g, ""))} />
+              </label>
+              <label className="block text-sm font-semibold">
+                Ghi chú
+                <Input className="mt-1 min-h-11" placeholder="Ca tối, đủ số…" value={handNote} onChange={(event) => setHandNote(event.target.value)} />
+              </label>
+              <Button className="min-h-11" type="submit" disabled={handBusy}>
+                Ghi nhận nộp tiền
+              </Button>
+            </>
+          ) : null}
+        </form>
+      </section>
+      <section className="space-y-2">
+        <h2 className="font-bold text-primary">Đã nộp vào két</h2>
+        {desk.data && handovers.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có lần nộp tiền mặt.</p> : null}
+        <ListPager page={handoverPage.page} pages={handoverPage.pages} total={handoverPage.total} start={handoverPage.start} count={handoverPage.slice.length} noun="lần nộp" onPage={handoverPage.setPage} />
+        <ul className="space-y-2">
+          {handoverPage.slice.map((row) => (
+            <li key={row.id} className="rounded-md border bg-card p-3 text-sm">
+              <p className="font-semibold">
+                {row.fromName} nộp {formatVnd(row.amount)}
+              </p>
+              <p className="text-muted-foreground">
+                {vnYmd(row.at)}
+                {row.byName ? ` · ghi bởi ${row.byName}` : ""}
+                {row.note ? ` · ${row.note}` : ""}
+              </p>
+            </li>
+          ))}
+        </ul>
       </section>
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <section className="order-2 space-y-3 lg:order-1 lg:col-span-2">

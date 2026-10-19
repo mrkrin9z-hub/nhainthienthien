@@ -15,7 +15,7 @@ import type { WalletId } from "@/domain/money";
 import { walletLabel } from "@/domain/money";
 import { formatMaybe, formatVnd } from "@/lib/brand";
 import { CHANNEL_LABEL, CHANNELS } from "@/domain/types";
-import { getCollectList, recordDeposit } from "@/lib/admin.functions";
+import { getCollectList, handCashIn, recordDeposit } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/thu")({
   component: CollectPage,
@@ -44,6 +44,7 @@ function CollectBody() {
   const [query, setQuery] = useState("");
   const [channel, setChannel] = useState("all");
   const [open, setOpen] = useState<CollectRow | null>(null);
+  const [handOpen, setHandOpen] = useState(false);
   const list = useQuery({ queryKey: ["collect"], queryFn: () => getCollectList() });
   const needle = query.trim().toLowerCase();
   const source = list.data?.rows ?? [];
@@ -70,13 +71,20 @@ function CollectBody() {
       <MoneyLinks />
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Thu tiền</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Bấm Thu tiền trên đơn. Số tiền cộng vào ví của người đang thu.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Bấm Thu tiền trên đơn. Tiền mặt vào ví của người đang thu. Cuối ca nộp số tiền mặt đang giữ vào két tiệm.</p>
       </div>
       {me ? (
         <section className="grid gap-3 sm:grid-cols-2">
           <article className="rounded-md border bg-card p-4">
             <p className="text-sm text-muted-foreground">Ví tiền mặt của {me.name}</p>
             <p className="text-xl font-extrabold">{formatVnd(me.tien_mat)}</p>
+            {me.tien_mat > 0 ? (
+              <Button className="mt-3 min-h-11" variant="outline" onClick={() => setHandOpen(true)}>
+                Nộp tiền mặt
+              </Button>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">Không còn tiền mặt đang giữ.</p>
+            )}
           </article>
           <article className="rounded-md border bg-card p-4">
             <p className="text-sm text-muted-foreground">Ví chuyển khoản của {me.name}</p>
@@ -113,7 +121,58 @@ function CollectBody() {
         ))}
       </ul>
       <CollectDialog key={open?.id ?? "closed"} row={open} payerName={me?.name ?? ""} onOpenChange={(next) => { if (!next) setOpen(null); }} />
+      <HandDialog key={handOpen ? `hand-${me?.tien_mat ?? 0}` : "hand-closed"} open={handOpen} held={me?.tien_mat ?? 0} onOpenChange={setHandOpen} />
     </div>
+  );
+}
+
+function HandDialog({ open, held, onOpenChange }: { open: boolean; held: number; onOpenChange: (open: boolean) => void }) {
+  const queryClient = useQueryClient();
+  const [amount, setAmount] = useState(held > 0 ? String(held) : "");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Nộp tiền mặt</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">Đưa số tiền mặt đang giữ về két tiệm. Đang giữ {formatVnd(held)}.</p>
+        <label className="text-sm font-semibold">
+          Số tiền nộp
+          <Input className="mt-1 min-h-11" inputMode="numeric" aria-label="Số tiền nộp" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} />
+        </label>
+        <label className="text-sm font-semibold">
+          Ghi chú
+          <Input className="mt-1 min-h-11" placeholder="Cuối ca" value={note} onChange={(event) => setNote(event.target.value)} />
+        </label>
+        <DialogFooter>
+          <Button
+            className="min-h-11"
+            disabled={busy || !Number(amount)}
+            onClick={async () => {
+              const value = Number(amount);
+              if (!value) return;
+              setBusy(true);
+              try {
+                await handCashIn({ data: { amount: value, note } });
+                toast.success("Đã nộp tiền mặt vào két");
+                onOpenChange(false);
+                await queryClient.invalidateQueries({ queryKey: ["collect"] });
+                await queryClient.invalidateQueries({ queryKey: ["money"] });
+              } catch (error) {
+                toast.error((error as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Nộp tiền mặt
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
