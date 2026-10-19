@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { canPreviewPhoto, PhotoViewer, staffThumb } from "@/components/photo-thumb";
+import { canPreviewPhoto, PhotoViewer, saveStaffFile, saveStaffFiles, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getMe, getPhotoAlbum, linkPhotoAlbum } from "@/lib/admin.functions";
@@ -20,6 +20,7 @@ function AlbumDetailPage() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [openFile, setOpenFile] = useState<string | null>(null);
+  const [savingFiles, setSavingFiles] = useState(false);
   const data = album.data;
   const canLink = me.data?.role === "owner" || me.data?.role === "sale";
 
@@ -85,7 +86,26 @@ function AlbumDetailPage() {
           </Link>
         </p>
       ) : null}
-      {data.files.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có ảnh.</p> : null}
+      {data.files.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có ảnh.</p> : (
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11"
+          disabled={savingFiles}
+          onClick={() => {
+            setSavingFiles(true);
+            void saveStaffFiles(
+              data.files.map((file) => ({ id: file.id, name: file.name })),
+              `${data.orderCode || "album"}-anh.zip`,
+            )
+              .then(() => toast.success(data.files.length > 1 ? "Đã tải một file zip về máy." : "Đã tải file về máy."))
+              .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không tải được file."))
+              .finally(() => setSavingFiles(false));
+          }}
+        >
+          {savingFiles ? "Đang tải…" : "Tải tất cả về máy"}
+        </Button>
+      )}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {data.files.map((file) => (
           <li key={file.id} className="glass-card overflow-hidden rounded-2xl">
@@ -95,9 +115,9 @@ function AlbumDetailPage() {
                 <span className="block truncate px-2 py-2 text-xs font-semibold">{file.name}</span>
               </button>
             ) : (
-              <a href={`/api/staff/file/${file.id}`} className="block truncate px-2 py-2 text-xs font-semibold">
+              <button type="button" className="block truncate px-2 py-2 text-left text-xs font-semibold" onClick={() => void saveStaffFile(file.id, file.name).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không tải được file."))}>
                 {file.name}
-              </a>
+              </button>
             )}
           </li>
         ))}

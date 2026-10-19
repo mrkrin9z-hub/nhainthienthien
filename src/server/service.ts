@@ -27,7 +27,7 @@ import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/images";
 import { albumPhone, photoTooBig, publicUploadCard, uploadTokenShape } from "@/domain/order-upload";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
-import { orderRevisionBlock } from "@/domain/order-edit";
+import { marketplaceEditLocked, orderRevisionBlock } from "@/domain/order-edit";
 import { bytesStillShared, filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
@@ -1195,6 +1195,7 @@ export async function reviseOrder(
   await mutate(async (state) => {
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
+    if (marketplaceEditLocked(order.channel)) throw new Error("Đơn TikTok hoặc Shopee không sửa trên web.");
     const changingItems = input.items != null;
     const blocked = orderRevisionBlock(order, changingItems);
     if (blocked) throw new Error(blocked);
@@ -1277,6 +1278,7 @@ export async function addDeposit(actor: Actor, input: { orderId: string; amount:
   await mutate(async (state) => {
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
+    if (marketplaceEditLocked(order.channel)) throw new Error("Đơn TikTok hoặc Shopee không thu tiền trên web.");
     const before = order.depositPaid;
     const next = appendCollection(
       order,

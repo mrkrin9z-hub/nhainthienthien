@@ -10,6 +10,7 @@ export const Route = createFileRoute("/api/staff/file/$id")({
         if (!person) return new Response("Chưa đăng nhập", { status: 401 });
         const url = new URL(request.url);
         const preview = url.searchParams.get("thumb") === "1" ? (url.searchParams.get("view") === "1" ? 1600 : 480) : null;
+        const download = url.searchParams.get("dl") === "1";
         let file;
         try {
           file = await fileForStaff(person, params.id, preview);
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/api/staff/file/$id")({
         return new Response(Buffer.from(bytes), {
           headers: {
             "content-type": servedMime(file.mime || ""),
-            "content-disposition": contentDisposition(file.name),
+            "content-disposition": contentDisposition(file.name, download),
             "x-content-type-options": "nosniff",
           },
         });

@@ -49,8 +49,9 @@ export function servedMime(mime: string): string {
 }
 
 /** Tên file an toàn trong Content-Disposition: bỏ ngoặc kép và xuống dòng. */
-export function contentDisposition(name: string): string {
+export function contentDisposition(name: string, download = false): string {
   const cleaned = name.replace(/[\r\n"\\]/g, "").slice(-120) || "tep";
   const asciiName = cleaned.replace(/[^\x20-\x7E]/g, "_");
-  return `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(cleaned)}`;
+  const kind = download ? "attachment" : "inline";
+  return `${kind}; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(cleaned)}`;
 }
