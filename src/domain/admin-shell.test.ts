@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { orderRevisionBlock } from "./order-edit.ts";
+import { marketplaceEditLocked, orderRevisionBlock } from "./order-edit.ts";
 
 test("đơn đã trừ kho hoặc đã xong thì không sửa sản phẩm", () => {
   assert.equal(orderRevisionBlock({ status: "nhan_don", printDeducted: false, packDeducted: false }, true), null);
@@ -22,6 +22,13 @@ test("cài đặt chia nhóm nhưng không bỏ sót ô số", () => {
   assert.match(src, /Lưu cài đặt/);
 });
 
+test("đơn TikTok và Shopee không sửa khách, sản phẩm hay thu tiền", () => {
+  assert.equal(marketplaceEditLocked("tiktok"), true);
+  assert.equal(marketplaceEditLocked("shopee"), true);
+  assert.equal(marketplaceEditLocked("tai_tiem"), false);
+  assert.equal(marketplaceEditLocked("facebook"), false);
+});
+
 test("admin có việc hằng ngày và đơn dạng cột", () => {
   const shell = readFileSync(new URL("../routes/admin.tsx", import.meta.url), "utf8");
   assert.match(shell, /admin-desk/);
@@ -30,12 +37,18 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   const orders = readFileSync(new URL("../routes/admin.don-hang.index.tsx", import.meta.url), "utf8");
   assert.match(orders, /Dạng cột/);
   assert.match(orders, /Danh sách/);
-  const form = readFileSync(new URL("../routes/admin.don-moi.tsx", import.meta.url), "utf8");
-  assert.match(form, /Tạo đơn mới/);
+  const form = readFileSync(new URL("../components/admin/order-desk.tsx", import.meta.url), "utf8");
+  assert.match(readFileSync(new URL("../routes/admin.don-moi.tsx", import.meta.url), "utf8"), /Tạo đơn mới/);
   assert.match(form, /Danh sách sản phẩm/);
   assert.match(form, /md:grid-cols-2/);
   assert.match(form, /Thu tiền lần 1/);
   assert.match(form, /Lưu đơn/);
+  const detail = readFileSync(new URL("../routes/admin.don-hang.$code.tsx", import.meta.url), "utf8");
+  assert.match(detail, /Khách hàng/);
+  assert.match(detail, /Hình ảnh/);
+  assert.match(detail, /Tình trạng/);
+  assert.match(detail, /OrderDesk/);
+  assert.match(form, /Cập nhật/);
   assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Thêm nhân viên/);
   assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Phân quyền/);
   assert.match(readFileSync(new URL("../routes/admin.san-xuat.tsx", import.meta.url), "utf8"), /Lệnh sản xuất/);

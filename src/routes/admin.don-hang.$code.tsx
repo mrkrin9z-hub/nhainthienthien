@@ -3,18 +3,19 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { OrderEditDialog } from "@/components/admin/order-edit-dialog";
+import { OrderDesk, type DeskSku } from "@/components/admin/order-desk";
 import { OrderQrDialog } from "@/components/admin/order-qr-dialog";
 import { WaybillBox } from "@/components/admin/waybill-box";
-import { canPreviewPhoto, PhotoViewer, staffThumb } from "@/components/photo-thumb";
+import { canPreviewPhoto, PhotoViewer, saveStaffFile, saveStaffFiles, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
-import { changeStatus, getMe, getOrderDetail, recordDeposit, saveNote, saveReprint, storeShipping } from "@/lib/admin.functions";
-import { isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
+import { changeStatus, getMe, getOrderDetail, getSkuOptions, recordDeposit, reviseOrder, saveNote, saveReprint, storeShipping } from "@/lib/admin.functions";
+import { isMergedWoodAlias, isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
+import { marketplaceEditLocked } from "@/domain/order-edit";
 import { JT_CARRIER, jtOrder } from "@/domain/jt";
-import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
+import { CHANNEL_LABEL, STATUS_LABEL, type OrderStatus } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/don-hang/$code")({
   component: OrderDetailPage,
@@ -34,14 +35,14 @@ function OrderDetailPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
   const [note, setNote] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
-  const [deposit, setDeposit] = useState("");
-  const [method, setMethod] = useState("chuyển khoản");
+  const [tab, setTab] = useState("thong-tin");
   const [override, setOverride] = useState(false);
   const [reason, setReason] = useState("");
   const [reopenReason, setReopenReason] = useState("");
   const [openFile, setOpenFile] = useState<string | null>(null);
+  const [savingFiles, setSavingFiles] = useState(false);
+  const skus = useQuery({ queryKey: ["sku-options"], queryFn: () => getSkuOptions(), enabled: me.data?.role !== "production" });
   const data = order.data;
   const role = me.data?.role;
   const closed = data?.status === "huy" || data?.status === "xong";
@@ -58,9 +59,6 @@ function OrderDetailPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
         <div className="flex flex-wrap gap-2">
-          {role !== "production" ? (
-            <Button className="min-h-11" onClick={() => setEditing(true)}>Sửa đơn</Button>
-          ) : null}
           {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
             <Button asChild variant="outline" className="min-h-11">
               <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
@@ -79,83 +77,160 @@ function OrderDetailPage() {
       <p className="text-xs text-muted-foreground">
         Kho in: {data.printDeducted ? "đã trừ" : "chưa trừ"} · Kho đóng gói: {data.packDeducted ? "đã trừ" : "chưa trừ"}
       </p>
+      <div className="flex gap-1 overflow-x-auto border-b">
+        {(
+          [
+            ["thong-tin", "Thông tin"],
+            ["khach", "Khách hàng"],
+            ["anh", "Hình ảnh"],
+            ["giao", "Giao hàng"],
+            ["trang-thai", "Tình trạng"],
+            ["lich-su", "Lịch sử"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={`shrink-0 border-b-2 px-3 py-2 text-sm font-semibold ${tab === id ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {role !== "production" ? (
-        <ShippingForm
-          orderId={data.id}
-          shipping={data.shipping}
-          channel={data.channel}
-          source={data.source}
-          fulfillment={data.fulfillment}
-          status={data.status}
-          address={data.address}
-          onDone={refresh}
-        />
-      ) : (
-        <p className="text-sm">
-          Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}
-          {data.shipping?.carrierStatus ? ` · ${data.shipping.carrierStatus}` : ""}
-        </p>
-      )}
-
-      <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Sản phẩm</h2>
-        <ul className="mt-2 space-y-1 text-sm">
-          {data.items.map((item) => (
-            <li key={item.id} className="flex justify-between gap-3">
-              <span>
-                {item.quantity}× {item.name}
-              </span>
-              {role === "production" ? null : (
-                <span className="text-right">
-                  {item.lineTotal === null ? "Chưa có giá" : formatMaybe(item.lineTotal)}
-                  {item.listUnitPrice != null && item.lineTotal != null ? (
-                    <span className="block text-xs font-normal text-muted-foreground">
-                      Niêm yết {formatMaybe(item.listUnitPrice * item.quantity)} · Lệch {formatMaybe(item.lineTotal - item.listUnitPrice * item.quantity)}
-                    </span>
-                  ) : null}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-        {role === "production" ? null : data.total !== null ? (
-          <p className="mt-2 font-bold">Tổng {formatMaybe(data.total)}</p>
+      {tab === "thong-tin" ? (
+        role === "production" ? (
+          <section className="rounded-md border bg-card p-4">
+            <h2 className="font-semibold text-primary">Sản phẩm</h2>
+            <ul className="mt-2 space-y-1 text-sm">
+              {data.items.map((item) => (
+                <li key={item.id}>
+                  {item.quantity}× {item.name}
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : (
-          <p className="mt-2 text-sm">Chưa đủ giá bán để ra tổng.</p>
-        )}
-      </section>
+          <OrderDesk
+            key={data.id}
+            mode="edit"
+            owner={role === "owner"}
+            fieldsLocked={marketplaceEditLocked(data.channel)}
+            itemsLocked={marketplaceEditLocked(data.channel) || data.printDeducted || data.packDeducted || data.status === "xong" || data.status === "huy"}
+            lockNote={
+              marketplaceEditLocked(data.channel)
+                ? "Đơn TikTok hoặc Shopee lấy từ sàn. Khách, sản phẩm, giá và thu tiền bị khóa."
+                : data.status === "xong" || data.status === "huy"
+                  ? "Đơn đã hủy hoặc đã xong. Mở lại ở tab Tình trạng rồi mới sửa sản phẩm."
+                  : data.printDeducted || data.packDeducted
+                    ? "Đơn đã trừ kho. Lùi về trước bước In rồi mới sửa sản phẩm. Tên, số và địa chỉ vẫn lưu được."
+                    : ""
+            }
+            catalog={((skus.data ?? []) as DeskSku[]).filter((sku) => !isMergedWoodAlias(sku) || data.items.some((item) => item.skuId === sku.id))}
+            paidSoFar={data.depositPaid ?? 0}
+            initial={{
+              channel: data.channel,
+              fullName: data.customerName,
+              phone: data.phone,
+              address: data.address,
+              fulfillment: data.fulfillment,
+              note: data.customerNote,
+              dueDate: data.dueDate ? data.dueDate.slice(0, 10) : "",
+              marketplaceCode: data.marketplaceCode,
+              lines: data.items.map((item) => ({
+                key: item.id,
+                skuId: item.skuId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice === null ? "" : String(item.unitPrice),
+              })),
+            }}
+            onSave={async (value) => {
+              await reviseOrder({
+                data: {
+                  orderId: data.id,
+                  fullName: value.fullName,
+                  phone: value.phone,
+                  address: value.address,
+                  fulfillment: value.fulfillment,
+                  note: value.note,
+                  dueDate: value.dueDate,
+                  ...(value.items ? { items: value.items } : {}),
+                },
+              });
+              toast.success("Đã cập nhật đơn");
+              await refresh();
+            }}
+            onCollect={async (amount, payMethod) => {
+              await recordDeposit({ data: { orderId: data.id, amount, method: payMethod } });
+              toast.success("Đã ghi tiền");
+              await refresh();
+            }}
+          />
+        )
+      ) : null}
 
-      {role !== "production" ? (
-        <section className="glass-card rounded-3xl p-4">
-          <h2 className="font-bold text-primary">Cọc</h2>
-          <p className="text-sm">
-            {data.depositRequired === null
-              ? "Cần cọc 50% nhưng chưa có giá bán để tính số tiền."
-              : `Cần cọc ${formatMaybe(data.depositRequired)} · Đã ghi ${formatMaybe(data.depositPaid)} ${data.depositMethod}`}
-          </p>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-            <Input className="min-h-12 w-full sm:w-36" inputMode="numeric" placeholder="Số tiền" value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/\D/g, ""))} />
-            <Input className="min-h-12 w-full sm:w-40" value={method} onChange={(e) => setMethod(e.target.value)} />
-            <Button
-              className="min-h-12"
-              onClick={async () => {
-                try {
-                  await recordDeposit({ data: { orderId: data.id, amount: Number(deposit), method } });
-                  toast.success("Đã ghi cọc");
-                  setDeposit("");
-                  await refresh();
-                } catch (error) {
-                  toast.error((error as Error).message);
-                }
-              }}
-            >
-              Ghi nhận
-            </Button>
-          </div>
+      {tab === "khach" ? (
+        <section className="rounded-md border bg-card p-4">
+          <h2 className="font-semibold text-primary">Khách hàng</h2>
+          <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">Tên</dt>
+              <dd className="text-base font-semibold">{data.customerName}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Số điện thoại</dt>
+              <dd className="text-base font-semibold">{data.phone}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Kênh</dt>
+              <dd>{CHANNEL_LABEL[data.channel]}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Nhận hàng</dt>
+              <dd>{data.fulfillment === "delivery" ? "Giao hàng" : "Tại tiệm"}</dd>
+            </div>
+            <div className="md:col-span-2">
+              <dt className="text-muted-foreground">Địa chỉ</dt>
+              <dd>{data.address || "Chưa có địa chỉ"}</dd>
+            </div>
+            {data.customerNote ? (
+              <div className="md:col-span-2">
+                <dt className="text-muted-foreground">Ghi chú khách</dt>
+                <dd>{data.customerNote}</dd>
+              </div>
+            ) : null}
+          </dl>
+          {role === "production" ? null : (
+            <Link to="/admin/khach/$id" params={{ id: data.customerId }} className="mt-3 inline-block text-sm font-semibold text-primary">
+              Hồ sơ khách
+            </Link>
+          )}
         </section>
       ) : null}
 
+      {tab === "giao" ? (
+        role !== "production" ? (
+          <ShippingForm
+            orderId={data.id}
+            shipping={data.shipping}
+            channel={data.channel}
+            source={data.source}
+            fulfillment={data.fulfillment}
+            status={data.status}
+            address={data.address}
+            onDone={refresh}
+          />
+        ) : (
+          <p className="text-sm">
+            Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}
+            {data.shipping?.carrierStatus ? ` · ${data.shipping.carrierStatus}` : ""}
+          </p>
+        )
+      ) : null}
+
+      {tab === "trang-thai" ? (
+      <>
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Quy trình</h2>
         {data.status === "huy" ? (
@@ -240,7 +315,7 @@ function OrderDetailPage() {
       </section>
 
       {role !== "production" ? (
-        <section className="glass-card rounded-3xl p-4">
+        <section className="mt-4 rounded-md border bg-card p-4">
           <h2 className="font-bold text-primary">Ghi chú nội bộ</h2>
           <Textarea className="mt-2" value={note ?? data.internalNote} onChange={(e) => setNote(e.target.value)} />
           <Button
@@ -260,15 +335,41 @@ function OrderDetailPage() {
           </Button>
         </section>
       ) : null}
+      </>
+      ) : null}
 
-      <section className="glass-card rounded-3xl p-4">
+      {tab === "anh" ? (
+      <>
+      <section className="rounded-md border bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-bold text-primary">Ảnh khách</h2>
-          {role !== "production" && data.status !== "huy" ? (
-            <Button type="button" variant="outline" className="min-h-11" onClick={() => setQrOpen(true)}>
-              Mã QR gửi khách
-            </Button>
-          ) : null}
+          <h2 className="font-bold text-primary">Hình ảnh</h2>
+          <div className="flex flex-wrap gap-2">
+            {data.files.length > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11"
+                disabled={savingFiles}
+                onClick={() => {
+                  setSavingFiles(true);
+                  void saveStaffFiles(
+                    data.files.map((file) => ({ id: file.id, name: file.name })),
+                    `${data.code}-anh.zip`,
+                  )
+                    .then(() => toast.success(data.files.length > 1 ? "Đã tải một file zip về máy." : "Đã tải file về máy."))
+                    .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không tải được file."))
+                    .finally(() => setSavingFiles(false));
+                }}
+              >
+                {savingFiles ? "Đang tải…" : "Tải tất cả về máy"}
+              </Button>
+            ) : null}
+            {role !== "production" && data.status !== "huy" ? (
+              <Button type="button" variant="outline" className="min-h-11" onClick={() => setQrOpen(true)}>
+                Mã QR gửi khách
+              </Button>
+            ) : null}
+          </div>
         </div>
         {data.files.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Chưa có file.</p> : null}
         <ul className="mt-3 grid grid-cols-3 gap-2">
@@ -285,9 +386,9 @@ function OrderDetailPage() {
         <ul className="mt-2 space-y-2 text-sm">
           {data.files.filter((file) => !canPreviewPhoto(file)).map((file) => (
             <li key={file.id}>
-              <a className="font-semibold text-primary" href={`/api/staff/file/${file.id}`}>
+              <button type="button" className="font-semibold text-primary" onClick={() => void saveStaffFile(file.id, file.name).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không tải được file."))}>
                 {file.name}
-              </a>
+              </button>
               <span className="text-muted-foreground"> · {FILE_KIND[file.kind] ?? file.kind}</span>
             </li>
           ))}
@@ -302,9 +403,11 @@ function OrderDetailPage() {
         />
       ) : null}
       {qrOpen ? <OrderQrDialog open={qrOpen} onOpenChange={setQrOpen} orderId={data.id} code={data.code} /> : null}
+      </>
+      ) : null}
 
-      {role !== "production" ? (
-        <section className="glass-card rounded-3xl p-4">
+      {tab === "trang-thai" && role !== "production" ? (
+        <section className="rounded-md border bg-card p-4">
           <h2 className="font-bold text-primary">In lại</h2>
           <p className="text-sm text-muted-foreground">Trong 3 ngày sau khi giao, in lại nếu lỗi do xưởng. Quá hạn web sẽ cảnh báo.</p>
           <Textarea className="mt-2" placeholder="Lý do khách báo" value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -343,8 +446,8 @@ function OrderDetailPage() {
         </section>
       ) : null}
 
-      {role === "owner" && data.quote ? (
-        <section className="glass-card rounded-3xl p-4">
+      {tab === "trang-thai" && role === "owner" && data.quote ? (
+        <section className="rounded-md border bg-card p-4">
           <h2 className="font-bold text-primary">Lãi gộp theo định mức hiện tại</h2>
           <ul className="mt-2 space-y-1 text-sm">
             {data.quote.map((quote, index) =>
@@ -359,7 +462,8 @@ function OrderDetailPage() {
         </section>
       ) : null}
 
-      <section className="glass-card rounded-3xl p-4">
+      {tab === "lich-su" ? (
+      <section className="rounded-md border bg-card p-4">
         <h2 className="font-bold text-primary">Lịch sử</h2>
         <ul className="mt-2 space-y-1 text-sm">
           {data.history.map((item, index) => (
@@ -370,32 +474,6 @@ function OrderDetailPage() {
           ))}
         </ul>
       </section>
-      {role !== "production" ? (
-        <Link to="/admin/khach/$id" params={{ id: data.customerId }} className="text-sm font-semibold text-accent">
-          Hồ sơ khách
-        </Link>
-      ) : null}
-      {editing && role !== "production" ? (
-        <OrderEditDialog
-          open
-          onOpenChange={setEditing}
-          owner={role === "owner"}
-          order={{
-            id: data.id,
-            code: data.code,
-            channel: data.channel,
-            customerName: data.customerName,
-            phone: data.phone,
-            address: data.address,
-            fulfillment: data.fulfillment,
-            customerNote: data.customerNote,
-            dueDate: data.dueDate,
-            status: data.status,
-            printDeducted: data.printDeducted,
-            packDeducted: data.packDeducted,
-            items: data.items,
-          }}
-        />
       ) : null}
     </div>
   );
