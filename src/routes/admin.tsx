@@ -191,7 +191,8 @@ function AdminLayout() {
         className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-sidebar-border bg-sidebar pt-[env(safe-area-inset-top)] md:sticky md:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-3">
-          <span className="truncate text-[13px] font-bold tracking-[0.08em] text-primary uppercase">Thiên Thiên</span>
+          <span className="flex size-7 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground">TT</span>
+          <span className="truncate text-[13px] font-bold tracking-tight text-foreground">Thiên Thiên</span>
           <button type="button" className="ml-auto flex size-7 items-center justify-center rounded md:hidden" aria-label="Đóng" onClick={() => setMenuOpen(false)}>
             <X className="size-4" />
           </button>
@@ -209,7 +210,7 @@ function AdminLayout() {
                     key={`${item.to}-${item.label}`}
                     to={item.to}
                     aria-current={active ? "page" : undefined}
-                    className={`mb-0.5 flex min-h-9 items-center gap-2 rounded-md px-2 text-[13px] ${active ? "bg-primary/10 font-semibold text-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"}`}
+                    className={`mb-0.5 flex min-h-9 items-center gap-2 rounded-md px-2.5 text-[13px] ${active ? "bg-primary font-semibold text-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"}`}
                     onClick={() => setMenuOpen(false)}
                   >
                     <Icon className="size-4 shrink-0" />

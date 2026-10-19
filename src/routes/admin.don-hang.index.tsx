@@ -180,7 +180,7 @@ function OrdersPage() {
           />
         </DialogContent>
       </Dialog>
-      <FilterChips label="Trạng thái đơn" value={status} chips={statusChips} onChange={setStatus} />
+      <FilterChips label="Trạng thái đơn" value={status} chips={statusChips} onChange={setStatus} wrap />
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={pageRows.length} noun="đơn" onPage={list.setPage} />
       {view === "board" ? (
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -211,43 +211,45 @@ function OrdersPage() {
           <OrderCard key={order.id} order={order} money={!production} />
         ))}
       </div>
-      <div className="hidden overflow-hidden rounded-2xl border border-border/70 bg-card md:block">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-muted/50 text-xs font-semibold text-muted-foreground">
+      <div className="hidden overflow-hidden rounded-md border bg-card md:block">
+        <table className="w-full text-left text-[13px]">
+          <thead className="bg-muted/40 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             <tr>
-              <th className="px-4 py-3">Mã đơn</th>
-              <th className="px-4 py-3">Khách</th>
-              <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3">Kênh</th>
-              {production ? null : <th className="px-4 py-3">Tổng</th>}
-              {production ? null : <th className="px-4 py-3">Đã thu</th>}
-              {production ? null : <th className="px-4 py-3">Còn lại</th>}
+              <th className="px-3 py-2.5">STT</th>
+              <th className="px-3 py-2.5">Mã đơn</th>
+              <th className="px-3 py-2.5">Khách hàng</th>
+              <th className="px-3 py-2.5">Trạng thái</th>
+              <th className="px-3 py-2.5">Kênh</th>
+              {production ? null : <th className="px-3 py-2.5 text-right">Số tiền</th>}
+              {production ? null : <th className="px-3 py-2.5 text-right">Đã thu</th>}
+              {production ? null : <th className="px-3 py-2.5 text-right">Còn lại</th>}
             </tr>
           </thead>
           <tbody>
-            {pageRows.map((order) => (
+            {pageRows.map((order, index) => (
               <tr
                 key={order.id}
-                className="cursor-pointer border-t hover:bg-muted/40"
+                className="cursor-pointer border-t hover:bg-muted/30"
                 onClick={() => navigate({ to: "/admin/don-hang/$code", params: { code: order.code } })}
               >
-                <td className="px-4 py-3 font-semibold">
+                <td className="px-3 py-2.5 text-muted-foreground">{list.start + index + 1}</td>
+                <td className="px-3 py-2.5 font-semibold">
                   <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="text-primary">
                     {order.code}
                   </Link>
-                  {order.late ? <span className="ml-2 text-xs font-bold text-destructive">Trễ</span> : null}
+                  {order.late ? <span className="ml-2 text-[11px] font-bold text-destructive">Trễ</span> : null}
                 </td>
-                <td className="px-4 py-3">
-                  <p>{order.customerName}</p>
-                  <p className="text-xs text-muted-foreground">{order.phone}</p>
+                <td className="px-3 py-2.5">
+                  <p className="font-medium">{order.customerName}</p>
+                  <p className="text-[11px] text-muted-foreground">{order.phone}</p>
                 </td>
-                <td className="px-4 py-3"><StatusPill status={order.status} label={order.statusLabel} /></td>
-                <td className="px-4 py-3">{order.channelLabel}</td>
+                <td className="px-3 py-2.5"><StatusPill status={order.status} label={order.statusLabel} /></td>
+                <td className="px-3 py-2.5">{order.channelLabel}</td>
                 {production ? null : (
                   <>
-                    <td className="px-4 py-3 font-semibold">{order.total == null ? "Chưa có giá" : formatMaybe(order.total)}</td>
-                    <td className="px-4 py-3">{formatMaybe(order.depositPaid)}</td>
-                    <td className="px-4 py-3 font-semibold">{order.remain == null ? "—" : formatMaybe(order.remain)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold">{order.total == null ? "Chưa có giá" : formatMaybe(order.total)}</td>
+                    <td className="px-3 py-2.5 text-right">{formatMaybe(order.depositPaid)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold">{order.remain == null ? "—" : formatMaybe(order.remain)}</td>
                   </>
                 )}
               </tr>

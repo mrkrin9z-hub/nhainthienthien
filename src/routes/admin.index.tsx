@@ -61,50 +61,61 @@ function DashboardPage() {
 
   const hello = greeting();
   const since = data.clockedInAt ? new Date(data.clockedInAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "";
+  const todayLabel = new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date());
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Tổng quan hoạt động · {hello}</p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight text-primary sm:text-2xl">{data.name}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {data.clockedIn ? `Đang trong ca${since ? ` từ ${since}` : ""}.` : "Chưa vào ca."} Giờ làm 8:00–18:00. Bấm trên điện thoại, không cần vị trí hay ảnh.
-            </p>
-            <button
-              type="button"
-              className="mt-2 text-sm font-semibold text-primary"
-              onClick={() => {
-                if (typeof Notification === "undefined") {
-                  toast.error("Máy này không hiện được thông báo.");
-                  return;
-                }
-                void Notification.requestPermission().then((permission) => {
-                  toast.success(permission === "granted" ? "Đã bật báo khi trang đang mở." : "Chưa bật báo trên máy.");
-                });
-              }}
-            >
-              Bật báo trên máy
-            </button>
+            <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">Tổng quan hoạt động</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+              {hello}, {data.name}
+            </h1>
+            <p className="mt-1 text-[13px] text-muted-foreground capitalize">{todayLabel}</p>
           </div>
+          <button
+            type="button"
+            className="text-[13px] font-semibold text-primary"
+            onClick={() => {
+              if (typeof Notification === "undefined") {
+                toast.error("Máy này không hiện được thông báo.");
+                return;
+              }
+              void Notification.requestPermission().then((permission) => {
+                toast.success(permission === "granted" ? "Đã bật báo khi trang đang mở." : "Chưa bật báo trên máy.");
+              });
+            }}
+          >
+            Bật báo trên máy
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-card px-3 py-2.5">
+          <p className="text-[13px] text-muted-foreground">
+            {data.clockedIn ? `Đang trong ca${since ? ` từ ${since}` : ""}.` : "Bạn chưa chấm công hôm nay."} Giờ làm 8:00–18:00.
+          </p>
           <div className="flex gap-2">
             <button
               type="button"
-              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-50 sm:flex-none"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 text-[13px] font-semibold text-white active:scale-[0.97] disabled:opacity-50"
               onClick={() => clock("in")}
               disabled={data.clockedIn}
             >
-              <LogIn className="size-4" />
+              <LogIn className="size-3.5" />
               Vào ca
             </button>
             <button
               type="button"
-              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border bg-background px-4 text-sm font-medium active:scale-[0.97] disabled:opacity-50 sm:flex-none"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border bg-background px-3 text-[13px] font-semibold active:scale-[0.97] disabled:opacity-50"
               onClick={() => clock("out")}
               disabled={!data.clockedIn}
             >
-              <LogOut className="size-4" />
+              <LogOut className="size-3.5" />
               Ra ca
             </button>
           </div>
@@ -241,14 +252,14 @@ function greeting() {
 
 function Card({ label, value, hint, icon: Icon, tone }: { label: string; value: string; hint?: string; icon: LucideIcon; tone: string }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-card p-4">
+    <div className="rounded-md border bg-card p-4 shadow-none">
       <div className="flex items-start justify-between gap-2">
-        <p className="font-sans text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
-        <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${tone}`}>
-          <Icon className="size-4" />
+        <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
+        <span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${tone}`}>
+          <Icon className="size-3.5" />
         </span>
       </div>
-      <p className="mt-3 text-xl font-semibold tracking-tight text-primary sm:text-2xl">{value}</p>
+      <p className="mt-3 text-2xl font-semibold tracking-tight">{value}</p>
       {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );

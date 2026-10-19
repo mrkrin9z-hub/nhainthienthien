@@ -34,8 +34,8 @@ export function PageToolbar({
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold">{title}</h1>
-          {hint ? <p className="text-sm text-muted-foreground">{hint}</p> : null}
+          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+          {hint ? <p className="mt-0.5 text-[13px] text-muted-foreground">{hint}</p> : null}
         </div>
         {actions ? <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
@@ -49,7 +49,7 @@ export function PageToolbar({
                 onChange={(event) => onSearch(event.target.value)}
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
-                className="h-11 rounded-xl pr-10 pl-9 text-base sm:h-9 sm:text-sm"
+                className="h-10 rounded-md pr-10 pl-9 text-sm sm:h-9"
               />
               {search ? (
                 <button
