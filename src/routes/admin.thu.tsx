@@ -80,7 +80,7 @@ function CollectBody() {
             <p className="text-xl font-extrabold">{formatVnd(me.tien_mat)}</p>
             {me.tien_mat > 0 ? (
               <Button className="mt-3 min-h-11" variant="outline" onClick={() => setHandOpen(true)}>
-                Nộp tiền mặt
+                Nộp vào ví cửa hàng
               </Button>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">Không còn tiền mặt đang giữ.</p>

@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { ListPager, useListPage } from "@/components/admin/list-page";
@@ -48,6 +48,7 @@ function WalletBody() {
   const [handNote, setHandNote] = useState("");
   const [handFrom, setHandFrom] = useState("");
   const [handBusy, setHandBusy] = useState(false);
+  const [tab, setTab] = useState<"tong" | "vi" | "so">("tong");
   const queryClient = useQueryClient();
   const desk = useQuery({ queryKey: ["money", month], queryFn: () => getMoneyDesk({ data: { month } }) });
   const lines = (desk.data?.lines ?? []).filter((line) => {
@@ -60,130 +61,210 @@ function WalletBody() {
   const till = (desk.data?.holders ?? []).find((holder) => holder.staffId === SHOP_TILL_ID);
   const carriers = holders.filter((holder) => holder.staffId && holder.tien_mat > 0);
   const handing = carriers.find((holder) => holder.staffId === handFrom) ?? carriers[0];
-  const holderPage = useListPage(holders, month);
   const handovers = desk.data?.handovers ?? [];
   const handoverPage = useListPage(handovers, month);
+  const cashCard = (desk.data?.cards ?? []).find((card) => card.id === "tien_mat");
+  const bankCard = (desk.data?.cards ?? []).find((card) => card.id === "chuyen_khoan");
+  const ledgerCash = cashCard?.balance ?? 0;
+  const ledgerBank = bankCard?.balance ?? 0;
+  const tillCash = till?.tien_mat ?? 0;
+  const staffCash = holders.reduce((sum, holder) => sum + holder.tien_mat, 0);
+  const staffBank = holders.reduce((sum, holder) => sum + holder.chuyen_khoan, 0);
+  const walletRows = [
+    { id: "ket", name: "Két tiệm", sub: "Tiền mặt đã nộp", kind: "Ví cửa hàng", cash: tillCash, bank: 0 },
+    { id: "bank", name: "Tài khoản nhận", sub: "Chuyển khoản", kind: "Ví cửa hàng", cash: 0, bank: ledgerBank },
+    ...holders.map((holder) => ({
+      id: holder.staffId || holder.name,
+      name: holder.name,
+      sub: "Người thu",
+      kind: "Nhân viên",
+      cash: holder.tien_mat,
+      bank: holder.chuyen_khoan,
+    })),
+  ];
+
+  async function submitHandover(event: FormEvent) {
+    event.preventDefault();
+    const value = Math.round(Number(handAmount));
+    if (!handing || !value) {
+      toast.error("Chọn người đang giữ tiền mặt và số tiền nộp.");
+      return;
+    }
+    setHandBusy(true);
+    try {
+      await handCashIn({ data: { staffId: handing.staffId, amount: value, note: handNote } });
+      setHandAmount("");
+      setHandNote("");
+      toast.success("Đã nộp vào ví cửa hàng");
+      await queryClient.invalidateQueries({ queryKey: ["money", month] });
+      await queryClient.invalidateQueries({ queryKey: ["collect"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setHandBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
       <MoneyLinks />
-      <div>
-        <h1 className="text-2xl font-extrabold text-primary">Ví tiền</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Ví cửa hàng là toàn bộ tiền đã ghi sổ. Két tiệm là tiền mặt nhân viên đã nộp. Phần còn lại vẫn nằm ở ví người thu. Chuyển khoản vào tài khoản thì ở ví chuyển khoản.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Ví</h1>
+          <p className="text-sm text-muted-foreground">Số dư hiện tại của cả tiệm. Tiền mặt đã nộp nằm ở két. Chuyển khoản nằm ở tài khoản nhận.</p>
+        </div>
+        <Input className="min-h-11 max-w-[11rem]" type="month" aria-label="Tháng ví" value={month} onChange={(e) => setMonth(e.target.value)} />
       </div>
-      <Input className="min-h-12 max-w-xs" type="month" aria-label="Tháng ví" value={month} onChange={(e) => setMonth(e.target.value)} />
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Mục ví">
+        {(
+          [
+            ["tong", "Tổng quan"],
+            ["vi", "Ví cửa hàng"],
+            ["so", "Sổ giao dịch"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            className={`min-h-9 rounded-md px-3 text-sm font-semibold ${tab === id ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"}`}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {desk.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {desk.isError ? <p className="font-semibold text-destructive">{(desk.error as Error).message}</p> : null}
-      <section className="grid gap-3 sm:grid-cols-2">
-        {(desk.data?.cards ?? []).map((card) => (
-          <article key={card.id} className="glass-card rounded-3xl p-4">
-            <h2 className="font-bold text-primary">{card.label}</h2>
-            <p className="mt-1 text-2xl font-extrabold">{formatVnd(card.balance)}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Tháng này vào {formatVnd(card.inMonth)} · ra {formatVnd(card.outMonth)}
-            </p>
-          </article>
-        ))}
-      </section>
-      <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Két tiệm</h2>
-        <p className="mt-1 text-2xl font-extrabold">{formatVnd(till?.tien_mat ?? 0)}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Tiền mặt nhân viên đã nộp về két.</p>
-      </section>
-      <section className="space-y-2">
-        <h2 className="font-bold text-primary">Ví người thu</h2>
-        <p className="text-sm text-muted-foreground">Tiền mặt ở đây là phần nhân viên còn đang giữ. Thu cộng vào người bấm thu, chi trừ người ghi chi.</p>
-        {desk.data && holders.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có tiền gắn với người thu.</p> : null}
-        <ListPager page={holderPage.page} pages={holderPage.pages} total={holderPage.total} start={holderPage.start} count={holderPage.slice.length} noun="ví người" onPage={holderPage.setPage} />
-        <div className="grid gap-3 sm:grid-cols-2">
-          {holderPage.slice.map((holder) => (
-            <article key={holder.staffId || "none"} className="rounded-md border bg-card p-4">
-              <h3 className="font-bold">{holder.name}</h3>
-              <p className="mt-1 text-sm">Tiền mặt {formatVnd(holder.tien_mat)}</p>
-              <p className="text-sm">Chuyển khoản {formatVnd(holder.chuyen_khoan)}</p>
+      {tab === "tong" ? (
+        <>
+          <section className="grid gap-3 lg:grid-cols-3">
+            <article className="rounded-md border bg-card p-4">
+              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Tổng tiền tiệm đang có</p>
+              <p className="mt-2 text-2xl font-bold text-primary">{formatVnd(ledgerCash + ledgerBank)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Tiền mặt: {formatVnd(ledgerCash)}</p>
+              <p className="text-sm text-muted-foreground">Chuyển khoản: {formatVnd(ledgerBank)}</p>
             </article>
-          ))}
-        </div>
-        <form
-          className="glass-card space-y-3 rounded-3xl p-4"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            const value = Math.round(Number(handAmount));
-            if (!handing || !value) {
-              toast.error("Chọn người đang giữ tiền mặt và số tiền nộp.");
-              return;
-            }
-            setHandBusy(true);
-            try {
-              await handCashIn({ data: { staffId: handing.staffId, amount: value, note: handNote } });
-              setHandAmount("");
-              setHandNote("");
-              toast.success("Đã ghi nhận nộp tiền mặt");
-              await queryClient.invalidateQueries({ queryKey: ["money", month] });
-              await queryClient.invalidateQueries({ queryKey: ["collect"] });
-            } catch (error) {
-              toast.error((error as Error).message);
-            } finally {
-              setHandBusy(false);
-            }
-          }}
-        >
-          <h3 className="font-bold text-primary">Ghi nhận nộp tiền</h3>
-          <p className="text-sm text-muted-foreground">Chủ ghi khi nhân viên đưa tiền mặt về két. Số này rời ví người thu và vào két tiệm.</p>
-          {carriers.length === 0 ? <p className="text-sm">Chưa có tiền mặt đang nằm ở nhân viên.</p> : null}
-          {carriers.length > 0 ? (
-            <>
-              <label className="block text-sm font-semibold">
-                Người đang giữ
-                <select
-                  className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
-                  aria-label="Người nộp tiền"
-                  value={handing?.staffId ?? ""}
-                  onChange={(event) => setHandFrom(event.target.value)}
-                >
-                  {carriers.map((holder) => (
-                    <option key={holder.staffId} value={holder.staffId}>
-                      {holder.name} · đang giữ {formatVnd(holder.tien_mat)}
-                    </option>
+            <article className="rounded-md border bg-card p-4">
+              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Trong ví cửa hàng</p>
+              <p className="mt-2 text-2xl font-bold">{formatVnd(tillCash + ledgerBank)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Két tiệm: {formatVnd(tillCash)}</p>
+              <p className="text-sm text-muted-foreground">Tài khoản nhận: {formatVnd(ledgerBank)}</p>
+            </article>
+            <article className="rounded-md border bg-card p-4">
+              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Nhân viên đang giữ</p>
+              <p className="mt-2 text-2xl font-bold">{formatVnd(staffCash)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Tiền mặt chưa nộp: {formatVnd(staffCash)}</p>
+              <p className="text-sm text-muted-foreground">Chuyển khoản ghi tên người thu: {formatVnd(staffBank)}</p>
+            </article>
+          </section>
+          <section className="overflow-hidden rounded-md border bg-card">
+            <h2 className="border-b px-4 py-3 text-sm font-semibold">Danh sách ví</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[40rem] text-sm">
+                <thead className="bg-muted/50 text-left text-xs tracking-wide text-muted-foreground uppercase">
+                  <tr>
+                    <th className="px-4 py-2 font-semibold">Ví</th>
+                    <th className="px-4 py-2 font-semibold">Loại</th>
+                    <th className="px-4 py-2 text-right font-semibold">Tiền mặt</th>
+                    <th className="px-4 py-2 text-right font-semibold">Chuyển khoản</th>
+                    <th className="px-4 py-2 text-right font-semibold">Số dư</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {walletRows.map((row) => (
+                    <tr key={row.id} className="border-t">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold">{row.name}</p>
+                        <p className="text-xs text-muted-foreground">{row.sub}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${row.kind === "Ví cửa hàng" ? "bg-primary/10 text-primary" : "bg-orange-100 text-orange-700"}`}>{row.kind}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">{formatVnd(row.cash)}</td>
+                      <td className="px-4 py-3 text-right">{formatVnd(row.bank)}</td>
+                      <td className="px-4 py-3 text-right font-semibold">{formatVnd(row.cash + row.bank)}</td>
+                    </tr>
                   ))}
-                </select>
-              </label>
-              <label className="block text-sm font-semibold">
-                Số tiền nộp
-                <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={handAmount} onChange={(event) => setHandAmount(event.target.value.replace(/\D/g, ""))} />
-              </label>
-              <label className="block text-sm font-semibold">
-                Ghi chú
-                <Input className="mt-1 min-h-11" placeholder="Ca tối, đủ số…" value={handNote} onChange={(event) => setHandNote(event.target.value)} />
-              </label>
-              <Button className="min-h-11" type="submit" disabled={handBusy}>
-                Ghi nhận nộp tiền
-              </Button>
-            </>
-          ) : null}
-        </form>
-      </section>
-      <section className="space-y-2">
-        <h2 className="font-bold text-primary">Đã nộp vào két</h2>
-        {desk.data && handovers.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có lần nộp tiền mặt.</p> : null}
-        <ListPager page={handoverPage.page} pages={handoverPage.pages} total={handoverPage.total} start={handoverPage.start} count={handoverPage.slice.length} noun="lần nộp" onPage={handoverPage.setPage} />
-        <ul className="space-y-2">
-          {handoverPage.slice.map((row) => (
-            <li key={row.id} className="rounded-md border bg-card p-3 text-sm">
-              <p className="font-semibold">
-                {row.fromName} nộp {formatVnd(row.amount)}
-              </p>
-              <p className="text-muted-foreground">
-                {vnYmd(row.at)}
-                {row.byName ? ` · ghi bởi ${row.byName}` : ""}
-                {row.note ? ` · ${row.note}` : ""}
-              </p>
-            </li>
-          ))}
-        </ul>
-      </section>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section className="grid gap-3 lg:grid-cols-2">
+            <article className="rounded-md border bg-card p-4">
+              <h2 className="font-semibold">Cần thu về từ nhân viên</h2>
+              {carriers.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Không còn tiền mặt nằm ở nhân viên.</p> : null}
+              <ul className="mt-2 divide-y">
+                {carriers.map((holder) => (
+                  <li key={holder.staffId} className="flex items-center justify-between gap-3 py-2">
+                    <span className="font-medium">{holder.name}</span>
+                    <span className="font-semibold">{formatVnd(holder.tien_mat)}</span>
+                  </li>
+                ))}
+              </ul>
+              <form className="mt-3 space-y-2" onSubmit={submitHandover}>
+                {carriers.length > 0 ? (
+                  <>
+                    <label className="block text-sm font-semibold">
+                      Người nộp
+                      <select className="mt-1 min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Người nộp tiền" value={handing?.staffId ?? ""} onChange={(event) => setHandFrom(event.target.value)}>
+                        {carriers.map((holder) => (
+                          <option key={holder.staffId} value={holder.staffId}>
+                            {holder.name} · {formatVnd(holder.tien_mat)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block text-sm font-semibold">
+                      Số tiền nộp vào ví cửa hàng
+                      <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={handAmount} onChange={(event) => setHandAmount(event.target.value.replace(/\D/g, ""))} />
+                    </label>
+                    <Input aria-label="Ghi chú nộp tiền" placeholder="Ghi chú" value={handNote} onChange={(event) => setHandNote(event.target.value)} />
+                    <Button className="min-h-11" type="submit" disabled={handBusy}>Nộp vào ví cửa hàng</Button>
+                  </>
+                ) : null}
+              </form>
+            </article>
+            <article className="rounded-md border bg-card p-4">
+              <h2 className="font-semibold">Đơn còn phải thu</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Tiền khách chưa trả nằm ở danh sách thu, chưa cộng vào tổng ở trên.</p>
+              <Link to="/admin/thu" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary">Mở danh sách đơn còn nợ</Link>
+              <h3 className="mt-4 font-semibold">Đã nộp vào két</h3>
+              {desk.data && handovers.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Chưa có lần nộp tiền mặt.</p> : null}
+              <ListPager page={handoverPage.page} pages={handoverPage.pages} total={handoverPage.total} start={handoverPage.start} count={handoverPage.slice.length} noun="lần nộp" onPage={handoverPage.setPage} />
+              <ul className="mt-2 space-y-2 text-sm">
+                {handoverPage.slice.map((row) => (
+                  <li key={row.id}>
+                    <span className="font-semibold">{row.fromName} nộp {formatVnd(row.amount)}</span>
+                    <span className="block text-muted-foreground">{vnYmd(row.at)}{row.note ? ` · ${row.note}` : ""}</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          </section>
+        </>
+      ) : null}
+      {tab === "vi" ? (
+        <section className="grid gap-3 sm:grid-cols-2">
+          <article className="rounded-md border bg-card p-4">
+            <h2 className="font-semibold">Két tiệm</h2>
+            <p className="mt-2 text-2xl font-bold">{formatVnd(tillCash)}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Tiền mặt nhân viên đã nộp về ví cửa hàng.</p>
+          </article>
+          <article className="rounded-md border bg-card p-4">
+            <h2 className="font-semibold">Tài khoản nhận</h2>
+            <p className="mt-2 text-2xl font-bold">{formatVnd(ledgerBank)}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Tháng này vào {formatVnd(bankCard?.inMonth ?? 0)} · ra {formatVnd(bankCard?.outMonth ?? 0)}</p>
+          </article>
+          <article className="rounded-md border bg-card p-4">
+            <h2 className="font-semibold">Tiền mặt trên sổ</h2>
+            <p className="mt-2 text-2xl font-bold">{formatVnd(ledgerCash)}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Tháng này vào {formatVnd(cashCard?.inMonth ?? 0)} · ra {formatVnd(cashCard?.outMonth ?? 0)}</p>
+          </article>
+        </section>
+      ) : null}
+      {tab === "so" ? (
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <section className="order-2 space-y-3 lg:order-1 lg:col-span-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -265,6 +346,7 @@ function WalletBody() {
           </Button>
         </form>
       </div>
+      ) : null}
     </div>
   );
 }

@@ -67,7 +67,7 @@ function DashboardPage() {
       <section className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{hello}</p>
+            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Tổng quan hoạt động · {hello}</p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-primary sm:text-2xl">{data.name}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {data.clockedIn ? `Đang trong ca${since ? ` từ ${since}` : ""}.` : "Chưa vào ca."} Giờ làm 8:00–18:00. Bấm trên điện thoại, không cần vị trí hay ảnh.
