@@ -139,6 +139,8 @@ export type Settings = {
   remindMessage?: string;
   fixedCosts: { key: string; name: string; amount: number; note: string }[];
   rentFromJune2027: number;
+  /** Tài khoản nhận chuyển khoản. Thiếu thì đơn không hiện mã QR. */
+  bank?: { id: string; account: string; holder: string };
   /** Địa chỉ lấy hàng cho GHN, GHTK, J&T. Không phải khóa. */
   carrierPickup?: {
     name: string;
@@ -252,12 +254,14 @@ export type OrderFile = {
   mime: string;
   size: number;
   status: "uploading" | "complete" | "error";
-  kind: "original" | "design" | "approval" | "packing_video";
+  kind: "original" | "design" | "approval" | "packing_video" | "packing_photo";
   storage: "supabase" | "drive" | "local" | "r2" | "kv";
   path: string;
   driveFileId: string | null;
   createdAt: string;
   deletedAt: string | null;
+  /** Ảnh gốc khách hoặc sale đánh dấu để in. Thiếu nghĩa là chưa chọn. */
+  print?: boolean;
 };
 
 export type OrderShipping = {
@@ -324,6 +328,17 @@ export type Order = {
   completedAt: string | null;
   files: OrderFile[];
   history: { at: string; from: OrderStatus | null; to: OrderStatus; by: string | null; note: string }[];
+  /** Ba việc xưởng đánh dấu trước khi giao. Ảnh gói là file kind packing_photo. */
+  packCheck?: { ep: boolean; bo: boolean; tem: boolean };
+  /** Một câu khách trả sau khi giao. */
+  feedback?: { at: string; answer: "dung_y" | "sai_mau" | "sai_kho" | "khac"; note: string } | null;
+  /** Mỗi lần đổi khổ hoặc số lượng. */
+  itemChanges?: {
+    at: string;
+    by: string | null;
+    before: { name: string; quantity: number; unitPrice: number | null }[];
+    after: { name: string; quantity: number; unitPrice: number | null }[];
+  }[];
 };
 
 export type Reprint = {

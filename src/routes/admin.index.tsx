@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import { CalendarDays, CircleAlert, LogIn, LogOut, PiggyBank, Target, TrendingUp, Wallet } from "lucide-react";
 import { toast } from "sonner";
@@ -12,12 +13,40 @@ export const Route = createFileRoute("/admin/")({
   component: DashboardPage,
 });
 
+const NO_ALERTS: { code: string; kind: "san" | "tre"; title: string; body: string }[] = [];
+
 function DashboardPage() {
   const queryClient = useQueryClient();
   const dash = useQuery({ queryKey: ["dashboard"], queryFn: () => getDashboard() });
-  if (dash.isLoading) return <p className="text-muted-foreground">Đang tải tổng quan…</p>;
-  if (dash.isError || !dash.data) return <p className="text-destructive">{(dash.error as Error)?.message ?? "Không tải được."}</p>;
   const data = dash.data;
+  const alerts = data && "alerts" in data ? data.alerts : NO_ALERTS;
+  useEffect(() => {
+    if (!data) return;
+    const badge = navigator as Navigator & { setAppBadge?: (n: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    if (!alerts.length) {
+      void badge.clearAppBadge?.();
+      return;
+    }
+    void badge.setAppBadge?.(alerts.length);
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
+    const seen = new Set<string>(JSON.parse(localStorage.getItem("tt-desk-alerted") || "[]"));
+    const fresh = alerts.filter((item) => !seen.has(`${day}:${item.kind}:${item.code}`));
+    for (const item of fresh.slice(0, 3)) {
+      seen.add(`${day}:${item.kind}:${item.code}`);
+      const payload = { title: item.title, body: item.body, icon: "/brand/icon-192.png", data: { url: `/admin/don-hang/${item.code}` } };
+      void navigator.serviceWorker?.ready
+        .then((registration) => registration.showNotification(item.title, payload))
+        .catch(() => {
+          new Notification(item.title, { body: item.body });
+        });
+    }
+    if (fresh.length) localStorage.setItem("tt-desk-alerted", JSON.stringify([...seen].slice(-80)));
+  }, [alerts, data]);
+
+  if (!data) {
+    return <p className={dash.isError ? "text-destructive" : "text-muted-foreground"}>{dash.isError ? (dash.error as Error).message : "Đang tải tổng quan…"}</p>;
+  }
 
   async function clock(action: "in" | "out") {
     try {
@@ -43,6 +72,21 @@ function DashboardPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {data.clockedIn ? `Đang trong ca${since ? ` từ ${since}` : ""}.` : "Chưa vào ca."} Giờ làm 8:00–18:00. Bấm trên điện thoại, không cần vị trí hay ảnh.
             </p>
+            <button
+              type="button"
+              className="mt-2 text-sm font-semibold text-primary"
+              onClick={() => {
+                if (typeof Notification === "undefined") {
+                  toast.error("Máy này không hiện được thông báo.");
+                  return;
+                }
+                void Notification.requestPermission().then((permission) => {
+                  toast.success(permission === "granted" ? "Đã bật báo khi trang đang mở." : "Chưa bật báo trên máy.");
+                });
+              }}
+            >
+              Bật báo trên máy
+            </button>
           </div>
           <div className="flex gap-2">
             <button
@@ -66,6 +110,23 @@ function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {alerts.length > 0 ? (
+        <section className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+          <h2 className="font-semibold text-primary">Cần xem</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Đơn sàn mới trong 36 giờ và đơn quá mốc. Báo hiện khi trang quản trị đang mở.</p>
+          <ul className="mt-3 space-y-2">
+            {alerts.map((item) => (
+              <li key={`${item.kind}-${item.code}`}>
+                <Link to="/admin/don-hang/$code" params={{ code: item.code }} className="block rounded-2xl bg-card px-4 py-3">
+                  <span className="font-bold text-primary">{item.title}</span>
+                  <p className="text-sm text-muted-foreground">{item.body}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section>
         <div className="mb-2 flex items-end justify-between gap-3">

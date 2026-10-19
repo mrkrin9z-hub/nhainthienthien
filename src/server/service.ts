@@ -28,6 +28,18 @@ import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/im
 import { albumPhone, photoTooBig, publicUploadCard, uploadTokenShape } from "@/domain/order-upload";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
 import { marketplaceEditLocked, orderRevisionBlock } from "@/domain/order-edit";
+import {
+  cleanBank,
+  feedbackAnswer,
+  feedbackLabel,
+  feedbackOpensReprint,
+  hasPackingPhoto,
+  itemChangeNote,
+  packReady,
+  type FeedbackAnswer,
+  type LineSnap,
+  type PackCheck,
+} from "@/domain/print-shop";
 import { bytesStillShared, filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
@@ -1201,6 +1213,7 @@ export async function reviseOrder(
     if (blocked) throw new Error(blocked);
     const customer = upsertCustomer(state, { name, phone: input.phone, address: input.address });
     const before = order.items.map((item) => `${item.quantity}× ${item.skuCode}`).join(", ");
+    const beforeLines: LineSnap[] = order.items.map((item) => ({ name: item.name, quantity: item.quantity, unitPrice: item.unitPrice }));
     order.customerId = customer.id;
     order.address = input.address.trim();
     order.customerNote = input.note.trim();
@@ -1237,6 +1250,15 @@ export async function reviseOrder(
     }
     order.updatedAt = nowIso();
     const after = order.items.map((item) => `${item.quantity}× ${item.skuCode}`).join(", ");
+    if (input.items) {
+      const afterLines: LineSnap[] = order.items.map((item) => ({ name: item.name, quantity: item.quantity, unitPrice: item.unitPrice }));
+      if (itemChangeNote(beforeLines, afterLines, true)) {
+        order.itemChanges = [
+          ...(order.itemChanges ?? []),
+          { at: order.updatedAt, by: actor.id, before: beforeLines, after: afterLines },
+        ];
+      }
+    }
     audit(state, actor.id, "order.revise", order.id, { items: before }, { items: after, name });
   });
 }
@@ -1258,6 +1280,7 @@ export async function setOrderStatus(
       reason,
       depositRequired: order.depositRequired,
       depositPaid: order.depositPaid,
+      packReady: packReady(order.packCheck, hasPackingPhoto(order.files)),
     });
     if (blocked) throw new Error(blocked);
     const from = order.status;
@@ -1297,6 +1320,137 @@ export async function addDeposit(actor: Actor, input: { orderId: string; amount:
     order.depositBy = next.depositBy;
     order.updatedAt = nowIso();
     audit(state, actor.id, "order.deposit", order.id, { depositPaid: before }, { depositPaid: order.depositPaid, method: input.method });
+  });
+}
+
+function markPrint(order: Order, fileId: string, print: boolean, by: string | null, who: string) {
+  const file = order.files.find((item) => item.id === fileId && !item.deletedAt && item.status === "complete" && item.kind === "original");
+  if (!file) throw new Error("Không thấy ảnh gốc.");
+  if (Boolean(file.print) === print) return;
+  file.print = print;
+  order.updatedAt = nowIso();
+  order.history.push({
+    at: order.updatedAt,
+    from: order.status,
+    to: order.status,
+    by,
+    note: `${who} ${print ? "chọn in" : "bỏ in"} ảnh ${file.name}`,
+  });
+}
+
+export async function setFilePrint(actor: Actor, orderId: string, fileId: string, print: boolean) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    markPrint(order, fileId, print, actor.id, actor.name);
+  });
+}
+
+export async function setCustomerFilePrint(token: string, fileId: string, print: boolean) {
+  await mutate(async (state) => {
+    const order = await orderByUploadToken(state, token);
+    markPrint(order, fileId, print, null, "Khách");
+  });
+}
+
+export async function setOrderPackCheck(actor: Actor, orderId: string, check: PackCheck) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    if (order.status === "huy" || order.status === "xong") throw new Error("Đơn đã xong hoặc đã hủy.");
+    order.packCheck = { ep: check.ep, bo: check.bo, tem: check.tem };
+    order.updatedAt = nowIso();
+  });
+}
+
+export async function savePackingPhoto(actor: Actor, orderId: string, bytes: Uint8Array, mime: string) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  if (!imageMimeAllowed(mime) || !imageBytesMatch(mime, bytes)) throw new Error("Chỉ nhận ảnh JPG, PNG hoặc WEBP.");
+  if (bytes.byteLength > 4 * 1024 * 1024) throw new Error("Ảnh gói tối đa 4MB.");
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    if (order.status === "huy" || order.status === "xong") throw new Error("Đơn đã xong hoặc đã hủy.");
+    const stamp = nowIso();
+    for (const file of order.files) {
+      if (file.kind === "packing_photo" && !file.deletedAt) file.deletedAt = stamp;
+    }
+    const file: OrderFile = {
+      id: nid(),
+      name: `goi-${order.code}.jpg`,
+      mime,
+      size: bytes.byteLength,
+      status: "complete",
+      kind: "packing_photo",
+      storage: "local",
+      path: "",
+      driveFileId: null,
+      createdAt: stamp,
+      deletedAt: null,
+    };
+    await putPhoto(
+      file,
+      {
+        orderId: order.id,
+        code: order.code,
+        customerName: customerName(state, order.customerId).name,
+        createdAt: order.createdAt,
+        source: order.source,
+        channel: order.channel,
+      },
+      bytes,
+      mime,
+    );
+    order.files.push(file);
+    order.updatedAt = stamp;
+    audit(state, actor.id, "order.pack_photo", order.id, null, { code: order.code });
+  });
+}
+
+export async function publicFeedbackCard(token: string) {
+  const state = await readState();
+  const order = await orderByUploadToken(state, token);
+  return {
+    code: order.code,
+    status: order.status,
+    open: order.status === "giao" || order.status === "xong",
+    feedback: order.feedback ? { answer: order.feedback.answer, note: order.feedback.note } : null,
+  };
+}
+
+export async function submitOrderFeedback(token: string, answer: FeedbackAnswer, note: string) {
+  const text = note.trim().slice(0, 300);
+  return mutate(async (state) => {
+    const order = await orderByUploadToken(state, token);
+    if (order.status !== "giao" && order.status !== "xong") throw new Error("Đơn chưa giao xong.");
+    if (order.feedback) return { already: true as const, answer: order.feedback.answer };
+    const at = nowIso();
+    order.feedback = { at, answer, note: text };
+    order.updatedAt = at;
+    order.history.push({
+      at,
+      from: order.status,
+      to: order.status,
+      by: null,
+      note: `Khách đánh giá: ${feedbackLabel(answer)}${text ? ` · ${text}` : ""}`,
+    });
+    if (feedbackOpensReprint(answer)) {
+      state.reprints.unshift({
+        id: nid(),
+        orderId: order.id,
+        reportedAt: at,
+        reason: text || feedbackLabel(answer),
+        decision: null,
+        extraCost: null,
+        materialNote: "",
+        overdue: false,
+        by: null,
+        uses: [],
+      });
+    }
+    return { already: false as const, answer };
   });
 }
 
@@ -2222,6 +2376,11 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
       }));
     }
     if (Array.isArray(patch.kpiTargets)) state.settings.kpiTargets = (patch.kpiTargets as number[]).map(Number);
+    if ("bank" in patch) {
+      const next = cleanBank(patch.bank && typeof patch.bank === "object" ? (patch.bank as { id?: string; account?: string; holder?: string }) : null);
+      if (next) state.settings.bank = next;
+      else delete state.settings.bank;
+    }
     recalcBoms(state);
     audit(state, actor.id, "settings.update", "settings", before, state.settings);
   });

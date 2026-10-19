@@ -1,4 +1,4 @@
-const CACHE = "thien-thien-shell-2";
+const CACHE = "thien-thien-shell-3";
 const SHELL = [
   "/offline.html",
   "/manifest.webmanifest",
@@ -17,6 +17,20 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/admin";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      const open = clients.find((client) => "focus" in client);
+      if (open && "navigate" in open) {
+        return open.navigate(url).then((client) => client?.focus());
+      }
+      return self.clients.openWindow(url);
+    }),
   );
 });
 

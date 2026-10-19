@@ -146,6 +146,38 @@ const uploadTargetSchema = z.object({
   token: z.string().regex(/^[a-f0-9]{32}$/),
 });
 
+export const setCustomerPrint = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ token: z.string().regex(/^[a-f0-9]{32}$/), fileId: z.string().uuid(), print: z.boolean() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { setCustomerFilePrint } = await import("@/server/service");
+    await setCustomerFilePrint(data.token, data.fileId, data.print);
+    return { ok: true };
+  });
+
+export const getFeedbackCard = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ token: z.string().regex(/^[a-f0-9]{32}$/) }).parse(data))
+  .handler(async ({ data }) => {
+    const { publicFeedbackCard } = await import("@/server/service");
+    return publicFeedbackCard(data.token);
+  });
+
+export const sendFeedback = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        token: z.string().regex(/^[a-f0-9]{32}$/),
+        answer: z.enum(["dung_y", "sai_mau", "sai_kho", "khac"]),
+        note: z.string().max(300).optional().default(""),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { submitOrderFeedback } = await import("@/server/service");
+    return submitOrderFeedback(data.token, data.answer, data.note);
+  });
+
 export const getUploadTarget = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => uploadTargetSchema.parse(data))
   .handler(async ({ data }) => {

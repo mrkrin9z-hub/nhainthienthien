@@ -20,7 +20,7 @@ export function filesToPurge(state: ShopState, now = Date.now()): PurgeTarget[] 
   for (const order of state.orders) {
     for (const file of order.files) {
       if (file.deletedAt || file.status !== "complete") continue;
-      if (file.kind === "packing_video") {
+      if (file.kind === "packing_video" || file.kind === "packing_photo") {
         const ageDays = (now - new Date(file.createdAt).getTime()) / DAY;
         if (ageDays >= state.settings.videoRetentionDays) {
           rows.push({
