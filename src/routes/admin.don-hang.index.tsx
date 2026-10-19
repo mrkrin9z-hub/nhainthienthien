@@ -1,10 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { AlarmClock, Columns3, Download, FileSpreadsheet, List, Plus, Wallet } from "lucide-react";
 
+import { CreateOrderForm } from "@/components/admin/create-order-form";
 import { ListPager, useListPage } from "@/components/admin/list-page";
 import { ClearFilters, FilterSheet, PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { OrderLinks } from "@/components/admin/sections";
 import { ALL_TONE, CHANNEL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
 import { formatMaybe } from "@/lib/brand";
@@ -30,7 +32,9 @@ function OrdersPage() {
   const [channel, setChannel] = useState("all");
   const [lateOnly, setLateOnly] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [view, setView] = useState<"list" | "board">("list");
+  const queryClient = useQueryClient();
   useEffect(() => {
     if (window.localStorage.getItem("admin-orders-view") === "board") setView("board");
   }, []);
@@ -152,7 +156,7 @@ function OrdersPage() {
                 }}
               />
             )}
-            {production ? null : <ToolbarLink label="Tạo đơn" icon={Plus} primary to="/admin/don-moi" />}
+            {production ? null : <ToolbarButton label="Tạo đơn" icon={Plus} primary onClick={() => setCreateOpen(true)} />}
             {production ? null : <ToolbarLink label="Nhập Excel" icon={FileSpreadsheet} to="/admin/nhap-don" />}
             {production ? null : <ToolbarLink label="Đối soát COD" icon={Wallet} to="/admin/cod" />}
           </>
@@ -163,6 +167,19 @@ function OrdersPage() {
           </div>
         }
       />
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Tạo đơn</DialogTitle>
+          </DialogHeader>
+          <CreateOrderForm
+            onCreated={() => {
+              setCreateOpen(false);
+              void queryClient.invalidateQueries({ queryKey: ["orders"] });
+            }}
+          />
+        </DialogContent>
+      </Dialog>
       <FilterChips label="Trạng thái đơn" value={status} chips={statusChips} onChange={setStatus} />
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={pageRows.length} noun="đơn" onPage={list.setPage} />
       {view === "board" ? (

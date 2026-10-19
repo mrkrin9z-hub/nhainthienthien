@@ -8,6 +8,7 @@ import { MoneyLinks } from "@/components/admin/sections";
 import { WalletToggle } from "@/components/admin/wallet-toggle";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { vnMonth, vnYmd } from "@/domain/calc";
 import { SHOP_TILL_ID, type WalletId } from "@/domain/money";
@@ -48,6 +49,8 @@ function WalletBody() {
   const [handNote, setHandNote] = useState("");
   const [handFrom, setHandFrom] = useState("");
   const [handBusy, setHandBusy] = useState(false);
+  const [handOpen, setHandOpen] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const [tab, setTab] = useState<"tong" | "vi" | "so">("tong");
   const queryClient = useQueryClient();
   const desk = useQuery({ queryKey: ["money", month], queryFn: () => getMoneyDesk({ data: { month } }) });
@@ -95,6 +98,7 @@ function WalletBody() {
       await handCashIn({ data: { staffId: handing.staffId, amount: value, note: handNote } });
       setHandAmount("");
       setHandNote("");
+      setHandOpen(false);
       toast.success("Đã nộp vào ví cửa hàng");
       await queryClient.invalidateQueries({ queryKey: ["money", month] });
       await queryClient.invalidateQueries({ queryKey: ["collect"] });
@@ -203,28 +207,22 @@ function WalletBody() {
                   </li>
                 ))}
               </ul>
-              <form className="mt-3 space-y-2" onSubmit={submitHandover}>
-                {carriers.length > 0 ? (
-                  <>
-                    <label className="block text-sm font-semibold">
-                      Người nộp
-                      <select className="mt-1 min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Người nộp tiền" value={handing?.staffId ?? ""} onChange={(event) => setHandFrom(event.target.value)}>
-                        {carriers.map((holder) => (
-                          <option key={holder.staffId} value={holder.staffId}>
-                            {holder.name} · {formatVnd(holder.tien_mat)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="block text-sm font-semibold">
-                      Số tiền nộp vào ví cửa hàng
-                      <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={handAmount} onChange={(event) => setHandAmount(event.target.value.replace(/\D/g, ""))} />
-                    </label>
-                    <Input aria-label="Ghi chú nộp tiền" placeholder="Ghi chú" value={handNote} onChange={(event) => setHandNote(event.target.value)} />
-                    <Button className="min-h-11" type="submit" disabled={handBusy}>Nộp vào ví cửa hàng</Button>
-                  </>
-                ) : null}
-              </form>
+              {carriers.length > 0 ? (
+                <Button
+                  className="mt-3 min-h-11"
+                  type="button"
+                  onClick={() => {
+                    const person = handing ?? carriers[0];
+                    if (person) {
+                      setHandFrom(person.staffId);
+                      setHandAmount(String(person.tien_mat));
+                    }
+                    setHandOpen(true);
+                  }}
+                >
+                  Nộp vào ví cửa hàng
+                </Button>
+              ) : null}
             </article>
             <article className="rounded-md border bg-card p-4">
               <h2 className="font-semibold">Đơn còn phải thu</h2>
@@ -265,10 +263,13 @@ function WalletBody() {
         </section>
       ) : null}
       {tab === "so" ? (
-      <div className="grid items-start gap-4 lg:grid-cols-3">
-        <section className="order-2 space-y-3 lg:order-1 lg:col-span-2">
+      <div className="space-y-3">
+        <section className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-bold text-primary">Danh sách giao dịch</h2>
+            <Button className="min-h-11" type="button" onClick={() => setAdjustOpen(true)}>
+              Tạo giao dịch
+            </Button>
             <Input className="min-h-11 max-w-xs" placeholder="Tìm giao dịch" aria-label="Tìm giao dịch" value={q} onChange={(e) => setQ(e.target.value)} />
             <select className="min-h-11 rounded-xl border border-input bg-background px-3 text-sm" aria-label="Lọc ví" value={filter} onChange={(e) => setFilter(e.target.value as "all" | WalletId)}>
               <option value="all">Cả hai ví</option>
@@ -294,59 +295,104 @@ function WalletBody() {
             ))}
           </ul>
         </section>
-        <form
-          className="glass-card order-1 space-y-3 rounded-3xl p-4 lg:sticky lg:top-20 lg:order-2"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            const value = Math.round(Number(amount));
-            if (!value) {
-              toast.error("Số tiền điều chỉnh chưa đúng.");
-              return;
-            }
-            setBusy(true);
-            try {
-              await saveWalletAdjust({
-                data: { wallet, amount: direction === "tru" ? -value : value, note },
-              });
-              setAmount("");
-              setNote("");
-              toast.success("Đã tạo giao dịch");
-              await queryClient.invalidateQueries({ queryKey: ["money", month] });
-            } catch (error) {
-              toast.error((error as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <h2 className="font-bold text-primary">Tạo giao dịch</h2>
-          <p className="text-sm text-muted-foreground">Dùng khi đếm két lệch hoặc chuyển tiền giữa két và tài khoản. Thu đơn và chi phí đã tự vào ví.</p>
-          <div>
-            <p className="mb-1 text-sm font-semibold">Ví</p>
-            <WalletToggle value={wallet} onChange={setWallet} />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" aria-pressed={direction === "cong"} className={`min-h-11 rounded-xl border text-sm font-semibold ${direction === "cong" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`} onClick={() => setDirection("cong")}>
-              Cộng vào ví
-            </button>
-            <button type="button" aria-pressed={direction === "tru"} className={`min-h-11 rounded-xl border text-sm font-semibold ${direction === "tru" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`} onClick={() => setDirection("tru")}>
-              Trừ khỏi ví
-            </button>
-          </div>
-          <label className="block text-sm font-semibold">
-            Số tiền
-            <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} />
-          </label>
-          <label className="block text-sm font-semibold">
-            Diễn giải
-            <Input className="mt-1 min-h-11" placeholder="Vì sao điều chỉnh" value={note} onChange={(e) => setNote(e.target.value)} />
-          </label>
-          <Button className="min-h-11 w-full" type="submit" disabled={busy}>
-            Tạo giao dịch
-          </Button>
-        </form>
       </div>
       ) : null}
+      <Dialog open={handOpen} onOpenChange={setHandOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nộp vào ví cửa hàng</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-3" onSubmit={submitHandover}>
+            <label className="block text-sm font-semibold">
+              Người nộp
+              <select
+                className="mt-1 min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                aria-label="Người nộp tiền"
+                value={handing?.staffId ?? ""}
+                onChange={(event) => {
+                  setHandFrom(event.target.value);
+                  const next = carriers.find((holder) => holder.staffId === event.target.value);
+                  if (next) setHandAmount(String(next.tien_mat));
+                }}
+              >
+                {carriers.map((holder) => (
+                  <option key={holder.staffId} value={holder.staffId}>
+                    {holder.name} · {formatVnd(holder.tien_mat)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-semibold">
+              Số tiền nộp vào ví cửa hàng
+              <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={handAmount} onChange={(event) => setHandAmount(event.target.value.replace(/\D/g, ""))} />
+            </label>
+            <Input aria-label="Ghi chú nộp tiền" placeholder="Ghi chú" value={handNote} onChange={(event) => setHandNote(event.target.value)} />
+            <DialogFooter>
+              <Button className="min-h-11" type="submit" disabled={handBusy}>Nộp vào ví cửa hàng</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tạo giao dịch</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const value = Math.round(Number(amount));
+              if (!value) {
+                toast.error("Số tiền điều chỉnh chưa đúng.");
+                return;
+              }
+              setBusy(true);
+              try {
+                await saveWalletAdjust({
+                  data: { wallet, amount: direction === "tru" ? -value : value, note },
+                });
+                setAmount("");
+                setNote("");
+                setAdjustOpen(false);
+                toast.success("Đã tạo giao dịch");
+                await queryClient.invalidateQueries({ queryKey: ["money", month] });
+              } catch (error) {
+                toast.error((error as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <p className="text-sm text-muted-foreground">Dùng khi đếm két lệch hoặc chuyển tiền giữa két và tài khoản. Thu đơn và chi phí đã tự vào ví.</p>
+            <div>
+              <p className="mb-1 text-sm font-semibold">Ví</p>
+              <WalletToggle value={wallet} onChange={setWallet} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" aria-pressed={direction === "cong"} className={`min-h-11 rounded-xl border text-sm font-semibold ${direction === "cong" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`} onClick={() => setDirection("cong")}>
+                Cộng vào ví
+              </button>
+              <button type="button" aria-pressed={direction === "tru"} className={`min-h-11 rounded-xl border text-sm font-semibold ${direction === "tru" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`} onClick={() => setDirection("tru")}>
+                Trừ khỏi ví
+              </button>
+            </div>
+            <label className="block text-sm font-semibold">
+              Số tiền
+              <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} />
+            </label>
+            <label className="block text-sm font-semibold">
+              Diễn giải
+              <Input className="mt-1 min-h-11" placeholder="Vì sao điều chỉnh" value={note} onChange={(e) => setNote(e.target.value)} />
+            </label>
+            <DialogFooter>
+              <Button className="min-h-11" type="submit" disabled={busy}>
+                Tạo giao dịch
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

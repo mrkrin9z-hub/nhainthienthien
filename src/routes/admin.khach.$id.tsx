@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ListPager, useListPage } from "@/components/admin/list-page";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
@@ -34,6 +35,7 @@ function CustomerBody() {
   const [address, setAddress] = useState<string | null>(null);
   const [label, setLabel] = useState("Ngày giỗ");
   const [when, setWhen] = useState("");
+  const [dateOpen, setDateOpen] = useState(false);
   const [orderQ, setOrderQ] = useState("");
   const orders = (customer.data?.orders ?? []).filter((order) => {
     const needle = orderQ.trim().toLowerCase();
@@ -79,7 +81,12 @@ function CustomerBody() {
         <Textarea className="mt-1" value={note ?? data.note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú chăm sóc" />
       </label>
       <section className="space-y-2">
-        <h2 className="font-bold text-primary">Ngày cần nhớ</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold text-primary">Ngày cần nhớ</h2>
+          <Button className="min-h-11" type="button" onClick={() => setDateOpen(true)}>
+            Thêm ngày
+          </Button>
+        </div>
         <ul className="space-y-1 text-sm">
           {dates.map((date) => (
             <li key={`${date.label}-${date.month}-${date.day}`} className="flex items-center justify-between gap-2">
@@ -108,33 +115,47 @@ function CustomerBody() {
           ))}
           {dates.length === 0 ? <li className="text-muted-foreground">Chưa có ngày giỗ hay ngày đặc biệt.</li> : null}
         </ul>
-        <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-          <Input className="min-h-12" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ngày giỗ" />
-          <Input className="min-h-12" type="date" value={when} onChange={(e) => setWhen(e.target.value)} />
-          <Button
-            className="min-h-12"
-            onClick={async () => {
-              const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(when);
-              if (!match) {
-                toast.error("Chọn ngày");
-                return;
-              }
-              await saveCustomer({
-                data: {
-                  id,
-                  note: note ?? data.note,
-                  tags: (tags ?? data.tags.join(", ")).split(",").map((tag) => tag.trim()).filter(Boolean),
-                  specialDates: [...dates, { label: label.trim() || "Ngày nhớ", month: Number(match[2]), day: Number(match[3]) }],
-                },
-              });
-              setWhen("");
-              toast.success("Đã thêm ngày");
-              await queryClient.invalidateQueries({ queryKey: ["customer", id] });
-            }}
-          >
-            Thêm ngày
-          </Button>
-        </div>
+        <Dialog open={dateOpen} onOpenChange={setDateOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Thêm ngày</DialogTitle>
+            </DialogHeader>
+            <label className="block text-sm font-semibold">
+              Tên ngày
+              <Input className="mt-1 min-h-12" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ngày giỗ" />
+            </label>
+            <label className="block text-sm font-semibold">
+              Ngày
+              <Input className="mt-1 min-h-12" type="date" value={when} onChange={(e) => setWhen(e.target.value)} />
+            </label>
+            <DialogFooter>
+              <Button
+                className="min-h-12"
+                onClick={async () => {
+                  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(when);
+                  if (!match) {
+                    toast.error("Chọn ngày");
+                    return;
+                  }
+                  await saveCustomer({
+                    data: {
+                      id,
+                      note: note ?? data.note,
+                      tags: (tags ?? data.tags.join(", ")).split(",").map((tag) => tag.trim()).filter(Boolean),
+                      specialDates: [...dates, { label: label.trim() || "Ngày nhớ", month: Number(match[2]), day: Number(match[3]) }],
+                    },
+                  });
+                  setWhen("");
+                  setDateOpen(false);
+                  toast.success("Đã thêm ngày");
+                  await queryClient.invalidateQueries({ queryKey: ["customer", id] });
+                }}
+              >
+                Lưu ngày
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </section>
       <Button
         className="min-h-12"

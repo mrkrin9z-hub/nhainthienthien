@@ -7,6 +7,7 @@ import { ListPager, useListPage } from "@/components/admin/list-page";
 import { OrderLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteSkuMap, getMarketplaceSync, getSkuMaps, importMarketplace, previewMarketplace, pullMarketplace, storeSkuMap } from "@/lib/admin.functions";
@@ -36,6 +37,7 @@ function ImportBody() {
   const [externalSku, setExternalSku] = useState("");
   const [skuId, setSkuId] = useState("");
   const [mapQuery, setMapQuery] = useState("");
+  const [mapOpen, setMapOpen] = useState(false);
   const mapRows = (maps.data?.maps ?? []).filter((row) => {
     if (row.channel !== channel) return false;
     const needle = mapQuery.trim().toLowerCase();
@@ -150,28 +152,54 @@ function ImportBody() {
         ) : null}
       </section>
       <section className="glass-card space-y-3 rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Bảng gắn mã SKU</h2>
-        <p className="text-sm text-muted-foreground">Mã trên sàn trỏ tới mã của tiệm. Dòng chưa gắn mã bị đánh dấu, không tạo đơn.</p>
-        <div className="grid gap-2 md:grid-cols-3">
-          <Input className="min-h-12" placeholder="SKU trên sàn" value={externalSku} onChange={(e) => setExternalSku(e.target.value)} />
-          <select className="min-h-12 rounded-xl border bg-card px-3" value={skuId} onChange={(e) => setSkuId(e.target.value)}>
-            <option value="">Mã của tiệm</option>
-            {(maps.data?.skus ?? []).map((sku) => (
-              <option key={sku.id} value={sku.id}>{sku.label}</option>
-            ))}
-          </select>
-          <Button
-            className="min-h-12"
-            onClick={async () => {
-              await storeSkuMap({ data: { channel, externalSku, skuId } });
-              setExternalSku("");
-              toast.success("Đã lưu map");
-              await queryClient.invalidateQueries({ queryKey: ["sku-maps"] });
-            }}
-          >
-            Lưu map
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-bold text-primary">Bảng gắn mã SKU</h2>
+            <p className="text-sm text-muted-foreground">Mã trên sàn trỏ tới mã của tiệm. Dòng chưa gắn mã bị đánh dấu, không tạo đơn.</p>
+          </div>
+          <Button className="min-h-11" type="button" onClick={() => setMapOpen(true)}>
+            Tạo map
           </Button>
         </div>
+        <Dialog open={mapOpen} onOpenChange={setMapOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Tạo map SKU</DialogTitle>
+            </DialogHeader>
+            <label className="block text-sm font-semibold">
+              SKU trên sàn
+              <Input className="mt-1 min-h-12" placeholder="SKU trên sàn" value={externalSku} onChange={(e) => setExternalSku(e.target.value)} />
+            </label>
+            <label className="block text-sm font-semibold">
+              Mã của tiệm
+              <select className="mt-1 min-h-12 w-full rounded-xl border bg-card px-3" value={skuId} onChange={(e) => setSkuId(e.target.value)} aria-label="Mã của tiệm">
+                <option value="">Mã của tiệm</option>
+                {(maps.data?.skus ?? []).map((sku) => (
+                  <option key={sku.id} value={sku.id}>{sku.label}</option>
+                ))}
+              </select>
+            </label>
+            <DialogFooter>
+              <Button
+                className="min-h-12"
+                onClick={async () => {
+                  try {
+                    await storeSkuMap({ data: { channel, externalSku, skuId } });
+                    setExternalSku("");
+                    setSkuId("");
+                    setMapOpen(false);
+                    toast.success("Đã lưu map");
+                    await queryClient.invalidateQueries({ queryKey: ["sku-maps"] });
+                  } catch (error) {
+                    toast.error((error as Error).message);
+                  }
+                }}
+              >
+                Lưu map
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <Input className="min-h-11" placeholder="Tìm mã sàn hoặc mã tiệm" aria-label="Tìm map SKU" value={mapQuery} onChange={(e) => setMapQuery(e.target.value)} />
         <ListPager page={mapPage.page} pages={mapPage.pages} total={mapPage.total} start={mapPage.start} count={mapPage.slice.length} noun="map" onPage={mapPage.setPage} />
         <ul className="space-y-2 text-sm">
