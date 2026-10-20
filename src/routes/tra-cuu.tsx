@@ -239,6 +239,7 @@ function LookupPage() {
                           />
                           <span className="block truncate px-2 py-1 text-xs text-muted-foreground">{photo.name}</span>
                           {photo.print ? <span className="block px-2 pb-1 text-[11px] font-semibold text-primary">Đã chọn in</span> : null}
+                          {photo.comment ? <span className="block px-2 pb-2 text-[11px] text-foreground/80">{photo.comment}</span> : null}
                         </button>
                       </li>
                     ))}

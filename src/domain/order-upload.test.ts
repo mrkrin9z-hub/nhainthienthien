@@ -75,6 +75,7 @@ test("mã đơn cho khách thấy người đặt, sản phẩm và ảnh gốc 
   assert.equal(card.remain, 50000);
   assert.equal(card.shipping?.carrier, "GHN");
   assert.deepEqual(card.photos.map((photo) => photo.id), ["new", "old"]);
+  assert.equal(card.photos[0]?.comment, "");
   assert.equal(JSON.stringify(card).includes("mau.jpg"), false);
   assert.equal(JSON.stringify(card).includes("drive"), false);
   assert.equal(googleThumbSize("https://lh3.googleusercontent.com/d/abc=s220", 480), "https://lh3.googleusercontent.com/d/abc=s480");

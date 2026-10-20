@@ -23,11 +23,12 @@ export type LookupOrder = {
     createdAt?: string;
     deletedAt?: string | null;
     print?: boolean;
+    comment?: string;
   }[];
   history: { to: string; at: string; note: string }[];
 };
 
-export type PublicLookupPhoto = { id: string; name: string; createdAt: string; print: boolean };
+export type PublicLookupPhoto = { id: string; name: string; createdAt: string; print: boolean; comment: string };
 
 export type PublicLookupOrder = {
   code: string;
@@ -57,7 +58,7 @@ export type PhoneLookup = {
 };
 
 const HISTORY_CAP = 50;
-const PHOTO_CAP = 60;
+const PHOTO_CAP = 500;
 
 /** Cùng quy tắc với số lưu trên khách: 84… dài thành 0…. */
 export function lookupPhoneDigits(phone: string): string {
@@ -88,6 +89,7 @@ function photosOf(order: LookupOrder): PublicLookupPhoto[] {
       name: file.name || "Ảnh",
       createdAt: file.createdAt || order.createdAt,
       print: file.print === true,
+      comment: (file.comment ?? "").trim(),
     }));
 }
 

@@ -75,6 +75,7 @@ test("tra cứu trả tiền đã trả, còn nợ, ảnh và mã xem ảnh khi 
   assert.equal(row.photoToken, token);
   assert.equal(row.fileCount, 1);
   assert.equal(row.photos[0]?.id, "p1");
+  assert.equal(row.photos[0]?.comment, "");
   assert.equal(row.shipping?.tracking, "JT1");
   assert.equal(row.history[1]?.to, "in");
 });

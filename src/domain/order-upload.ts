@@ -32,7 +32,7 @@ export function customerUploadPath(token: string): string {
   return `/gui-anh/${token}`;
 }
 
-export type PublicUploadPhoto = { id: string; name: string; createdAt: string; print: boolean };
+export type PublicUploadPhoto = { id: string; name: string; createdAt: string; print: boolean; comment: string };
 
 export type PublicUploadCard = {
   orderId: string;
@@ -54,7 +54,7 @@ export type PublicUploadCard = {
   photos: PublicUploadPhoto[];
 };
 
-const PHOTO_CAP = 60;
+const PHOTO_CAP = 500;
 
 /** Thẻ khách thấy khi mở mã của đúng đơn. Không có ghi chú nội bộ, mã Drive, hay đơn khác. */
 export function publicUploadCard(input: {
@@ -72,7 +72,7 @@ export function publicUploadCard(input: {
     depositPaid?: number;
     shipping?: { carrier?: string; tracking?: string; carrierStatus?: string } | null;
     items: { name: string; skuCode: string; quantity: number; lineTotal: number | null }[];
-    files: { id: string; name: string; status: string; kind: string; createdAt: string; deletedAt?: string | null; print?: boolean }[];
+    files: { id: string; name: string; status: string; kind: string; createdAt: string; deletedAt?: string | null; print?: boolean; comment?: string }[];
   };
   customer: { name: string; phone: string } | undefined;
 }): PublicUploadCard {
@@ -80,7 +80,13 @@ export function publicUploadCard(input: {
     .filter((file) => file.kind === "original" && file.status === "complete" && !file.deletedAt)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : b.id.localeCompare(a.id)))
     .slice(0, PHOTO_CAP)
-    .map((file) => ({ id: file.id, name: file.name, createdAt: file.createdAt, print: file.print === true }));
+    .map((file) => ({
+      id: file.id,
+      name: file.name,
+      createdAt: file.createdAt,
+      print: file.print === true,
+      comment: (file.comment ?? "").trim(),
+    }));
   const ship = input.order.shipping;
   const carrier = ship?.carrier?.trim() || "";
   const tracking = ship?.tracking?.trim() || "";
@@ -104,8 +110,8 @@ export function publicUploadCard(input: {
       lineTotal: item.lineTotal,
     })),
     total: input.order.total,
-    depositPaid: input.order.depositPaid,
-    remain: remainOf({ total: input.order.total, depositPaid: input.order.depositPaid }),
+    depositPaid: input.order.depositPaid ?? 0,
+    remain: remainOf({ total: input.order.total, depositPaid: input.order.depositPaid ?? 0 }),
     shipping: carrier || tracking || carrierStatus ? { carrier, tracking, carrierStatus } : null,
     photos,
   };

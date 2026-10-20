@@ -807,13 +807,17 @@ export async function createUploadTicket(input: {
   fileName: string;
   mimeType: string;
   sizeBytes: number;
+  comment?: string;
 }) {
   if (!imageMimeAllowed(input.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
   const limit = await photoByteLimit();
-  if (photoTooBig(input.sizeBytes, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (photoTooBig(input.sizeBytes, limit)) {
+    throw new Error(limit === null ? "Ảnh quá lớn." : "Mỗi ảnh tối đa 10MB khi chưa nối Google Drive. Nối Drive để gửi ảnh không giới hạn dung lượng.");
+  }
   const fileId = nid();
   const safe = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
   const storagePath = `orders/${input.orderId}/originals/${fileId}-${safe}`;
+  const comment = (input.comment ?? "").trim().slice(0, 500);
   await mutate(async (state) => {
     const order = await orderByToken(state, input.orderId, input.accessToken);
     order.files.push({
@@ -828,6 +832,7 @@ export async function createUploadTicket(input: {
       driveFileId: null,
       createdAt: nowIso(),
       deletedAt: null,
+      ...(comment ? { comment } : {}),
     });
   });
   return { fileId, path: storagePath, mode: "server" as const };
@@ -1345,6 +1350,17 @@ export async function setFilePrint(actor: Actor, orderId: string, fileId: string
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
     markPrint(order, fileId, print, actor.id, actor.name);
+  });
+}
+
+export async function setCustomerFileComment(token: string, fileId: string, comment: string) {
+  const note = comment.trim().slice(0, 500);
+  await mutate(async (state) => {
+    const order = await orderByUploadToken(state, token);
+    const file = order.files.find((item) => item.id === fileId && !item.deletedAt && item.kind === "original");
+    if (!file) throw new Error("Không thấy ảnh.");
+    file.comment = note;
+    order.updatedAt = nowIso();
   });
 }
 

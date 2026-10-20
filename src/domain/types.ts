@@ -262,6 +262,8 @@ export type OrderFile = {
   deletedAt: string | null;
   /** Ảnh gốc khách hoặc sale đánh dấu để in. Thiếu nghĩa là chưa chọn. */
   print?: boolean;
+  /** Ghi chú chỉnh sửa / mong muốn của khách trên ảnh này. */
+  comment?: string;
 };
 
 export type OrderShipping = {

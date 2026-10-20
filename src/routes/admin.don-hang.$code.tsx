@@ -416,6 +416,9 @@ function OrderDetailPage() {
                 <img src={staffThumb(file.id)} alt={file.name} className="aspect-square w-full object-cover" />
                 <span className="block truncate px-2 pt-1 text-xs font-semibold">{file.name}</span>
                 <span className="block truncate px-2 text-[11px] text-muted-foreground">{FILE_KIND[file.kind] ?? file.kind}</span>
+                {"comment" in file && typeof file.comment === "string" && file.comment.trim() ? (
+                  <span className="block px-2 pb-1 text-[11px] text-foreground/80">{file.comment}</span>
+                ) : null}
               </button>
               {file.kind === "original" ? (
                 <button

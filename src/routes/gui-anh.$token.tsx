@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Loader2, PackageSearch, UploadCloud, X } from "lucide-react";
 
 import { LocalPhotoThumb } from "@/components/photo-thumb";
@@ -8,12 +8,21 @@ import { OrderMoney } from "@/components/site/order-money";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { photoLimitLabel, uploadTokenShape } from "@/domain/order-upload";
 import { publicStatusLabel } from "@/domain/public-status";
 import { formatMaybe } from "@/lib/brand";
-import { putDriveFile } from "@/lib/drive-put";
-import { acknowledgeCustomerPhotos, createUploadTicket, finishOrderDriveUpload, getUploadTarget, prepareOrderDriveUpload, setCustomerPrint } from "@/lib/orders.functions";
+import { postFormWithProgress, putDriveFile } from "@/lib/drive-put";
+import {
+  acknowledgeCustomerPhotos,
+  createUploadTicket,
+  finishOrderDriveUpload,
+  getUploadTarget,
+  prepareOrderDriveUpload,
+  setCustomerComment,
+  setCustomerPrint,
+} from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/gui-anh/$token")({
   head: () => ({
@@ -25,7 +34,6 @@ export const Route = createFileRoute("/gui-anh/$token")({
   component: CustomerUploadPage,
 });
 
-const MAX_FILES = 30;
 const ACCEPT = ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*";
 
 function formatWhen(value: string): string {
@@ -41,7 +49,9 @@ function channelLabel(channel: string): string {
 type Row = {
   key: string;
   file: File;
+  comment: string;
   status: "pending" | "uploading" | "complete" | "error";
+  progress: number;
   message?: string;
 };
 
@@ -69,19 +79,44 @@ function CustomerUploadPage() {
   const [done, setDone] = useState<{ code: string; fileCount: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openPhoto, setOpenPhoto] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState(0);
+  const [photoNotes, setPhotoNotes] = useState<Record<string, string>>({});
   const limit = target.data ? target.data.maxPhotoBytes : undefined;
   const direct = limit === null;
+
+  useEffect(() => {
+    const photos = target.data?.photos;
+    if (!photos) return;
+    setPhotoNotes((current) => {
+      const next = { ...current };
+      for (const photo of photos) {
+        if (next[photo.id] === undefined) next[photo.id] = photo.comment;
+      }
+      return next;
+    });
+  }, [target.data?.photos]);
+
+  const overallLabel = useMemo(() => {
+    if (!busy) return null;
+    return `Đang gửi… ${batchProgress}%`;
+  }, [busy, batchProgress]);
 
   function addFiles(list: FileList | null) {
     if (!list) return;
     const next: Row[] = [];
     for (const file of list) {
-      if (rows.length + next.length >= MAX_FILES) break;
       if (limit != null && file.size > limit) {
-        next.push({ key: crypto.randomUUID(), file, status: "error", message: "Ảnh lớn hơn mức cho phép." });
+        next.push({
+          key: crypto.randomUUID(),
+          file,
+          comment: "",
+          status: "error",
+          progress: 0,
+          message: `Ảnh lớn hơn ${photoLimitLabel(limit)}. Nối Google Drive trên admin để bỏ giới hạn dung lượng.`,
+        });
         continue;
       }
-      next.push({ key: crypto.randomUUID(), file, status: "pending" });
+      next.push({ key: crypto.randomUUID(), file, comment: "", status: "pending", progress: 0 });
     }
     setRows((current) => [...current, ...next]);
     setDone(null);
@@ -97,15 +132,26 @@ function CustomerUploadPage() {
     }
     setBusy(true);
     setError(null);
+    setBatchProgress(0);
     let failed = false;
     let completed = 0;
+    const queue = pending.filter((row) => !(limit != null && row.file.size > limit));
+    const totalBytes = Math.max(1, queue.reduce((sum, row) => sum + row.file.size, 0));
+    let loadedBytes = 0;
     try {
       for (const row of pending) {
         if (limit != null && row.file.size > limit) {
           failed = true;
           continue;
         }
-        setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "uploading", message: undefined } : item)));
+        setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "uploading", progress: 0, message: undefined } : item)));
+        const baseLoaded = loadedBytes;
+        const report = (loaded: number, total: number) => {
+          const fileLoaded = total > 0 ? Math.min(row.file.size, Math.round((loaded / total) * row.file.size)) : loaded;
+          const pct = Math.min(100, Math.round((fileLoaded / Math.max(row.file.size, 1)) * 100));
+          setRows((current) => current.map((item) => (item.key === row.key ? { ...item, progress: pct } : item)));
+          setBatchProgress(Math.min(100, Math.round(((baseLoaded + fileLoaded) / totalBytes) * 100)));
+        };
         try {
           const mime = guessMime(row.file);
           const ticket = await createUploadTicket({
@@ -115,13 +161,14 @@ function CustomerUploadPage() {
               fileName: row.file.name,
               mimeType: mime,
               sizeBytes: row.file.size,
+              comment: row.comment,
             },
           });
           if (direct) {
             const session = await prepareOrderDriveUpload({
               data: { orderId: info.orderId, accessToken: token, fileId: ticket.fileId },
             });
-            const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime);
+            const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime, report);
             await finishOrderDriveUpload({
               data: { orderId: info.orderId, accessToken: token, fileId: ticket.fileId, driveFileId },
             });
@@ -131,17 +178,18 @@ function CustomerUploadPage() {
             body.set("accessToken", token);
             body.set("fileId", ticket.fileId);
             body.set("file", row.file);
-            const uploaded = await fetch("/api/public/upload", { method: "POST", body });
-            if (!uploaded.ok) throw new Error(await uploaded.text());
+            await postFormWithProgress("/api/public/upload", body, report);
           }
+          loadedBytes += row.file.size;
           completed += 1;
-          setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "complete" } : item)));
+          setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "complete", progress: 100 } : item)));
         } catch (err) {
           const message = err instanceof Error ? err.message : "Không tải được ảnh.";
           failed = true;
           setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "error", message } : item)));
         }
       }
+      setBatchProgress(failed ? Math.min(99, batchProgress) : 100);
       const result = await acknowledgeCustomerPhotos({ data: { orderId: info.orderId, accessToken: token } });
       await target.refetch();
       if (failed) {
@@ -198,6 +246,7 @@ function CustomerUploadPage() {
               onClick={() => {
                 setDone(null);
                 setError(null);
+                setBatchProgress(0);
               }}
             >
               Gửi thêm ảnh
@@ -220,9 +269,9 @@ function CustomerUploadPage() {
           <section className="glass-card space-y-5 rounded-3xl p-5">
             <div>
               <h1 className="text-2xl text-primary">Gửi ảnh cho đơn {info.code}</h1>
-              <p className="mt-1 text-sm text-muted-foreground">Ảnh vào đúng đơn này. Kiểm tra thông tin và tiền trước khi gửi.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Ảnh vào đúng đơn này. Có thể ghi chú chỉnh sửa từng ảnh.</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                JPG, PNG, WEBP, HEIC{limit === undefined ? "" : ` — ${photoLimitLabel(limit)}`}, tối đa {MAX_FILES} ảnh.
+                JPG, PNG, WEBP, HEIC — {direct ? "không giới hạn dung lượng và số lượng ảnh" : photoLimitLabel(limit ?? null)}.
               </p>
             </div>
 
@@ -276,31 +325,52 @@ function CustomerUploadPage() {
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Ảnh đã gửi ({info.photos.length})</h2>
               {info.photos.length ? (
-                <ul className="mt-2 grid grid-cols-3 gap-2">
+                <ul className="mt-2 space-y-3">
                   {info.photos.map((photo) => (
-                    <li key={photo.id} className="overflow-hidden rounded-2xl border border-border bg-muted">
-                      <button type="button" className="block w-full text-left" onClick={() => setOpenPhoto(photo.id)}>
-                        <img
-                          src={`/api/public/order-photo/${token}/${photo.id}`}
-                          alt={photo.name}
-                          className="aspect-square w-full object-cover"
-                          onError={(event) => {
-                            event.currentTarget.style.display = "none";
-                          }}
-                        />
-                        <span className="block truncate px-2 py-1 text-left text-xs text-muted-foreground">{photo.name}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`w-full px-2 py-2 text-left text-xs font-semibold ${photo.print ? "bg-primary text-primary-foreground" : "text-primary"}`}
-                        onClick={() => {
-                          void setCustomerPrint({ data: { token, fileId: photo.id, print: !photo.print } })
-                            .then(() => target.refetch())
-                            .catch((error: unknown) => setError(error instanceof Error ? error.message : "Không lưu được lựa chọn."));
-                        }}
-                      >
-                        {photo.print ? "Đã chọn in" : "In ảnh này"}
-                      </button>
+                    <li key={photo.id} className="overflow-hidden rounded-2xl border border-border bg-muted/40">
+                      <div className="flex gap-3 p-2">
+                        <button type="button" className="shrink-0" onClick={() => setOpenPhoto(photo.id)}>
+                          <img
+                            src={`/api/public/order-photo/${token}/${photo.id}`}
+                            alt={photo.name}
+                            className="size-20 rounded-xl object-cover"
+                            onError={(event) => {
+                              event.currentTarget.style.display = "none";
+                            }}
+                          />
+                        </button>
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <p className="truncate text-xs text-muted-foreground">{photo.name}</p>
+                          <Textarea
+                            value={photoNotes[photo.id] ?? photo.comment}
+                            rows={2}
+                            placeholder="Ghi chú chỉnh sửa ảnh này…"
+                            className="min-h-16 text-sm"
+                            onChange={(event) => {
+                              const comment = event.target.value.slice(0, 500);
+                              setPhotoNotes((current) => ({ ...current, [photo.id]: comment }));
+                            }}
+                            onBlur={() => {
+                              const comment = (photoNotes[photo.id] ?? photo.comment).trim();
+                              if (comment === photo.comment) return;
+                              void setCustomerComment({ data: { token, fileId: photo.id, comment } })
+                                .then(() => target.refetch())
+                                .catch((err: unknown) => setError(err instanceof Error ? err.message : "Không lưu được ghi chú."));
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className={`rounded-lg px-2 py-1 text-xs font-semibold ${photo.print ? "bg-primary text-primary-foreground" : "text-primary"}`}
+                            onClick={() => {
+                              void setCustomerPrint({ data: { token, fileId: photo.id, print: !photo.print } })
+                                .then(() => target.refetch())
+                                .catch((err: unknown) => setError(err instanceof Error ? err.message : "Không lưu được lựa chọn."));
+                            }}
+                          >
+                            {photo.print ? "Đã chọn in" : "In ảnh này"}
+                          </button>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -311,6 +381,7 @@ function CustomerUploadPage() {
             <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-8 text-center">
               <UploadCloud className="size-8 text-accent" />
               <span className="mt-2 font-semibold">Chọn ảnh gốc</span>
+              <span className="mt-1 text-xs text-muted-foreground">Không giới hạn số lượng ảnh</span>
               <input
                 type="file"
                 multiple
@@ -322,17 +393,52 @@ function CustomerUploadPage() {
                 }}
               />
             </label>
-            <ul className="grid grid-cols-3 gap-2 text-sm">
+            <ul className="space-y-3 text-sm">
               {rows.map((row) => (
-                <li key={row.key} className="overflow-hidden rounded-2xl border border-border bg-card">
-                  <LocalPhotoThumb file={row.file} className="aspect-square w-full object-cover" />
-                  <span className="block truncate px-2 pt-1 text-xs">{row.file.name}</span>
-                  <span className={`block truncate px-2 pb-2 text-xs ${row.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
-                    {row.status === "uploading" ? "Đang gửi" : row.status === "complete" ? "Đã nhận" : row.status === "error" ? row.message || "Lỗi" : "Chờ"}
-                  </span>
+                <li key={row.key} className="overflow-hidden rounded-2xl border border-border bg-card p-2">
+                  <div className="flex gap-3">
+                    <LocalPhotoThumb file={row.file} className="size-20 shrink-0 rounded-xl object-cover" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <span className="block truncate text-xs font-medium">{row.file.name}</span>
+                      <Textarea
+                        value={row.comment}
+                        rows={2}
+                        disabled={row.status === "uploading" || row.status === "complete"}
+                        placeholder="Muốn chỉnh sửa gì? (xóa nền, sáng hơn, crop…)"
+                        className="min-h-16 text-sm"
+                        onChange={(event) => {
+                          const comment = event.target.value.slice(0, 500);
+                          setRows((current) => current.map((item) => (item.key === row.key ? { ...item, comment } : item)));
+                        }}
+                      />
+                      {row.status === "uploading" ? (
+                        <div className="space-y-1">
+                          <div className="h-2 overflow-hidden rounded-full bg-muted">
+                            <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${row.progress}%` }} />
+                          </div>
+                          <p className="text-xs text-muted-foreground">Đang gửi {row.progress}%</p>
+                        </div>
+                      ) : (
+                        <span className={`block text-xs ${row.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
+                          {row.status === "complete" ? "Đã nhận" : row.status === "error" ? row.message || "Lỗi" : "Chờ gửi"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </li>
               ))}
             </ul>
+            {busy ? (
+              <div className="space-y-2 rounded-2xl border border-border bg-muted/40 p-3">
+                <div className="flex items-center justify-between text-sm font-semibold">
+                  <span>{overallLabel}</span>
+                  <span>{batchProgress}%</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-background">
+                  <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${batchProgress}%` }} />
+                </div>
+              </div>
+            ) : null}
             {error ? <p className="text-sm font-semibold text-destructive">{error}</p> : null}
             <Button type="button" className="min-h-12 w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={busy} onClick={() => void send()}>
               {busy ? <Loader2 className="size-4 animate-spin" /> : null}
@@ -351,11 +457,14 @@ function CustomerUploadPage() {
           >
             <X className="size-5" />
           </button>
-          <img
-            src={`/api/public/order-photo/${token}/${opened.id}?view=1`}
-            alt={opened.name}
-            className="max-h-[85vh] max-w-full rounded-2xl object-contain"
-          />
+          <div className="max-h-[90vh] w-full max-w-lg space-y-3">
+            <img
+              src={`/api/public/order-photo/${token}/${opened.id}?view=1`}
+              alt={opened.name}
+              className="max-h-[70vh] w-full rounded-2xl object-contain"
+            />
+            {opened.comment ? <p className="rounded-2xl bg-background/95 p-3 text-sm text-foreground">{opened.comment}</p> : null}
+          </div>
         </div>
       ) : null}
     </div>

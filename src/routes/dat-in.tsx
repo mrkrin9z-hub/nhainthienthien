@@ -14,7 +14,7 @@ import { sheetOptionLabel, sizeChoices, sizeSummary } from "@/domain/catalog-lab
 import { ChoiceChip } from "@/components/site/choice-chip";
 import { photoLimitLabel } from "@/domain/order-upload";
 import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
-import { putDriveFile } from "@/lib/drive-put";
+import { postFormWithProgress, putDriveFile } from "@/lib/drive-put";
 import { createOrder, createUploadTicket, finishOrderDriveUpload, markFileStatus, prepareOrderDriveUpload, submitOrder } from "@/lib/orders.functions";
 import { formatVnd } from "@/lib/brand";
 
@@ -49,13 +49,13 @@ export const Route = createFileRoute("/dat-in")({
   component: OrderPage,
 });
 
-const MAX_FILES = 30;
 const ACCEPT = ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*";
 
 type FileState = {
   key: string;
   file: File;
   status: "pending" | "uploading" | "complete" | "error";
+  progress: number;
   fileId?: string;
   message?: string;
 };
@@ -136,13 +136,13 @@ function OrderPage() {
         rejected.push(file.name);
         continue;
       }
-      next.push({ key: crypto.randomUUID(), file, status: "pending" });
+      next.push({ key: crypto.randomUUID(), file, status: "pending", progress: 0 });
     }
     if (rejected.length && maxPhotoBytes !== null) {
       const limitMb = Math.round(maxPhotoBytes / (1024 * 1024));
-      setError(`${rejected.join(", ")} lớn hơn ${limitMb}MB. Mỗi ảnh tối đa ${limitMb}MB.`);
+      setError(`${rejected.join(", ")} lớn hơn ${limitMb}MB. Nối Google Drive để bỏ giới hạn dung lượng.`);
     }
-    setFiles((prev) => [...prev, ...next].slice(0, MAX_FILES));
+    setFiles((prev) => [...prev, ...next]);
   }
 
   const phoneDigits = phone.replace(/\D/g, "");
@@ -179,8 +179,12 @@ function OrderPage() {
       for (const item of files) {
         if (item.status === "complete") continue;
         setFiles((prev) =>
-          prev.map((f) => (f.key === item.key ? { ...f, status: "uploading" } : f)),
+          prev.map((f) => (f.key === item.key ? { ...f, status: "uploading", progress: 0 } : f)),
         );
+        const report = (loaded: number, total: number) => {
+          const pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+          setFiles((prev) => prev.map((f) => (f.key === item.key ? { ...f, progress: pct } : f)));
+        };
         try {
           const mime = item.file.type || "image/jpeg";
           const ticket = await createUploadTicket({
@@ -196,7 +200,7 @@ function OrderPage() {
             const session = await prepareOrderDriveUpload({
               data: { orderId: order.orderId, accessToken: order.accessToken, fileId: ticket.fileId },
             });
-            const driveFileId = await putDriveFile(session.uploadUrl, item.file, mime);
+            const driveFileId = await putDriveFile(session.uploadUrl, item.file, mime, report);
             await finishOrderDriveUpload({
               data: { orderId: order.orderId, accessToken: order.accessToken, fileId: ticket.fileId, driveFileId },
             });
@@ -206,8 +210,7 @@ function OrderPage() {
             body.set("accessToken", order.accessToken);
             body.set("fileId", ticket.fileId);
             body.set("file", item.file);
-            const uploaded = await fetch("/api/public/upload", { method: "POST", body });
-            if (!uploaded.ok) throw new Error(await uploaded.text());
+            await postFormWithProgress("/api/public/upload", body, report);
           }
 
           await markFileStatus({
@@ -220,7 +223,7 @@ function OrderPage() {
           });
           setFiles((prev) =>
             prev.map((f) =>
-              f.key === item.key ? { ...f, status: "complete", fileId: ticket.fileId } : f,
+              f.key === item.key ? { ...f, status: "complete", progress: 100, fileId: ticket.fileId } : f,
             ),
           );
         } catch (err) {
@@ -421,7 +424,7 @@ function OrderPage() {
                   <UploadCloud className="size-8 text-accent" />
                   <span className="mt-2 font-semibold text-foreground">Chọn ảnh gốc</span>
                   <span className="mt-1 text-xs text-muted-foreground">
-                    JPG, PNG, WEBP, HEIC — {photoLimitLabel(maxPhotoBytes)}, {MAX_FILES} ảnh mỗi đơn
+                    JPG, PNG, WEBP, HEIC — {maxPhotoBytes === null ? "không giới hạn dung lượng và số lượng" : photoLimitLabel(maxPhotoBytes)}
                   </span>
                   <input
                     type="file"
@@ -438,7 +441,7 @@ function OrderPage() {
                       <LocalPhotoThumb file={f.file} className="aspect-square w-full object-cover" />
                       <span className="flex items-center gap-1 px-2 py-2">
                         <span className="min-w-0 flex-1 truncate">{f.file.name}</span>
-                        {f.status === "uploading" ? <Loader2 className="size-4 shrink-0 animate-spin text-primary" /> : null}
+                        {f.status === "uploading" ? <span className="shrink-0 text-xs font-semibold text-primary">{f.progress}%</span> : null}
                         {f.status === "complete" ? <CheckCircle2 className="size-4 shrink-0 text-accent" /> : null}
                         {f.status === "error" ? <AlertCircle className="size-4 shrink-0 text-destructive" /> : null}
                         <button
@@ -449,6 +452,11 @@ function OrderPage() {
                           <X className="size-4 text-muted-foreground" />
                         </button>
                       </span>
+                      {f.status === "uploading" ? (
+                        <div className="mx-2 mb-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${f.progress}%` }} />
+                        </div>
+                      ) : null}
                       {f.message ? <span className="block px-2 pb-2 text-xs text-destructive">{f.message}</span> : null}
                     </li>
                   ))}

@@ -35,6 +35,7 @@ const uploadTicketSchema = z.object({
   fileName: z.string().min(1).max(200),
   mimeType: z.string().min(3).max(100),
   sizeBytes: z.number().int().min(1),
+  comment: z.string().trim().max(500).optional().default(""),
 });
 
 export const createUploadTicket = createServerFn({ method: "POST" })
@@ -95,7 +96,7 @@ export type OrderLookupResult = {
     items: { name: string; variant: string; quantity: number; lineTotal: number | null }[];
     fileCount: number;
     photoToken: string | null;
-    photos: { id: string; name: string; createdAt: string; print: boolean }[];
+    photos: { id: string; name: string; createdAt: string; print: boolean; comment: string }[];
     shipping: { carrier: string; tracking: string; carrierStatus: string } | null;
     history: { to: string; at: string; note: string }[];
   }[];
@@ -159,6 +160,22 @@ export const setCustomerPrint = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { setCustomerFilePrint } = await import("@/server/service");
     await setCustomerFilePrint(data.token, data.fileId, data.print);
+    return { ok: true };
+  });
+
+export const setCustomerComment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        token: z.string().regex(/^[a-f0-9]{32}$/),
+        fileId: z.string().uuid(),
+        comment: z.string().max(500),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { setCustomerFileComment } = await import("@/server/service");
+    await setCustomerFileComment(data.token, data.fileId, data.comment);
     return { ok: true };
   });
 
