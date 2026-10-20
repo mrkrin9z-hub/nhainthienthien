@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
+import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
 import { getCustomer, saveCustomer } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/khach/$id")({
@@ -40,7 +41,9 @@ function CustomerBody() {
   const orders = (customer.data?.orders ?? []).filter((order) => {
     const needle = orderQ.trim().toLowerCase();
     if (!needle) return true;
-    return `${order.code} ${order.statusLabel} ${order.channelLabel} ${order.itemSummary}`.toLowerCase().includes(needle);
+    return `${order.code} ${statusLabelOf(order.status, order.statusLabel)} ${channelLabelOf(order.channel, order.channelLabel)} ${order.itemSummary}`
+      .toLowerCase()
+      .includes(needle);
   });
   const orderList = useListPage(orders, orderQ);
   if (!customer.data) return <p className="text-muted-foreground">{customer.isError ? (customer.error as Error).message : "Đang tải…"}</p>;
@@ -194,7 +197,8 @@ function CustomerBody() {
             <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="glass-card block rounded-3xl p-4">
               <p className="font-bold">{order.code}</p>
               <p className="text-sm text-muted-foreground">
-                {order.channelLabel} · {order.statusLabel} · {order.total === null ? "Chưa có giá" : formatMaybe(order.total)}
+                {channelLabelOf(order.channel, order.channelLabel)} · {statusLabelOf(order.status, order.statusLabel)} ·{" "}
+                {order.total === null ? "Chưa có giá" : formatMaybe(order.total)}
               </p>
               <p className="text-sm">{order.itemSummary}</p>
             </Link>

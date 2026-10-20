@@ -16,6 +16,7 @@ import { isMergedWoodAlias, isProductionStep, PRODUCTION_STEPS } from "@/domain/
 import { marketplaceEditLocked } from "@/domain/order-edit";
 import { JT_CARRIER, jtOrder } from "@/domain/jt";
 import { CHANNEL_LABEL, STATUS_LABEL, type OrderStatus } from "@/domain/types";
+import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
 
 export const Route = createFileRoute("/admin/don-hang/$code")({
   component: OrderDetailPage,
@@ -68,7 +69,7 @@ function OrderDetailPage() {
         </div>
       </div>
       <p className="break-words text-sm">
-        {data.customerName} · {data.phone} · {data.channelLabel} · {data.statusLabel}
+        {data.customerName} · {data.phone} · {channelLabelOf(data.channel, data.channelLabel)} · {statusLabelOf(data.status, data.statusLabel)}
         {data.recipientName && data.recipientName !== data.customerName ? ` · Người nhận: ${data.recipientName}` : ""}
         {data.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
       </p>

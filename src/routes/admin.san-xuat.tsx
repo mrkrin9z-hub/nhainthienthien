@@ -8,6 +8,7 @@ import { PageToolbar } from "@/components/admin/page-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
+import { statusLabelOf } from "@/lib/display-labels";
 import { getOrders } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/san-xuat")({
@@ -70,7 +71,7 @@ function ProductionPage() {
                 <TableCell>{order.customerName}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{order.itemSummary}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary">{order.statusLabel}</Badge>
+                  <Badge variant="secondary">{statusLabelOf(order.status, order.statusLabel)}</Badge>
                 </TableCell>
               </TableRow>
             ))}

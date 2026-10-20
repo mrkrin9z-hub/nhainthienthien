@@ -15,6 +15,7 @@ import type { WalletId } from "@/domain/money";
 import { walletLabel } from "@/domain/money";
 import { formatMaybe, formatVnd } from "@/lib/brand";
 import { CHANNEL_LABEL, CHANNELS } from "@/domain/types";
+import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
 import { getCollectList, handCashIn, recordDeposit } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/thu")({
@@ -25,7 +26,9 @@ type CollectRow = {
   id: string;
   code: string;
   customerName: string;
+  status: string;
   statusLabel: string;
+  channel: string;
   channelLabel: string;
   total: number | null;
   depositPaid: number;
@@ -49,7 +52,7 @@ function CollectBody() {
   const needle = query.trim().toLowerCase();
   const source = list.data?.rows ?? [];
   const rows = source.filter((row) => {
-    if (channel !== "all" && row.channelLabel !== CHANNEL_LABEL[channel as keyof typeof CHANNEL_LABEL]) return false;
+    if (channel !== "all" && row.channel !== channel) return false;
     if (!needle) return true;
     return row.code.toLowerCase().includes(needle) || row.customerName.toLowerCase().includes(needle);
   });
@@ -58,7 +61,7 @@ function CollectBody() {
     ...CHANNELS.map((id) => ({
       id,
       label: CHANNEL_LABEL[id],
-      count: source.filter((row) => row.channelLabel === CHANNEL_LABEL[id]).length,
+      count: source.filter((row) => row.channel === id).length,
       color: CHANNEL_TONE[id]?.color ?? "#6B7280",
       icon: CHANNEL_TONE[id]?.icon,
     })),
@@ -107,7 +110,7 @@ function CollectBody() {
                 {row.code}
               </Link>
               <p className="text-sm text-muted-foreground">
-                {row.customerName || "Khách lẻ"} · {row.channelLabel} · {row.statusLabel}
+                {row.customerName || "Khách lẻ"} · {channelLabelOf(row.channel, row.channelLabel)} · {statusLabelOf(row.status, row.statusLabel)}
               </p>
             </div>
             <div className="text-right text-sm">

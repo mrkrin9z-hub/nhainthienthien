@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { STATUS_TONE } from "@/components/admin/filter-chips";
 import { formatMaybe } from "@/lib/brand";
+import { statusLabelOf } from "@/lib/display-labels";
 import { getDashboard, punchClock } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/")({
@@ -265,7 +266,7 @@ function Card({ label, value, hint, icon: Icon, tone }: { label: string; value: 
   );
 }
 
-function OrderBlock({ title, rows }: { title: string; rows: { code: string; itemSummary: string; statusLabel: string; late: boolean }[] }) {
+function OrderBlock({ title, rows }: { title: string; rows: { code: string; itemSummary: string; status: string; statusLabel: string; late: boolean }[] }) {
   return (
     <section className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
@@ -279,7 +280,7 @@ function OrderBlock({ title, rows }: { title: string; rows: { code: string; item
   );
 }
 
-function OrderList({ rows }: { rows: { code: string; itemSummary: string; statusLabel: string; late: boolean; customerName?: string }[] }) {
+function OrderList({ rows }: { rows: { code: string; itemSummary: string; status: string; statusLabel: string; late: boolean; customerName?: string }[] }) {
   if (!rows.length) return <p className="mt-2 text-sm text-muted-foreground">Chưa có đơn.</p>;
   const shown = rows.slice(0, 8);
   return (
@@ -288,7 +289,7 @@ function OrderList({ rows }: { rows: { code: string; itemSummary: string; status
         <li key={row.code}>
           <Link to="/admin/don-hang/$code" params={{ code: row.code }} className="block rounded-2xl bg-card px-4 py-3">
             <span className="font-bold text-primary">{row.code}</span>
-            <span className="ml-2 text-sm">{row.statusLabel}</span>
+            <span className="ml-2 text-sm">{statusLabelOf(row.status, row.statusLabel)}</span>
             {row.late ? <span className="ml-2 text-sm font-bold text-destructive">Trễ mốc</span> : null}
             <p className="text-sm text-muted-foreground">{row.customerName ? `${row.customerName} · ` : ""}{row.itemSummary}</p>
           </Link>

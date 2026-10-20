@@ -9,6 +9,7 @@ import { OrderLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL, type OrderStatus } from "@/domain/types";
 import { formatMaybe } from "@/lib/brand";
+import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
 import { getDeliveries, getMe } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/giao-hang")({
@@ -100,12 +101,12 @@ function DeliveryPage() {
               <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="text-lg font-extrabold text-primary">
                 {order.code}
               </Link>
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{order.statusLabel}</span>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{statusLabelOf(order.status, order.statusLabel)}</span>
             </div>
             <p>{order.recipientName || order.customerName} · {order.phone}</p>
             {order.recipientName && order.recipientName !== order.customerName ? <p>Khách trong sổ: {order.customerName}</p> : null}
             {order.address ? <p>{order.address}</p> : null}
-            <p className="text-muted-foreground">{order.channelLabel} · {order.itemSummary}</p>
+            <p className="text-muted-foreground">{channelLabelOf(order.channel, order.channelLabel)} · {order.itemSummary}</p>
             <p>Hãng: {order.carrier || "chưa ghi"} · Vận đơn: {order.tracking || "chưa có"}{order.carrierStatus ? ` · ${order.carrierStatus}` : ""}</p>
             {money ? (
               <p>Phí ship: {order.shipFee === null ? "chưa có" : formatMaybe(order.shipFee)} · COD: {order.codAmount === null ? "không" : formatMaybe(order.codAmount)}</p>

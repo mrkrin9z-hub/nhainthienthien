@@ -12,6 +12,7 @@ import { ALL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/component
 import { formatMaybe } from "@/lib/brand";
 import { downloadExcel, getMe, getOrders } from "@/lib/admin.functions";
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL, type OrderStatus } from "@/domain/types";
+import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
 
 export const Route = createFileRoute("/admin/don-hang/")({
   validateSearch: (search: Record<string, unknown>): { status: string } => ({
@@ -74,7 +75,7 @@ function OrdersPage() {
     if (unpaidOnly && !(order.remain != null && order.remain > 0)) return false;
     const needle = q.trim().toLowerCase();
     if (!needle) return true;
-    return [order.code, order.customerName, order.phone, order.itemSummary, order.channelLabel]
+    return [order.code, order.customerName, order.phone, order.itemSummary, channelLabelOf(order.channel, order.channelLabel)]
       .join(" ")
       .toLowerCase()
       .includes(needle);
@@ -253,8 +254,8 @@ function OrdersPage() {
                   <p className="font-medium">{order.customerName}</p>
                   <p className="text-[11px] text-muted-foreground">{order.phone}</p>
                 </td>
-                <td className="px-3 py-2.5"><StatusPill status={order.status} label={order.statusLabel} /></td>
-                <td className="px-3 py-2.5">{order.channelLabel}</td>
+                <td className="px-3 py-2.5"><StatusPill status={order.status} label={statusLabelOf(order.status, order.statusLabel)} /></td>
+                <td className="px-3 py-2.5">{channelLabelOf(order.channel, order.channelLabel)}</td>
                 {production ? null : (
                   <>
                     <td className="px-3 py-2.5 text-right font-semibold">{order.total == null ? "Chưa có giá" : formatMaybe(order.total)}</td>
@@ -308,6 +309,7 @@ function OrderCard({
     statusLabel: string;
     customerName: string;
     phone: string;
+    channel: string;
     channelLabel: string;
     itemSummary: string;
     total: number | null;
@@ -325,12 +327,12 @@ function OrderCard({
           <p className="font-semibold text-primary">{order.code}</p>
           <p className="truncate text-sm text-muted-foreground">{order.customerName} · {order.phone}</p>
         </div>
-        <StatusPill status={order.status} label={order.statusLabel} />
+        <StatusPill status={order.status} label={statusLabelOf(order.status, order.statusLabel)} />
       </div>
       <p className="line-clamp-2 text-sm">{order.itemSummary}</p>
       {order.late ? <p className="mt-1 text-sm font-semibold text-destructive">Trễ mốc</p> : null}
       <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm">
-        <span className="text-muted-foreground">{order.channelLabel}</span>
+        <span className="text-muted-foreground">{channelLabelOf(order.channel, order.channelLabel)}</span>
         <span className="text-right font-semibold">
           {money && order.total != null ? formatMaybe(order.total) : `${order.fileCount} ảnh`}
           {money && order.remain != null ? <span className="block text-xs font-normal text-muted-foreground">Còn {formatMaybe(order.remain)}</span> : null}

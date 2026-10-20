@@ -2307,6 +2307,7 @@ export async function collectList(actor: Actor) {
         customerName: order.customerName,
         status: order.status,
         statusLabel: STATUS_LABEL[order.status as keyof typeof STATUS_LABEL] ?? order.status,
+        channel: full?.channel ?? "",
         channelLabel: full ? CHANNEL_LABEL[full.channel] : "",
         total: order.total,
         depositPaid: order.depositPaid,
