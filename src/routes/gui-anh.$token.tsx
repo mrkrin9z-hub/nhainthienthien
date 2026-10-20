@@ -1,13 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, UploadCloud, X } from "lucide-react";
+import { CheckCircle2, Loader2, PackageSearch, UploadCloud, X } from "lucide-react";
 
 import { LocalPhotoThumb } from "@/components/photo-thumb";
+import { OrderMoney } from "@/components/site/order-money";
+import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { photoLimitLabel, uploadTokenShape } from "@/domain/order-upload";
+import { publicStatusLabel } from "@/domain/public-status";
 import { formatMaybe } from "@/lib/brand";
 import { putDriveFile } from "@/lib/drive-put";
 import { acknowledgeCustomerPhotos, createUploadTicket, finishOrderDriveUpload, getUploadTarget, prepareOrderDriveUpload, setCustomerPrint } from "@/lib/orders.functions";
@@ -24,19 +27,6 @@ export const Route = createFileRoute("/gui-anh/$token")({
 
 const MAX_FILES = 30;
 const ACCEPT = ".jpg,.jpeg,.png,.webp,.heic,.heif,image/*";
-
-const STATUS_LABEL: Record<string, string> = {
-  draft_upload: "Đang gửi ảnh",
-  upload_error: "Lỗi tải ảnh",
-  nhan_don: "Đã nhận đơn",
-  thiet_ke: "Đang thiết kế",
-  cho_duyet: "Chờ khách duyệt",
-  in: "Đang in",
-  dong_goi: "Đang đóng gói",
-  giao: "Đang giao",
-  xong: "Hoàn tất",
-  huy: "Đã hủy",
-};
 
 function formatWhen(value: string): string {
   const date = new Date(value);
@@ -76,7 +66,7 @@ function CustomerUploadPage() {
   });
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<{ code: string; fileCount: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openPhoto, setOpenPhoto] = useState<string | null>(null);
   const limit = target.data ? target.data.maxPhotoBytes : undefined;
@@ -108,6 +98,7 @@ function CustomerUploadPage() {
     setBusy(true);
     setError(null);
     let failed = false;
+    let completed = 0;
     try {
       for (const row of pending) {
         if (limit != null && row.file.size > limit) {
@@ -143,6 +134,7 @@ function CustomerUploadPage() {
             const uploaded = await fetch("/api/public/upload", { method: "POST", body });
             if (!uploaded.ok) throw new Error(await uploaded.text());
           }
+          completed += 1;
           setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "complete" } : item)));
         } catch (err) {
           const message = err instanceof Error ? err.message : "Không tải được ảnh.";
@@ -151,9 +143,14 @@ function CustomerUploadPage() {
         }
       }
       const result = await acknowledgeCustomerPhotos({ data: { orderId: info.orderId, accessToken: token } });
-      setDone(result.code);
       await target.refetch();
-      if (failed) setError("Một số ảnh chưa lên. Chọn lại ảnh lỗi rồi gửi tiếp.");
+      if (failed) {
+        setError("Một số ảnh chưa lên. Chọn lại ảnh lỗi rồi gửi tiếp.");
+        setDone(null);
+      } else {
+        setDone({ code: result.code, fileCount: result.fileCount || completed });
+        setRows([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chưa gửi được.");
     } finally {
@@ -173,6 +170,45 @@ function CustomerUploadPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [opened]);
 
+  if (done && info) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SiteHeader />
+        <main className="mx-auto w-full max-w-lg px-4 py-12 text-center">
+          <CheckCircle2 className="mx-auto size-14 text-accent" />
+          <h1 className="mt-4 text-3xl font-extrabold text-primary">Đã nhận ảnh</h1>
+          <p className="mt-2 text-muted-foreground">
+            Đơn <strong className="text-foreground">{done.code}</strong> đã nhận ảnh. Xưởng sẽ xử lý theo tiến trình trên phiếu.
+          </p>
+          <OrderMoney total={info.total} depositPaid={info.depositPaid} remain={info.remain} className="mx-auto mt-6 max-w-sm space-y-2 rounded-2xl border border-border/70 bg-card p-4 text-left text-sm" />
+          <p className="mt-4 text-sm text-muted-foreground">
+            Muốn xem lại đơn, ảnh đã gửi và trạng thái (đã in, đã ship…): vào Tra cứu, nhập SĐT rồi chọn đơn này.
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
+              <Link to="/tra-cuu" search={{ code: done.code, phone: info.phone || "" }}>
+                <PackageSearch className="size-4" />
+                Tra cứu đơn
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              onClick={() => {
+                setDone(null);
+                setError(null);
+              }}
+            >
+              Gửi thêm ảnh
+            </Button>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
@@ -184,7 +220,7 @@ function CustomerUploadPage() {
           <section className="glass-card space-y-5 rounded-3xl p-5">
             <div>
               <h1 className="text-2xl text-primary">Gửi ảnh cho đơn {info.code}</h1>
-              <p className="mt-1 text-sm text-muted-foreground">Ảnh vào đúng đơn này. Ảnh đã gửi nằm bên dưới.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Ảnh vào đúng đơn này. Kiểm tra thông tin và tiền trước khi gửi.</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 JPG, PNG, WEBP, HEIC{limit === undefined ? "" : ` — ${photoLimitLabel(limit)}`}, tối đa {MAX_FILES} ảnh.
               </p>
@@ -200,7 +236,7 @@ function CustomerUploadPage() {
                 <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Đơn hàng</h2>
                 <p className="mt-1 font-semibold text-foreground">{info.code}</p>
                 <p className="text-muted-foreground">
-                  {STATUS_LABEL[info.status] ?? info.status}
+                  {publicStatusLabel(info.status)}
                   {info.createdAt ? ` · ${formatWhen(info.createdAt)}` : ""}
                 </p>
                 <p className="text-muted-foreground">
@@ -209,6 +245,11 @@ function CustomerUploadPage() {
                 {info.marketplaceCode ? <p className="text-muted-foreground">Mã trên sàn: {info.marketplaceCode}</p> : null}
                 {info.address ? <p className="text-muted-foreground">{info.address}</p> : null}
                 {info.customerNote ? <p className="text-muted-foreground">Ghi chú: {info.customerNote}</p> : null}
+                {info.shipping ? (
+                  <p className="text-muted-foreground">
+                    Vận chuyển: {[info.shipping.carrier, info.shipping.tracking, info.shipping.carrierStatus].filter(Boolean).join(" · ")}
+                  </p>
+                ) : null}
               </div>
               <div>
                 <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Sản phẩm</h2>
@@ -225,10 +266,10 @@ function CustomerUploadPage() {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 flex justify-between border-t border-border pt-2 font-bold text-foreground">
-                  <span>Tạm tính</span>
-                  <span className="text-accent">{formatMaybe(info.total) === "—" ? "Liên hệ" : formatMaybe(info.total)}</span>
-                </p>
+              </div>
+              <div>
+                <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Thanh toán</h2>
+                <OrderMoney total={info.total} depositPaid={info.depositPaid} remain={info.remain} />
               </div>
             </div>
 
@@ -267,12 +308,6 @@ function CustomerUploadPage() {
                 <p className="mt-1 text-sm text-muted-foreground">Chưa có ảnh trong đơn.</p>
               )}
             </div>
-            {done ? (
-              <p className="flex items-center gap-2 font-semibold text-primary">
-                <CheckCircle2 className="size-5" />
-                Đã nhận ảnh cho đơn {done}. Có thể đóng trang.
-              </p>
-            ) : null}
             <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-8 text-center">
               <UploadCloud className="size-8 text-accent" />
               <span className="mt-2 font-semibold">Chọn ảnh gốc</span>

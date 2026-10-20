@@ -54,6 +54,8 @@ test("mã đơn cho khách thấy người đặt, sản phẩm và ảnh gốc 
       address: "Xuân Lộc",
       customerNote: "In sáng",
       total: 70000,
+      depositPaid: 20000,
+      shipping: { carrier: "GHN", tracking: "GHN1", carrierStatus: "Đang giao" },
       items: [{ name: "Ảnh ép gỗ", skuCode: "TG-13x18", quantity: 2, lineTotal: 70000 }],
       files: [
         { id: "old", name: "cu.jpg", status: "complete", kind: "original", createdAt: "2026-10-01T00:00:00.000Z" },
@@ -69,6 +71,9 @@ test("mã đơn cho khách thấy người đặt, sản phẩm và ảnh gốc 
   assert.equal(card.code, "TT1");
   assert.equal(card.items[0]?.variant, "TG-13x18");
   assert.equal(card.items[0]?.quantity, 2);
+  assert.equal(card.depositPaid, 20000);
+  assert.equal(card.remain, 50000);
+  assert.equal(card.shipping?.carrier, "GHN");
   assert.deepEqual(card.photos.map((photo) => photo.id), ["new", "old"]);
   assert.equal(JSON.stringify(card).includes("mau.jpg"), false);
   assert.equal(JSON.stringify(card).includes("drive"), false);

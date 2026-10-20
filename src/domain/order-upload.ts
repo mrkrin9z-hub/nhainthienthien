@@ -1,3 +1,5 @@
+import { remainOf } from "./money.ts";
+
 /** Trang khách quét mã chung của tiệm. */
 export const SHARED_UPLOAD_PATH = "/gui-anh";
 
@@ -46,6 +48,9 @@ export type PublicUploadCard = {
   phone: string;
   items: { name: string; variant: string; quantity: number; lineTotal: number | null }[];
   total: number | null;
+  depositPaid: number;
+  remain: number | null;
+  shipping: { carrier: string; tracking: string; carrierStatus: string } | null;
   photos: PublicUploadPhoto[];
 };
 
@@ -64,6 +69,8 @@ export function publicUploadCard(input: {
     address: string;
     customerNote: string;
     total: number | null;
+    depositPaid?: number;
+    shipping?: { carrier?: string; tracking?: string; carrierStatus?: string } | null;
     items: { name: string; skuCode: string; quantity: number; lineTotal: number | null }[];
     files: { id: string; name: string; status: string; kind: string; createdAt: string; deletedAt?: string | null; print?: boolean }[];
   };
@@ -74,6 +81,10 @@ export function publicUploadCard(input: {
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : b.id.localeCompare(a.id)))
     .slice(0, PHOTO_CAP)
     .map((file) => ({ id: file.id, name: file.name, createdAt: file.createdAt, print: file.print === true }));
+  const ship = input.order.shipping;
+  const carrier = ship?.carrier?.trim() || "";
+  const tracking = ship?.tracking?.trim() || "";
+  const carrierStatus = ship?.carrierStatus?.trim() || "";
   return {
     orderId: input.order.id,
     code: input.order.code,
@@ -93,6 +104,9 @@ export function publicUploadCard(input: {
       lineTotal: item.lineTotal,
     })),
     total: input.order.total,
+    depositPaid: input.order.depositPaid,
+    remain: remainOf({ total: input.order.total, depositPaid: input.order.depositPaid }),
+    shipping: carrier || tracking || carrierStatus ? { carrier, tracking, carrierStatus } : null,
     photos,
   };
 }

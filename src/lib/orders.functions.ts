@@ -85,12 +85,18 @@ export type OrderLookupResult = {
     status: string;
     createdAt: string;
     total: number | null;
+    depositPaid: number;
+    remain: number | null;
     fulfillment: string;
     address: string | null;
     note: string | null;
+    channel: string | null;
     customerName: string;
     items: { name: string; variant: string; quantity: number; lineTotal: number | null }[];
     fileCount: number;
+    photoToken: string | null;
+    photos: { id: string; name: string; createdAt: string; print: boolean }[];
+    shipping: { carrier: string; tracking: string; carrierStatus: string } | null;
     history: { to: string; at: string; note: string }[];
   }[];
 };
