@@ -23,6 +23,7 @@ import { Route as AdminBaoCaoRouteImport } from './routes/admin.bao-cao'
 import { Route as AdminBaoCaoChiRouteImport } from './routes/admin.bao-cao-chi'
 import { Route as AdminCaiDatRouteImport } from './routes/admin.cai-dat'
 import { Route as AdminChamCongRouteImport } from './routes/admin.cham-cong'
+import { Route as AdminChatRouteImport } from './routes/admin.chat'
 import { Route as AdminChiPhiRouteImport } from './routes/admin.chi-phi'
 import { Route as AdminCodRouteImport } from './routes/admin.cod'
 import { Route as AdminDonMoiRouteImport } from './routes/admin.don-moi'
@@ -56,6 +57,7 @@ import { Route as AdminTemCodeRouteImport } from './routes/admin.tem.$code'
 import { Route as ApiAdminProductPhotoRouteImport } from './routes/api/admin/product-photo'
 import { Route as ApiPublicAlbumRouteImport } from './routes/api/public/album'
 import { Route as ApiPublicCleanupFilesRouteImport } from './routes/api/public/cleanup-files'
+import { Route as ApiPublicStudiobaseWebhookRouteImport } from './routes/api/public/studiobase-webhook'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiStaffPackingPhotoRouteImport } from './routes/api/staff/packing-photo'
 import { Route as ApiAdminDriveCallbackRouteImport } from './routes/api/admin/drive.callback'
@@ -136,6 +138,11 @@ const AdminCaiDatRoute = AdminCaiDatRouteImport.update({
 const AdminChamCongRoute = AdminChamCongRouteImport.update({
   id: '/cham-cong',
   path: '/cham-cong',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminChatRoute = AdminChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminChiPhiRoute = AdminChiPhiRouteImport.update({
@@ -303,6 +310,12 @@ const ApiPublicCleanupFilesRoute = ApiPublicCleanupFilesRouteImport.update({
   path: '/api/public/cleanup-files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStudiobaseWebhookRoute =
+  ApiPublicStudiobaseWebhookRouteImport.update({
+    id: '/api/public/studiobase-webhook',
+    path: '/api/public/studiobase-webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
   id: '/api/public/upload',
   path: '/api/public/upload',
@@ -375,6 +388,7 @@ export interface FileRoutesByFullPath {
   '/admin/bao-cao-chi': typeof AdminBaoCaoChiRoute
   '/admin/cai-dat': typeof AdminCaiDatRoute
   '/admin/cham-cong': typeof AdminChamCongRoute
+  '/admin/chat': typeof AdminChatRoute
   '/admin/chi-phi': typeof AdminChiPhiRoute
   '/admin/cod': typeof AdminCodRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
@@ -406,6 +420,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/album': typeof ApiPublicAlbumRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
+  '/api/public/studiobase-webhook': typeof ApiPublicStudiobaseWebhookRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/staff/packing-photo': typeof ApiStaffPackingPhotoRoute
   '/admin/album/': typeof AdminAlbumIndexRoute
@@ -434,6 +449,7 @@ export interface FileRoutesByTo {
   '/admin/bao-cao-chi': typeof AdminBaoCaoChiRoute
   '/admin/cai-dat': typeof AdminCaiDatRoute
   '/admin/cham-cong': typeof AdminChamCongRoute
+  '/admin/chat': typeof AdminChatRoute
   '/admin/chi-phi': typeof AdminChiPhiRoute
   '/admin/cod': typeof AdminCodRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
@@ -465,6 +481,7 @@ export interface FileRoutesByTo {
   '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/album': typeof ApiPublicAlbumRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
+  '/api/public/studiobase-webhook': typeof ApiPublicStudiobaseWebhookRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/staff/packing-photo': typeof ApiStaffPackingPhotoRoute
   '/admin/album': typeof AdminAlbumIndexRoute
@@ -495,6 +512,7 @@ export interface FileRoutesById {
   '/admin/bao-cao-chi': typeof AdminBaoCaoChiRoute
   '/admin/cai-dat': typeof AdminCaiDatRoute
   '/admin/cham-cong': typeof AdminChamCongRoute
+  '/admin/chat': typeof AdminChatRoute
   '/admin/chi-phi': typeof AdminChiPhiRoute
   '/admin/cod': typeof AdminCodRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
@@ -526,6 +544,7 @@ export interface FileRoutesById {
   '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/album': typeof ApiPublicAlbumRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
+  '/api/public/studiobase-webhook': typeof ApiPublicStudiobaseWebhookRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/staff/packing-photo': typeof ApiStaffPackingPhotoRoute
   '/admin/album/': typeof AdminAlbumIndexRoute
@@ -557,6 +576,7 @@ export interface FileRouteTypes {
     | '/admin/bao-cao-chi'
     | '/admin/cai-dat'
     | '/admin/cham-cong'
+    | '/admin/chat'
     | '/admin/chi-phi'
     | '/admin/cod'
     | '/admin/don-moi'
@@ -588,6 +608,7 @@ export interface FileRouteTypes {
     | '/api/admin/product-photo'
     | '/api/public/album'
     | '/api/public/cleanup-files'
+    | '/api/public/studiobase-webhook'
     | '/api/public/upload'
     | '/api/staff/packing-photo'
     | '/admin/album/'
@@ -616,6 +637,7 @@ export interface FileRouteTypes {
     | '/admin/bao-cao-chi'
     | '/admin/cai-dat'
     | '/admin/cham-cong'
+    | '/admin/chat'
     | '/admin/chi-phi'
     | '/admin/cod'
     | '/admin/don-moi'
@@ -647,6 +669,7 @@ export interface FileRouteTypes {
     | '/api/admin/product-photo'
     | '/api/public/album'
     | '/api/public/cleanup-files'
+    | '/api/public/studiobase-webhook'
     | '/api/public/upload'
     | '/api/staff/packing-photo'
     | '/admin/album'
@@ -676,6 +699,7 @@ export interface FileRouteTypes {
     | '/admin/bao-cao-chi'
     | '/admin/cai-dat'
     | '/admin/cham-cong'
+    | '/admin/chat'
     | '/admin/chi-phi'
     | '/admin/cod'
     | '/admin/don-moi'
@@ -707,6 +731,7 @@ export interface FileRouteTypes {
     | '/api/admin/product-photo'
     | '/api/public/album'
     | '/api/public/cleanup-files'
+    | '/api/public/studiobase-webhook'
     | '/api/public/upload'
     | '/api/staff/packing-photo'
     | '/admin/album/'
@@ -738,6 +763,7 @@ export interface RootRouteChildren {
   ApiAdminProductPhotoRoute: typeof ApiAdminProductPhotoRoute
   ApiPublicAlbumRoute: typeof ApiPublicAlbumRoute
   ApiPublicCleanupFilesRoute: typeof ApiPublicCleanupFilesRoute
+  ApiPublicStudiobaseWebhookRoute: typeof ApiPublicStudiobaseWebhookRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
   ApiStaffPackingPhotoRoute: typeof ApiStaffPackingPhotoRoute
   ApiAdminDriveCallbackRoute: typeof ApiAdminDriveCallbackRoute
@@ -849,6 +875,13 @@ declare module '@tanstack/react-router' {
       path: '/cham-cong'
       fullPath: '/admin/cham-cong'
       preLoaderRoute: typeof AdminChamCongRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/chat': {
+      id: '/admin/chat'
+      path: '/chat'
+      fullPath: '/admin/chat'
+      preLoaderRoute: typeof AdminChatRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/chi-phi': {
@@ -1082,6 +1115,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCleanupFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/studiobase-webhook': {
+      id: '/api/public/studiobase-webhook'
+      path: '/api/public/studiobase-webhook'
+      fullPath: '/api/public/studiobase-webhook'
+      preLoaderRoute: typeof ApiPublicStudiobaseWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/upload': {
       id: '/api/public/upload'
       path: '/api/public/upload'
@@ -1168,6 +1208,7 @@ interface AdminRouteChildren {
   AdminBaoCaoChiRoute: typeof AdminBaoCaoChiRoute
   AdminCaiDatRoute: typeof AdminCaiDatRoute
   AdminChamCongRoute: typeof AdminChamCongRoute
+  AdminChatRoute: typeof AdminChatRoute
   AdminChiPhiRoute: typeof AdminChiPhiRoute
   AdminCodRoute: typeof AdminCodRoute
   AdminDonMoiRoute: typeof AdminDonMoiRoute
@@ -1204,6 +1245,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBaoCaoChiRoute: AdminBaoCaoChiRoute,
   AdminCaiDatRoute: AdminCaiDatRoute,
   AdminChamCongRoute: AdminChamCongRoute,
+  AdminChatRoute: AdminChatRoute,
   AdminChiPhiRoute: AdminChiPhiRoute,
   AdminCodRoute: AdminCodRoute,
   AdminDonMoiRoute: AdminDonMoiRoute,
@@ -1251,6 +1293,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminProductPhotoRoute: ApiAdminProductPhotoRoute,
   ApiPublicAlbumRoute: ApiPublicAlbumRoute,
   ApiPublicCleanupFilesRoute: ApiPublicCleanupFilesRoute,
+  ApiPublicStudiobaseWebhookRoute: ApiPublicStudiobaseWebhookRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
   ApiStaffPackingPhotoRoute: ApiStaffPackingPhotoRoute,
   ApiAdminDriveCallbackRoute: ApiAdminDriveCallbackRoute,

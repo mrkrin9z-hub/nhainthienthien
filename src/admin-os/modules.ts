@@ -34,6 +34,7 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
   {
     title: "Kinh doanh",
     items: [
+      { to: "/admin/chat", label: "Chat", roles: ["owner", "sale"], managePath: "/manage/conversations" },
       { to: "/admin/don-hang", label: "Đơn hàng", roles: ["owner", "sale", "production"], managePath: "/manage/orders" },
       { to: "/admin/khach", label: "Khách hàng", roles: ["owner", "sale"], managePath: "/manage/customers" },
       { to: "/admin/thu", label: "Thu tiền", roles: ["owner", "sale"], managePath: "/manage/wallet" },

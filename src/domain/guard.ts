@@ -117,6 +117,9 @@ export const INTEGRATION_PROVIDERS = [
   "google_client_id",
   "google_client_secret",
   "google_drive",
+  "studiobase_chat_api_key",
+  "studiobase_anon_key",
+  "studiobase_webhook_secret",
 ] as const;
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
 
@@ -145,5 +148,8 @@ export function emptySecretStatus(): Record<IntegrationProvider, boolean> {
     google_client_id: false,
     google_client_secret: false,
     google_drive: false,
+    studiobase_chat_api_key: false,
+    studiobase_anon_key: false,
+    studiobase_webhook_secret: false,
   };
 }

@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageCircle,
   Package,
   Plug,
   Receipt,
@@ -50,6 +51,7 @@ export const Route = createFileRoute("/admin")({
 
 const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin": LayoutDashboard,
+  "/admin/chat": MessageCircle,
   "/admin/don-hang": ClipboardList,
   "/admin/don-moi": ClipboardList,
   "/admin/san-xuat": ClipboardList,

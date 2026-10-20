@@ -81,6 +81,11 @@ function ConnectPage() {
         <SecretField field={{ id: "shopee_partner_id", label: "Partner ID", hint: "Số partner_id của app." }} saved={Boolean(status.data?.shopee_partner_id)} inputType="text" />
         <SecretField field={{ id: "shopee_partner_key", label: "Partner key", hint: "Khóa ký. Không hiện lại sau khi lưu." }} saved={Boolean(status.data?.shopee_partner_key)} />
       </ShopCard>
+      <StudioBaseCard
+        apiSaved={Boolean(status.data?.studiobase_chat_api_key)}
+        anonSaved={Boolean(status.data?.studiobase_anon_key)}
+        hookSaved={Boolean(status.data?.studiobase_webhook_secret)}
+      />
       <CarrierCards status={status.data} />
       {FIELDS.map((field) => (
         <div key={field.id} className="glass-card rounded-3xl p-4">
@@ -88,6 +93,39 @@ function ConnectPage() {
         </div>
       ))}
     </div>
+  );
+}
+
+function StudioBaseCard({ apiSaved, anonSaved, hookSaved }: { apiSaved: boolean; anonSaved: boolean; hookSaved: boolean }) {
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
+  const webhook = `${origin}/api/public/studiobase-webhook`;
+  return (
+    <section className="glass-card space-y-3 rounded-3xl p-4">
+      <h2 className="font-bold text-primary">StudioBase Partner Chat</h2>
+      <p className="text-xs text-muted-foreground">
+        Inbox Messenger / Comment / Zalo và tạo đơn gắn hội thoại. Owner tạo API key tại StudioBase → Cài đặt → Partner Chat. App không OAuth Meta/Zalo.
+      </p>
+      <SecretField
+        field={{ id: "studiobase_chat_api_key", label: "Chat API key", hint: "Bearer sbchat_live_… Không hiện lại sau khi lưu." }}
+        saved={apiSaved}
+      />
+      <SecretField
+        field={{ id: "studiobase_anon_key", label: "Supabase anon / publishable key", hint: "Header apikey công khai của project StudioBase." }}
+        saved={anonSaved}
+      />
+      <SecretField
+        field={{ id: "studiobase_webhook_secret", label: "Webhook secret", hint: "Ký X-StudioBase-Signature (sha256 HMAC)." }}
+        saved={hookSaved}
+      />
+      <p className="break-all text-xs text-muted-foreground">Webhook URL: {origin ? webhook : "/api/public/studiobase-webhook"}</p>
+      <p className="text-sm font-semibold">{apiSaved && anonSaved ? "Đã có khóa Chat — mở mục Chat trên menu." : "Chưa đủ khóa Chat."}</p>
+      {apiSaved && anonSaved ? (
+        <Button asChild variant="outline" className="min-h-11">
+          <a href="/admin/chat">Mở Chat</a>
+        </Button>
+      ) : null}
+    </section>
   );
 }
 

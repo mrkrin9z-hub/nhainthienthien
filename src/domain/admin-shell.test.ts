@@ -71,6 +71,7 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../routes/admin.thu.tsx", import.meta.url), "utf8"), /Nộp tiền mặt/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Két tiệm/);
   const modules = readFileSync(new URL("../admin-os/modules.ts", import.meta.url), "utf8");
+  assert.match(modules, /label: "Chat"/);
   assert.match(modules, /label: "Thu tiền"/);
   assert.match(modules, /label: "Ví tiền"/);
   assert.match(modules, /managePath: "\/manage\/orders"/);
