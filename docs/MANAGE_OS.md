@@ -10,21 +10,17 @@ Hướng đúng: **lấy luồng Manage (PhotoShare / StudioBase) làm nền v�
 
 Repo: https://github.com/mrkrin9z-hub/photosharevn/
 
-## Blocker quyền truy cập (2026-10-20)
+## Nguồn PhotoShare (tạm bỏ qua)
 
-Cloud Agent **chưa clone được** repo trên:
+URL dự kiến: https://github.com/mrkrin9z-hub/photosharevn/
 
-- Token chỉ gắn environment `nhainthienthien` → `photosharevn` trả 404
-- Repo private (GitHub web cũng 404 với token hiện tại)
+Cloud Agent run này **không clone được** (token chỉ `nhainthienthien`; user đã skip PAT / multi-repo). Manage OS tiếp tục dựa trên:
 
-Cần một trong các cách:
+- UX/luồng quan sát từ `studiobase.vn/manage`
+- Domain xưởng sẵn có trong repo này
+- `src/admin-os/modules.ts` làm bản đồ module
 
-1. Invite GitHub App / bot Cursor vào `photosharevn` (Read)
-2. Thêm `github.com/mrkrin9z-hub/photosharevn` vào Cloud Agent environment (multi-repo)
-3. Tạm Public repo
-4. Upload zip nhánh có `/manage` lên Drive
-
-Sau khi có quyền: clone → khảo sát `/manage` → port shell/luồng vào `src/admin-os` + adapters domain xưởng.
+Khi có source: port shell thật; không merge DB studio.
 
 ## Kiến trúc 3 lớp
 
