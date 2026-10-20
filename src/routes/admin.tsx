@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ADMIN_MODULE_GROUPS, modulesForRole } from "@/admin-os/modules";
 import { LOGO_HORIZONTAL } from "@/lib/assets";
 import { changeOwnPassword, getMe, loginStaff, logoutStaff } from "@/lib/admin.functions";
 import { ROLE_LABEL, type Role } from "@/domain/types";
@@ -78,56 +79,6 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin/cai-dat": Settings,
 };
 
-const GROUPS: { title: string; items: { to: string; label: string; roles: Role[] }[] }[] = [
-  {
-    title: "",
-    items: [{ to: "/admin", label: "Trang chủ", roles: ["owner", "sale", "production"] }],
-  },
-  {
-    title: "Kinh doanh",
-    items: [
-      { to: "/admin/don-hang", label: "Đơn hàng", roles: ["owner", "sale", "production"] },
-      { to: "/admin/khach", label: "Khách hàng", roles: ["owner", "sale"] },
-      { to: "/admin/thu", label: "Thu tiền", roles: ["owner", "sale"] },
-    ],
-  },
-  {
-    title: "Sản xuất",
-    items: [
-      { to: "/admin/san-xuat", label: "Sản xuất", roles: ["owner", "sale", "production"] },
-      { to: "/admin/giao-hang", label: "Giao hàng", roles: ["owner", "sale", "production"] },
-      { to: "/admin/san-pham", label: "Sản phẩm", roles: ["owner"] },
-      { to: "/admin/gia", label: "Bảng giá", roles: ["owner", "sale"] },
-      { to: "/admin/kho", label: "Kho", roles: ["owner", "sale", "production"] },
-      { to: "/admin/album", label: "Album ảnh", roles: ["owner", "sale", "production"] },
-    ],
-  },
-  {
-    title: "Vận hành",
-    items: [
-      { to: "/admin/nhan-vien", label: "Nhân viên", roles: ["owner"] },
-      { to: "/admin/cham-cong", label: "Chấm công", roles: ["owner", "sale", "production"] },
-      { to: "/admin/tai-khoan", label: "Tài khoản", roles: ["sale", "production"] },
-    ],
-  },
-  {
-    title: "Tài chính",
-    items: [
-      { to: "/admin/vi", label: "Ví tiền", roles: ["owner", "sale"] },
-      { to: "/admin/chi-phi", label: "Chi phí", roles: ["owner"] },
-      { to: "/admin/loi-nhuan", label: "Thu chi", roles: ["owner"] },
-      { to: "/admin/bao-cao", label: "Báo cáo", roles: ["owner"] },
-    ],
-  },
-  {
-    title: "Hệ thống",
-    items: [
-      { to: "/admin/nhat-ky", label: "Nhật ký", roles: ["owner"] },
-      { to: "/admin/cai-dat", label: "Cài đặt", roles: ["owner"] },
-    ],
-  },
-];
-
 function pathActive(pathname: string, to: string) {
   if (to === "/admin") return pathname === "/admin" || pathname === "/admin/";
   return pathname === to || pathname.startsWith(`${to}/`);
@@ -138,7 +89,7 @@ function pageTitle(pathname: string, role: Role): string {
   if (pathname.startsWith("/admin/tem/")) return "Tem đơn";
   if (pathname.startsWith("/admin/don-hang/") && pathname !== "/admin/don-hang" && pathname !== "/admin/don-hang/") return "Chi tiết đơn";
   if (pathname.startsWith("/admin/khach/") && pathname !== "/admin/khach" && pathname !== "/admin/khach/") return "Hồ sơ khách";
-  const items = GROUPS.flatMap((group) => group.items).filter((item) => item.roles.includes(role));
+  const items = ADMIN_MODULE_GROUPS.flatMap((group) => group.items).filter((item) => item.roles.includes(role));
   const match = items
     .filter((item) => pathActive(pathname, item.to))
     .sort((a, b) => b.to.length - a.to.length)[0];
@@ -177,10 +128,7 @@ function AdminLayout() {
   }
 
   const title = pageTitle(pathname, role);
-  const groups = GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => item.roles.includes(role)),
-  })).filter((group) => group.items.length > 0);
+  const groups = modulesForRole(role);
 
   return (
     <div className="admin-desk flex min-h-screen">
