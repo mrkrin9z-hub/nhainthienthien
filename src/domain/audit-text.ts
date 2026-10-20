@@ -32,6 +32,7 @@ export const AUDIT_ACTIONS: { action: string; label: string }[] = [
   { action: "cost.fixed", label: "Chi phí cố định" },
   { action: "cost.expense", label: "Chi phí" },
   { action: "wallet.adjust", label: "Điều chỉnh ví" },
+  { action: "cash.handover", label: "Nộp tiền mặt" },
   { action: "settings.update", label: "Cài đặt" },
   { action: "file.delete", label: "Xóa file" },
   { action: "backup.manual", label: "Sao lưu" },
@@ -226,6 +227,8 @@ function detailOf(item: Pick<Audit, "action" | "entity" | "before" | "after">, s
       return `ghi chi phí ${text(after.name)}: ${dong(after.amount)}${walletBit(after.wallet)}`;
     case "wallet.adjust":
       return `điều chỉnh ví ${walletName(after?.wallet)}: ${dong(after?.amount)}${after?.note ? ` (${text(after.note)})` : ""}`;
+    case "cash.handover":
+      return `nộp ${dong(after?.amount)} tiền mặt của ${personLabel(text(after?.fromId), shop)} vào két${after?.note ? ` (${text(after.note)})` : ""}`;
     case "settings.update":
       return `sửa cài đặt: ${settingsBits(item.before, item.after, shop)}`;
     case "staff.update":

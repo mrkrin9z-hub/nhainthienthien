@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-/** Một trang danh sách, cùng cỡ trang khách của StudioBase. */
-export const LIST_PAGE_SIZE = 20;
+/** Một trang danh sách, cùng cỡ trang đơn của StudioBase manage. */
+export const LIST_PAGE_SIZE = 30;
 
 export function useListPage<T>(rows: T[], resetKey: string) {
   const [page, setPage] = useState(1);
@@ -41,12 +41,11 @@ export function ListPager({
   noun: string;
   onPage: (page: number) => void;
 }) {
-  const from = total === 0 ? 0 : start + 1;
-  const to = start + count;
+  const shown = total === 0 ? 0 : count;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+    <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-muted-foreground">
       <p>
-        Hiển thị <span className="font-semibold text-foreground">{from}–{to}</span> / {total} {noun}
+        Hiển thị <span className="font-semibold text-foreground">{shown}</span> / {total} {noun}
       </p>
       {pages > 1 ? (
         <div className="flex items-center gap-2">

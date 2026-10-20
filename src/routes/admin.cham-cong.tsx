@@ -8,6 +8,7 @@ import { ListPager, useListPage } from "@/components/admin/list-page";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { StaffLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { vnMonth } from "@/domain/calc";
 import { getAttendance, getMe, grantLeave, punchClock } from "@/lib/admin.functions";
@@ -206,20 +207,41 @@ function PunchRow({
 
 function LeaveForm({ staffId, onDone }: { staffId: string; onDone: () => Promise<void> }) {
   const [date, setDate] = useState("");
+  const [open, setOpen] = useState(false);
   return (
-    <div className="mt-3 grid grid-cols-1 gap-2 sm:flex">
-      <Input className="h-12 w-full sm:w-auto" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-      <Button
-        variant="outline"
-        className="min-h-11"
-        onClick={async () => {
-          await grantLeave({ data: { staffId, date, note: "Nghỉ có phép" } });
-          toast.success("Đã ghi ngày nghỉ");
-          await onDone();
-        }}
-      >
+    <>
+      <Button variant="outline" className="mt-3 min-h-11" type="button" onClick={() => setOpen(true)}>
         Nghỉ có phép
       </Button>
-    </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ghi ngày nghỉ</DialogTitle>
+          </DialogHeader>
+          <label className="block text-sm font-semibold">
+            Ngày nghỉ
+            <Input className="mt-1 h-12 w-full" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          <DialogFooter>
+            <Button
+              className="min-h-11"
+              onClick={async () => {
+                if (!date) {
+                  toast.error("Chọn ngày nghỉ");
+                  return;
+                }
+                await grantLeave({ data: { staffId, date, note: "Nghỉ có phép" } });
+                setDate("");
+                setOpen(false);
+                toast.success("Đã ghi ngày nghỉ");
+                await onDone();
+              }}
+            >
+              Lưu ngày nghỉ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

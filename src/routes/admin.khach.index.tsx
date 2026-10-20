@@ -87,17 +87,19 @@ function CustomersBody() {
       <div className="overflow-hidden rounded-md border bg-card">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Khách</TableHead>
-              <TableHead>Điện thoại</TableHead>
+            <TableRow className="bg-muted/40 text-[11px] tracking-wide uppercase">
+              <TableHead className="w-14">STT</TableHead>
+              <TableHead>Khách hàng</TableHead>
+              <TableHead>SĐT</TableHead>
               <TableHead>Kênh</TableHead>
               <TableHead className="text-right">Đơn</TableHead>
               <TableHead className="text-right">Doanh số</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {list.slice.map((customer) => (
+            {list.slice.map((customer, index) => (
               <TableRow key={customer.id}>
+                <TableCell className="text-muted-foreground">{list.start + index + 1}</TableCell>
                 <TableCell>
                   <Link to="/admin/khach/$id" params={{ id: customer.id }} className="font-medium text-primary">
                     {customer.name}
@@ -116,7 +118,7 @@ function CustomersBody() {
             ))}
             {customers.data && shown.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
                   {rows.length === 0 ? "Chưa có khách." : "Không có khách khớp bộ lọc."}
                 </TableCell>
               </TableRow>
@@ -130,9 +132,9 @@ function CustomersBody() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-card p-3">
+    <div className="rounded-md border bg-card p-3">
       <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-primary">{value}</p>
+      <p className="mt-1 text-xl font-semibold">{value}</p>
     </div>
   );
 }

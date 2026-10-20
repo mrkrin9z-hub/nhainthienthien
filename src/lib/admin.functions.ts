@@ -551,6 +551,22 @@ export const saveWalletAdjust = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const handCashIn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        staffId: z.string().min(1).optional(),
+        amount: z.number().int().positive().max(100_000_000),
+        note: z.string().max(200).optional().default(""),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { handCash } = await import("@/server/service");
+    await handCash(await actor(), data);
+    return { ok: true };
+  });
+
 export const getMoneyDesk = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
   .handler(async ({ data }) => {

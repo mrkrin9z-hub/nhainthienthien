@@ -77,6 +77,7 @@ import type {
   OrderStatus,
   PhotoAlbum,
   Role,
+  CashHandover,
   ShopState,
   Sku,
   SkuMap,
@@ -85,7 +86,7 @@ import type {
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL } from "@/domain/types";
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
-import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, holderBalances, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
+import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, handoverError, holderBalances, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
 import { getRequest } from "@tanstack/react-start/server";
 
@@ -2151,6 +2152,38 @@ export async function adjustWallet(actor: Actor, input: { wallet: "tien_mat" | "
   });
 }
 
+export async function handCash(actor: Actor, input: { staffId?: string; amount: number; note: string }) {
+  assertRole(actor, ["owner", "sale"]);
+  const amount = Math.round(input.amount);
+  const fromId = actor.role === "owner" && input.staffId ? input.staffId : actor.id;
+  if (actor.role !== "owner" && input.staffId && input.staffId !== actor.id) {
+    throw new Error("Chỉ nộp tiền mặt của chính mình.");
+  }
+  await mutate(async (state) => {
+    if (!state.staff.some((person) => person.id === fromId)) throw new Error("Không thấy nhân viên.");
+    const held =
+      holderBalances({
+        orders: cashOrders(state),
+        expenses: state.expenses,
+        staff: state.staff.map((person) => ({ id: person.id, name: person.name })),
+        handovers: state.handovers ?? [],
+      }).find((row) => row.staffId === fromId)?.tien_mat ?? 0;
+    const error = handoverError({ held, amount });
+    if (error) throw new Error(error);
+    const row: CashHandover = {
+      id: nid(),
+      at: nowIso(),
+      fromId,
+      amount,
+      wallet: "tien_mat",
+      note: input.note.trim(),
+      by: actor.id,
+    };
+    state.handovers = [row, ...(state.handovers ?? [])];
+    audit(state, actor.id, "cash.handover", row.id, null, { fromId, amount, note: row.note });
+  });
+}
+
 function cashOrders(state: ShopState): CashOrder[] {
   return state.orders.map((order) => {
     const row: CashOrder = {
@@ -2172,7 +2205,7 @@ function cashOrders(state: ShopState): CashOrder[] {
 }
 
 export async function moneyDesk(actor: Actor, month: string) {
-  assertRole(actor, ["owner"]);
+  assertRole(actor, ["owner", "sale"]);
   const state = await readState();
   const orders = cashOrders(state);
   const lines = buildLedger({
@@ -2202,14 +2235,47 @@ export async function moneyDesk(actor: Actor, month: string) {
       walletLabel: walletLabel(row.wallet ?? ""),
     }))
     .sort((a, b) => b.at.localeCompare(a.at));
+  const holders = holderBalances({
+    orders,
+    expenses: state.expenses,
+    staff: state.staff.map((person) => ({ id: person.id, name: person.name })),
+    handovers: state.handovers ?? [],
+  });
+  if (actor.role === "sale") {
+    const mine = holders.find((row) => row.staffId === actor.id);
+    const myLines = monthLines.filter((line) => line.holder === actor.id);
+    return {
+      month,
+      scope: "mine" as const,
+      me: {
+        name: actor.name,
+        tien_mat: mine?.tien_mat ?? 0,
+        chuyen_khoan: mine?.chuyen_khoan ?? 0,
+      },
+      cards: [],
+      holders: mine ? [mine] : [],
+      handovers: [],
+      lines: myLines,
+      expenses: [],
+      report: expenseReport([], month),
+      collected: myLines.filter((line) => line.kind === "thu").reduce((sum, line) => sum + line.amount, 0),
+    };
+  }
   return {
     month,
+    scope: "shop" as const,
+    me: null,
     cards: walletCards(lines, month),
-    holders: holderBalances({
-      orders,
-      expenses: state.expenses,
-      staff: state.staff.map((person) => ({ id: person.id, name: person.name })),
-    }),
+    holders,
+    handovers: (state.handovers ?? []).slice(0, 100).map((row) => ({
+      id: row.id,
+      at: row.at,
+      fromId: row.fromId,
+      fromName: names.get(row.fromId) ?? "Người đã nghỉ",
+      amount: row.amount,
+      note: row.note,
+      byName: row.by ? (names.get(row.by) ?? "Người đã nghỉ") : "",
+    })),
     lines: monthLines,
     expenses,
     report: expenseReport(state.expenses, month),
@@ -2225,6 +2291,7 @@ export async function collectList(actor: Actor) {
     orders,
     expenses: state.expenses,
     staff: [{ id: actor.id, name: actor.name }],
+    handovers: state.handovers ?? [],
   }).find((row) => row.staffId === actor.id);
   return {
     me: {

@@ -423,6 +423,17 @@ export type WalletAdjust = {
   by: string | null;
 };
 
+/** Nhân viên nộp tiền mặt đang giữ vào két tiệm. Không tạo thêm dòng thu trên sổ ví cửa hàng. */
+export type CashHandover = {
+  id: string;
+  at: string;
+  fromId: string;
+  amount: number;
+  wallet: "tien_mat";
+  note: string;
+  by: string | null;
+};
+
 export type PayrollLock = { month: string; at: string; by: string };
 
 export type Audit = {
@@ -463,6 +474,7 @@ export type ShopState = {
   leaves: Leave[];
   expenses: Expense[];
   walletAdjusts?: WalletAdjust[];
+  handovers?: CashHandover[];
   monthlyFixed: { month: string; key: string; amount: number }[];
   payrollLocks: PayrollLock[];
   audits: Audit[];

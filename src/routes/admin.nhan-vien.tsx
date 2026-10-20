@@ -12,8 +12,8 @@ function StaffPage() {
     <RoleGate allow={["owner"]} deny="Chỉ chủ xem.">
       <div className="space-y-4">
         <div>
-          <h1 className="text-2xl font-bold">Nhân sự</h1>
-          <p className="text-sm text-muted-foreground">Tạo tài khoản, phân quyền, chấm công và lương.</p>
+          <h1 className="text-2xl font-bold">Nhân viên</h1>
+          <p className="text-sm text-muted-foreground">Quản lý nhân viên, phân quyền ba vai, chấm công và lương.</p>
         </div>
         <div className="flex gap-1">
           <span className="inline-flex h-8 items-center rounded-md bg-sidebar-accent px-2.5 text-[13px] text-sidebar-accent-foreground">Nhân viên</span>

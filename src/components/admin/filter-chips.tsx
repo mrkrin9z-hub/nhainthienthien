@@ -72,7 +72,7 @@ export function FilterChips({
         "flex min-w-0 max-w-full gap-1.5",
         wrap
           ? "flex-wrap"
-          : "overflow-x-auto scrollbar-none rounded-2xl border border-border/70 bg-muted/50 p-1.5 md:flex-wrap md:overflow-visible",
+          : "overflow-x-auto scrollbar-none md:flex-wrap md:overflow-visible",
       )}
       style={wrap ? undefined : { WebkitOverflowScrolling: "touch" }}
     >
@@ -86,10 +86,10 @@ export function FilterChips({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(chip.id)}
-            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold whitespace-nowrap transition-transform active:scale-95 md:min-h-8 md:text-[11px]"
+            className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap transition-transform active:scale-95 md:min-h-7"
             style={{
-              borderColor: active ? chip.color : "transparent",
-              backgroundColor: active ? chip.color : `${chip.color}18`,
+              borderColor: active ? chip.color : `${chip.color}33`,
+              backgroundColor: active ? chip.color : `${chip.color}14`,
               color: active ? "#fff" : chip.color,
             }}
           >

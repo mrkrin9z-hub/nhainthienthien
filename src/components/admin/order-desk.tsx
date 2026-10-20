@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { ProductPickerDialog } from "@/components/admin/product-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,7 @@ import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { getCustomers } from "@/lib/admin.functions";
 import { formatMaybe, formatVnd } from "@/lib/brand";
 
-const control = "min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm";
+const control = "min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm";
 
 export type DeskSku = {
   id: string;
@@ -102,13 +103,16 @@ export function OrderDesk({
   const [lines, setLines] = useState<Line[]>(
     initial.lines.length
       ? initial.lines.map((line) => ({ ...line, query: "", priceTouched: line.unitPrice !== "" }))
-      : [blankLine()],
+      : mode === "create"
+        ? []
+        : [blankLine()],
   );
   const [deposit, setDeposit] = useState("");
   const [method, setMethod] = useState(mode === "create" ? "Tiền mặt" : "chuyển khoản");
   const [saving, setSaving] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const customers = useQuery({
     queryKey: ["order-customers", fullName],
     queryFn: () => getCustomers({ data: { q: fullName.trim(), includeCancelled: false } }),
@@ -140,6 +144,24 @@ export function OrderDesk({
     const sku = catalog.find((item) => item.id === skuId);
     const listed = sku?.prices?.[channel] ?? null;
     patchLine(key, { skuId, query: "", priceTouched: false, unitPrice: listed === null ? "" : String(listed) });
+  }
+
+  function addSkus(skuIds: string[]) {
+    setLines((current) => {
+      const next = [...current.filter((line) => line.skuId), ...skuIds.map((skuId) => {
+        const sku = catalog.find((item) => item.id === skuId);
+        const listed = sku?.prices?.[channel] ?? null;
+        return {
+          key: crypto.randomUUID(),
+          skuId,
+          query: "",
+          quantity: 1,
+          unitPrice: listed === null ? "" : String(listed),
+          priceTouched: false,
+        } satisfies Line;
+      })];
+      return next.length ? next : current;
+    });
   }
 
   function changeChannel(next: Channel) {
@@ -289,30 +311,45 @@ export function OrderDesk({
           <div className="mb-3 flex items-center justify-between gap-2">
             <h2 className="text-base font-semibold">Danh sách sản phẩm</h2>
             {itemsLocked ? null : (
-              <Button type="button" size="sm" variant="outline" onClick={() => setLines((current) => [...current, blankLine()])}>
+              <Button type="button" size="sm" onClick={() => setPickerOpen(true)}>
                 <Plus className="mr-1 size-3" />
                 Thêm sản phẩm
               </Button>
             )}
           </div>
-          <div className="space-y-3">
-            {priced.map((line, index) => (
-              <ProductLine
-                key={line.key}
-                index={index}
-                line={line}
-                catalog={catalog}
-                owner={owner}
-                locked={itemsLocked}
-                canRemove={!itemsLocked && lines.length > 1}
-                onQuery={(query) => patchLine(line.key, { query })}
-                onSku={(skuId) => chooseSku(line.key, skuId)}
-                onQty={(quantity) => patchLine(line.key, { quantity })}
-                onPrice={(unitPrice) => patchLine(line.key, { unitPrice, priceTouched: true })}
-                onRemove={() => setLines((current) => current.filter((item) => item.key !== line.key))}
-              />
-            ))}
-          </div>
+          {priced.length === 0 ? (
+            <p className="rounded-md border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
+              Chưa có sản phẩm. Bấm Thêm sản phẩm để chọn từ bảng giá.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {priced.map((line, index) => (
+                <ProductLine
+                  key={line.key}
+                  index={index}
+                  line={line}
+                  catalog={catalog}
+                  owner={owner}
+                  locked={itemsLocked}
+                  canRemove={!itemsLocked && lines.length > 0}
+                  onQuery={(query) => patchLine(line.key, { query })}
+                  onSku={(skuId) => chooseSku(line.key, skuId)}
+                  onQty={(quantity) => patchLine(line.key, { quantity })}
+                  onPrice={(unitPrice) => patchLine(line.key, { unitPrice, priceTouched: true })}
+                  onRemove={() => setLines((current) => current.filter((item) => item.key !== line.key))}
+                />
+              ))}
+            </div>
+          )}
+          {itemsLocked ? null : (
+            <ProductPickerDialog
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              catalog={catalog}
+              channel={channel}
+              onConfirm={addSkus}
+            />
+          )}
         </section>
       </div>
 
@@ -358,6 +395,7 @@ export function OrderDesk({
         {mode === "create" ? (
           <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
             <p className="text-sm font-medium">Thu tiền lần 1</p>
+            <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn.</p>
             <div className="flex items-end gap-2">
               <div className="min-w-0 flex-1">
                 <Field label="Số tiền">
@@ -377,6 +415,7 @@ export function OrderDesk({
         ) : (
           <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
             <p className="text-sm font-medium">Thu tiền</p>
+            <p className="text-[12px] text-muted-foreground">Ghi nhận sẽ cộng vào ví của bạn.</p>
             <div className="flex items-end gap-2">
               <div className="min-w-0 flex-1">
                 <Field label="Số tiền">
@@ -405,7 +444,7 @@ export function OrderDesk({
                   .finally(() => setCollecting(false));
               }}
             >
-              {collecting ? "Đang ghi…" : "Ghi nhận"}
+              {collecting ? "Đang ghi…" : "Ghi nhận vào ví của bạn"}
             </Button>
           </div>
         )}

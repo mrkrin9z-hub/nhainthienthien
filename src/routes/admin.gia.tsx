@@ -124,16 +124,17 @@ function PricePage() {
       ) : null}
       <FilterChips label="Giá kênh đang chọn" value={priced} chips={priceChips} onChange={setPriced} />
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="khổ" onPage={list.setPage} />
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
-        <div className="hidden grid-cols-[7rem_minmax(0,1.4fr)_8rem_minmax(0,1fr)] gap-2 border-b bg-muted/50 px-3 py-3 text-xs font-semibold text-muted-foreground md:grid">
-          <span>Mã</span>
-          <span>Quy cách</span>
+      <div className="overflow-hidden rounded-md border bg-card">
+        <div className="hidden grid-cols-[3rem_7rem_minmax(0,1.4fr)_8rem_minmax(0,1fr)] gap-2 border-b bg-muted/40 px-3 py-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase md:grid">
+          <span>STT</span>
+          <span>Mã SP</span>
+          <span>Tên sản phẩm</span>
           <span>Giá</span>
           <span>Trạng thái</span>
         </div>
         <div className="divide-y">
-          {list.slice.map((row) => (
-            <PriceRow key={`${row.skuId}-${channel}`} row={row} channel={channel} owner={owner} />
+          {list.slice.map((row, index) => (
+            <PriceRow key={`${row.skuId}-${channel}`} row={row} channel={channel} owner={owner} stt={list.start + index + 1} />
           ))}
         </div>
       </div>
@@ -208,6 +209,7 @@ function PriceRow({
   row,
   channel,
   owner,
+  stt,
 }: {
   row: {
     skuId: string;
@@ -218,6 +220,7 @@ function PriceRow({
   };
   channel: Channel;
   owner: boolean;
+  stt: number;
 }) {
   const queryClient = useQueryClient();
   const cell = row.prices[channel] ?? { price: null, status: "dang_ban", note: "" };
@@ -262,21 +265,24 @@ function PriceRow({
   ) : null;
 
   return (
-    <article className="grid gap-3 p-3 md:grid-cols-[7rem_minmax(0,1.4fr)_8rem_minmax(0,1fr)] md:items-center md:gap-2 md:px-3">
-      <p className="font-semibold md:text-sm">{row.code}</p>
-      <div className="text-sm">
-        <p>{row.name}</p>
+    <article className="grid gap-3 p-3 md:grid-cols-[3rem_7rem_minmax(0,1.4fr)_8rem_minmax(0,1fr)] md:items-center md:gap-2 md:px-3">
+      <p className="hidden text-[13px] text-muted-foreground md:block">{stt}</p>
+      <p className="font-semibold md:text-[13px]">
+        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[12px]">{row.code}</span>
+      </p>
+      <div className="text-[13px]">
+        <p className="font-medium">{row.name}</p>
         {pack}
       </div>
-      <Input className="h-11 md:w-full" inputMode="numeric" value={price} placeholder="Chưa có" disabled={!owner} aria-label={`Giá ${row.name}`} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
+      <Input className="h-9 md:w-full" inputMode="numeric" value={price} placeholder="Chưa có" disabled={!owner} aria-label={`Giá ${row.name}`} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
       <div className="flex gap-2">
-        <select className="min-h-11 min-w-0 flex-1 rounded-xl border bg-background px-2" value={status} disabled={!owner} aria-label={`Trạng thái ${row.name}`} onChange={(e) => setStatus(e.target.value)}>
+        <select className="min-h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-[13px]" value={status} disabled={!owner} aria-label={`Trạng thái ${row.name}`} onChange={(e) => setStatus(e.target.value)}>
           <option value="dang_ban">Đang bán</option>
           <option value="nhap">Chưa có giá</option>
           <option value="cho_duyet">Chờ duyệt</option>
         </select>
         {owner ? (
-          <Button className="min-h-11 shrink-0" onClick={save}>
+          <Button className="min-h-9 shrink-0" onClick={save}>
             Lưu
           </Button>
         ) : null}

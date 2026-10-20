@@ -95,6 +95,7 @@ export function MoneyLinks() {
         label="Tài chính"
         items={[
           { to: "/admin/thu", label: "Thu tiền" },
+          { to: "/admin/vi", label: "Ví tiền" },
           { to: "/admin/kpi", label: "KPI" },
         ]}
       />

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { appendCollection, buildLedger, expenseReport, expenseStamp, holderBalances, ordersToCollect, walletCards, walletOfMethod, type CashOrder } from "./money.ts";
+import { appendCollection, buildLedger, expenseReport, expenseStamp, handoverError, holderBalances, ordersToCollect, SHOP_TILL_ID, walletCards, walletOfMethod, type CashOrder } from "./money.ts";
 
 function order(partial: Partial<CashOrder> & Pick<CashOrder, "id" | "code">): CashOrder {
   return {
@@ -126,6 +126,36 @@ test("thu vào ví người thu và chi trừ ví người ghi", () => {
     staff: [{ id: "sale", name: "Lan" }],
   });
   assert.equal(legacy.find((row) => row.staffId === "sale")?.tien_mat, 15000);
+});
+
+test("nộp tiền mặt chuyển từ người thu sang két, ví cửa hàng không thêm dòng", () => {
+  const orders = [
+    order({
+      id: "o",
+      code: "TT",
+      depositPaid: 80000,
+      depositMethod: "Tiền mặt",
+      depositBy: "sale",
+      payments: [{ at: "2026-10-10T05:00:00.000Z", amount: 80000, method: "Tiền mặt", by: "sale" }],
+    }),
+  ];
+  const staff = [{ id: "sale", name: "Lan" }];
+  const before = holderBalances({ orders, expenses: [], staff });
+  assert.equal(before.find((row) => row.staffId === "sale")?.tien_mat, 80000);
+  assert.equal(handoverError({ held: 80000, amount: 30000 }), null);
+  assert.match(handoverError({ held: 80000, amount: 90000 }) ?? "", /lớn hơn/);
+  assert.match(handoverError({ held: 80000, amount: 0 }) ?? "", /chưa đúng/);
+  const after = holderBalances({
+    orders,
+    expenses: [],
+    staff,
+    handovers: [{ fromId: "sale", amount: 30000 }],
+  });
+  assert.equal(after.find((row) => row.staffId === "sale")?.tien_mat, 50000);
+  assert.equal(after.find((row) => row.staffId === SHOP_TILL_ID)?.tien_mat, 30000);
+  assert.equal(after[0]?.staffId, SHOP_TILL_ID);
+  const lines = buildLedger({ orders, expenses: [], adjusts: [] });
+  assert.equal(walletCards(lines, "2026-10").find((card) => card.id === "tien_mat")?.balance, 80000);
 });
 
 test("ngày chi giữa trưa giờ Việt Nam", () => {
