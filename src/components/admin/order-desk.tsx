@@ -63,6 +63,8 @@ export function OrderDesk({
   catalog,
   initial,
   paidSoFar,
+  payments = [],
+  transfer = null,
   onSave,
   onCollect,
 }: {
@@ -84,6 +86,8 @@ export function OrderDesk({
     lines: { key: string; skuId: string; quantity: number; unitPrice: string }[];
   };
   paidSoFar: number;
+  payments?: { at: string; amount: number; method: string; byName: string }[];
+  transfer?: { image: string; content: string; bank: string; holder: string; amount: number } | null;
   onSave: (value: DeskSave) => Promise<void>;
   onCollect?: (amount: number, method: string) => Promise<void>;
 }) {
@@ -323,6 +327,29 @@ export function OrderDesk({
             <span className="text-muted-foreground">Đã thu</span>
             <span className="font-medium">{formatVnd(paid)}</span>
           </div>
+          {payments.length > 0 ? (
+            <ul className="space-y-1 border-t pt-2 text-xs text-muted-foreground">
+              {payments.map((payment, index) => (
+                <li key={`${payment.at}-${index}`} className="flex justify-between gap-2">
+                  <span>
+                    {new Date(payment.at).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+                    {" · "}
+                    {payment.method}
+                    {payment.byName ? ` · ${payment.byName}` : ""}
+                  </span>
+                  <span className="shrink-0 font-semibold text-foreground">{formatVnd(payment.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {transfer ? (
+            <div className="rounded-lg border bg-background p-3 text-center">
+              <img src={transfer.image} alt={`Mã chuyển khoản ${transfer.content}`} className="mx-auto h-40 w-40" />
+              <p className="mt-2 text-xs text-muted-foreground">
+                {transfer.bank} · {transfer.holder}. Nội dung chuyển khoản: <strong className="text-foreground">{transfer.content}</strong>
+              </p>
+            </div>
+          ) : null}
           <div className="flex justify-between">
             <span className="text-muted-foreground">{remain !== null && remain < 0 ? "Dư tiền" : "Còn lại"}</span>
             <span className="font-semibold">{remain === null ? "—" : formatVnd(Math.abs(remain))}</span>

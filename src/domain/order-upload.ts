@@ -30,7 +30,7 @@ export function customerUploadPath(token: string): string {
   return `/gui-anh/${token}`;
 }
 
-export type PublicUploadPhoto = { id: string; name: string; createdAt: string };
+export type PublicUploadPhoto = { id: string; name: string; createdAt: string; print: boolean };
 
 export type PublicUploadCard = {
   orderId: string;
@@ -65,7 +65,7 @@ export function publicUploadCard(input: {
     customerNote: string;
     total: number | null;
     items: { name: string; skuCode: string; quantity: number; lineTotal: number | null }[];
-    files: { id: string; name: string; status: string; kind: string; createdAt: string; deletedAt?: string | null }[];
+    files: { id: string; name: string; status: string; kind: string; createdAt: string; deletedAt?: string | null; print?: boolean }[];
   };
   customer: { name: string; phone: string } | undefined;
 }): PublicUploadCard {
@@ -73,7 +73,7 @@ export function publicUploadCard(input: {
     .filter((file) => file.kind === "original" && file.status === "complete" && !file.deletedAt)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : b.id.localeCompare(a.id)))
     .slice(0, PHOTO_CAP)
-    .map((file) => ({ id: file.id, name: file.name, createdAt: file.createdAt }));
+    .map((file) => ({ id: file.id, name: file.name, createdAt: file.createdAt, print: file.print === true }));
   return {
     orderId: input.order.id,
     code: input.order.code,

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
-import { changeStatus, getMe, getOrderDetail, getSkuOptions, recordDeposit, reviseOrder, saveNote, saveReprint, storeShipping } from "@/lib/admin.functions";
+import { changeStatus, getMe, getOrderDetail, getSkuOptions, orderUploadLink, recordDeposit, reviseOrder, saveNote, savePackCheck, saveReprint, setPrintChoice, storeShipping } from "@/lib/admin.functions";
 import { isMergedWoodAlias, isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
 import { marketplaceEditLocked } from "@/domain/order-edit";
 import { JT_CARRIER, jtOrder } from "@/domain/jt";
@@ -27,6 +27,7 @@ const FILE_KIND: Record<string, string> = {
   design: "Thiết kế",
   approval: "Duyệt",
   packing_video: "Video đóng gói",
+  packing_photo: "Ảnh gói hàng",
 };
 
 function OrderDetailPage() {
@@ -129,6 +130,8 @@ function OrderDetailPage() {
             }
             catalog={((skus.data ?? []) as DeskSku[]).filter((sku) => !isMergedWoodAlias(sku) || data.items.some((item) => item.skuId === sku.id))}
             paidSoFar={data.depositPaid ?? 0}
+            payments={data.payments ?? []}
+            transfer={data.transfer?.image ? data.transfer : null}
             initial={{
               channel: data.channel,
               fullName: data.customerName,
@@ -249,6 +252,15 @@ function OrderDetailPage() {
         )}
       </section>
 
+      <PackBox
+        orderId={data.id}
+        check={data.packCheck}
+        hasPhoto={data.hasPackingPhoto}
+        photoId={data.files.find((file) => file.kind === "packing_photo")?.id ?? null}
+        closed={data.status === "huy" || data.status === "xong"}
+        onDone={refresh}
+      />
+
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Chuyển bước</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -265,7 +277,7 @@ function OrderDetailPage() {
         {role === "owner" ? (
           <label className="mt-2 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
-            Chủ bỏ qua điều kiện cọc
+            Chủ bỏ qua cọc và checklist giao
           </label>
         ) : null}
         {role === "owner" && closed ? (
@@ -311,6 +323,23 @@ function OrderDetailPage() {
           >
             Chép câu trả lời
           </Button>
+          {role !== "production" && (data.status === "giao" || data.status === "xong") ? (
+            <Button
+              variant="outline"
+              className="mt-2 min-h-11"
+              onClick={() => {
+                void orderUploadLink({ data: { orderId: data.id, rotate: false } })
+                  .then(async (result) => {
+                    const link = `${window.location.origin}/danh-gia/${result.token}`;
+                    await navigator.clipboard.writeText(link);
+                    toast.success("Đã chép câu hỏi cho khách");
+                  })
+                  .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không tạo được link."));
+              }}
+            >
+              Chép câu hỏi đánh giá
+            </Button>
+          ) : null}
         </div>
       </section>
 
@@ -372,14 +401,36 @@ function OrderDetailPage() {
           </div>
         </div>
         {data.files.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Chưa có file.</p> : null}
+        {data.files.some((file) => file.kind === "original") ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {data.files.filter((file) => file.kind === "original" && file.print).length > 0
+              ? `Khách chọn ${data.files.filter((file) => file.kind === "original" && file.print).length} ảnh để in.`
+              : "Chưa chọn ảnh. Xưởng in mọi ảnh gốc cho đến khi có ảnh được đánh dấu."}
+          </p>
+        ) : null}
         <ul className="mt-3 grid grid-cols-3 gap-2">
           {data.files.filter((file) => canPreviewPhoto(file)).map((file) => (
             <li key={file.id}>
               <button type="button" className="block w-full overflow-hidden rounded-2xl border border-border bg-muted text-left" onClick={() => setOpenFile(file.id)}>
                 <img src={staffThumb(file.id)} alt={file.name} className="aspect-square w-full object-cover" />
                 <span className="block truncate px-2 pt-1 text-xs font-semibold">{file.name}</span>
-                <span className="block truncate px-2 pb-2 text-[11px] text-muted-foreground">{FILE_KIND[file.kind] ?? file.kind}</span>
+                <span className="block truncate px-2 text-[11px] text-muted-foreground">{FILE_KIND[file.kind] ?? file.kind}</span>
               </button>
+              {file.kind === "original" ? (
+                <button
+                  type="button"
+                  className={`w-full px-2 py-1 text-left text-[11px] font-semibold ${file.print ? "text-primary" : "text-muted-foreground"}`}
+                  onClick={() => {
+                    void setPrintChoice({ data: { orderId: data.id, fileId: file.id, print: !file.print } })
+                      .then(() => refresh())
+                      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không lưu được lựa chọn."));
+                  }}
+                >
+                  {file.print ? "Bỏ chọn in" : "In ảnh này"}
+                </button>
+              ) : (
+                <span className="block px-2 pb-2" />
+              )}
             </li>
           ))}
         </ul>
@@ -465,6 +516,15 @@ function OrderDetailPage() {
       {tab === "lich-su" ? (
       <section className="rounded-md border bg-card p-4">
         <h2 className="font-bold text-primary">Lịch sử</h2>
+        {(data.itemChanges ?? []).length > 0 ? (
+          <ul className="mt-2 space-y-1 text-sm">
+            {data.itemChanges.map((item, index) => (
+              <li key={`item-${index}`}>
+                {new Date(item.at).toLocaleString("vi-VN")} · Đổi sản phẩm · {item.byName || "Hệ thống"} · {item.note}
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <ul className="mt-2 space-y-1 text-sm">
           {data.history.map((item, index) => (
             <li key={index}>
@@ -476,6 +536,83 @@ function OrderDetailPage() {
       </section>
       ) : null}
     </div>
+  );
+}
+
+function PackBox({
+  orderId,
+  check,
+  hasPhoto,
+  photoId,
+  closed,
+  onDone,
+}: {
+  orderId: string;
+  check: { ep: boolean; bo: boolean; tem: boolean };
+  hasPhoto: boolean;
+  photoId: string | null;
+  closed: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const rows = [
+    ["ep", "Đã ép"],
+    ["bo", "Đã bo viền"],
+    ["tem", "Đã dán tem"],
+  ] as const;
+
+  async function toggle(key: "ep" | "bo" | "tem") {
+    try {
+      await savePackCheck({ data: { orderId, ...check, [key]: !check[key] } });
+      await onDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không lưu được.");
+    }
+  }
+
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <h2 className="font-bold text-primary">Trước khi giao</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Ba việc này và một ảnh gói phải xong rồi mới chuyển sang Giao.</p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {rows.map(([key, label]) => (
+          <label key={key} className="flex min-h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold">
+            <input type="checkbox" checked={check[key]} disabled={closed || busy} onChange={() => void toggle(key)} />
+            {label}
+          </label>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        {photoId ? <img src={staffThumb(photoId)} alt="Ảnh gói hàng" className="size-16 rounded-xl object-cover" /> : null}
+        <label className="inline-flex min-h-11 cursor-pointer items-center rounded-full border px-4 text-sm font-semibold">
+          {hasPhoto ? "Đổi ảnh gói" : "Chụp ảnh gói"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            disabled={closed || busy}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
+              setBusy(true);
+              const body = new FormData();
+              body.set("orderId", orderId);
+              body.set("file", file);
+              void fetch("/api/staff/packing-photo", { method: "POST", body })
+                .then(async (response) => {
+                  if (!response.ok) throw new Error(await response.text());
+                  toast.success("Đã lưu ảnh gói");
+                  await onDone();
+                })
+                .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không lưu được ảnh gói."))
+                .finally(() => setBusy(false));
+            }}
+          />
+        </label>
+        {hasPhoto ? <span className="text-sm text-muted-foreground">Đã có ảnh gói.</span> : <span className="text-sm text-muted-foreground">Chưa có ảnh gói.</span>}
+      </div>
+    </section>
   );
 }
 

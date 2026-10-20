@@ -103,6 +103,7 @@ const SETTING_LABEL: Record<string, string> = {
   repeatCustomerOrders: "Khách quay lại từ số đơn",
   remindAfterDays: "Nhắc khi đơn cuối cách đây (ngày)",
   remindMessage: "Mẫu tin nhắc khách",
+  bank: "Tài khoản nhận tiền",
   fixedCosts: "Chi phí cố định mặc định",
   rentFromJune2027: "Mặt bằng từ T6/2027",
 };
@@ -310,7 +311,7 @@ function settingsBits(before: unknown, after: unknown, shop: AuditShop): string 
       bits.push(...groupBits(oldRow[key], next[key], shop));
       continue;
     }
-    if (key === "fixedCosts" || key === "commissionTiers" || key === "kpiTargets" || key === "productPhotos" || key === "remindMessage") {
+    if (key === "fixedCosts" || key === "commissionTiers" || key === "kpiTargets" || key === "productPhotos" || key === "remindMessage" || key === "bank") {
       bits.push(`sửa ${SETTING_LABEL[key] ?? key}`);
       continue;
     }

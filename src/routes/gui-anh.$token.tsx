@@ -10,7 +10,7 @@ import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { photoLimitLabel, uploadTokenShape } from "@/domain/order-upload";
 import { formatMaybe } from "@/lib/brand";
 import { putDriveFile } from "@/lib/drive-put";
-import { acknowledgeCustomerPhotos, createUploadTicket, finishOrderDriveUpload, getUploadTarget, prepareOrderDriveUpload } from "@/lib/orders.functions";
+import { acknowledgeCustomerPhotos, createUploadTicket, finishOrderDriveUpload, getUploadTarget, prepareOrderDriveUpload, setCustomerPrint } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/gui-anh/$token")({
   head: () => ({
@@ -237,8 +237,8 @@ function CustomerUploadPage() {
               {info.photos.length ? (
                 <ul className="mt-2 grid grid-cols-3 gap-2">
                   {info.photos.map((photo) => (
-                    <li key={photo.id}>
-                      <button type="button" className="block w-full overflow-hidden rounded-2xl border border-border bg-muted" onClick={() => setOpenPhoto(photo.id)}>
+                    <li key={photo.id} className="overflow-hidden rounded-2xl border border-border bg-muted">
+                      <button type="button" className="block w-full text-left" onClick={() => setOpenPhoto(photo.id)}>
                         <img
                           src={`/api/public/order-photo/${token}/${photo.id}`}
                           alt={photo.name}
@@ -248,6 +248,17 @@ function CustomerUploadPage() {
                           }}
                         />
                         <span className="block truncate px-2 py-1 text-left text-xs text-muted-foreground">{photo.name}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`w-full px-2 py-2 text-left text-xs font-semibold ${photo.print ? "bg-primary text-primary-foreground" : "text-primary"}`}
+                        onClick={() => {
+                          void setCustomerPrint({ data: { token, fileId: photo.id, print: !photo.print } })
+                            .then(() => target.refetch())
+                            .catch((error: unknown) => setError(error instanceof Error ? error.message : "Không lưu được lựa chọn."));
+                        }}
+                      >
+                        {photo.print ? "Đã chọn in" : "In ảnh này"}
                       </button>
                     </li>
                   ))}

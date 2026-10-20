@@ -160,6 +160,24 @@ export const changeStatus = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const setPrintChoice = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), fileId: z.string().uuid(), print: z.boolean() }).parse(data))
+  .handler(async ({ data }) => {
+    const { setFilePrint } = await import("@/server/service");
+    await setFilePrint(await actor(), data.orderId, data.fileId, data.print);
+    return { ok: true };
+  });
+
+export const savePackCheck = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ orderId: z.string().uuid(), ep: z.boolean(), bo: z.boolean(), tem: z.boolean() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { setOrderPackCheck } = await import("@/server/service");
+    await setOrderPackCheck(await actor(), data.orderId, { ep: data.ep, bo: data.bo, tem: data.tem });
+    return { ok: true };
+  });
+
 export const recordDeposit = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({ orderId: z.string().uuid(), amount: z.number().positive(), method: z.string().min(1) }).parse(data),

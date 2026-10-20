@@ -12,6 +12,7 @@ import { RoleGate } from "@/components/role-gate";
 import { StaffDesk } from "@/components/admin/staff-desk";
 import { dueFiles, loadSettings, removeFile, runRecalc, storeSettings } from "@/lib/admin.functions";
 import { DEFAULT_REMIND_DAYS, DEFAULT_REMIND_MESSAGE, DEFAULT_REPEAT_ORDERS } from "@/domain/crm";
+import { TRANSFER_BANKS } from "@/domain/print-shop";
 
 export const Route = createFileRoute("/admin/cai-dat")({
   component: SettingsPage,
@@ -229,6 +230,26 @@ function SettingsBody() {
           </span>
         </label>
         <label className="block text-sm font-semibold">
+          Ngân hàng nhận chuyển khoản
+          <select id="bankId" className="mt-1 min-h-12 w-full rounded-xl border bg-card px-3" defaultValue={data.settings.bank?.id ?? ""}>
+            <option value="">Chưa gắn</option>
+            {TRANSFER_BANKS.map((bank) => (
+              <option key={bank.id} value={bank.id}>
+                {bank.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm font-semibold">
+          Số tài khoản
+          <Input className="mt-1 min-h-11" id="bankAccount" inputMode="numeric" defaultValue={data.settings.bank?.account ?? ""} />
+        </label>
+        <label className="block text-sm font-semibold">
+          Tên chủ tài khoản
+          <Input className="mt-1 min-h-11" id="bankHolder" defaultValue={data.settings.bank?.holder ?? ""} />
+          <span className="mt-1 block font-normal text-muted-foreground">Để trống cả ba ô nếu chưa dùng mã QR. Khách chuyển khoản với nội dung là mã đơn. Nhân viên vẫn bấm Ghi nhận khi tiền vào.</span>
+        </label>
+        <label className="block text-sm font-semibold">
           Mẫu tin nhắc khách. Chỗ trống: {"{ten}"} {"{so_don}"} {"{ngay}"} {"{dip}"} {"{so_dt}"}. Không tự gửi.
           <textarea id="remindMessage" className="mt-1 min-h-24 w-full rounded-xl border bg-card px-3 py-2" defaultValue={data.settings.remindMessage || DEFAULT_REMIND_MESSAGE} />
         </label>
@@ -257,6 +278,7 @@ function SettingsBody() {
             patch.showAnhThe = checked("anhThe");
             patch.showAlbum = checked("album");
             patch.groupListed = Object.fromEntries(data.groups.map((group) => [group.id, checked(`g-${group.id}`)]));
+            patch.bank = { id: read("bankId"), account: read("bankAccount"), holder: read("bankHolder") };
             patch.remindMessage = (document.getElementById("remindMessage") as HTMLTextAreaElement).value;
             patch.commissionBasis = (document.getElementById("commissionBasis") as HTMLSelectElement).value;
             await storeSettings({ data: patch });

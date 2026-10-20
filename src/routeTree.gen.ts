@@ -43,6 +43,7 @@ import { Route as AdminSaoLuuRouteImport } from './routes/admin.sao-luu'
 import { Route as AdminTaiKhoanRouteImport } from './routes/admin.tai-khoan'
 import { Route as AdminThuRouteImport } from './routes/admin.thu'
 import { Route as AdminViRouteImport } from './routes/admin.vi'
+import { Route as DanhGiaTokenRouteImport } from './routes/danh-gia.$token'
 import { Route as GuiAnhIndexRouteImport } from './routes/gui-anh.index'
 import { Route as GuiAnhTokenRouteImport } from './routes/gui-anh.$token'
 import { Route as AdminAlbumIndexRouteImport } from './routes/admin.album.index'
@@ -56,6 +57,7 @@ import { Route as ApiAdminProductPhotoRouteImport } from './routes/api/admin/pro
 import { Route as ApiPublicAlbumRouteImport } from './routes/api/public/album'
 import { Route as ApiPublicCleanupFilesRouteImport } from './routes/api/public/cleanup-files'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
+import { Route as ApiStaffPackingPhotoRouteImport } from './routes/api/staff/packing-photo'
 import { Route as ApiAdminDriveCallbackRouteImport } from './routes/api/admin/drive.callback'
 import { Route as ApiAdminDriveStartRouteImport } from './routes/api/admin/drive.start'
 import { Route as ApiAdminShopeeCallbackRouteImport } from './routes/api/admin/shopee.callback'
@@ -236,6 +238,11 @@ const AdminViRoute = AdminViRouteImport.update({
   path: '/vi',
   getParentRoute: () => AdminRoute,
 } as any)
+const DanhGiaTokenRoute = DanhGiaTokenRouteImport.update({
+  id: '/danh-gia/$token',
+  path: '/danh-gia/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GuiAnhIndexRoute = GuiAnhIndexRouteImport.update({
   id: '/gui-anh/',
   path: '/gui-anh/',
@@ -299,6 +306,11 @@ const ApiPublicCleanupFilesRoute = ApiPublicCleanupFilesRouteImport.update({
 const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
   id: '/api/public/upload',
   path: '/api/public/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStaffPackingPhotoRoute = ApiStaffPackingPhotoRouteImport.update({
+  id: '/api/staff/packing-photo',
+  path: '/api/staff/packing-photo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdminDriveCallbackRoute = ApiAdminDriveCallbackRouteImport.update({
@@ -383,6 +395,7 @@ export interface FileRoutesByFullPath {
   '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/thu': typeof AdminThuRoute
   '/admin/vi': typeof AdminViRoute
+  '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/gui-anh/': typeof GuiAnhIndexRoute
@@ -394,6 +407,7 @@ export interface FileRoutesByFullPath {
   '/api/public/album': typeof ApiPublicAlbumRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
+  '/api/staff/packing-photo': typeof ApiStaffPackingPhotoRoute
   '/admin/album/': typeof AdminAlbumIndexRoute
   '/admin/don-hang/': typeof AdminDonHangIndexRoute
   '/admin/khach/': typeof AdminKhachIndexRoute
@@ -440,6 +454,7 @@ export interface FileRoutesByTo {
   '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/thu': typeof AdminThuRoute
   '/admin/vi': typeof AdminViRoute
+  '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/admin': typeof AdminIndexRoute
   '/gui-anh': typeof GuiAnhIndexRoute
@@ -451,6 +466,7 @@ export interface FileRoutesByTo {
   '/api/public/album': typeof ApiPublicAlbumRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
+  '/api/staff/packing-photo': typeof ApiStaffPackingPhotoRoute
   '/admin/album': typeof AdminAlbumIndexRoute
   '/admin/don-hang': typeof AdminDonHangIndexRoute
   '/admin/khach': typeof AdminKhachIndexRoute
@@ -499,6 +515,7 @@ export interface FileRoutesById {
   '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/thu': typeof AdminThuRoute
   '/admin/vi': typeof AdminViRoute
+  '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/gui-anh/': typeof GuiAnhIndexRoute
@@ -510,6 +527,7 @@ export interface FileRoutesById {
   '/api/public/album': typeof ApiPublicAlbumRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
+  '/api/staff/packing-photo': typeof ApiStaffPackingPhotoRoute
   '/admin/album/': typeof AdminAlbumIndexRoute
   '/admin/don-hang/': typeof AdminDonHangIndexRoute
   '/admin/khach/': typeof AdminKhachIndexRoute
@@ -559,6 +577,7 @@ export interface FileRouteTypes {
     | '/admin/tai-khoan'
     | '/admin/thu'
     | '/admin/vi'
+    | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/admin/'
     | '/gui-anh/'
@@ -570,6 +589,7 @@ export interface FileRouteTypes {
     | '/api/public/album'
     | '/api/public/cleanup-files'
     | '/api/public/upload'
+    | '/api/staff/packing-photo'
     | '/admin/album/'
     | '/admin/don-hang/'
     | '/admin/khach/'
@@ -616,6 +636,7 @@ export interface FileRouteTypes {
     | '/admin/tai-khoan'
     | '/admin/thu'
     | '/admin/vi'
+    | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/admin'
     | '/gui-anh'
@@ -627,6 +648,7 @@ export interface FileRouteTypes {
     | '/api/public/album'
     | '/api/public/cleanup-files'
     | '/api/public/upload'
+    | '/api/staff/packing-photo'
     | '/admin/album'
     | '/admin/don-hang'
     | '/admin/khach'
@@ -674,6 +696,7 @@ export interface FileRouteTypes {
     | '/admin/tai-khoan'
     | '/admin/thu'
     | '/admin/vi'
+    | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/admin/'
     | '/gui-anh/'
@@ -685,6 +708,7 @@ export interface FileRouteTypes {
     | '/api/public/album'
     | '/api/public/cleanup-files'
     | '/api/public/upload'
+    | '/api/staff/packing-photo'
     | '/admin/album/'
     | '/admin/don-hang/'
     | '/admin/khach/'
@@ -708,12 +732,14 @@ export interface RootRouteChildren {
   LienHeRoute: typeof LienHeRoute
   SanPhamRoute: typeof SanPhamRoute
   TraCuuRoute: typeof TraCuuRoute
+  DanhGiaTokenRoute: typeof DanhGiaTokenRoute
   GuiAnhTokenRoute: typeof GuiAnhTokenRoute
   GuiAnhIndexRoute: typeof GuiAnhIndexRoute
   ApiAdminProductPhotoRoute: typeof ApiAdminProductPhotoRoute
   ApiPublicAlbumRoute: typeof ApiPublicAlbumRoute
   ApiPublicCleanupFilesRoute: typeof ApiPublicCleanupFilesRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
+  ApiStaffPackingPhotoRoute: typeof ApiStaffPackingPhotoRoute
   ApiAdminDriveCallbackRoute: typeof ApiAdminDriveCallbackRoute
   ApiAdminDriveStartRoute: typeof ApiAdminDriveStartRoute
   ApiAdminShopeeCallbackRoute: typeof ApiAdminShopeeCallbackRoute
@@ -965,6 +991,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminViRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/danh-gia/$token': {
+      id: '/danh-gia/$token'
+      path: '/danh-gia/$token'
+      fullPath: '/danh-gia/$token'
+      preLoaderRoute: typeof DanhGiaTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/gui-anh/': {
       id: '/gui-anh/'
       path: '/gui-anh'
@@ -1054,6 +1087,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/upload'
       fullPath: '/api/public/upload'
       preLoaderRoute: typeof ApiPublicUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/staff/packing-photo': {
+      id: '/api/staff/packing-photo'
+      path: '/api/staff/packing-photo'
+      fullPath: '/api/staff/packing-photo'
+      preLoaderRoute: typeof ApiStaffPackingPhotoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/drive/callback': {
@@ -1205,12 +1245,14 @@ const rootRouteChildren: RootRouteChildren = {
   LienHeRoute: LienHeRoute,
   SanPhamRoute: SanPhamRoute,
   TraCuuRoute: TraCuuRoute,
+  DanhGiaTokenRoute: DanhGiaTokenRoute,
   GuiAnhTokenRoute: GuiAnhTokenRoute,
   GuiAnhIndexRoute: GuiAnhIndexRoute,
   ApiAdminProductPhotoRoute: ApiAdminProductPhotoRoute,
   ApiPublicAlbumRoute: ApiPublicAlbumRoute,
   ApiPublicCleanupFilesRoute: ApiPublicCleanupFilesRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
+  ApiStaffPackingPhotoRoute: ApiStaffPackingPhotoRoute,
   ApiAdminDriveCallbackRoute: ApiAdminDriveCallbackRoute,
   ApiAdminDriveStartRoute: ApiAdminDriveStartRoute,
   ApiAdminShopeeCallbackRoute: ApiAdminShopeeCallbackRoute,
