@@ -2,68 +2,52 @@
 
 ## Quyết định
 
-Dừng clone/vá UI từng màn theo studiobase.vn/manage.
+**Clone vận hành StudioBase** (chat, đơn, ví, NV, quyền, báo cáo…) với UI riêng tối ưu **in ấn**. Data/nghiệp vụ bám StudioBase; app Thiên Thiên giữ domain xưởng (cost, BOM, QR gửi ảnh, album, kho…).
 
-Hướng đúng: **lấy luồng Manage (PhotoShare / StudioBase) làm nền vận hành**, rồi tối ưu thiết kế + gắn domain xưởng in (cost, BOM, kênh sàn, sản xuất, giao hàng).
+## Mapping thuật ngữ
 
-## Nguồn Manage
+| StudioBase | Xưởng in |
+|---|---|
+| Ngày chụp | Ngày nhận / hẹn in |
+| Đã chụp | Đã nhận file |
+| Gửi ảnh gốc | Khách duyệt / chọn size |
+| Chỉnh sửa | Xử lý trước in |
+| Đã gửi in | Đưa vào máy in |
+| Đã giao | Giao khách |
 
-Repo: https://github.com/mrkrin9z-hub/photosharevn/
-
-## Nguồn PhotoShare (tạm bỏ qua)
-
-URL dự kiến: https://github.com/mrkrin9z-hub/photosharevn/
-
-Cloud Agent run này **không clone được** (token chỉ `nhainthienthien`; user đã skip PAT / multi-repo). Manage OS tiếp tục dựa trên:
-
-- UX/luồng quan sát từ `studiobase.vn/manage`
-- Domain xưởng sẵn có trong repo này
-- `src/admin-os/modules.ts` làm bản đồ module
-
-Khi có source: port shell thật; không merge DB studio.
-
-## Kiến trúc 3 lớp
+## Kiến trúc
 
 ```
-┌─────────────────────────────────────────┐
-│  Admin shell (UX Manage)                │
-│  menu · list+dialog · filter · ví NV    │
-├─────────────────────────────────────────┤
-│  Adapters                               │
-│  map route/DTO Manage ↔ domain xưởng    │
-├─────────────────────────────────────────┤
-│  Domain Thiên Thiên (giữ nguyên lõi)    │
-│  cost · BOM · kênh · SX · ví · Workers  │
-└─────────────────────────────────────────┘
+UI Thiên Thiên (shell + brand)
+  ├─ live modules → Workers/KV domain xưởng + Partner Chat API
+  └─ bridge modules → deep-link StudioBase Manage (phase 2–4)
 ```
 
-- **Không** merge schema/DB studio vào Workers/KV.
-- **Không** mang lịch chụp, trang phục, chiến dịch marketing studio, Fanpage social.
-- **Có** cost/BOM, trạng thái sản xuất, giao/COD, kênh marketplace — đây là phần studio không có.
+- Partner Chat API: inbox + tạo đơn gắn hội thoại — xem `docs/STUDIOBASE_CHAT.md`
+- **Không** OAuth Meta/Zalo trong app; **không** garment / AI tools studio-chụp
+- **Giữ** QR khách gửi ảnh, album, thu→ví NV, sản xuất, kho…
 
-## Bản đồ module
+## Bản đồ module (`src/admin-os/modules.ts`)
 
-| Manage                         | Thiên Thiên                         | Ghi chú                          |
-| ------------------------------ | ----------------------------------- | -------------------------------- |
-| `/manage/dashboard`            | `/admin`                            | Chấm công + KPI xưởng            |
-| `/manage/orders` (+ create)    | `/admin/don-hang`                   | Chưa thu, picker SP, thu → ví NV |
-| `/manage/products`             | `/admin/san-pham`, `/gia`, cost     | Thêm cost/BOM                    |
-| `/manage/customers`            | `/admin/khach`                      | CRM in                           |
-| `/manage/wallet`               | `/admin/vi`                         | Thu → ví NV → nộp két            |
-| `/manage/expenses`             | `/admin/chi-phi`, thu chi           | Giữ                              |
-| `/manage/statistics`           | `/admin/bao-cao`                    | Giữ                              |
-| `/manage/activity-log`         | `/admin/nhat-ky`                    | Giữ                              |
-| *(không có trên studio)*       | `/admin/san-xuat`, giao, kho        | Module xưởng                     |
-| calendar / garments / campaigns| —                                   | Bỏ                               |
+| Nhóm | Live (app) | Bridge (Manage) |
+|---|---|---|
+| Kinh doanh | Chat, Đơn, Khách, Thu, Nhắc khách | Chiến dịch |
+| Sản xuất | SX, Giao, SP, Giá, Kho, Album | Lịch, Công việc |
+| Vận hành | NV, Chấm công, Lương, Tài khoản | Nhóm quyền, Bộ phận, Cửa hàng |
+| Tài chính | Ví, Chi phí, Thu chi, Báo cáo, KPI | Mục tiêu, SePay |
+| Hệ thống | Kết nối, Sao lưu, Nhật ký, Cài đặt | Tin mẫu, Push, Đánh giá, TB nội bộ, Tài liệu, Gói, Hướng dẫn |
 
-## Thứ tự port (khi có source)
+Ẩn: `/manage/garments`, `/manage/tools`.
 
-1. Nhận source Manage.
-2. Tách shell UI khỏi data studio; viết adapters sang `src/domain` + `src/server/service.ts`.
-3. Port theo module: **Orders → Wallet → Products+Cost → Production → Expenses → Reports**.
-4. Cutover: một PR thay admin shell; đóng các nhánh vá UI nhỏ.
+## Phase
 
-## Trong repo này (chờ source)
+1. ✅ Chat + đơn từ hội thoại (Partner API) + QR/upload/album domain xưởng  
+2. Staff/roles/branches + list đơn lifecycle đầy đủ (API hoặc bridge)  
+3. Ví SePay + thống kê sâu  
+4. Drive/tin mẫu/social/HĐĐT/push…
 
-- `src/admin-os/modules.ts` — nguồn sự thật duy nhất cho menu/module (bắt đầu gom shell).
-- Tiếp tục **không** thêm patch UI Manage lẻ tẻ trên nhánh cũ trừ hotfix nghiệp vụ xưởng.
+## Code
+
+- Menu: `src/admin-os/modules.ts`
+- Bridge: `src/admin-os/bridges.ts`, `src/routes/admin.studio.$slug.tsx`
+- Chat: `src/routes/admin.chat.tsx`, `src/server/studiobase.ts`

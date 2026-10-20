@@ -52,6 +52,21 @@ export const Route = createFileRoute("/admin")({
 const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin": LayoutDashboard,
   "/admin/chat": MessageCircle,
+  "/admin/studio/lich": ClipboardList,
+  "/admin/studio/cong-viec": ClipboardList,
+  "/admin/studio/chien-dich": Target,
+  "/admin/studio/nhom-quyen": UserCog,
+  "/admin/studio/bo-phan": Users,
+  "/admin/studio/chi-nhanh": Landmark,
+  "/admin/studio/muc-tieu": Target,
+  "/admin/studio/sepay": Wallet,
+  "/admin/studio/thong-bao": Bell,
+  "/admin/studio/tin-mau": MessageCircle,
+  "/admin/studio/danh-gia": ScrollText,
+  "/admin/studio/goi": Archive,
+  "/admin/studio/huong-dan": ScrollText,
+  "/admin/studio/thong-bao-noi-bo": Bell,
+  "/admin/studio/tai-lieu": Archive,
   "/admin/don-hang": ClipboardList,
   "/admin/don-moi": ClipboardList,
   "/admin/san-xuat": ClipboardList,
@@ -91,6 +106,7 @@ function pageTitle(pathname: string, role: Role): string {
   if (pathname.startsWith("/admin/tem/")) return "Tem đơn";
   if (pathname.startsWith("/admin/don-hang/") && pathname !== "/admin/don-hang" && pathname !== "/admin/don-hang/") return "Chi tiết đơn";
   if (pathname.startsWith("/admin/khach/") && pathname !== "/admin/khach" && pathname !== "/admin/khach/") return "Hồ sơ khách";
+  if (pathname.startsWith("/admin/album/") && pathname !== "/admin/album" && pathname !== "/admin/album/") return "Album ảnh";
   const items = ADMIN_MODULE_GROUPS.flatMap((group) => group.items).filter((item) => item.roles.includes(role));
   const match = items
     .filter((item) => pathActive(pathname, item.to))

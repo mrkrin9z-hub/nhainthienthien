@@ -76,9 +76,15 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(modules, /label: "Ví tiền"/);
   assert.match(modules, /managePath: "\/manage\/orders"/);
   assert.match(modules, /MANAGE_SKIP/);
+  assert.match(modules, /\/manage\/garments/);
+  assert.match(modules, /mode: "bridge"/);
+  assert.match(modules, /studio\/lich/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Nhân viên đang giữ/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Trong ví cửa hàng/);
   assert.match(modules, /Kinh doanh/);
+  assert.match(readFileSync(new URL("../routes/admin.studio.\$slug.tsx", import.meta.url), "utf8"), /StudioBridgePanel/);
+  assert.match(readFileSync(new URL("../routes/gui-anh.\$token.tsx", import.meta.url), "utf8"), /Gửi ảnh/);
+  assert.match(readFileSync(new URL("../components/admin/order-qr-dialog.tsx", import.meta.url), "utf8"), /gui-anh|QR|upload/i);
   assert.match(modules, /Tài chính/);
   assert.match(shell, /modulesForRole/);
   assert.match(readFileSync(new URL("../routes/admin.bao-cao-chi.tsx", import.meta.url), "utf8"), /Báo cáo chi phí/);

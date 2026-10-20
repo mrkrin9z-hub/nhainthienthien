@@ -53,6 +53,7 @@ import { Route as AdminDonHangIndexRouteImport } from './routes/admin.don-hang.i
 import { Route as AdminDonHangCodeRouteImport } from './routes/admin.don-hang.$code'
 import { Route as AdminKhachIndexRouteImport } from './routes/admin.khach.index'
 import { Route as AdminKhachIdRouteImport } from './routes/admin.khach.$id'
+import { Route as AdminStudioSlugRouteImport } from './routes/admin.studio.$slug'
 import { Route as AdminTemCodeRouteImport } from './routes/admin.tem.$code'
 import { Route as ApiAdminProductPhotoRouteImport } from './routes/api/admin/product-photo'
 import { Route as ApiPublicAlbumRouteImport } from './routes/api/public/album'
@@ -290,6 +291,11 @@ const AdminKhachIdRoute = AdminKhachIdRouteImport.update({
   path: '/khach/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminStudioSlugRoute = AdminStudioSlugRouteImport.update({
+  id: '/studio/$slug',
+  path: '/studio/$slug',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminTemCodeRoute = AdminTemCodeRouteImport.update({
   id: '/tem/$code',
   path: '/tem/$code',
@@ -416,6 +422,7 @@ export interface FileRoutesByFullPath {
   '/admin/album/$id': typeof AdminAlbumIdRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
+  '/admin/studio/$slug': typeof AdminStudioSlugRoute
   '/admin/tem/$code': typeof AdminTemCodeRoute
   '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/album': typeof ApiPublicAlbumRoute
@@ -477,6 +484,7 @@ export interface FileRoutesByTo {
   '/admin/album/$id': typeof AdminAlbumIdRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
+  '/admin/studio/$slug': typeof AdminStudioSlugRoute
   '/admin/tem/$code': typeof AdminTemCodeRoute
   '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/album': typeof ApiPublicAlbumRoute
@@ -540,6 +548,7 @@ export interface FileRoutesById {
   '/admin/album/$id': typeof AdminAlbumIdRoute
   '/admin/don-hang/$code': typeof AdminDonHangCodeRoute
   '/admin/khach/$id': typeof AdminKhachIdRoute
+  '/admin/studio/$slug': typeof AdminStudioSlugRoute
   '/admin/tem/$code': typeof AdminTemCodeRoute
   '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/album': typeof ApiPublicAlbumRoute
@@ -604,6 +613,7 @@ export interface FileRouteTypes {
     | '/admin/album/$id'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
+    | '/admin/studio/$slug'
     | '/admin/tem/$code'
     | '/api/admin/product-photo'
     | '/api/public/album'
@@ -665,6 +675,7 @@ export interface FileRouteTypes {
     | '/admin/album/$id'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
+    | '/admin/studio/$slug'
     | '/admin/tem/$code'
     | '/api/admin/product-photo'
     | '/api/public/album'
@@ -727,6 +738,7 @@ export interface FileRouteTypes {
     | '/admin/album/$id'
     | '/admin/don-hang/$code'
     | '/admin/khach/$id'
+    | '/admin/studio/$slug'
     | '/admin/tem/$code'
     | '/api/admin/product-photo'
     | '/api/public/album'
@@ -1087,6 +1099,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminKhachIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/studio/$slug': {
+      id: '/admin/studio/$slug'
+      path: '/studio/$slug'
+      fullPath: '/admin/studio/$slug'
+      preLoaderRoute: typeof AdminStudioSlugRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/tem/$code': {
       id: '/admin/tem/$code'
       path: '/tem/$code'
@@ -1233,6 +1252,7 @@ interface AdminRouteChildren {
   AdminAlbumIdRoute: typeof AdminAlbumIdRoute
   AdminDonHangCodeRoute: typeof AdminDonHangCodeRoute
   AdminKhachIdRoute: typeof AdminKhachIdRoute
+  AdminStudioSlugRoute: typeof AdminStudioSlugRoute
   AdminTemCodeRoute: typeof AdminTemCodeRoute
   AdminAlbumIndexRoute: typeof AdminAlbumIndexRoute
   AdminDonHangIndexRoute: typeof AdminDonHangIndexRoute
@@ -1270,6 +1290,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAlbumIdRoute: AdminAlbumIdRoute,
   AdminDonHangCodeRoute: AdminDonHangCodeRoute,
   AdminKhachIdRoute: AdminKhachIdRoute,
+  AdminStudioSlugRoute: AdminStudioSlugRoute,
   AdminTemCodeRoute: AdminTemCodeRoute,
   AdminAlbumIndexRoute: AdminAlbumIndexRoute,
   AdminDonHangIndexRoute: AdminDonHangIndexRoute,
