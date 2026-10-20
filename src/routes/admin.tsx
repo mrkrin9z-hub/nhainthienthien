@@ -113,7 +113,7 @@ const GROUPS: { title: string; items: { to: string; label: string; roles: Role[]
   {
     title: "Tài chính",
     items: [
-      { to: "/admin/vi", label: "Ví tiền", roles: ["owner"] },
+      { to: "/admin/vi", label: "Ví tiền", roles: ["owner", "sale"] },
       { to: "/admin/chi-phi", label: "Chi phí", roles: ["owner"] },
       { to: "/admin/loi-nhuan", label: "Thu chi", roles: ["owner"] },
       { to: "/admin/bao-cao", label: "Báo cáo", roles: ["owner"] },

@@ -2205,7 +2205,7 @@ function cashOrders(state: ShopState): CashOrder[] {
 }
 
 export async function moneyDesk(actor: Actor, month: string) {
-  assertRole(actor, ["owner"]);
+  assertRole(actor, ["owner", "sale"]);
   const state = await readState();
   const orders = cashOrders(state);
   const lines = buildLedger({
@@ -2235,15 +2235,38 @@ export async function moneyDesk(actor: Actor, month: string) {
       walletLabel: walletLabel(row.wallet ?? ""),
     }))
     .sort((a, b) => b.at.localeCompare(a.at));
+  const holders = holderBalances({
+    orders,
+    expenses: state.expenses,
+    staff: state.staff.map((person) => ({ id: person.id, name: person.name })),
+    handovers: state.handovers ?? [],
+  });
+  if (actor.role === "sale") {
+    const mine = holders.find((row) => row.staffId === actor.id);
+    const myLines = monthLines.filter((line) => line.holder === actor.id);
+    return {
+      month,
+      scope: "mine" as const,
+      me: {
+        name: actor.name,
+        tien_mat: mine?.tien_mat ?? 0,
+        chuyen_khoan: mine?.chuyen_khoan ?? 0,
+      },
+      cards: [],
+      holders: mine ? [mine] : [],
+      handovers: [],
+      lines: myLines,
+      expenses: [],
+      report: expenseReport([], month),
+      collected: myLines.filter((line) => line.kind === "thu").reduce((sum, line) => sum + line.amount, 0),
+    };
+  }
   return {
     month,
+    scope: "shop" as const,
+    me: null,
     cards: walletCards(lines, month),
-    holders: holderBalances({
-      orders,
-      expenses: state.expenses,
-      staff: state.staff.map((person) => ({ id: person.id, name: person.name })),
-      handovers: state.handovers ?? [],
-    }),
+    holders,
     handovers: (state.handovers ?? []).slice(0, 100).map((row) => ({
       id: row.id,
       at: row.at,

@@ -1,14 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { AlarmClock, Columns3, Download, FileSpreadsheet, List, Plus, Wallet } from "lucide-react";
+import { AlarmClock, Columns3, Download, FileSpreadsheet, HandCoins, List, Plus, Wallet } from "lucide-react";
 
 import { CreateOrderForm } from "@/components/admin/create-order-form";
 import { ListPager, useListPage } from "@/components/admin/list-page";
 import { ClearFilters, FilterSheet, PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { OrderLinks } from "@/components/admin/sections";
-import { ALL_TONE, CHANNEL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
+import { ALL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
 import { formatMaybe } from "@/lib/brand";
 import { downloadExcel, getMe, getOrders } from "@/lib/admin.functions";
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL, type OrderStatus } from "@/domain/types";
@@ -31,6 +31,7 @@ function OrdersPage() {
   const [q, setQ] = useState("");
   const [channel, setChannel] = useState("all");
   const [lateOnly, setLateOnly] = useState(false);
+  const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [view, setView] = useState<"list" | "board">("list");
@@ -65,26 +66,12 @@ function OrdersPage() {
     ];
   }, [rows, flow]);
 
-  const channelChips = useMemo<FilterChip[]>(() => {
-    return [
-      { id: "all", label: "Mọi kênh", count: rows.length, ...ALL_TONE },
-      ...CHANNELS.map((id) => {
-        const tone = CHANNEL_TONE[id] ?? ALL_TONE;
-        return {
-          id,
-          label: CHANNEL_LABEL[id],
-          count: rows.filter((row) => row.channel === id).length,
-          color: tone.color,
-          icon: tone.icon,
-        };
-      }),
-    ];
-  }, [rows]);
-
+  const unpaidCount = rows.filter((order) => order.remain != null && order.remain > 0).length;
   const shown = rows.filter((order) => {
     if (status !== "all" && order.status !== status) return false;
     if (channel !== "all" && order.channel !== channel) return false;
     if (lateOnly && !order.late) return false;
+    if (unpaidOnly && !(order.remain != null && order.remain > 0)) return false;
     const needle = q.trim().toLowerCase();
     if (!needle) return true;
     return [order.code, order.customerName, order.phone, order.itemSummary, order.channelLabel]
@@ -92,27 +79,50 @@ function OrdersPage() {
       .toLowerCase()
       .includes(needle);
   });
-  const filterCount = (status !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (lateOnly ? 1 : 0);
-  const list = useListPage(shown, `${status}|${channel}|${lateOnly}|${q}`);
+  const filterCount = (status !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (lateOnly ? 1 : 0) + (unpaidOnly ? 1 : 0);
+  const list = useListPage(shown, `${status}|${channel}|${lateOnly}|${unpaidOnly}|${q}`);
   const pageRows = list.slice;
 
   function clearFilters() {
     setStatus("all");
     setChannel("all");
     setLateOnly(false);
+    setUnpaidOnly(false);
   }
 
   function extraFilters() {
     return (
       <>
-        <FilterChips label="Kênh" value={channel} chips={channelChips} onChange={setChannel} wrap />
+        <select
+          className="h-9 min-w-[10rem] rounded-md border border-input bg-background px-3 text-[13px]"
+          aria-label="Lọc kênh"
+          value={channel}
+          onChange={(event) => setChannel(event.target.value)}
+        >
+          <option value="all">Mọi kênh ({rows.length})</option>
+          {CHANNELS.map((id) => (
+            <option key={id} value={id}>
+              {CHANNEL_LABEL[id]} ({rows.filter((row) => row.channel === id).length})
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          aria-pressed={unpaidOnly}
+          className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold active:scale-[0.97] ${unpaidOnly ? "border-primary bg-primary text-primary-foreground" : "bg-background"}`}
+          onClick={() => setUnpaidOnly((value) => !value)}
+        >
+          <HandCoins className="size-3.5" />
+          Chưa thu
+          <span className={`inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold ${unpaidOnly ? "bg-white/25" : "bg-muted"}`}>{unpaidCount}</span>
+        </button>
         <button
           type="button"
           aria-pressed={lateOnly}
-          className={`inline-flex min-h-11 items-center gap-1.5 self-start rounded-full border px-3 text-sm font-semibold active:scale-[0.97] ${lateOnly ? "border-destructive bg-destructive text-white" : "bg-background"}`}
+          className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold active:scale-[0.97] ${lateOnly ? "border-destructive bg-destructive text-white" : "bg-background"}`}
           onClick={() => setLateOnly((value) => !value)}
         >
-          <AlarmClock className="size-4" />
+          <AlarmClock className="size-3.5" />
           Trễ mốc
         </button>
         {filterCount > 0 ? <ClearFilters onClick={clearFilters} /> : null}
@@ -170,7 +180,7 @@ function OrdersPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Tạo đơn</DialogTitle>
+            <DialogTitle>Tạo đơn hàng mới</DialogTitle>
           </DialogHeader>
           <CreateOrderForm
             onCreated={() => {

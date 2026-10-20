@@ -23,7 +23,7 @@ const KIND_LABEL = { thu: "Thu", chi: "Chi", dieu_chinh: "Điều chỉnh" } as 
 
 function WalletPage() {
   return (
-    <RoleGate allow={["owner"]} deny="Chỉ chủ xem.">
+    <RoleGate allow={["owner", "sale"]} deny="Chỉ chủ và sale xem ví.">
       <WalletBody />
     </RoleGate>
   );
@@ -60,6 +60,7 @@ function WalletBody() {
     return !needle || `${line.label} ${line.holderName ?? ""}`.toLowerCase().includes(needle);
   });
   const page = useListPage(lines, `${month}|${filter}|${q}`);
+  const minePage = useListPage(desk.data?.scope === "mine" ? lines : [], `${month}|mine|${q}|${filter}`);
   const holders = (desk.data?.holders ?? []).filter((holder) => holder.staffId !== SHOP_TILL_ID);
   const till = (desk.data?.holders ?? []).find((holder) => holder.staffId === SHOP_TILL_ID);
   const carriers = holders.filter((holder) => holder.staffId && holder.tien_mat > 0);
@@ -89,13 +90,20 @@ function WalletBody() {
   async function submitHandover(event: FormEvent) {
     event.preventDefault();
     const value = Math.round(Number(handAmount));
-    if (!handing || !value) {
+    const mineScope = desk.data?.scope === "mine";
+    if (!mineScope && (!handing || !value)) {
       toast.error("Chọn người đang giữ tiền mặt và số tiền nộp.");
+      return;
+    }
+    if (mineScope && !value) {
+      toast.error("Nhập số tiền nộp.");
       return;
     }
     setHandBusy(true);
     try {
-      await handCashIn({ data: { staffId: handing.staffId, amount: value, note: handNote } });
+      await handCashIn({
+        data: mineScope ? { amount: value, note: handNote } : { staffId: handing!.staffId, amount: value, note: handNote },
+      });
       setHandAmount("");
       setHandNote("");
       setHandOpen(false);
@@ -109,13 +117,110 @@ function WalletBody() {
     }
   }
 
+  if (desk.data?.scope === "mine") {
+    const me = desk.data.me;
+    return (
+      <div className="space-y-4">
+        <MoneyLinks />
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">Ví của tôi</h1>
+            <p className="text-sm text-muted-foreground">Tiền bạn thu từ đơn tự vào ví này. Tiền mặt cuối ca nộp về két tiệm.</p>
+          </div>
+          <Input className="min-h-11 max-w-[11rem]" type="month" aria-label="Tháng ví" value={month} onChange={(e) => setMonth(e.target.value)} />
+        </div>
+        {desk.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
+        {desk.isError ? <p className="font-semibold text-destructive">{(desk.error as Error).message}</p> : null}
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <article className="rounded-md border bg-card p-4">
+            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Thu nhập tháng</p>
+            <p className="mt-2 text-2xl font-bold text-primary">{formatVnd(desk.data.collected)}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Từ đơn hàng bạn thu</p>
+          </article>
+          <article className="rounded-md border bg-card p-4">
+            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Tiền mặt đang giữ</p>
+            <p className="mt-2 text-2xl font-bold">{formatVnd(me?.tien_mat ?? 0)}</p>
+            {(me?.tien_mat ?? 0) > 0 ? (
+              <Button
+                className="mt-3 min-h-9"
+                variant="outline"
+                onClick={() => {
+                  setHandAmount(String(me?.tien_mat ?? 0));
+                  setHandOpen(true);
+                }}
+              >
+                Nộp vào ví cửa hàng
+              </Button>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">Không còn tiền mặt đang giữ.</p>
+            )}
+          </article>
+          <article className="rounded-md border bg-card p-4">
+            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Chuyển khoản ghi tên bạn</p>
+            <p className="mt-2 text-2xl font-bold">{formatVnd(me?.chuyen_khoan ?? 0)}</p>
+          </article>
+          <article className="rounded-md border bg-card p-4">
+            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Số dư ví</p>
+            <p className="mt-2 text-2xl font-bold">{formatVnd((me?.tien_mat ?? 0) + (me?.chuyen_khoan ?? 0))}</p>
+          </article>
+        </section>
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-semibold">Giao dịch ví</h2>
+            <Input className="min-h-11 max-w-xs" placeholder="Tìm giao dịch" aria-label="Tìm giao dịch" value={q} onChange={(e) => setQ(e.target.value)} />
+            <select className="min-h-11 rounded-md border border-input bg-background px-3 text-sm" aria-label="Lọc ví" value={filter} onChange={(e) => setFilter(e.target.value as "all" | WalletId)}>
+              <option value="all">Cả hai ví</option>
+              <option value="tien_mat">Tiền mặt</option>
+              <option value="chuyen_khoan">Chuyển khoản</option>
+            </select>
+          </div>
+          <ListPager page={minePage.page} pages={minePage.pages} total={minePage.total} start={minePage.start} count={minePage.slice.length} noun="giao dịch" onPage={minePage.setPage} />
+          <ul className="space-y-2">
+            {minePage.slice.map((line) => (
+              <li key={line.id} className="flex flex-wrap items-center gap-3 rounded-md border bg-card p-4">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{line.label}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {vnYmd(line.at)} · {KIND_LABEL[line.kind]} · {line.wallet === "chuyen_khoan" ? "Chuyển khoản" : "Tiền mặt"}
+                  </p>
+                </div>
+                <p className={`font-extrabold ${line.amount < 0 ? "text-destructive" : "text-primary"}`}>{signed(line.amount)}</p>
+              </li>
+            ))}
+          </ul>
+          {desk.data && lines.length === 0 ? <p className="rounded-md border bg-card p-4 text-sm text-muted-foreground">Chưa có giao dịch trong tháng này.</p> : null}
+        </section>
+        <Dialog open={handOpen} onOpenChange={setHandOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nộp vào ví cửa hàng</DialogTitle>
+            </DialogHeader>
+            <form className="space-y-3" onSubmit={submitHandover}>
+              <p className="text-sm text-muted-foreground">Đang giữ {formatVnd(me?.tien_mat ?? 0)} tiền mặt.</p>
+              <label className="block text-sm font-semibold">
+                Số tiền nộp
+                <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={handAmount} onChange={(event) => setHandAmount(event.target.value.replace(/\D/g, ""))} />
+              </label>
+              <Input aria-label="Ghi chú nộp tiền" placeholder="Ghi chú" value={handNote} onChange={(event) => setHandNote(event.target.value)} />
+              <DialogFooter>
+                <Button className="min-h-11" type="submit" disabled={handBusy}>
+                  Nộp tiền mặt
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <MoneyLinks />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Ví</h1>
-          <p className="text-sm text-muted-foreground">Số dư hiện tại của cả tiệm. Tiền mặt đã nộp nằm ở két. Chuyển khoản nằm ở tài khoản nhận.</p>
+          <h1 className="text-xl font-semibold">Ví</h1>
+          <p className="text-sm text-muted-foreground">Khi nhân viên thu tiền, số đó vào ví nhân viên trước. Tiền mặt nộp két mới vào ví cửa hàng.</p>
         </div>
         <Input className="min-h-11 max-w-[11rem]" type="month" aria-label="Tháng ví" value={month} onChange={(e) => setMonth(e.target.value)} />
       </div>
@@ -161,6 +266,7 @@ function WalletBody() {
               <p className="mt-2 text-2xl font-bold">{formatVnd(staffCash)}</p>
               <p className="mt-2 text-sm text-muted-foreground">Tiền mặt chưa nộp: {formatVnd(staffCash)}</p>
               <p className="text-sm text-muted-foreground">Chuyển khoản ghi tên người thu: {formatVnd(staffBank)}</p>
+              <p className="mt-2 text-xs text-muted-foreground">Mỗi lần thu đơn cộng thẳng vào ví nhân viên đó.</p>
             </article>
           </section>
           <section className="overflow-hidden rounded-md border bg-card">

@@ -71,7 +71,7 @@ function CollectBody() {
       <MoneyLinks />
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Thu tiền</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Bấm Thu tiền trên đơn. Tiền mặt vào ví của người đang thu. Cuối ca nộp số tiền mặt đang giữ vào két tiệm.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Bấm Thu tiền trên đơn. Số tiền tự vào ví của bạn. Xem chi tiết ở Ví tiền. Cuối ca nộp tiền mặt đang giữ vào két tiệm.</p>
       </div>
       {me ? (
         <section className="grid gap-3 sm:grid-cols-2">
