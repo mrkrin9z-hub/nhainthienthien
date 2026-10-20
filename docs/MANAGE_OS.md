@@ -6,15 +6,25 @@ Dừng clone/vá UI từng màn theo studiobase.vn/manage.
 
 Hướng đúng: **lấy luồng Manage (PhotoShare / StudioBase) làm nền vận hành**, rồi tối ưu thiết kế + gắn domain xưởng in (cost, BOM, kênh sàn, sản xuất, giao hàng).
 
-## Blocker
+## Nguồn Manage
 
-Workspace hiện **không có source** PhotoShare/StudioBase:
+Repo: https://github.com/mrkrin9z-hub/photosharevn/
 
-- `mrkrin9z-hub/photos` trống
-- Google Drive không có zip/repo
-- Chỉ truy cập được SPA live (React + Supabase) tại `studiobase.vn/manage`
+## Blocker quyền truy cập (2026-10-20)
 
-Không port bằng cách reverse-engineer bundle site. Cần **repo GitHub, zip source, hoặc thêm repo vào Cursor project**.
+Cloud Agent **chưa clone được** repo trên:
+
+- Token chỉ gắn environment `nhainthienthien` → `photosharevn` trả 404
+- Repo private (GitHub web cũng 404 với token hiện tại)
+
+Cần một trong các cách:
+
+1. Invite GitHub App / bot Cursor vào `photosharevn` (Read)
+2. Thêm `github.com/mrkrin9z-hub/photosharevn` vào Cloud Agent environment (multi-repo)
+3. Tạm Public repo
+4. Upload zip nhánh có `/manage` lên Drive
+
+Sau khi có quyền: clone → khảo sát `/manage` → port shell/luồng vào `src/admin-os` + adapters domain xưởng.
 
 ## Kiến trúc 3 lớp
 
