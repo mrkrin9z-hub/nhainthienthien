@@ -58,7 +58,7 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin/muc-tieu": Target,
   "/admin/sepay": Wallet,
   "/admin/thong-bao": Bell,
-  "/admin/studio/tin-mau": MessageCircle,
+  "/admin/tin-mau": MessageCircle,
   "/admin/danh-gia": ScrollText,
   "/admin/goi": Archive,
   "/admin/don-hang": ClipboardList,

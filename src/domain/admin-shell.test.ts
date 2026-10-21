@@ -78,11 +78,12 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(modules, /MANAGE_SKIP/);
   assert.match(modules, /\/manage\/garments/);
   assert.match(modules, /mode: "live"/);
-  assert.match(modules, /mode: "bridge"/);
+  assert.doesNotMatch(modules, /mode: "bridge"/);
   assert.match(modules, /to: "\/admin\/lich"/);
   assert.match(modules, /to: "\/admin\/cong-viec"/);
   assert.match(modules, /to: "\/admin\/goi"/);
-  assert.match(modules, /to: "\/admin\/studio\/tin-mau"/);
+  assert.match(modules, /to: "\/admin\/tin-mau"/);
+  assert.doesNotMatch(modules, /to: "\/admin\/studio\/tin-mau"/);
   assert.doesNotMatch(modules, /to: "\/admin\/chien-dich"/);
   assert.doesNotMatch(modules, /to: "\/admin\/chi-nhanh"/);
   assert.match(readFileSync(new URL("../routes/admin.lich.tsx", import.meta.url), "utf8"), /Lịch nhận/);
@@ -90,7 +91,8 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Nhân viên đang giữ/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Trong ví cửa hàng/);
   assert.match(modules, /Kinh doanh/);
-  assert.match(readFileSync(new URL("../routes/admin.studio.\$slug.tsx", import.meta.url), "utf8"), /StudioBridgePanel/);
+  assert.match(readFileSync(new URL("../routes/admin.tin-mau.tsx", import.meta.url), "utf8"), /Tin mẫu/);
+  assert.match(readFileSync(new URL("../routes/admin.chat.tsx", import.meta.url), "utf8"), /Chat Thiên Thiên/);
   assert.match(readFileSync(new URL("../routes/gui-anh.\$token.tsx", import.meta.url), "utf8"), /Gửi ảnh/);
   assert.match(readFileSync(new URL("../components/admin/order-qr-dialog.tsx", import.meta.url), "utf8"), /gui-anh|QR|upload/i);
   assert.match(modules, /Tài chính/);

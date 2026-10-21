@@ -22,14 +22,14 @@ test("ensureOrgCollections seed roleModules / sepay / packages", () => {
   assert.equal(ensureOrgCollections(state), false);
 });
 
-test("ensureOrgCollections gỡ path menu cũ và rename tin-mau", () => {
+test("ensureOrgCollections gỡ path bridge StudioBase và giữ tin-mau local", () => {
   const state = {
     settings: {
       sepay: { enabled: false, apiKey: "", accountHint: "", webhookPath: "/api/public/sepay", note: "" },
       notifyPrefs: { lateOrders: true, marketplaceNew: true, feedbackReprint: true, cashHandover: true },
     },
     roleModules: [
-      { role: "owner" as const, modules: ["/admin", "/admin/chi-nhanh", "/admin/tin-mau"] },
+      { role: "owner" as const, modules: ["/admin", "/admin/chi-nhanh", "/admin/studio/tin-mau"] },
       { role: "sale" as const, modules: ["/admin"] },
       { role: "production" as const, modules: ["/admin"] },
     ],
@@ -39,8 +39,8 @@ test("ensureOrgCollections gỡ path menu cũ và rename tin-mau", () => {
   assert.equal(ensureOrgCollections(state), true);
   const owner = state.roleModules.find((r) => r.role === "owner")?.modules ?? [];
   assert.ok(!owner.includes("/admin/chi-nhanh"));
-  assert.ok(!owner.includes("/admin/tin-mau"));
-  assert.ok(owner.includes("/admin/studio/tin-mau"));
+  assert.ok(!owner.includes("/admin/studio/tin-mau"));
+  assert.ok(owner.includes("/admin/tin-mau"));
   assert.equal(ensureOrgCollections(state), false);
 });
 
