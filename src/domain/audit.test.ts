@@ -298,7 +298,7 @@ test("nhật ký đọc bằng tiếng Việt", () => {
       { action: "price.update", entity: "TG-13x18-C1:tai_tiem", actorId: "owner-1", before: { price: 35000 }, after: { price: 40000 } },
       shop,
     ),
-    "Chủ Chu đổi giá TG-13x18-C1 kênh Tại tiệm / Web: 35.000đ → 40.000đ",
+    "Chủ Chu đổi giá TG-13x18-C1 kênh Tại tiệm (offline): 35.000đ → 40.000đ",
   );
   assert.equal(
     describeAudit({ action: "stock.count", entity: "giay", actorId: "sx-1", before: { stock: 12 }, after: { stock: 10 } }, shop),

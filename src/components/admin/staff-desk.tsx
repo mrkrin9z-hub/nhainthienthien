@@ -29,8 +29,6 @@ type Person = {
   active: boolean;
   probation: boolean;
   hiredAt: string | null;
-  branchId?: string | null;
-  departmentId?: string | null;
 };
 
 const empty = {
@@ -42,8 +40,6 @@ const empty = {
   active: true,
   probation: false,
   hiredAt: null as string | null,
-  branchId: "" as string,
-  departmentId: "" as string,
 };
 
 export function StaffDesk() {
@@ -55,8 +51,6 @@ export function StaffDesk() {
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
   const staff = (settings.data?.staff ?? []) as Person[];
-  const branches = settings.data?.branches ?? [];
-  const departments = settings.data?.departments ?? [];
   const rows = staff.filter((person) => {
     if (role !== "all" && person.role !== role) return false;
     const needle = q.trim().toLowerCase();
@@ -75,11 +69,7 @@ export function StaffDesk() {
   const editing = Boolean(form.id);
 
   function openNew() {
-    setForm({
-      ...empty,
-      branchId: branches[0]?.id ?? "",
-      departmentId: departments[0]?.id ?? "",
-    });
+    setForm(empty);
     setOpen(true);
   }
 
@@ -93,8 +83,6 @@ export function StaffDesk() {
       active: person.active,
       probation: person.probation,
       hiredAt: person.hiredAt,
-      branchId: person.branchId ?? "",
-      departmentId: person.departmentId ?? "",
     });
     setOpen(true);
   }
@@ -104,7 +92,7 @@ export function StaffDesk() {
       <section className="rounded-md border bg-card p-4" aria-label="Bảng phân quyền">
         <h2 className="font-bold">Phân quyền</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ba vai trò của xưởng in. Chi tiết chỉnh ở{" "}
+          Ba vai trò của xưởng in. Kênh bán (tại tiệm / online / TikTok / Shopee) là “nhánh” trên từng đơn — không gán cửa hàng riêng. Menu chỉnh ở{" "}
           <a href="/admin/nhom-quyen" className="font-medium text-primary">
             Nhóm quyền
           </a>
@@ -208,8 +196,6 @@ export function StaffDesk() {
                     probation: form.probation,
                     active: form.active,
                     hiredAt: form.hiredAt,
-                    branchId: form.branchId || null,
-                    departmentId: form.departmentId || null,
                   },
                 });
                 toast.success(editing ? "Đã cập nhật nhân viên" : "Đã tạo nhân viên và tài khoản");
@@ -265,41 +251,6 @@ export function StaffDesk() {
                 ))}
               </div>
               <p className="text-[11px] text-muted-foreground">Mỗi người một vai trò. Đổi quyền có hiệu lực ở lần tải trang sau.</p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 border-t pt-3 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="staff-branch">Cửa hàng</Label>
-                <select
-                  id="staff-branch"
-                  className="mt-1 min-h-11 w-full rounded-md border bg-background px-2"
-                  value={form.branchId}
-                  onChange={(event) => setForm((current) => ({ ...current, branchId: event.target.value }))}
-                >
-                  <option value="">Chưa gán</option>
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="staff-dept">Bộ phận</Label>
-                <select
-                  id="staff-dept"
-                  className="mt-1 min-h-11 w-full rounded-md border bg-background px-2"
-                  value={form.departmentId}
-                  onChange={(event) => setForm((current) => ({ ...current, departmentId: event.target.value }))}
-                >
-                  <option value="">Chưa gán</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
 
             <label className="flex items-center gap-2 text-sm">

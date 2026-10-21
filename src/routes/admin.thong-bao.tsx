@@ -1,10 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { studioManageUrl } from "@/admin-os/bridges";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
@@ -23,7 +21,7 @@ type Prefs = {
 };
 
 const LABELS: { key: keyof Prefs; label: string; hint: string }[] = [
-  { key: "lateOrders", label: "Đơn trễ hẹn giao", hint: "Cảnh báo trên Trang chủ / Lịch." },
+  { key: "lateOrders", label: "Đơn trễ hẹn giao", hint: "Cảnh báo trên Trang chủ / Lịch (PC + PWA)." },
   { key: "marketplaceNew", label: "Đơn sàn mới", hint: "TikTok / Shopee vừa nhập." },
   { key: "feedbackReprint", label: "Đánh giá mở in lại", hint: "Khách báo sai màu / sai khổ." },
   { key: "cashHandover", label: "Nộp tiền mặt", hint: "Nhắc khi sale giữ tiền mặt." },
@@ -43,6 +41,7 @@ function NotifyBody() {
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [saving, setSaving] = useState(false);
   const [perm, setPerm] = useState<string>("default");
+  const [standalone, setStandalone] = useState(false);
 
   useEffect(() => {
     if (data.data?.notifyPrefs) setPrefs(data.data.notifyPrefs);
@@ -50,16 +49,20 @@ function NotifyBody() {
 
   useEffect(() => {
     if (typeof Notification !== "undefined") setPerm(Notification.permission);
+    const mq = window.matchMedia("(display-mode: standalone)");
+    setStandalone(mq.matches || (navigator as Navigator & { standalone?: boolean }).standalone === true);
   }, []);
-
-  const pushHref = studioManageUrl("/manage/settings/notifications");
 
   return (
     <div className="space-y-4">
       <PageToolbar
         title="Thông báo đẩy"
-        hint="Bật loại cảnh báo trong app. Web Push / VAPID (thông báo ngoài tab) cấu hình trên StudioBase."
+        hint="Cấp quyền trình duyệt (PC) hoặc cài PWA trên điện thoại để nhận thông báo khi mở / cài app. Service worker đã đăng ký sẵn."
       />
+      <p className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">
+        Trạng thái: quyền <strong className="text-foreground">{perm}</strong>
+        {standalone ? " · đang chạy PWA (standalone)" : " · mở trong tab trình duyệt (có thể Add to Home Screen)"}
+      </p>
       {data.isLoading || !prefs ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {prefs ? (
         <form
@@ -105,20 +108,26 @@ function NotifyBody() {
                   toast.error("Trình duyệt không hỗ trợ Notification.");
                   return;
                 }
+                await navigator.serviceWorker?.ready;
                 const next = await Notification.requestPermission();
                 setPerm(next);
                 setPrefs((c) => (c ? { ...c, browserPrompted: true } : c));
-                if (next === "granted") toast.success("Đã cho phép thông báo trình duyệt");
-                else toast.message(`Quyền thông báo: ${next}`);
+                if (next === "granted") {
+                  toast.success("Đã cho phép thông báo");
+                  try {
+                    const reg = await navigator.serviceWorker.ready;
+                    await reg.showNotification("Nhà In Thiên Thiên", {
+                      body: "Thông báo PWA/PC đã bật. Cảnh báo đơn sẽ hiện khi có việc trên Trang chủ.",
+                      icon: "/brand/icon-192.png",
+                      data: { url: "/admin" },
+                    });
+                  } catch {
+                    new Notification("Nhà In Thiên Thiên", { body: "Thông báo đã bật." });
+                  }
+                } else toast.message(`Quyền thông báo: ${next}`);
               }}
             >
-              Xin quyền trình duyệt ({perm})
-            </Button>
-            <Button type="button" variant="outline" asChild>
-              <a href={pushHref} target="_blank" rel="noreferrer">
-                <ExternalLink className="size-4" />
-                Web Push trên StudioBase
-              </a>
+              Cấp quyền PC / PWA ({perm})
             </Button>
           </div>
         </form>

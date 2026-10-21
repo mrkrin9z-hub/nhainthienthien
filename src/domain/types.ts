@@ -1,9 +1,10 @@
 export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee"] as const;
 export type Channel = (typeof CHANNELS)[number];
 
+/** Kênh bán = “nhánh” vận hành (offline / online / sàn). */
 export const CHANNEL_LABEL: Record<Channel, string> = {
-  tai_tiem: "Tại tiệm / Web",
-  facebook: "Facebook",
+  tai_tiem: "Tại tiệm (offline)",
+  facebook: "Online / Facebook",
   tiktok: "TikTok",
   shopee: "Shopee",
 };
@@ -221,14 +222,27 @@ export type ShopDocument = {
   by: string | null;
 };
 
-/** Cấu hình SePay cục bộ (webhook → ví). OAuth đầy đủ vẫn trên StudioBase. */
+/** Cấu hình SePay — webhook tiền vào → tự thu đơn (mã CK = mã đơn). */
 export type SePayConfig = {
   enabled: boolean;
-  /** Ghi chú / mã tài khoản nhận trên SePay */
+  /** API Key / Bearer SePay gửi kèm (xác thực webhook) */
+  apiKey: string;
+  /** Ghi chú / số TK trên SePay */
   accountHint: string;
-  /** URL webhook (hiển thị để dán vào SePay) */
+  /** Path webhook công khai */
   webhookPath: string;
   note: string;
+};
+
+/** Gói dịch vụ bán tại xưởng (không phải subscription StudioBase). */
+export type ServicePackage = {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  includes: string;
+  active: boolean;
+  sort: number;
 };
 
 /** Nguồn / chiến dịch ads (local — gắn đơn hoặc khách). */
@@ -589,8 +603,12 @@ export type ShopState = {
   announcements?: Announcement[];
   /** Kho tài liệu nội bộ. */
   documents?: ShopDocument[];
-  /** Chiến dịch / nguồn ads. */
+  /** Chiến dịch / nguồn ads (legacy — không còn menu). */
   campaigns?: Campaign[];
-  /** Tin mẫu chép tay. */
+  /** Tin mẫu local (legacy — dùng StudioBase Chat). */
   messageTemplates?: MessageTemplate[];
+  /** Gói dịch vụ bán tại xưởng. */
+  packages?: ServicePackage[];
+  /** Id giao dịch SePay đã xử lý (idempotent). */
+  sepaySeen?: string[];
 };

@@ -1163,3 +1163,36 @@ export const getNotifyPrefs = createServerFn({ method: "GET" }).handler(async ()
   const { getNotifyPrefs: load } = await import("@/server/service");
   return load(await actor());
 });
+
+export const getPackages = createServerFn({ method: "GET" }).handler(async () => {
+  const { listPackages } = await import("@/server/service");
+  return listPackages(await actor());
+});
+
+export const storePackage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        name: z.string().min(2),
+        price: z.number().int().min(0),
+        description: z.string().optional(),
+        includes: z.string().optional(),
+        active: z.boolean().optional(),
+        sort: z.number().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { savePackage } = await import("@/server/service");
+    await savePackage(await actor(), data);
+    return { ok: true };
+  });
+
+export const deletePackage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removePackage } = await import("@/server/service");
+    await removePackage(await actor(), data.id);
+    return { ok: true };
+  });

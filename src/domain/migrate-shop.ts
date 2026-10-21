@@ -1,13 +1,5 @@
 import { ensureOrgCollections } from "./org-desk.ts";
-import type {
-  Branch,
-  Campaign,
-  Department,
-  MessageTemplate,
-  NotifyPrefs,
-  RoleModules,
-  SePayConfig,
-} from "./types.ts";
+import type { NotifyPrefs, RoleModules, SePayConfig, ServicePackage } from "./types.ts";
 
 const LEGACY_ANH_THO = "Miễn phí khôi phục, thay áo, đổi nền. Không giới hạn số lần sửa.";
 const NEXT_ANH_THO = "Hỗ trợ chỉnh sửa ảnh cơ bản.";
@@ -43,13 +35,9 @@ type Migratable = {
   groups?: ShopGroup[];
   skus?: { id: string; code: string; groupId: string }[];
   orders?: { items: { name: string }[] }[];
-  branches?: Branch[];
-  departments?: Department[];
   roleModules?: RoleModules[];
-  announcements?: unknown[];
-  documents?: unknown[];
-  campaigns?: Campaign[];
-  messageTemplates?: MessageTemplate[];
+  packages?: ServicePackage[];
+  sepaySeen?: string[];
 };
 
 /** Đổi tên cũ đúng nguyên văn. Tên chủ đã sửa thì giữ. */

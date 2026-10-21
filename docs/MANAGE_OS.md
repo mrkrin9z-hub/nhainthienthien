@@ -2,54 +2,28 @@
 
 ## Quyết định
 
-**Clone vận hành StudioBase** (chat, đơn, ví, NV, quyền, báo cáo…) với UI riêng tối ưu **in ấn**. Data/nghiệp vụ bám StudioBase; app Thiên Thiên giữ domain xưởng (cost, BOM, QR gửi ảnh, album, kho…).
+Clone vận hành StudioBase với UI in ấn. **Kênh bán = nhánh** (`tai_tiem` offline, `facebook` online, `tiktok`, `shopee`) — không có màn chi nhánh/bộ phận riêng.
 
-## Mapping thuật ngữ
+## Đã lược
 
-| StudioBase | Xưởng in |
+Chiến dịch, chi nhánh, bộ phận, TB nội bộ, tài liệu, hướng dẫn admin. Tin mẫu local — dùng StudioBase Chat / Manage.
+
+## Live lõi
+
+Chat, đơn, khách, thu, nhắc khách, SX/giao/lịch/công việc, SP, **gói dịch vụ (bán tại xưởng)**, giá, kho, album, NV/chấm công/lương, **nhóm quyền (ẩn menu)**, ví/chi/KPI/mục tiêu, **SePay webhook tự thu**, kết nối, sao lưu, **thông báo PC/PWA**, nhật ký, đánh giá, cài đặt.
+
+## Deep-link
+
+| Màn | StudioBase |
 |---|---|
-| Ngày chụp | Ngày nhận / hẹn in |
-| Đã chụp | Đã nhận file |
-| Gửi ảnh gốc | Khách duyệt / chọn size |
-| Chỉnh sửa | Xử lý trước in |
-| Đã gửi in | Đưa vào máy in |
-| Đã giao | Giao khách |
+| Tin mẫu & kênh | `/manage/messages/settings` + chat.studiobase.vn |
 
-## Kiến trúc
+## SePay
 
-```
-UI Thiên Thiên (shell + brand)
-  ├─ live modules → Workers/KV domain xưởng + Partner Chat API
-  └─ deep-link StudioBase chỉ khi bắt buộc OAuth / VAPID / billing
-```
-
-- Partner Chat API: inbox + tạo đơn gắn hội thoại — xem `docs/STUDIOBASE_CHAT.md`
-- **Không** OAuth Meta/Zalo trong app; **không** garment / AI tools studio-chụp
-- **Giữ** QR khách gửi ảnh, album, thu→ví NV, sản xuất, kho…
-
-## Bản đồ module (`src/admin-os/modules.ts`)
-
-Tất cả mục menu Manage OS là **live** trong app. Deep-link StudioBase chỉ còn nút phụ trong:
-
-| Màn app | Deep-link Manage |
-|---|---|
-| Tin mẫu & kênh | `/manage/messages/settings` (OAuth Fanpage/Zalo) |
-| Thông báo đẩy | `/manage/settings/notifications` (VAPID / Web Push) |
-| Gói dịch vụ | `/manage/subscription` |
-| SePay | `/manage/settings/sepay` (tuỳ chọn) |
-
-Ẩn: `/manage/garments`, `/manage/tools`.
-
-## Phase
-
-1. ✅ Chat + đơn từ hội thoại (Partner API) + QR/upload/album  
-2. ✅ Lịch / Công việc + chi nhánh / bộ phận / nhóm quyền  
-3. ✅ Mục tiêu KPI + SePay stub  
-4. ✅ Đánh giá, TB nội bộ, tài liệu, hướng dẫn, chiến dịch, tin mẫu local, prefs thông báo, gói (matrix + deep-link)  
+`POST /api/public/sepay` — khớp mã CK (= mã đơn VietQR `TTyymmdd-nnn`) → ghi thu `SePay / chuyển khoản`. Cấu hình API Key + bật ở `/admin/sepay`. Trên SePay: tiền tố `TT`, Money in.
 
 ## Code
 
 - Menu: `src/admin-os/modules.ts`
-- Deep-link helper: `src/admin-os/bridges.ts` (`studioManageUrl`)
-- Org + extend: `src/domain/org-desk.ts`
-- Chat: `src/routes/admin.chat.tsx`, `src/server/studiobase.ts`
+- SePay: `src/domain/sepay.ts`, `src/routes/api/public/sepay.ts`
+- Quyền menu: `roleModules` + `modulesForRole(role, me.modules)`

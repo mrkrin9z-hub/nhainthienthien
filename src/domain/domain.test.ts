@@ -385,7 +385,7 @@ test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của 
   assert.equal(state.settings.zaloDefaultMigrated, true);
   assert.equal(state.groups[0]?.description, "Ảnh thờ. Hỗ trợ chỉnh sửa ảnh cơ bản.");
   assert.equal(state.groups[0]?.turnaround, "Theo đơn");
-  assert.ok(Array.isArray((state as { branches?: unknown[] }).branches));
+  assert.ok(Array.isArray((state as { roleModules?: unknown[] }).roleModules));
   state.settings.showZalo = true;
   assert.equal(applyStoreMigrations(state), false);
   assert.equal(state.settings.showZalo, true);
@@ -490,18 +490,14 @@ test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và đ
     settings: {
       zaloDefaultMigrated: true,
       groupListed: { ep_go: false, trang_guong: true },
-      sepay: { enabled: false, accountHint: "", webhookPath: "/api/webhooks/sepay", note: "" },
+      sepay: { enabled: false, apiKey: "", accountHint: "", webhookPath: "/api/public/sepay", note: "" },
       notifyPrefs: { lateOrders: true, marketplaceNew: true, feedbackReprint: true, cashHandover: true },
     },
     groups: [{ id: "trang_guong", name: "Tên chủ đã sửa", description: "x", turnaround: "3 ngày" }],
     skus: [{ id: "EG-40x60-C1", code: "EG-40x60-C1", groupId: "trang_guong" }],
-    branches: [{ id: "branch-main", name: "Cửa hàng chính", address: "", phone: "", active: true, sort: 0 }],
-    departments: [{ id: "dept-sale", name: "Sale", note: "", active: true, sort: 0 }],
-    roleModules: [{ role: "owner" as const, modules: ["/admin"] }],
-    announcements: [],
-    documents: [],
-    campaigns: [],
-    messageTemplates: [{ id: "tpl", title: "x", body: "y", kind: "other" as const, updatedAt: "2026-01-01T00:00:00.000Z" }],
+    roleModules: [{ role: "owner" as const, modules: ["/admin", "/admin/goi"] }],
+    packages: [],
+    sepaySeen: [],
   };
   assert.equal(applyStoreMigrations(renamedByOwner), false);
   assert.equal(renamedByOwner.groups[0]?.name, "Tên chủ đã sửa");

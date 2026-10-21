@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { ADMIN_MODULE_GROUPS } from "@/admin-os/modules";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,12 @@ import { getOrg, storeRoleModules } from "@/lib/admin.functions";
 export const Route = createFileRoute("/admin/nhom-quyen")({
   component: RolesPage,
 });
+
+const ROLES: Role[] = ["owner", "sale", "production"];
+
+function allMenuItems() {
+  return ADMIN_MODULE_GROUPS.flatMap((group) => group.items.map((item) => ({ ...item, group: group.title || "Chung" })));
+}
 
 function RolesPage() {
   return (
@@ -25,23 +32,38 @@ function RolesPage() {
 function RolesBody() {
   const queryClient = useQueryClient();
   const org = useQuery({ queryKey: ["org"], queryFn: () => getOrg() });
-  const [draft, setDraft] = useState<Record<Role, string>>({ owner: "", sale: "", production: "" });
+  const menu = useMemo(() => allMenuItems(), []);
+  const [draft, setDraft] = useState<Record<Role, Set<string>>>({
+    owner: new Set(),
+    sale: new Set(),
+    production: new Set(),
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const rows = org.data?.roleModules ?? DEFAULT_ROLE_MODULES;
     setDraft({
-      owner: (rows.find((r) => r.role === "owner")?.modules ?? []).join("\n"),
-      sale: (rows.find((r) => r.role === "sale")?.modules ?? []).join("\n"),
-      production: (rows.find((r) => r.role === "production")?.modules ?? []).join("\n"),
+      owner: new Set(rows.find((r) => r.role === "owner")?.modules ?? []),
+      sale: new Set(rows.find((r) => r.role === "sale")?.modules ?? []),
+      production: new Set(rows.find((r) => r.role === "production")?.modules ?? []),
     });
   }, [org.data]);
+
+  function toggle(role: Role, path: string) {
+    setDraft((current) => {
+      const next = new Set(current[role]);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      if (path !== "/admin") next.add("/admin");
+      return { ...current, [role]: next };
+    });
+  }
 
   return (
     <div className="space-y-4">
       <PageToolbar
         title="Nhóm quyền"
-        hint="Ba vai trò cố định của xưởng in. Ma trận bên dưới là quy tắc nghiệp vụ; danh sách module chỉnh menu theo role (mỗi dòng một path /admin/…)."
+        hint="Tick module hiện trên menu theo vai. API vẫn chặn theo role cứng (owner/sale/production)."
       />
       <section className="rounded-md border bg-card p-4" aria-label="Ma trận quyền">
         <h2 className="font-bold">Quyền nghiệp vụ</h2>
@@ -70,21 +92,47 @@ function RolesBody() {
       </section>
 
       <section className="space-y-3 rounded-md border bg-card p-4">
-        <h2 className="font-bold">Module menu theo vai</h2>
-        <p className="text-sm text-muted-foreground">Lưu ý: API vẫn kiểm tra role cứng. Danh sách này dùng để ghi nhận / đồng bộ menu (chuẩn bị filter sidebar).</p>
-        {(["owner", "sale", "production"] as Role[]).map((role) => (
-          <div key={role}>
-            <label className="text-sm font-medium" htmlFor={`mods-${role}`}>
-              {ROLE_LABEL[role]}
-            </label>
-            <textarea
-              id={`mods-${role}`}
-              className="mt-1 min-h-28 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
-              value={draft[role]}
-              onChange={(e) => setDraft((c) => ({ ...c, [role]: e.target.value }))}
-            />
-          </div>
-        ))}
+        <h2 className="font-bold">Menu theo vai</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[36rem] text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-2 pr-3 font-semibold">Module</th>
+                {ROLES.map((role) => (
+                  <th key={role} className="px-2 py-2 font-semibold">
+                    {ROLE_LABEL[role]}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {menu.map((item) => (
+                <tr key={item.to} className="border-b last:border-0">
+                  <td className="py-2 pr-3">
+                    <span className="font-medium">{item.label}</span>
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      {item.group} · {item.to}
+                    </span>
+                  </td>
+                  {ROLES.map((role) => {
+                    const allowedByRole = item.roles.includes(role);
+                    return (
+                      <td key={role} className="px-2 py-2">
+                        <input
+                          type="checkbox"
+                          disabled={!allowedByRole || item.to === "/admin"}
+                          checked={draft[role].has(item.to)}
+                          onChange={() => toggle(role, item.to)}
+                          aria-label={`${ROLE_LABEL[role]} · ${item.label}`}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <Button
           type="button"
           disabled={saving || org.isLoading}
@@ -93,17 +141,15 @@ function RolesBody() {
             try {
               await storeRoleModules({
                 data: {
-                  rows: (["owner", "sale", "production"] as Role[]).map((role) => ({
+                  rows: ROLES.map((role) => ({
                     role,
-                    modules: draft[role]
-                      .split(/\n+/)
-                      .map((line) => line.trim())
-                      .filter(Boolean),
+                    modules: [...draft[role]],
                   })),
                 },
               });
-              toast.success("Đã lưu nhóm quyền");
+              toast.success("Đã lưu nhóm quyền — menu áp dụng ngay lần tải sau");
               await queryClient.invalidateQueries({ queryKey: ["org"] });
+              await queryClient.invalidateQueries({ queryKey: ["me"] });
             } catch (error) {
               toast.error((error as Error).message);
             } finally {
@@ -111,7 +157,7 @@ function RolesBody() {
             }
           }}
         >
-          {saving ? "Đang lưu…" : "Lưu module"}
+          {saving ? "Đang lưu…" : "Lưu menu theo vai"}
         </Button>
       </section>
     </div>

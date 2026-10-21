@@ -75,10 +75,16 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     (status) => ({ status, label: STATUS_LABEL[status], count: visible.filter((order) => order.status === status).length }),
   );
   const late = visible.filter((order) => isLate(state, order, clock)).map((order) => orderSummary(state, order, actor.role));
+  const prefs = state.settings.notifyPrefs;
   const alerts = deskAlerts(
     visible.map((order) => orderSummary(state, order, actor.role)),
     Date.now(),
-  );
+  ).filter((alert) => {
+    if (!prefs) return true;
+    if (alert.kind === "tre") return prefs.lateOrders !== false;
+    if (alert.kind === "san") return prefs.marketplaceNew !== false;
+    return true;
+  });
   const lowStock = state.materials
     .filter((material) => material.minStock !== null && material.stock <= material.minStock)
     .map((material) => ({ id: material.id, name: material.name, stock: material.stock, unit: material.unit, min: material.minStock }));

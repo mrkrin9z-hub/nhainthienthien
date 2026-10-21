@@ -54,19 +54,13 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin/chat": MessageCircle,
   "/admin/lich": ClipboardList,
   "/admin/cong-viec": ClipboardList,
-  "/admin/chien-dich": Target,
   "/admin/nhom-quyen": UserCog,
-  "/admin/bo-phan": Users,
-  "/admin/chi-nhanh": Landmark,
   "/admin/muc-tieu": Target,
   "/admin/sepay": Wallet,
   "/admin/thong-bao": Bell,
-  "/admin/tin-mau": MessageCircle,
+  "/admin/studio/tin-mau": MessageCircle,
   "/admin/danh-gia": ScrollText,
   "/admin/goi": Archive,
-  "/admin/huong-dan": ScrollText,
-  "/admin/thong-bao-noi-bo": Bell,
-  "/admin/tai-lieu": Archive,
   "/admin/don-hang": ClipboardList,
   "/admin/don-moi": ClipboardList,
   "/admin/san-xuat": ClipboardList,
@@ -146,7 +140,7 @@ function AdminLayout() {
   }
 
   const title = pageTitle(pathname, role);
-  const groups = modulesForRole(role);
+  const groups = modulesForRole(role, me.data.modules);
 
   return (
     <div className="admin-desk flex min-h-screen">

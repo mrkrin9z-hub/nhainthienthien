@@ -70,7 +70,8 @@ import { buildWebProduct, type WebProductInput } from "@/domain/web-product";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
-import { DEFAULT_ROLE_MODULES, defaultNotifyPrefs, defaultSePay, sortBySortThenName } from "@/domain/org-desk";
+import { DEFAULT_ROLE_MODULES, defaultNotifyPrefs, defaultSePay, modulesForStoredRole, sortBySortThenName } from "@/domain/org-desk";
+import { findOrderForSePay, sepayCollectAmount, sepayRejectReason, type SePayWebhookPayload } from "@/domain/sepay";
 import type {
   Announcement,
   Branch,
@@ -88,6 +89,7 @@ import type {
   RoleModules,
   CashHandover,
   SePayConfig,
+  ServicePackage,
   ShopDocument,
   ShopState,
   Sku,
@@ -111,11 +113,14 @@ import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
 
 export type Actor = Pick<Staff, "id" | "name" | "email" | "role" | "mustChangePassword"> & {
   totpEnabled: boolean;
+  /** Path menu được phép — từ roleModules. */
+  modules: string[];
 };
 
 export type LoginResult = Actor | { needsTotp: true };
 
-function toActor(staff: Staff): Actor {
+function toActor(staff: Staff, modules?: string[] | null): Actor {
+  const fallback = DEFAULT_ROLE_MODULES.find((row) => row.role === staff.role)?.modules ?? ["/admin"];
   return {
     id: staff.id,
     name: staff.name,
@@ -123,6 +128,7 @@ function toActor(staff: Staff): Actor {
     role: staff.role,
     mustChangePassword: staff.mustChangePassword,
     totpEnabled: staff.totpEnabled === true,
+    modules: modules?.length ? modules : [...fallback],
   };
 }
 
@@ -252,7 +258,7 @@ export async function currentActor(staffId: string | null): Promise<Actor | null
   const state = await readState();
   const staff = state.staff.find((s) => s.id === staffId && s.active);
   if (!staff) return null;
-  return toActor(staff);
+  return toActor(staff, modulesForStoredRole(staff.role, state.roleModules));
 }
 
 export async function login(email: string, password: string, code?: string): Promise<LoginResult> {
@@ -280,7 +286,7 @@ export async function login(email: string, password: string, code?: string): Pro
   await mutate(async (draft) => {
     audit(draft, staff.id, "auth.login", staff.id, null, { email: staff.email });
   });
-  return toActor(staff);
+  return toActor(staff, modulesForStoredRole(staff.role, state.roleModules));
 }
 
 export async function changePassword(actor: Actor, current: string, next: string): Promise<void> {
@@ -2485,8 +2491,9 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
       const prev = state.settings.sepay ?? defaultSePay();
       state.settings.sepay = {
         enabled: typeof raw.enabled === "boolean" ? raw.enabled : prev.enabled,
+        apiKey: typeof raw.apiKey === "string" ? raw.apiKey.trim() : prev.apiKey,
         accountHint: typeof raw.accountHint === "string" ? raw.accountHint.trim() : prev.accountHint,
-        webhookPath: typeof raw.webhookPath === "string" && raw.webhookPath.trim() ? raw.webhookPath.trim() : prev.webhookPath,
+        webhookPath: typeof raw.webhookPath === "string" && raw.webhookPath.trim() ? raw.webhookPath.trim() : prev.webhookPath || "/api/public/sepay",
         note: typeof raw.note === "string" ? raw.note.trim() : prev.note,
       };
     }
@@ -3937,4 +3944,131 @@ export async function getNotifyPrefs(actor: Actor) {
   assertRole(actor, ["owner"]);
   const state = await readState();
   return { notifyPrefs: state.settings.notifyPrefs ?? defaultNotifyPrefs() };
+}
+
+/** Webhook SePay: khớp mã CK với mã đơn → tự thu chuyển khoản. */
+export async function processSePayWebhook(payload: SePayWebhookPayload, authHeader: string | null): Promise<{ success: true; duplicate?: boolean; matched?: string; amount?: number; skipped?: string }> {
+  const state = await readState();
+  const cfg = state.settings.sepay ?? defaultSePay();
+  if (!cfg.enabled) return { success: true, skipped: "SePay chưa bật." };
+  const expected = cfg.apiKey.trim();
+  if (expected) {
+    const header = (authHeader ?? "").trim();
+    const ok =
+      header === expected ||
+      header === `Bearer ${expected}` ||
+      header === `Apikey ${expected}` ||
+      header.toLowerCase() === `apikey ${expected.toLowerCase()}`;
+    if (!ok) throw new Error("API key SePay không khớp.");
+  }
+  const txId = String(payload.id ?? "").trim();
+  if (!txId) throw new Error("Thiếu id giao dịch SePay.");
+  const seen = state.sepaySeen ?? [];
+  if (seen.includes(txId)) return { success: true, duplicate: true };
+
+  const candidates = state.orders.map((order) => ({
+    id: order.id,
+    code: order.code,
+    status: order.status,
+    channel: order.channel,
+    total: order.total,
+    depositPaid: order.depositPaid,
+  }));
+  const order = findOrderForSePay(candidates, payload);
+  const amountRaw = Number(payload.transferAmount) || 0;
+  const reject = sepayRejectReason(order, amountRaw, payload.transferType);
+  if (reject || !order) {
+    await mutate(async (draft) => {
+      draft.sepaySeen = [txId, ...(draft.sepaySeen ?? [])].slice(0, 500);
+      audit(draft, null, "sepay.skip", txId, null, { reason: reject ?? "unknown", content: payload.content, code: payload.code });
+    });
+    return { success: true, skipped: reject ?? "Không khớp." };
+  }
+
+  const amount = sepayCollectAmount(order, amountRaw);
+  await mutate(async (draft) => {
+    draft.sepaySeen = [txId, ...(draft.sepaySeen ?? [])].slice(0, 500);
+    const target = draft.orders.find((item) => item.id === order.id);
+    if (!target) return;
+    const before = target.depositPaid;
+    const next = appendCollection(
+      target,
+      {
+        id: nid(),
+        at: nowIso(),
+        amount,
+        method: "SePay / chuyển khoản",
+        by: null,
+      },
+      nid(),
+    );
+    target.payments = next.payments;
+    target.depositPaid = next.depositPaid;
+    target.depositMethod = next.depositMethod;
+    target.depositBy = next.depositBy;
+    target.updatedAt = nowIso();
+    target.history.push({
+      at: target.updatedAt,
+      from: target.status,
+      to: target.status,
+      by: null,
+      note: `SePay tự thu ${amount.toLocaleString("vi-VN")}đ · GD ${txId}`,
+    });
+    audit(draft, null, "sepay.collect", target.id, { depositPaid: before }, { depositPaid: target.depositPaid, txId, amount, reference: payload.referenceCode });
+  });
+  return { success: true, matched: order.code, amount };
+}
+
+export async function listPackages(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  return { packages: sortBySortThenName(state.packages ?? []) };
+}
+
+export async function savePackage(
+  actor: Actor,
+  input: { id?: string; name: string; price: number; description?: string; includes?: string; active?: boolean; sort?: number },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const name = input.name.trim();
+    if (name.length < 2) throw new Error("Tên gói cần ít nhất 2 ký tự.");
+    const price = Math.round(Number(input.price));
+    if (!Number.isFinite(price) || price < 0) throw new Error("Giá gói không hợp lệ.");
+    if (!state.packages) state.packages = [];
+    if (input.id) {
+      const row = state.packages.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy gói.");
+      row.name = name;
+      row.price = price;
+      if (input.description !== undefined) row.description = input.description.trim();
+      if (input.includes !== undefined) row.includes = input.includes.trim();
+      if (input.active !== undefined) row.active = input.active;
+      if (input.sort !== undefined) row.sort = input.sort;
+      audit(state, actor.id, "package.update", row.id, null, { name, price });
+      return;
+    }
+    const row: ServicePackage = {
+      id: nid(),
+      name,
+      price,
+      description: (input.description ?? "").trim(),
+      includes: (input.includes ?? "").trim(),
+      active: input.active !== false,
+      sort: input.sort ?? state.packages.length,
+    };
+    state.packages.push(row);
+    audit(state, actor.id, "package.create", row.id, null, { name, price });
+  });
+}
+
+export async function removePackage(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.packages ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy gói.");
+    const [removed] = list.splice(at, 1);
+    audit(state, actor.id, "package.remove", id, removed, null);
+  });
 }
