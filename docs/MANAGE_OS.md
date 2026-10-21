@@ -34,7 +34,7 @@ UI Thiên Thiên (shell + brand)
 | Kinh doanh | Chat, Đơn, Khách, Thu, Nhắc khách | Chiến dịch |
 | Sản xuất | SX, Giao, Lịch, Công việc, SP, Giá, Kho, Album | — |
 | Vận hành | NV, Chấm công, Lương, Tài khoản | Nhóm quyền, Bộ phận, Cửa hàng |
-| Tài chính | Ví, Chi phí, Thu chi, Báo cáo, KPI | Mục tiêu, SePay |
+| Tài chính | Ví, Chi phí, Báo cáo chi, Thu chi, Báo cáo, KPI | Mục tiêu, SePay |
 | Hệ thống | Kết nối, Sao lưu, Nhật ký, Cài đặt | Tin mẫu, Push, Đánh giá, TB nội bộ, Tài liệu, Gói, Hướng dẫn |
 
 Ẩn: `/manage/garments`, `/manage/tools`.

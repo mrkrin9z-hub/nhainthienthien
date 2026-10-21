@@ -33,3 +33,12 @@ test("sale thấy chat và đơn, không thấy kết nối", () => {
   assert.ok(sale.includes("/admin/don-hang"));
   assert.ok(!sale.includes("/admin/ket-noi"));
 });
+
+test("owner thấy báo cáo chi trên menu Tài chính", () => {
+  const owner = modulesForRole("owner").flatMap((group) => group.items).map((item) => item.to);
+  assert.ok(owner.includes("/admin/bao-cao-chi"));
+  assert.ok(owner.includes("/admin/chi-phi"));
+  assert.ok(owner.includes("/admin/nhan-vien"));
+  assert.ok(owner.includes("/admin/cham-cong"));
+  assert.ok(owner.includes("/admin/luong"));
+});

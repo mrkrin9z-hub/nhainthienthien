@@ -81,6 +81,7 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
     items: [
       { to: "/admin/vi", label: "Ví tiền", roles: ["owner", "sale"], managePath: "/manage/wallet", mode: "live" },
       { to: "/admin/chi-phi", label: "Chi phí", roles: ["owner"], managePath: "/manage/expenses", mode: "live" },
+      { to: "/admin/bao-cao-chi", label: "Báo cáo chi", roles: ["owner"], managePath: "/manage/expenses", mode: "live" },
       { to: "/admin/loi-nhuan", label: "Thu chi", roles: ["owner"], managePath: "/manage/expenses", mode: "live" },
       { to: "/admin/bao-cao", label: "Báo cáo", roles: ["owner"], managePath: "/manage/statistics", mode: "live" },
       { to: "/admin/kpi", label: "KPI", roles: ["owner", "sale"], managePath: "/manage/settings/targets", mode: "live" },
