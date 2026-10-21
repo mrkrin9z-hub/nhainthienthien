@@ -45,6 +45,7 @@ export function orderSummary(state: ShopState, order: Order, role: Role) {
     late: isLate(state, order),
     fileCount: order.files.filter((file) => !file.deletedAt && file.status === "complete").length,
     fulfillment: order.fulfillment,
+    dueDate: order.dueDate,
   };
 }
 

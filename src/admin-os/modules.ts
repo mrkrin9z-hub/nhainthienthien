@@ -56,8 +56,8 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
     items: [
       { to: "/admin/san-xuat", label: "Sản xuất", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },
       { to: "/admin/giao-hang", label: "Giao hàng", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },
-      { to: "/admin/studio/lich", label: "Lịch nhận/in", roles: ["owner", "sale", "production"], managePath: "/manage/calendar", mode: "bridge" },
-      { to: "/admin/studio/cong-viec", label: "Công việc", roles: ["owner", "sale", "production"], managePath: "/manage/tasks", mode: "bridge" },
+      { to: "/admin/lich", label: "Lịch nhận/in", roles: ["owner", "sale", "production"], managePath: "/manage/calendar", mode: "live" },
+      { to: "/admin/cong-viec", label: "Công việc", roles: ["owner", "sale", "production"], managePath: "/manage/tasks", mode: "live" },
       { to: "/admin/san-pham", label: "Sản phẩm", roles: ["owner"], managePath: "/manage/products", mode: "live" },
       { to: "/admin/gia", label: "Bảng giá", roles: ["owner", "sale"], managePath: "/manage/products", mode: "live" },
       { to: "/admin/kho", label: "Kho", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },

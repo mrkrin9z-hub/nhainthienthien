@@ -14,20 +14,6 @@ export type StudioBridge = {
 };
 
 export const STUDIO_BRIDGES: Record<string, StudioBridge> = {
-  lich: {
-    slug: "lich",
-    label: "Lịch nhận / hẹn in",
-    managePath: "/manage/calendar",
-    phase: 2,
-    blurb: "Lịch theo ngày nhận ảnh, hẹn in và giao — đổi nhãn từ “Ngày chụp”.",
-  },
-  "cong-viec": {
-    slug: "cong-viec",
-    label: "Công việc",
-    managePath: "/manage/tasks",
-    phase: 2,
-    blurb: "Checklist đơn: nhận file → xử lý → in → giao.",
-  },
   "chien-dich": {
     slug: "chien-dich",
     label: "Chiến dịch",

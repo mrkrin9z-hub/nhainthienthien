@@ -52,8 +52,8 @@ export const Route = createFileRoute("/admin")({
 const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin": LayoutDashboard,
   "/admin/chat": MessageCircle,
-  "/admin/studio/lich": ClipboardList,
-  "/admin/studio/cong-viec": ClipboardList,
+  "/admin/lich": ClipboardList,
+  "/admin/cong-viec": ClipboardList,
   "/admin/studio/chien-dich": Target,
   "/admin/studio/nhom-quyen": UserCog,
   "/admin/studio/bo-phan": Users,

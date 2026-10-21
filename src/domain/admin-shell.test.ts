@@ -78,7 +78,10 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(modules, /MANAGE_SKIP/);
   assert.match(modules, /\/manage\/garments/);
   assert.match(modules, /mode: "bridge"/);
-  assert.match(modules, /studio\/lich/);
+  assert.match(modules, /to: "\/admin\/lich"/);
+  assert.match(modules, /to: "\/admin\/cong-viec"/);
+  assert.match(readFileSync(new URL("../routes/admin.lich.tsx", import.meta.url), "utf8"), /Lịch nhận/);
+  assert.match(readFileSync(new URL("../routes/admin.cong-viec.tsx", import.meta.url), "utf8"), /Công việc xưởng/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Nhân viên đang giữ/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Trong ví cửa hàng/);
   assert.match(modules, /Kinh doanh/);

@@ -14,13 +14,16 @@ test("menu đủ nhóm vận hành và ẩn garment/tools", () => {
   assert.deepEqual([...MANAGE_SKIP].sort(), ["/manage/garments", "/manage/tools"].sort());
 });
 
-test("chat và đơn là live; lịch là bridge", () => {
+test("chat, đơn, lịch, công việc là live; nhóm quyền vẫn bridge", () => {
   const items = ADMIN_MODULE_GROUPS.flatMap((group) => group.items);
   assert.equal(items.find((item) => item.to === "/admin/chat")?.mode, "live");
   assert.equal(items.find((item) => item.to === "/admin/don-hang")?.mode, "live");
   assert.equal(items.find((item) => item.to === "/admin/album")?.mode, "live");
-  assert.equal(items.find((item) => item.to === "/admin/studio/lich")?.mode, "bridge");
-  assert.ok(STUDIO_BRIDGES.lich);
+  assert.equal(items.find((item) => item.to === "/admin/lich")?.mode, "live");
+  assert.equal(items.find((item) => item.to === "/admin/cong-viec")?.mode, "live");
+  assert.equal(items.find((item) => item.to === "/admin/studio/nhom-quyen")?.mode, "bridge");
+  assert.ok(STUDIO_BRIDGES["nhom-quyen"]);
+  assert.ok(!STUDIO_BRIDGES.lich);
   assert.match(studioManageUrl("/manage/calendar"), /studiobase\.vn\/manage\/calendar/);
 });
 
