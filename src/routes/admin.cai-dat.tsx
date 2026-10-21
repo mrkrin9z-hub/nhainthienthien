@@ -3,13 +3,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ListPager, useListPage } from "@/components/admin/list-page";
+import { canPreviewPhoto, PhotoViewer, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RoleGate } from "@/components/role-gate";
-import { dueFiles, loadSettings, removeFile, runRecalc, storeSettings, storeStaff } from "@/lib/admin.functions";
+import { StaffDesk } from "@/components/admin/staff-desk";
+import { dueFiles, loadSettings, removeFile, runRecalc, storeSettings } from "@/lib/admin.functions";
 import { DEFAULT_REMIND_DAYS, DEFAULT_REMIND_MESSAGE, DEFAULT_REPEAT_ORDERS } from "@/domain/crm";
-import { ROLE_LABEL, type Role } from "@/domain/types";
+import { TRANSFER_BANKS } from "@/domain/print-shop";
 
 export const Route = createFileRoute("/admin/cai-dat")({
   component: SettingsPage,
@@ -99,7 +102,20 @@ function SettingsBody() {
   const files = useQuery({ queryKey: ["due-files"], queryFn: () => dueFiles() });
   const [draft, setDraft] = useState<Record<string, string> | null>(null);
   const [tab, setTab] = useState<"so" | "cua" | "tk" | "file">("so");
+  const [fileQ, setFileQ] = useState("");
+  const [auditQ, setAuditQ] = useState("");
+  const [openFile, setOpenFile] = useState<string | null>(null);
   const data = settings.data;
+  const due = (files.data ?? []).filter((file) => {
+    const needle = fileQ.trim().toLowerCase();
+    return !needle || `${file.orderCode} ${file.name}`.toLowerCase().includes(needle);
+  });
+  const audits = (data?.audits ?? []).filter((item) => {
+    const needle = auditQ.trim().toLowerCase();
+    return !needle || item.sentence.toLowerCase().includes(needle);
+  });
+  const fileList = useListPage(due, fileQ);
+  const auditList = useListPage(audits, auditQ);
   const values = draft ?? (data ? Object.fromEntries(NUMBER_FIELDS.map((field) => {
     const raw = (data.settings as Record<string, unknown>)[field.key];
     if (raw === null || raw === undefined) {
@@ -116,7 +132,7 @@ function SettingsBody() {
   const tabs = [
     { id: "so" as const, label: "Số liệu" },
     { id: "cua" as const, label: "Cửa hàng" },
-    { id: "tk" as const, label: "Tài khoản" },
+    { id: "tk" as const, label: "Người dùng & quyền" },
     { id: "file" as const, label: "Ảnh và nhật ký" },
   ];
 
@@ -214,6 +230,26 @@ function SettingsBody() {
           </span>
         </label>
         <label className="block text-sm font-semibold">
+          Ngân hàng nhận chuyển khoản
+          <select id="bankId" className="mt-1 min-h-12 w-full rounded-xl border bg-card px-3" defaultValue={data.settings.bank?.id ?? ""}>
+            <option value="">Chưa gắn</option>
+            {TRANSFER_BANKS.map((bank) => (
+              <option key={bank.id} value={bank.id}>
+                {bank.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm font-semibold">
+          Số tài khoản
+          <Input className="mt-1 min-h-11" id="bankAccount" inputMode="numeric" defaultValue={data.settings.bank?.account ?? ""} />
+        </label>
+        <label className="block text-sm font-semibold">
+          Tên chủ tài khoản
+          <Input className="mt-1 min-h-11" id="bankHolder" defaultValue={data.settings.bank?.holder ?? ""} />
+          <span className="mt-1 block font-normal text-muted-foreground">Để trống cả ba ô nếu chưa dùng mã QR. Khách chuyển khoản với nội dung là mã đơn. Nhân viên vẫn bấm Ghi nhận khi tiền vào.</span>
+        </label>
+        <label className="block text-sm font-semibold">
           Mẫu tin nhắc khách. Chỗ trống: {"{ten}"} {"{so_don}"} {"{ngay}"} {"{dip}"} {"{so_dt}"}. Không tự gửi.
           <textarea id="remindMessage" className="mt-1 min-h-24 w-full rounded-xl border bg-card px-3 py-2" defaultValue={data.settings.remindMessage || DEFAULT_REMIND_MESSAGE} />
         </label>
@@ -242,6 +278,7 @@ function SettingsBody() {
             patch.showAnhThe = checked("anhThe");
             patch.showAlbum = checked("album");
             patch.groupListed = Object.fromEntries(data.groups.map((group) => [group.id, checked(`g-${group.id}`)]));
+            patch.bank = { id: read("bankId"), account: read("bankAccount"), holder: read("bankHolder") };
             patch.remindMessage = (document.getElementById("remindMessage") as HTMLTextAreaElement).value;
             patch.commissionBasis = (document.getElementById("commissionBasis") as HTMLSelectElement).value;
             await storeSettings({ data: patch });
@@ -255,27 +292,33 @@ function SettingsBody() {
         </Button>
       ) : null}
 
-      <section className={tab === "tk" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
-        <h2 className="font-semibold text-primary">Tài khoản</h2>
-        <ul className="mt-2 space-y-1 text-sm">
-          {data.staff.map((person) => (
-            <li key={person.id}>
-              {person.name} · {person.email} · {ROLE_LABEL[person.role as Role]}
-              {person.probation ? " · thử việc" : ""}
-            </li>
-          ))}
-        </ul>
-        <StaffForm />
+      <section className={tab === "tk" ? "space-y-3" : "hidden"}>
+        <div>
+          <h2 className="text-lg font-bold">Người dùng và quyền</h2>
+          <p className="text-sm text-muted-foreground">Mỗi người một vai trò. Bấm dòng để đổi quyền hoặc mật khẩu.</p>
+        </div>
+        <StaffDesk />
       </section>
 
       <section className={tab === "file" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
         <h2 className="font-semibold text-primary">Ảnh đến hạn xóa</h2>
         <p className="text-sm text-muted-foreground">Web chỉ liệt kê. Chủ bấm xóa, không tự xóa im lặng.</p>
+        <Input value={fileQ} onChange={(event) => setFileQ(event.target.value)} placeholder="Tìm mã đơn hoặc tên ảnh…" aria-label="Tìm ảnh đến hạn" className="mt-2 h-11" />
+        <div className="mt-2">
+          <ListPager page={fileList.page} pages={fileList.pages} total={fileList.total} start={fileList.start} count={fileList.slice.length} noun="ảnh" onPage={fileList.setPage} />
+        </div>
         <ul className="mt-2 space-y-2 text-sm">
-          {(files.data ?? []).map((file) => (
+          {fileList.slice.map((file) => (
             <li key={file.fileId} className="flex items-center justify-between gap-2">
-              <span>
-                {file.orderCode} · {file.name} · {file.ageDays} ngày
+              <span className="flex min-w-0 items-center gap-2">
+                {canPreviewPhoto(file) ? (
+                  <button type="button" className="shrink-0 overflow-hidden rounded-xl border border-border" onClick={() => setOpenFile(file.fileId)} aria-label={`Xem ${file.name}`}>
+                    <img src={staffThumb(file.fileId)} alt="" className="size-14 object-cover" />
+                  </button>
+                ) : null}
+                <span className="min-w-0 truncate">
+                  {file.orderCode} · {file.name} · {file.ageDays} ngày
+                </span>
               </span>
               <Button
                 size="sm"
@@ -290,14 +333,26 @@ function SettingsBody() {
               </Button>
             </li>
           ))}
-          {files.data && files.data.length === 0 ? <li>Chưa có file đến hạn.</li> : null}
+          {fileList.total === 0 ? <li>{(files.data ?? []).length === 0 ? "Chưa có file đến hạn." : "Không có ảnh khớp bộ lọc."}</li> : null}
         </ul>
+        {openFile ? (
+          <PhotoViewer
+            src={staffThumb(openFile, true)}
+            name={fileList.slice.find((file) => file.fileId === openFile)?.name ?? "Ảnh"}
+            downloadHref={`/api/staff/file/${openFile}`}
+            onClose={() => setOpenFile(null)}
+          />
+        ) : null}
       </section>
 
       <section className={tab === "file" ? "rounded-2xl border border-border/70 bg-card p-4" : "hidden"}>
         <h2 className="font-semibold text-primary">Nhật ký sửa</h2>
+        <Input value={auditQ} onChange={(event) => setAuditQ(event.target.value)} placeholder="Tìm nội dung sửa…" aria-label="Tìm nhật ký sửa" className="mt-2 h-11" />
+        <div className="mt-2">
+          <ListPager page={auditList.page} pages={auditList.pages} total={auditList.total} start={auditList.start} count={auditList.slice.length} noun="dòng" onPage={auditList.setPage} />
+        </div>
         <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-          {data.audits.map((item) => (
+          {auditList.slice.map((item) => (
             <li key={item.id}>
               {new Date(item.at).toLocaleString("vi-VN")} · {item.sentence}
             </li>
@@ -305,43 +360,5 @@ function SettingsBody() {
         </ul>
       </section>
     </div>
-  );
-}
-
-function StaffForm() {
-  const queryClient = useQueryClient();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("sale");
-  const [password, setPassword] = useState("");
-  return (
-    <form
-      className="mt-4 grid gap-2"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        await storeStaff({ data: { name, email, role, password } });
-        toast.success("Đã tạo tài khoản");
-        setName("");
-        setEmail("");
-        setPassword("");
-        await queryClient.invalidateQueries({ queryKey: ["settings"] });
-      }}
-    >
-      <Label>Tên</Label>
-      <Input className="min-h-11" value={name} onChange={(e) => setName(e.target.value)} required />
-      <Label>Email</Label>
-      <Input className="min-h-11" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      <Label>Vai trò</Label>
-      <select className="min-h-11 rounded-xl border bg-background px-3" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-        <option value="owner">Chủ</option>
-        <option value="sale">Sale</option>
-        <option value="production">Sản xuất</option>
-      </select>
-      <Label>Mật khẩu tạm</Label>
-      <Input className="min-h-11" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      <Button type="submit" className="min-h-11">
-        Tạo tài khoản
-      </Button>
-    </form>
   );
 }

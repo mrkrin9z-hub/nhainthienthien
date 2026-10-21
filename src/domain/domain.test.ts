@@ -19,6 +19,7 @@ import {
 } from "./calc.ts";
 import { commissionBasisOf, commissionForSale } from "./commission.ts";
 import { contentDisposition, imageBytesMatch, imageMimeAllowed, servedMime } from "./images.ts";
+import { crc32, zipNames, zipStored } from "./zip-store.ts";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginLocked } from "./login-limit.ts";
 import { vnBackupDay } from "./guard.ts";
 import { publicContact } from "./public-contact.ts";
@@ -109,6 +110,24 @@ test("ảnh tải lên phải đúng loại và tên file không phá header", (
   assert.equal(header.includes("\r"), false);
   assert.equal(header.includes("\n"), false);
   assert.equal(header.split('"').length, 3);
+  assert.match(header, /^inline;/);
+  assert.match(contentDisposition("anh.png", true), /^attachment;/);
+});
+
+test("zip ảnh lưu tên và đúng checksum", async () => {
+  const hello = new TextEncoder().encode("hello");
+  assert.equal(crc32(hello), 0x3610a686);
+  assert.deepEqual(zipNames(["a.png", "a.png", "b"]), ["a.png", "a-2.png", "b"]);
+  const blob = zipStored([
+    { name: "a.png", bytes: hello },
+    { name: "a.png", bytes: hello },
+  ]);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  assert.equal(bytes[0], 0x50);
+  assert.equal(bytes[1], 0x4b);
+  const text = new TextDecoder().decode(bytes);
+  assert.match(text, /a\.png/);
+  assert.match(text, /a-2\.png/);
 });
 
 test("combo sau không được đắt hơn trên mỗi tấm", () => {
@@ -366,6 +385,7 @@ test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của 
   assert.equal(state.settings.zaloDefaultMigrated, true);
   assert.equal(state.groups[0]?.description, "Ảnh thờ. Hỗ trợ chỉnh sửa ảnh cơ bản.");
   assert.equal(state.groups[0]?.turnaround, "Theo đơn");
+  assert.ok(Array.isArray((state as { roleModules?: unknown[] }).roleModules));
   state.settings.showZalo = true;
   assert.equal(applyStoreMigrations(state), false);
   assert.equal(state.settings.showZalo, true);
@@ -467,9 +487,17 @@ test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và đ
   assert.equal(applyStoreMigrations(legacy), false);
 
   const renamedByOwner = {
-    settings: { zaloDefaultMigrated: true, groupListed: { ep_go: false, trang_guong: true } },
+    settings: {
+      zaloDefaultMigrated: true,
+      groupListed: { ep_go: false, trang_guong: true },
+      sepay: { enabled: false, apiKey: "", accountHint: "", webhookPath: "/api/public/sepay", note: "" },
+      notifyPrefs: { lateOrders: true, marketplaceNew: true, feedbackReprint: true, cashHandover: true },
+    },
     groups: [{ id: "trang_guong", name: "Tên chủ đã sửa", description: "x", turnaround: "3 ngày" }],
     skus: [{ id: "EG-40x60-C1", code: "EG-40x60-C1", groupId: "trang_guong" }],
+    roleModules: [{ role: "owner" as const, modules: ["/admin", "/admin/goi"] }],
+    packages: [],
+    sepaySeen: [],
   };
   assert.equal(applyStoreMigrations(renamedByOwner), false);
   assert.equal(renamedByOwner.groups[0]?.name, "Tên chủ đã sửa");

@@ -13,7 +13,7 @@ export function SectionLinks({ label, items }: { label: string; items: { to: str
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   if (items.length < 2) return null;
   return (
-    <nav aria-label={label} className="flex gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+    <nav aria-label={label} className="flex gap-1 overflow-x-auto scrollbar-none">
       {items.map((item) => {
         const active = pathActive(pathname, item.to);
         return (
@@ -21,7 +21,7 @@ export function SectionLinks({ label, items }: { label: string; items: { to: str
             key={item.to}
             to={item.to as Item["to"]}
             aria-current={active ? "page" : undefined}
-            className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-3 text-sm font-semibold active:scale-[0.98] ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`}
+            className={`inline-flex h-8 shrink-0 items-center rounded-md px-2.5 text-[13px] ${active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-muted"}`}
           >
             {item.label}
           </Link>
@@ -77,6 +77,7 @@ export function StaffLinks() {
     <SectionLinks
       label="Nhân sự"
       items={[
+        ...(owner ? [{ to: "/admin/nhan-vien", label: "Nhân viên" }] : []),
         { to: "/admin/cham-cong", label: "Chấm công" },
         { to: "/admin/luong", label: owner ? "Lương" : "Lương của tôi" },
         { to: "/admin/tai-khoan", label: "Tài khoản" },
@@ -94,6 +95,7 @@ export function MoneyLinks() {
         label="Tài chính"
         items={[
           { to: "/admin/thu", label: "Thu tiền" },
+          { to: "/admin/vi", label: "Ví tiền" },
           { to: "/admin/kpi", label: "KPI" },
         ]}
       />

@@ -3,9 +3,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
+import { PageToolbar } from "@/components/admin/page-toolbar";
 import { GoodsLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { createWebProduct, getWebProducts, setWebProductListed } from "@/lib/admin.functions";
 import { formatVnd } from "@/lib/brand";
@@ -41,6 +45,22 @@ function WebProductsBody() {
   const [rows, setRows] = useState<SizeRow[]>([blankRow()]);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [listed, setListed] = useState("all");
+  const catalog = products.data ?? [];
+  const shown = catalog.filter((product) => {
+    if (listed === "on" && !product.listed) return false;
+    if (listed === "off" && product.listed) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || `${product.name} ${product.category}`.toLowerCase().includes(needle);
+  });
+  const chips: FilterChip[] = [
+    { id: "all", label: "Tất cả", count: catalog.length, ...ALL_TONE },
+    { id: "on", label: "Đang hiện", count: catalog.filter((product) => product.listed).length, color: "#059669" },
+    { id: "off", label: "Đang ẩn", count: catalog.filter((product) => !product.listed).length, color: "#6B7280" },
+  ];
+  const list = useListPage(shown, `${q}|${listed}`);
 
   function updateRow(index: number, patch: Partial<SizeRow>) {
     setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
@@ -70,6 +90,7 @@ function WebProductsBody() {
       setDescription("");
       setTurnaround("");
       setRows([blankRow()]);
+      setOpen(false);
       await refresh();
     } catch (error) {
       toast.error((error as Error).message);
@@ -94,15 +115,27 @@ function WebProductsBody() {
   return (
     <div className="space-y-6">
       <GoodsLinks />
-      <div>
-        <h1 className="text-2xl font-extrabold text-primary">Sản phẩm trên web</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Sản phẩm đang bật hiện ở gian hàng trang chủ, trang sản phẩm và đặt in. Giá nhập ở đây là giá tại tiệm.
-        </p>
-      </div>
+      <PageToolbar
+        title="Sản phẩm"
+        hint="Sản phẩm đang bật hiện ở gian hàng trang chủ, trang sản phẩm và đặt in. Giá nhập ở đây là giá tại tiệm."
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Tìm tên, mã sản phẩm…"
+        actions={
+          <Button className="min-h-9" onClick={() => setOpen(true)}>
+            Tạo
+          </Button>
+        }
+      />
+      <FilterChips label="Trang chủ" value={listed} chips={chips} onChange={setListed} wrap />
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="sản phẩm" onPage={list.setPage} />
 
-      <section className="glass-card space-y-3 rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Thêm sản phẩm</h2>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Tạo sản phẩm</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
         <label className="block text-sm font-semibold">
           Tên
           <Input className="mt-1 min-h-11" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ảnh canvas" />
@@ -163,35 +196,59 @@ function WebProductsBody() {
           Ảnh mẫu dùng tạm. Đổi ảnh thật ở <Link to="/admin/anh" className="font-semibold text-accent">Ảnh web</Link>.
           Kênh Facebook, TikTok và Shopee để trống đến khi sửa ở Bảng giá.
         </p>
-      </section>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      <section className="space-y-2">
-        <h2 className="font-bold text-primary">Đang có trong sổ</h2>
-        {products.isLoading ? <p className="text-sm text-muted-foreground">Đang tải…</p> : null}
-        {products.isError ? <p className="text-sm font-semibold text-destructive">{(products.error as Error).message}</p> : null}
-        <ul className="space-y-2">
-          {(products.data ?? []).map((product) => (
-            <li key={product.id} className="glass-card flex items-center gap-3 rounded-3xl p-3">
-              <label className="flex min-h-11 flex-1 items-center gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-5"
-                  checked={product.listed}
-                  disabled={busyId === product.id}
-                  onChange={(event) => void onListed(product.id, event.target.checked)}
-                />
-                <span className="min-w-0">
-                  <span className="block font-bold text-foreground">{product.name}</span>
-                  <span className="block text-muted-foreground">
-                    {product.category} · {product.variants} quy cách
-                    {product.from === null ? "" : ` · từ ${formatVnd(product.from)}`}
-                    {product.listed ? " · đang hiện" : " · đang ẩn"}
-                  </span>
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
+      <section className="overflow-hidden rounded-md border bg-card">
+        {products.isLoading ? <p className="p-4 text-sm text-muted-foreground">Đang tải…</p> : null}
+        {products.isError ? <p className="p-4 text-sm font-semibold text-destructive">{(products.error as Error).message}</p> : null}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[40rem] text-left text-[13px]">
+            <thead className="bg-muted/40 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              <tr>
+                <th className="px-3 py-2.5">STT</th>
+                <th className="px-3 py-2.5">Tên sản phẩm</th>
+                <th className="px-3 py-2.5">Nhóm SP</th>
+                <th className="px-3 py-2.5 text-right">Giá</th>
+                <th className="px-3 py-2.5">Quy cách</th>
+                <th className="px-3 py-2.5">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.slice.map((product, index) => (
+                <tr key={product.id} className="border-t">
+                  <td className="px-3 py-2.5 text-muted-foreground">{list.start + index + 1}</td>
+                  <td className="px-3 py-2.5 font-semibold">{product.name}</td>
+                  <td className="px-3 py-2.5">{product.category}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold">{product.from === null ? "—" : formatVnd(product.from)}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{product.variants}</td>
+                  <td className="px-3 py-2.5">
+                    <label className="inline-flex min-h-8 items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="size-4"
+                        checked={product.listed}
+                        disabled={busyId === product.id}
+                        onChange={(event) => void onListed(product.id, event.target.checked)}
+                      />
+                      <span className={product.listed ? "font-semibold text-emerald-700" : "text-muted-foreground"}>
+                        {product.listed ? "Đang hiện" : "Đang ẩn"}
+                      </span>
+                    </label>
+                  </td>
+                </tr>
+              ))}
+              {products.data && list.slice.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+                    Không có sản phẩm khớp.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

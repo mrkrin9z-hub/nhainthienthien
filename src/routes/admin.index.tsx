@@ -1,23 +1,53 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import { CalendarDays, CircleAlert, LogIn, LogOut, PiggyBank, Target, TrendingUp, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { STATUS_TONE } from "@/components/admin/filter-chips";
 import { formatMaybe } from "@/lib/brand";
+import { statusLabelOf } from "@/lib/display-labels";
 import { getDashboard, punchClock } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/")({
   component: DashboardPage,
 });
 
+const NO_ALERTS: { code: string; kind: "san" | "tre"; title: string; body: string }[] = [];
+
 function DashboardPage() {
   const queryClient = useQueryClient();
   const dash = useQuery({ queryKey: ["dashboard"], queryFn: () => getDashboard() });
-  if (dash.isLoading) return <p className="text-muted-foreground">Đang tải tổng quan…</p>;
-  if (dash.isError || !dash.data) return <p className="text-destructive">{(dash.error as Error)?.message ?? "Không tải được."}</p>;
   const data = dash.data;
+  const alerts = data && "alerts" in data ? data.alerts : NO_ALERTS;
+  useEffect(() => {
+    if (!data) return;
+    const badge = navigator as Navigator & { setAppBadge?: (n: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    if (!alerts.length) {
+      void badge.clearAppBadge?.();
+      return;
+    }
+    void badge.setAppBadge?.(alerts.length);
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
+    const seen = new Set<string>(JSON.parse(localStorage.getItem("tt-desk-alerted") || "[]"));
+    const fresh = alerts.filter((item) => !seen.has(`${day}:${item.kind}:${item.code}`));
+    for (const item of fresh.slice(0, 3)) {
+      seen.add(`${day}:${item.kind}:${item.code}`);
+      const payload = { title: item.title, body: item.body, icon: "/brand/icon-192.png", data: { url: `/admin/don-hang/${item.code}` } };
+      void navigator.serviceWorker?.ready
+        .then((registration) => registration.showNotification(item.title, payload))
+        .catch(() => {
+          new Notification(item.title, { body: item.body });
+        });
+    }
+    if (fresh.length) localStorage.setItem("tt-desk-alerted", JSON.stringify([...seen].slice(-80)));
+  }, [alerts, data]);
+
+  if (!data) {
+    return <p className={dash.isError ? "text-destructive" : "text-muted-foreground"}>{dash.isError ? (dash.error as Error).message : "Đang tải tổng quan…"}</p>;
+  }
 
   async function clock(action: "in" | "out") {
     try {
@@ -32,40 +62,83 @@ function DashboardPage() {
 
   const hello = greeting();
   const since = data.clockedInAt ? new Date(data.clockedInAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "";
+  const todayLabel = new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date());
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{hello}</p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight text-primary sm:text-2xl">{data.name}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {data.clockedIn ? `Đang trong ca${since ? ` từ ${since}` : ""}.` : "Chưa vào ca."} Giờ làm 8:00–18:00. Bấm trên điện thoại, không cần vị trí hay ảnh.
-            </p>
+            <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">Tổng quan hoạt động</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+              {hello}, {data.name}
+            </h1>
+            <p className="mt-1 text-[13px] text-muted-foreground capitalize">{todayLabel}</p>
           </div>
+          <button
+            type="button"
+            className="text-[13px] font-semibold text-primary"
+            onClick={() => {
+              if (typeof Notification === "undefined") {
+                toast.error("Máy này không hiện được thông báo.");
+                return;
+              }
+              void Notification.requestPermission().then((permission) => {
+                toast.success(permission === "granted" ? "Đã bật báo khi trang đang mở." : "Chưa bật báo trên máy.");
+              });
+            }}
+          >
+            Bật báo trên máy
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-card px-3 py-2.5">
+          <p className="text-[13px] text-muted-foreground">
+            {data.clockedIn ? `Đang trong ca${since ? ` từ ${since}` : ""}.` : "Bạn chưa chấm công hôm nay."} Giờ làm 8:00–18:00.
+          </p>
           <div className="flex gap-2">
             <button
               type="button"
-              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground active:scale-[0.97] disabled:opacity-50 sm:flex-none"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 text-[13px] font-semibold text-white active:scale-[0.97] disabled:opacity-50"
               onClick={() => clock("in")}
               disabled={data.clockedIn}
             >
-              <LogIn className="size-4" />
+              <LogIn className="size-3.5" />
               Vào ca
             </button>
             <button
               type="button"
-              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border bg-background px-4 text-sm font-medium active:scale-[0.97] disabled:opacity-50 sm:flex-none"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border bg-background px-3 text-[13px] font-semibold active:scale-[0.97] disabled:opacity-50"
               onClick={() => clock("out")}
               disabled={!data.clockedIn}
             >
-              <LogOut className="size-4" />
+              <LogOut className="size-3.5" />
               Ra ca
             </button>
           </div>
         </div>
       </section>
+
+      {alerts.length > 0 ? (
+        <section className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+          <h2 className="font-semibold text-primary">Cần xem</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Đơn sàn mới trong 36 giờ và đơn quá mốc. Báo hiện khi trang quản trị đang mở.</p>
+          <ul className="mt-3 space-y-2">
+            {alerts.map((item) => (
+              <li key={`${item.kind}-${item.code}`}>
+                <Link to="/admin/don-hang/$code" params={{ code: item.code }} className="block rounded-2xl bg-card px-4 py-3">
+                  <span className="font-bold text-primary">{item.title}</span>
+                  <p className="text-sm text-muted-foreground">{item.body}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section>
         <div className="mb-2 flex items-end justify-between gap-3">
@@ -141,11 +214,12 @@ function DashboardPage() {
               <p className="mt-2 text-sm text-muted-foreground">Chưa đặt mức tối thiểu, hoặc chưa có vật tư dưới mức.</p>
             ) : (
               <ul className="mt-3 space-y-2 text-sm">
-                {data.lowStock.map((item) => (
+                {data.lowStock.slice(0, 8).map((item) => (
                   <li key={item.id} className="rounded-xl bg-destructive/10 px-3 py-2 font-semibold text-destructive">
                     {item.name}: {item.stock} {item.unit} (tối thiểu {item.min})
                   </li>
                 ))}
+                {data.lowStock.length > 8 ? <li className="text-muted-foreground">Còn {data.lowStock.length - 8}. Mở kho để lọc.</li> : null}
               </ul>
             )}
           </section>
@@ -179,20 +253,20 @@ function greeting() {
 
 function Card({ label, value, hint, icon: Icon, tone }: { label: string; value: string; hint?: string; icon: LucideIcon; tone: string }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-card p-4">
+    <div className="rounded-md border bg-card p-4 shadow-none">
       <div className="flex items-start justify-between gap-2">
-        <p className="font-sans text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
-        <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${tone}`}>
-          <Icon className="size-4" />
+        <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
+        <span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${tone}`}>
+          <Icon className="size-3.5" />
         </span>
       </div>
-      <p className="mt-3 text-xl font-semibold tracking-tight text-primary sm:text-2xl">{value}</p>
+      <p className="mt-3 text-2xl font-semibold tracking-tight">{value}</p>
       {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
 
-function OrderBlock({ title, rows }: { title: string; rows: { code: string; itemSummary: string; statusLabel: string; late: boolean }[] }) {
+function OrderBlock({ title, rows }: { title: string; rows: { code: string; itemSummary: string; status: string; statusLabel: string; late: boolean }[] }) {
   return (
     <section className="rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
@@ -206,20 +280,22 @@ function OrderBlock({ title, rows }: { title: string; rows: { code: string; item
   );
 }
 
-function OrderList({ rows }: { rows: { code: string; itemSummary: string; statusLabel: string; late: boolean; customerName?: string }[] }) {
+function OrderList({ rows }: { rows: { code: string; itemSummary: string; status: string; statusLabel: string; late: boolean; customerName?: string }[] }) {
   if (!rows.length) return <p className="mt-2 text-sm text-muted-foreground">Chưa có đơn.</p>;
+  const shown = rows.slice(0, 8);
   return (
     <ul className="mt-3 space-y-2">
-      {rows.map((row) => (
+      {shown.map((row) => (
         <li key={row.code}>
           <Link to="/admin/don-hang/$code" params={{ code: row.code }} className="block rounded-2xl bg-card px-4 py-3">
             <span className="font-bold text-primary">{row.code}</span>
-            <span className="ml-2 text-sm">{row.statusLabel}</span>
+            <span className="ml-2 text-sm">{statusLabelOf(row.status, row.statusLabel)}</span>
             {row.late ? <span className="ml-2 text-sm font-bold text-destructive">Trễ mốc</span> : null}
             <p className="text-sm text-muted-foreground">{row.customerName ? `${row.customerName} · ` : ""}{row.itemSummary}</p>
           </Link>
         </li>
       ))}
+      {rows.length > shown.length ? <li className="text-sm text-muted-foreground">Còn {rows.length - shown.length}. Mở danh sách để lọc.</li> : null}
     </ul>
   );
 }

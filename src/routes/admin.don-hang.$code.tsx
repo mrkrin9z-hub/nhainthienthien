@@ -3,14 +3,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { OrderDesk, type DeskSku } from "@/components/admin/order-desk";
+import { OrderQrDialog } from "@/components/admin/order-qr-dialog";
+import { WaybillBox } from "@/components/admin/waybill-box";
+import { canPreviewPhoto, PhotoViewer, saveStaffFile, saveStaffFiles, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
-import { changeStatus, getMe, getOrderDetail, recordDeposit, saveNote, saveReprint, storeShipping } from "@/lib/admin.functions";
-import { isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
+import { changeStatus, getMe, getOrderDetail, getSkuOptions, orderUploadLink, recordDeposit, reviseOrder, saveNote, savePackCheck, saveReprint, setPrintChoice, storeShipping } from "@/lib/admin.functions";
+import { isMergedWoodAlias, isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
+import { marketplaceEditLocked } from "@/domain/order-edit";
 import { JT_CARRIER, jtOrder } from "@/domain/jt";
-import { STATUS_LABEL, type OrderStatus } from "@/domain/types";
+import { CHANNEL_LABEL, STATUS_LABEL, type OrderStatus } from "@/domain/types";
+import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
 
 export const Route = createFileRoute("/admin/don-hang/$code")({
   component: OrderDetailPage,
@@ -22,6 +28,7 @@ const FILE_KIND: Record<string, string> = {
   design: "Thiết kế",
   approval: "Duyệt",
   packing_video: "Video đóng gói",
+  packing_photo: "Ảnh gói hàng",
 };
 
 function OrderDetailPage() {
@@ -29,12 +36,15 @@ function OrderDetailPage() {
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
-  const [note, setNote] = useState("");
-  const [deposit, setDeposit] = useState("");
-  const [method, setMethod] = useState("chuyển khoản");
+  const [note, setNote] = useState<string | null>(null);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [tab, setTab] = useState("thong-tin");
   const [override, setOverride] = useState(false);
   const [reason, setReason] = useState("");
   const [reopenReason, setReopenReason] = useState("");
+  const [openFile, setOpenFile] = useState<string | null>(null);
+  const [savingFiles, setSavingFiles] = useState(false);
+  const skus = useQuery({ queryKey: ["sku-options"], queryFn: () => getSkuOptions(), enabled: me.data?.role !== "production" });
   const data = order.data;
   const role = me.data?.role;
   const closed = data?.status === "huy" || data?.status === "xong";
@@ -50,14 +60,16 @@ function OrderDetailPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
-        {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
-          <Button asChild variant="outline" className="min-h-11">
-            <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
+            <Button asChild variant="outline" className="min-h-11">
+              <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
       <p className="break-words text-sm">
-        {data.customerName} · {data.phone} · {data.channelLabel} · {data.statusLabel}
+        {data.customerName} · {data.phone} · {channelLabelOf(data.channel, data.channelLabel)} · {statusLabelOf(data.status, data.statusLabel)}
         {data.recipientName && data.recipientName !== data.customerName ? ` · Người nhận: ${data.recipientName}` : ""}
         {data.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
       </p>
@@ -67,78 +79,162 @@ function OrderDetailPage() {
       <p className="text-xs text-muted-foreground">
         Kho in: {data.printDeducted ? "đã trừ" : "chưa trừ"} · Kho đóng gói: {data.packDeducted ? "đã trừ" : "chưa trừ"}
       </p>
+      <div className="flex gap-1 overflow-x-auto border-b">
+        {(
+          [
+            ["thong-tin", "Thông tin"],
+            ["khach", "Khách hàng"],
+            ["anh", "Hình ảnh"],
+            ["giao", "Giao hàng"],
+            ["trang-thai", "Tình trạng"],
+            ["lich-su", "Lịch sử"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={`shrink-0 border-b-2 px-3 py-2 text-sm font-semibold ${tab === id ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {role !== "production" ? (
-        <ShippingForm
-          orderId={data.id}
-          shipping={data.shipping}
-          channel={data.channel}
-          source={data.source}
-          fulfillment={data.fulfillment}
-          onDone={refresh}
-        />
-      ) : (
-        <p className="text-sm">Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}</p>
-      )}
-
-      <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Sản phẩm</h2>
-        <ul className="mt-2 space-y-1 text-sm">
-          {data.items.map((item) => (
-            <li key={item.id} className="flex justify-between gap-3">
-              <span>
-                {item.quantity}× {item.name}
-              </span>
-              {role === "production" ? null : (
-                <span className="text-right">
-                  {item.lineTotal === null ? "Chưa có giá" : formatMaybe(item.lineTotal)}
-                  {item.listUnitPrice != null && item.lineTotal != null ? (
-                    <span className="block text-xs font-normal text-muted-foreground">
-                      Niêm yết {formatMaybe(item.listUnitPrice * item.quantity)} · Lệch {formatMaybe(item.lineTotal - item.listUnitPrice * item.quantity)}
-                    </span>
-                  ) : null}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-        {role === "production" ? null : data.total !== null ? (
-          <p className="mt-2 font-bold">Tổng {formatMaybe(data.total)}</p>
+      {tab === "thong-tin" ? (
+        role === "production" ? (
+          <section className="rounded-md border bg-card p-4">
+            <h2 className="font-semibold text-primary">Sản phẩm</h2>
+            <ul className="mt-2 space-y-1 text-sm">
+              {data.items.map((item) => (
+                <li key={item.id}>
+                  {item.quantity}× {item.name}
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : (
-          <p className="mt-2 text-sm">Chưa đủ giá bán để ra tổng.</p>
-        )}
-      </section>
+          <OrderDesk
+            key={data.id}
+            mode="edit"
+            owner={role === "owner"}
+            fieldsLocked={marketplaceEditLocked(data.channel)}
+            itemsLocked={marketplaceEditLocked(data.channel) || data.printDeducted || data.packDeducted || data.status === "xong" || data.status === "huy"}
+            lockNote={
+              marketplaceEditLocked(data.channel)
+                ? "Đơn TikTok hoặc Shopee lấy từ sàn. Khách, sản phẩm, giá và thu tiền bị khóa."
+                : data.status === "xong" || data.status === "huy"
+                  ? "Đơn đã hủy hoặc đã xong. Mở lại ở tab Tình trạng rồi mới sửa sản phẩm."
+                  : data.printDeducted || data.packDeducted
+                    ? "Đơn đã trừ kho. Lùi về trước bước In rồi mới sửa sản phẩm. Tên, số và địa chỉ vẫn lưu được."
+                    : ""
+            }
+            catalog={((skus.data ?? []) as DeskSku[]).filter((sku) => !isMergedWoodAlias(sku) || data.items.some((item) => item.skuId === sku.id))}
+            paidSoFar={data.depositPaid ?? 0}
+            payments={data.payments ?? []}
+            transfer={data.transfer?.image ? data.transfer : null}
+            initial={{
+              channel: data.channel,
+              fullName: data.customerName,
+              phone: data.phone,
+              address: data.address,
+              fulfillment: data.fulfillment,
+              note: data.customerNote,
+              dueDate: data.dueDate ? data.dueDate.slice(0, 10) : "",
+              marketplaceCode: data.marketplaceCode,
+              lines: data.items.map((item) => ({
+                key: item.id,
+                skuId: item.skuId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice === null ? "" : String(item.unitPrice),
+              })),
+            }}
+            onSave={async (value) => {
+              await reviseOrder({
+                data: {
+                  orderId: data.id,
+                  fullName: value.fullName,
+                  phone: value.phone,
+                  address: value.address,
+                  fulfillment: value.fulfillment,
+                  note: value.note,
+                  dueDate: value.dueDate,
+                  ...(value.items ? { items: value.items } : {}),
+                },
+              });
+              toast.success("Đã cập nhật đơn");
+              await refresh();
+            }}
+            onCollect={async (amount, payMethod) => {
+              await recordDeposit({ data: { orderId: data.id, amount, method: payMethod } });
+              toast.success("Đã ghi tiền");
+              await refresh();
+            }}
+          />
+        )
+      ) : null}
 
-      {role !== "production" ? (
-        <section className="glass-card rounded-3xl p-4">
-          <h2 className="font-bold text-primary">Cọc</h2>
-          <p className="text-sm">
-            {data.depositRequired === null
-              ? "Cần cọc 50% nhưng chưa có giá bán để tính số tiền."
-              : `Cần cọc ${formatMaybe(data.depositRequired)} · Đã ghi ${formatMaybe(data.depositPaid)} ${data.depositMethod}`}
-          </p>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-            <Input className="min-h-12 w-full sm:w-36" inputMode="numeric" placeholder="Số tiền" value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/\D/g, ""))} />
-            <Input className="min-h-12 w-full sm:w-40" value={method} onChange={(e) => setMethod(e.target.value)} />
-            <Button
-              className="min-h-12"
-              onClick={async () => {
-                try {
-                  await recordDeposit({ data: { orderId: data.id, amount: Number(deposit), method } });
-                  toast.success("Đã ghi cọc");
-                  setDeposit("");
-                  await refresh();
-                } catch (error) {
-                  toast.error((error as Error).message);
-                }
-              }}
-            >
-              Ghi nhận
-            </Button>
-          </div>
+      {tab === "khach" ? (
+        <section className="rounded-md border bg-card p-4">
+          <h2 className="font-semibold text-primary">Khách hàng</h2>
+          <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">Tên</dt>
+              <dd className="text-base font-semibold">{data.customerName}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Số điện thoại</dt>
+              <dd className="text-base font-semibold">{data.phone}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Kênh</dt>
+              <dd>{CHANNEL_LABEL[data.channel]}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Nhận hàng</dt>
+              <dd>{data.fulfillment === "delivery" ? "Giao hàng" : "Tại tiệm"}</dd>
+            </div>
+            <div className="md:col-span-2">
+              <dt className="text-muted-foreground">Địa chỉ</dt>
+              <dd>{data.address || "Chưa có địa chỉ"}</dd>
+            </div>
+            {data.customerNote ? (
+              <div className="md:col-span-2">
+                <dt className="text-muted-foreground">Ghi chú khách</dt>
+                <dd>{data.customerNote}</dd>
+              </div>
+            ) : null}
+          </dl>
+          {role === "production" ? null : (
+            <Link to="/admin/khach/$id" params={{ id: data.customerId }} className="mt-3 inline-block text-sm font-semibold text-primary">
+              Hồ sơ khách
+            </Link>
+          )}
         </section>
       ) : null}
 
+      {tab === "giao" ? (
+        role !== "production" ? (
+          <ShippingForm
+            orderId={data.id}
+            shipping={data.shipping}
+            channel={data.channel}
+            source={data.source}
+            fulfillment={data.fulfillment}
+            status={data.status}
+            address={data.address}
+            onDone={refresh}
+          />
+        ) : (
+          <p className="text-sm">
+            Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}
+            {data.shipping?.carrierStatus ? ` · ${data.shipping.carrierStatus}` : ""}
+          </p>
+        )
+      ) : null}
+
+      {tab === "trang-thai" ? (
+      <>
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Quy trình</h2>
         {data.status === "huy" ? (
@@ -157,6 +253,15 @@ function OrderDetailPage() {
         )}
       </section>
 
+      <PackBox
+        orderId={data.id}
+        check={data.packCheck}
+        hasPhoto={data.hasPackingPhoto}
+        photoId={data.files.find((file) => file.kind === "packing_photo")?.id ?? null}
+        closed={data.status === "huy" || data.status === "xong"}
+        onDone={refresh}
+      />
+
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Chuyển bước</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -173,7 +278,7 @@ function OrderDetailPage() {
         {role === "owner" ? (
           <label className="mt-2 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
-            Chủ bỏ qua điều kiện cọc
+            Chủ bỏ qua cọc và checklist giao
           </label>
         ) : null}
         {role === "owner" && closed ? (
@@ -219,43 +324,145 @@ function OrderDetailPage() {
           >
             Chép câu trả lời
           </Button>
+          {role !== "production" && (data.status === "giao" || data.status === "xong") ? (
+            <Button
+              variant="outline"
+              className="mt-2 min-h-11"
+              onClick={() => {
+                void orderUploadLink({ data: { orderId: data.id, rotate: false } })
+                  .then(async (result) => {
+                    const link = `${window.location.origin}/danh-gia/${result.token}`;
+                    await navigator.clipboard.writeText(link);
+                    toast.success("Đã chép câu hỏi cho khách");
+                  })
+                  .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không tạo được link."));
+              }}
+            >
+              Chép câu hỏi đánh giá
+            </Button>
+          ) : null}
         </div>
       </section>
 
       {role !== "production" ? (
-        <section className="glass-card rounded-3xl p-4">
+        <section className="mt-4 rounded-md border bg-card p-4">
           <h2 className="font-bold text-primary">Ghi chú nội bộ</h2>
-          <Textarea className="mt-2" defaultValue={data.internalNote} onChange={(e) => setNote(e.target.value)} />
+          <Textarea className="mt-2" value={note ?? data.internalNote} onChange={(e) => setNote(e.target.value)} />
           <Button
             className="mt-2 min-h-11"
             variant="outline"
             onClick={async () => {
-              await saveNote({ data: { orderId: data.id, note: note || data.internalNote } });
-              toast.success("Đã lưu ghi chú");
+              try {
+                await saveNote({ data: { orderId: data.id, note: note ?? data.internalNote } });
+                toast.success("Đã lưu ghi chú");
+                await refresh();
+              } catch (error) {
+                toast.error((error as Error).message);
+              }
             }}
           >
             Lưu ghi chú
           </Button>
         </section>
       ) : null}
+      </>
+      ) : null}
 
-      <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Ảnh khách</h2>
-        <ul className="mt-2 space-y-2 text-sm">
-          {data.files.map((file) => (
+      {tab === "anh" ? (
+      <>
+      <section className="rounded-md border bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold text-primary">Hình ảnh</h2>
+          <div className="flex flex-wrap gap-2">
+            {data.files.length > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11"
+                disabled={savingFiles}
+                onClick={() => {
+                  setSavingFiles(true);
+                  void saveStaffFiles(
+                    data.files.map((file) => ({ id: file.id, name: file.name })),
+                    `${data.code}-anh.zip`,
+                  )
+                    .then(() => toast.success(data.files.length > 1 ? "Đã tải một file zip về máy." : "Đã tải file về máy."))
+                    .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không tải được file."))
+                    .finally(() => setSavingFiles(false));
+                }}
+              >
+                {savingFiles ? "Đang tải…" : "Tải tất cả về máy"}
+              </Button>
+            ) : null}
+            {role !== "production" && data.status !== "huy" ? (
+              <Button type="button" variant="outline" className="min-h-11" onClick={() => setQrOpen(true)}>
+                Mã QR gửi khách
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        {data.files.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Chưa có file.</p> : null}
+        {data.files.some((file) => file.kind === "original") ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {data.files.filter((file) => file.kind === "original" && file.print).length > 0
+              ? `Khách chọn ${data.files.filter((file) => file.kind === "original" && file.print).length} ảnh để in.`
+              : "Chưa chọn ảnh. Xưởng in mọi ảnh gốc cho đến khi có ảnh được đánh dấu."}
+          </p>
+        ) : null}
+        <ul className="mt-3 grid grid-cols-3 gap-2">
+          {data.files.filter((file) => canPreviewPhoto(file)).map((file) => (
             <li key={file.id}>
-              <a className="font-semibold text-primary" href={`/api/staff/file/${file.id}`}>
+              <button type="button" className="block w-full overflow-hidden rounded-2xl border border-border bg-muted text-left" onClick={() => setOpenFile(file.id)}>
+                <img src={staffThumb(file.id)} alt={file.name} className="aspect-square w-full object-cover" />
+                <span className="block truncate px-2 pt-1 text-xs font-semibold">{file.name}</span>
+                <span className="block truncate px-2 text-[11px] text-muted-foreground">{FILE_KIND[file.kind] ?? file.kind}</span>
+                {"comment" in file && typeof file.comment === "string" && file.comment.trim() ? (
+                  <span className="block px-2 pb-1 text-[11px] text-foreground/80">{file.comment}</span>
+                ) : null}
+              </button>
+              {file.kind === "original" ? (
+                <button
+                  type="button"
+                  className={`w-full px-2 py-1 text-left text-[11px] font-semibold ${file.print ? "text-primary" : "text-muted-foreground"}`}
+                  onClick={() => {
+                    void setPrintChoice({ data: { orderId: data.id, fileId: file.id, print: !file.print } })
+                      .then(() => refresh())
+                      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không lưu được lựa chọn."));
+                  }}
+                >
+                  {file.print ? "Bỏ chọn in" : "In ảnh này"}
+                </button>
+              ) : (
+                <span className="block px-2 pb-2" />
+              )}
+            </li>
+          ))}
+        </ul>
+        <ul className="mt-2 space-y-2 text-sm">
+          {data.files.filter((file) => !canPreviewPhoto(file)).map((file) => (
+            <li key={file.id}>
+              <button type="button" className="font-semibold text-primary" onClick={() => void saveStaffFile(file.id, file.name).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không tải được file."))}>
                 {file.name}
-              </a>
+              </button>
               <span className="text-muted-foreground"> · {FILE_KIND[file.kind] ?? file.kind}</span>
             </li>
           ))}
-          {data.files.length === 0 ? <li className="text-muted-foreground">Chưa có file.</li> : null}
         </ul>
       </section>
+      {openFile ? (
+        <PhotoViewer
+          src={staffThumb(openFile, true)}
+          name={data.files.find((file) => file.id === openFile)?.name ?? "Ảnh"}
+          downloadHref={`/api/staff/file/${openFile}`}
+          onClose={() => setOpenFile(null)}
+        />
+      ) : null}
+      {qrOpen ? <OrderQrDialog open={qrOpen} onOpenChange={setQrOpen} orderId={data.id} code={data.code} /> : null}
+      </>
+      ) : null}
 
-      {role !== "production" ? (
-        <section className="glass-card rounded-3xl p-4">
+      {tab === "trang-thai" && role !== "production" ? (
+        <section className="rounded-md border bg-card p-4">
           <h2 className="font-bold text-primary">In lại</h2>
           <p className="text-sm text-muted-foreground">Trong 3 ngày sau khi giao, in lại nếu lỗi do xưởng. Quá hạn web sẽ cảnh báo.</p>
           <Textarea className="mt-2" placeholder="Lý do khách báo" value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -294,8 +501,8 @@ function OrderDetailPage() {
         </section>
       ) : null}
 
-      {role === "owner" && data.quote ? (
-        <section className="glass-card rounded-3xl p-4">
+      {tab === "trang-thai" && role === "owner" && data.quote ? (
+        <section className="rounded-md border bg-card p-4">
           <h2 className="font-bold text-primary">Lãi gộp theo định mức hiện tại</h2>
           <ul className="mt-2 space-y-1 text-sm">
             {data.quote.map((quote, index) =>
@@ -310,8 +517,18 @@ function OrderDetailPage() {
         </section>
       ) : null}
 
-      <section className="glass-card rounded-3xl p-4">
+      {tab === "lich-su" ? (
+      <section className="rounded-md border bg-card p-4">
         <h2 className="font-bold text-primary">Lịch sử</h2>
+        {(data.itemChanges ?? []).length > 0 ? (
+          <ul className="mt-2 space-y-1 text-sm">
+            {data.itemChanges.map((item, index) => (
+              <li key={`item-${index}`}>
+                {new Date(item.at).toLocaleString("vi-VN")} · Đổi sản phẩm · {item.byName || "Hệ thống"} · {item.note}
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <ul className="mt-2 space-y-1 text-sm">
           {data.history.map((item, index) => (
             <li key={index}>
@@ -321,12 +538,85 @@ function OrderDetailPage() {
           ))}
         </ul>
       </section>
-      {role !== "production" ? (
-        <Link to="/admin/khach/$id" params={{ id: data.customerId }} className="text-sm font-semibold text-accent">
-          Hồ sơ khách
-        </Link>
       ) : null}
     </div>
+  );
+}
+
+function PackBox({
+  orderId,
+  check,
+  hasPhoto,
+  photoId,
+  closed,
+  onDone,
+}: {
+  orderId: string;
+  check: { ep: boolean; bo: boolean; tem: boolean };
+  hasPhoto: boolean;
+  photoId: string | null;
+  closed: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const rows = [
+    ["ep", "Đã ép"],
+    ["bo", "Đã bo viền"],
+    ["tem", "Đã dán tem"],
+  ] as const;
+
+  async function toggle(key: "ep" | "bo" | "tem") {
+    try {
+      await savePackCheck({ data: { orderId, ...check, [key]: !check[key] } });
+      await onDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không lưu được.");
+    }
+  }
+
+  return (
+    <section className="rounded-md border bg-card p-4">
+      <h2 className="font-bold text-primary">Trước khi giao</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Ba việc này và một ảnh gói phải xong rồi mới chuyển sang Giao.</p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {rows.map(([key, label]) => (
+          <label key={key} className="flex min-h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold">
+            <input type="checkbox" checked={check[key]} disabled={closed || busy} onChange={() => void toggle(key)} />
+            {label}
+          </label>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        {photoId ? <img src={staffThumb(photoId)} alt="Ảnh gói hàng" className="size-16 rounded-xl object-cover" /> : null}
+        <label className="inline-flex min-h-11 cursor-pointer items-center rounded-full border px-4 text-sm font-semibold">
+          {hasPhoto ? "Đổi ảnh gói" : "Chụp ảnh gói"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            disabled={closed || busy}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
+              setBusy(true);
+              const body = new FormData();
+              body.set("orderId", orderId);
+              body.set("file", file);
+              void fetch("/api/staff/packing-photo", { method: "POST", body })
+                .then(async (response) => {
+                  if (!response.ok) throw new Error(await response.text());
+                  toast.success("Đã lưu ảnh gói");
+                  await onDone();
+                })
+                .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không lưu được ảnh gói."))
+                .finally(() => setBusy(false));
+            }}
+          />
+        </label>
+        {hasPhoto ? <span className="text-sm text-muted-foreground">Đã có ảnh gói.</span> : <span className="text-sm text-muted-foreground">Chưa có ảnh gói.</span>}
+      </div>
+    </section>
   );
 }
 
@@ -336,13 +626,17 @@ function ShippingForm({
   channel,
   source,
   fulfillment,
+  status,
+  address,
   onDone,
 }: {
   orderId: string;
-  shipping?: { carrier: string; tracking: string; shipFee: number | null; codAmount: number | null };
+  shipping?: { carrier: string; tracking: string; shipFee: number | null; codAmount: number | null; carrierStatus?: string };
   channel: string;
   source: string;
   fulfillment: string;
+  status: string;
+  address: string;
   onDone: () => Promise<void>;
 }) {
   const jt = jtOrder({ channel, source, fulfillment });
@@ -355,7 +649,7 @@ function ShippingForm({
       <h2 className="font-bold text-primary">Giao hàng</h2>
       {jt ? (
         <p className="text-xs text-muted-foreground">
-          Đơn web giao tận nơi và đơn Facebook đi J&T Express. Chưa có khóa thì ghi mã vận đơn và phí bằng tay. Tem in khổ 100×150.
+          Đơn web giao tận nơi và đơn Facebook mặc định J&T Express. Có khóa thì bấm Tạo vận đơn. Chưa có khóa thì ghi mã và phí bằng tay. Tem in khổ 100×150.
         </p>
       ) : null}
       <Input className="min-h-12" placeholder="Hãng vận chuyển" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
@@ -365,21 +659,37 @@ function ShippingForm({
       <Button
         className="min-h-11"
         onClick={async () => {
-          await storeShipping({
-            data: {
-              orderId,
-              carrier,
-              tracking,
-              shipFee: shipFee === "" ? null : Number(shipFee),
-              codAmount: codAmount === "" ? null : Number(codAmount),
-            },
-          });
-          toast.success("Đã lưu giao hàng");
-          await onDone();
+          try {
+            await storeShipping({
+              data: {
+                orderId,
+                carrier,
+                tracking,
+                shipFee: shipFee === "" ? null : Number(shipFee),
+                codAmount: codAmount === "" ? null : Number(codAmount),
+              },
+            });
+            toast.success("Đã lưu giao hàng");
+            await onDone();
+          } catch (error) {
+            toast.error((error as Error).message);
+          }
         }}
       >
         Lưu giao hàng
       </Button>
+      <WaybillBox
+        orderId={orderId}
+        channel={channel}
+        status={status}
+        fulfillment={fulfillment}
+        address={address}
+        carrier={carrier}
+        tracking={tracking}
+        carrierStatus={shipping?.carrierStatus ?? ""}
+        codAmount={codAmount === "" ? null : Number(codAmount)}
+        onDone={onDone}
+      />
     </section>
   );
 }

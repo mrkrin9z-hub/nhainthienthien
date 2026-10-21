@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { appendCollection, buildLedger, expenseReport, expenseStamp, ordersToCollect, walletCards, walletOfMethod, type CashOrder } from "./money.ts";
+import { appendCollection, buildLedger, expenseReport, expenseStamp, handoverError, holderBalances, ordersToCollect, SHOP_TILL_ID, walletCards, walletOfMethod, type CashOrder } from "./money.ts";
 
 function order(partial: Partial<CashOrder> & Pick<CashOrder, "id" | "code">): CashOrder {
   return {
@@ -94,6 +94,68 @@ test("báo cáo không cộng khoản chưa nhóm vào Khác", () => {
   assert.equal(report.byCategory.find((row) => row.label === "Chưa phân nhóm")?.amount, 100000);
   assert.equal(report.byWallet.find((row) => row.id === "tien_mat")?.amount, 50000);
   assert.equal(report.unknown, 100000);
+});
+
+test("thu vào ví người thu và chi trừ ví người ghi", () => {
+  const rows = holderBalances({
+    orders: [
+      order({
+        id: "o",
+        code: "TT",
+        depositPaid: 100000,
+        depositMethod: "Tiền mặt",
+        depositBy: "sale",
+        payments: [
+          { at: "2026-10-10T05:00:00.000Z", amount: 80000, method: "Tiền mặt", by: "sale" },
+          { at: "2026-10-11T05:00:00.000Z", amount: 20000, method: "Chuyển khoản", by: "owner" },
+        ],
+      }),
+    ],
+    expenses: [{ id: "e", name: "Giấy", amount: 30000, note: "", at: "", month: "2026-10", category: "vat_tu", wallet: "tien_mat", by: "owner" }],
+    staff: [
+      { id: "sale", name: "Lan" },
+      { id: "owner", name: "Chủ" },
+    ],
+  });
+  assert.equal(rows.find((row) => row.staffId === "sale")?.tien_mat, 80000);
+  assert.equal(rows.find((row) => row.staffId === "owner")?.chuyen_khoan, 20000);
+  assert.equal(rows.find((row) => row.staffId === "owner")?.tien_mat, -30000);
+  const legacy = holderBalances({
+    orders: [order({ id: "old", code: "OLD", depositPaid: 15000, depositMethod: "Tiền mặt", depositBy: "sale" })],
+    expenses: [],
+    staff: [{ id: "sale", name: "Lan" }],
+  });
+  assert.equal(legacy.find((row) => row.staffId === "sale")?.tien_mat, 15000);
+});
+
+test("nộp tiền mặt chuyển từ người thu sang két, ví cửa hàng không thêm dòng", () => {
+  const orders = [
+    order({
+      id: "o",
+      code: "TT",
+      depositPaid: 80000,
+      depositMethod: "Tiền mặt",
+      depositBy: "sale",
+      payments: [{ at: "2026-10-10T05:00:00.000Z", amount: 80000, method: "Tiền mặt", by: "sale" }],
+    }),
+  ];
+  const staff = [{ id: "sale", name: "Lan" }];
+  const before = holderBalances({ orders, expenses: [], staff });
+  assert.equal(before.find((row) => row.staffId === "sale")?.tien_mat, 80000);
+  assert.equal(handoverError({ held: 80000, amount: 30000 }), null);
+  assert.match(handoverError({ held: 80000, amount: 90000 }) ?? "", /lớn hơn/);
+  assert.match(handoverError({ held: 80000, amount: 0 }) ?? "", /chưa đúng/);
+  const after = holderBalances({
+    orders,
+    expenses: [],
+    staff,
+    handovers: [{ fromId: "sale", amount: 30000 }],
+  });
+  assert.equal(after.find((row) => row.staffId === "sale")?.tien_mat, 50000);
+  assert.equal(after.find((row) => row.staffId === SHOP_TILL_ID)?.tien_mat, 30000);
+  assert.equal(after[0]?.staffId, SHOP_TILL_ID);
+  const lines = buildLedger({ orders, expenses: [], adjusts: [] });
+  assert.equal(walletCards(lines, "2026-10").find((card) => card.id === "tien_mat")?.balance, 80000);
 });
 
 test("ngày chi giữa trưa giờ Việt Nam", () => {

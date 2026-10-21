@@ -67,6 +67,32 @@ export const getOrderDetail = createServerFn({ method: "GET" })
     return getOrder(await actor(), data.code);
   });
 
+export const getPhotoAlbums = createServerFn({ method: "GET" }).handler(async () => {
+  const { listPhotoAlbums } = await import("@/server/service");
+  return listPhotoAlbums(await actor());
+});
+
+export const getPhotoAlbum = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ albumId: z.string().uuid() }).parse(data))
+  .handler(async ({ data }) => {
+    const { getPhotoAlbum: load } = await import("@/server/service");
+    return load(await actor(), data.albumId);
+  });
+
+export const linkPhotoAlbum = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ albumId: z.string().uuid(), code: z.string().trim().min(4).max(30) }).parse(data))
+  .handler(async ({ data }) => {
+    const { linkAlbumToOrder } = await import("@/server/service");
+    return linkAlbumToOrder(await actor(), data.albumId, data.code);
+  });
+
+export const orderUploadLink = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), rotate: z.boolean().optional().default(false) }).parse(data))
+  .handler(async ({ data }) => {
+    const { orderUploadLink: link } = await import("@/server/service");
+    return link(await actor(), data.orderId, data.rotate);
+  });
+
 const itemSchema = z.object({
   skuId: z.string().min(2),
   quantity: z.number().int().min(1).max(500),
@@ -96,6 +122,27 @@ export const createDeskOrder = createServerFn({ method: "POST" })
     return createManualOrder(await actor(), data);
   });
 
+export const reviseOrder = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        orderId: z.string().uuid(),
+        fullName: z.string().min(2),
+        phone: z.string().min(8),
+        address: z.string().optional().default(""),
+        fulfillment: z.enum(["pickup", "delivery"]),
+        note: z.string().optional().default(""),
+        dueDate: z.string().nullable().optional().default(null),
+        items: z.array(itemSchema).min(1).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { reviseOrder: revise } = await import("@/server/service");
+    await revise(await actor(), data);
+    return { ok: true };
+  });
+
 export const changeStatus = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -110,6 +157,24 @@ export const changeStatus = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { setOrderStatus } = await import("@/server/service");
     await setOrderStatus(await actor(), data);
+    return { ok: true };
+  });
+
+export const setPrintChoice = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), fileId: z.string().uuid(), print: z.boolean() }).parse(data))
+  .handler(async ({ data }) => {
+    const { setFilePrint } = await import("@/server/service");
+    await setFilePrint(await actor(), data.orderId, data.fileId, data.print);
+    return { ok: true };
+  });
+
+export const savePackCheck = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ orderId: z.string().uuid(), ep: z.boolean(), bo: z.boolean(), tem: z.boolean() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { setOrderPackCheck } = await import("@/server/service");
+    await setOrderPackCheck(await actor(), data.orderId, { ep: data.ep, bo: data.bo, tem: data.tem });
     return { ok: true };
   });
 
@@ -172,6 +237,50 @@ export const savePrice = createServerFn({ method: "POST" })
     const { updateChannelPrice } = await import("@/server/service");
     await updateChannelPrice(await actor(), data);
     return { ok: true };
+  });
+
+const priceMap = z.object({
+  tai_tiem: z.number().int().min(1000).max(100_000_000).optional(),
+  facebook: z.number().int().min(1000).max(100_000_000).optional(),
+  tiktok: z.number().int().min(1000).max(100_000_000).optional(),
+  shopee: z.number().int().min(1000).max(100_000_000).optional(),
+});
+
+export const createPriceSize = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        groupId: z.string().min(1),
+        widthCm: z.number().int().min(1).max(200),
+        heightCm: z.number().int().min(1).max(200),
+        sheets: z.number().int().min(1).max(100),
+        prices: priceMap,
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { createPriceSize: create } = await import("@/server/service");
+    const prices: Partial<Record<"tai_tiem" | "facebook" | "tiktok" | "shopee", number>> = {};
+    if (data.prices.tai_tiem !== undefined) prices.tai_tiem = data.prices.tai_tiem;
+    if (data.prices.facebook !== undefined) prices.facebook = data.prices.facebook;
+    if (data.prices.tiktok !== undefined) prices.tiktok = data.prices.tiktok;
+    if (data.prices.shopee !== undefined) prices.shopee = data.prices.shopee;
+    return create(await actor(), { ...data, prices });
+  });
+
+export const importPriceSheet = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        groupId: z.string().min(1),
+        filename: z.string().min(1).max(180),
+        base64: z.string().min(1).max(6_000_000),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { importPriceSheet: load } = await import("@/server/service");
+    return load(await actor(), data);
   });
 
 export const savePieces = createServerFn({ method: "POST" })
@@ -301,12 +410,18 @@ export const saveCustomer = createServerFn({ method: "POST" })
         note: z.string(),
         tags: z.array(z.string()).optional(),
         specialDates: z.array(z.object({ label: z.string(), month: z.number().int(), day: z.number().int() })).optional(),
+        name: z.string().optional(),
+        phone: z.string().optional(),
+        address: z.string().optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
     const { saveCustomerNote } = await import("@/server/service");
-    await saveCustomerNote(await actor(), data.id, data.note, data.tags, data.specialDates);
+    const profile = data.name !== undefined || data.phone !== undefined || data.address !== undefined
+      ? { ...(data.name !== undefined ? { name: data.name } : {}), ...(data.phone !== undefined ? { phone: data.phone } : {}), ...(data.address !== undefined ? { address: data.address } : {}) }
+      : undefined;
+    await saveCustomerNote(await actor(), data.id, data.note, data.tags, data.specialDates, profile);
     return { ok: true };
   });
 
@@ -436,6 +551,22 @@ export const saveWalletAdjust = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const handCashIn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        staffId: z.string().min(1).optional(),
+        amount: z.number().int().positive().max(100_000_000),
+        note: z.string().max(200).optional().default(""),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { handCash } = await import("@/server/service");
+    await handCash(await actor(), data);
+    return { ok: true };
+  });
+
 export const getMoneyDesk = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => z.object({ month: z.string() }).parse(data))
   .handler(async ({ data }) => {
@@ -473,6 +604,8 @@ export const storeStaff = createServerFn({ method: "POST" })
         probation: z.boolean().optional(),
         hiredAt: z.string().nullable().optional(),
         active: z.boolean().optional(),
+        branchId: z.string().nullable().optional(),
+        departmentId: z.string().nullable().optional(),
       })
       .parse(data),
   )
@@ -566,6 +699,41 @@ export const saveIntegration = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const getMarketplaceSync = createServerFn({ method: "GET" }).handler(async () => {
+  const { marketplaceSyncStatus } = await import("@/server/service");
+  return marketplaceSyncStatus(await actor());
+});
+
+export const pullMarketplace = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ channel: z.enum(["tiktok", "shopee"]) }).parse(data))
+  .handler(async ({ data }) => {
+    const { pullMarketplaceNow } = await import("@/server/marketplace-sync");
+    return pullMarketplaceNow(await actor(), data.channel);
+  });
+
+export const pullCatalog = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ channel: z.enum(["tiktok", "shopee"]) }).parse(data))
+  .handler(async ({ data }) => {
+    const { pullCatalogNow } = await import("@/server/marketplace-sync");
+    return pullCatalogNow(await actor(), data.channel);
+  });
+
+export const cloneShelf = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        groupId: z.string().min(1),
+        from: z.enum(["tiktok", "shopee"]),
+        to: z.enum(["tai_tiem", "facebook"]),
+        overwrite: z.boolean(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { cloneShelfPrices } = await import("@/server/service");
+    return cloneShelfPrices(await actor(), data);
+  });
+
 export const previewRestore = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ key: z.string().min(8) }).parse(data))
   .handler(async ({ data }) => {
@@ -639,6 +807,62 @@ export const storeShipping = createServerFn({ method: "POST" })
     const { saveOrderShipping } = await import("@/server/service");
     await saveOrderShipping(await actor(), data);
     return { ok: true };
+  });
+
+const waybillInput = z.object({
+  orderId: z.string().min(1),
+  carrier: z.enum(["ghn", "ghtk", "jt"]),
+  province: z.string().max(80),
+  district: z.string().max(80),
+  ward: z.string().max(80),
+  address: z.string().max(500),
+  weightGrams: z.number().int(),
+  codAmount: z.number().int(),
+});
+
+export const getCarrierDesk = createServerFn({ method: "GET" }).handler(async () => {
+  const { carrierDesk } = await import("@/server/service");
+  return carrierDesk(await actor());
+});
+
+export const saveCarrierPickup = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        name: z.string().max(80),
+        phone: z.string().max(20),
+        address: z.string().max(250),
+        province: z.string().max(80),
+        district: z.string().max(80),
+        ward: z.string().max(80),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveCarrierPickup: save } = await import("@/server/service");
+    await save(await actor(), data);
+    return { ok: true };
+  });
+
+export const createCarrierWaybill = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => waybillInput.parse(data))
+  .handler(async ({ data }) => {
+    const { openCarrierWaybill } = await import("@/server/service");
+    return openCarrierWaybill(await actor(), data);
+  });
+
+export const quoteCarrierFee = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => waybillInput.parse(data))
+  .handler(async ({ data }) => {
+    const { quoteCarrierFee: quote } = await import("@/server/service");
+    return quote(await actor(), data);
+  });
+
+export const refreshCarrierWaybill = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { refreshCarrierWaybill: refresh } = await import("@/server/service");
+    return refresh(await actor(), data.orderId);
   });
 
 export const setCodReceived = createServerFn({ method: "POST" })
@@ -719,5 +943,256 @@ export const removeFile = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { deleteStoredFile } = await import("@/server/service");
     await deleteStoredFile(await actor(), data.fileId);
+    return { ok: true };
+  });
+
+export const getOrg = createServerFn({ method: "GET" }).handler(async () => {
+  const { listOrg } = await import("@/server/service");
+  return listOrg(await actor());
+});
+
+export const storeBranch = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        name: z.string().min(2),
+        address: z.string().optional(),
+        phone: z.string().optional(),
+        active: z.boolean().optional(),
+        sort: z.number().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveBranch } = await import("@/server/service");
+    await saveBranch(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteBranch = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeBranch } = await import("@/server/service");
+    await removeBranch(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const storeDepartment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        name: z.string().min(2),
+        note: z.string().optional(),
+        active: z.boolean().optional(),
+        sort: z.number().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveDepartment } = await import("@/server/service");
+    await saveDepartment(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteDepartment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeDepartment } = await import("@/server/service");
+    await removeDepartment(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const storeRoleModules = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        rows: z.array(
+          z.object({
+            role: z.enum(["owner", "sale", "production"]),
+            modules: z.array(z.string()),
+          }),
+        ),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveRoleModules } = await import("@/server/service");
+    await saveRoleModules(await actor(), data.rows);
+    return { ok: true };
+  });
+
+export const getAnnouncements = createServerFn({ method: "GET" }).handler(async () => {
+  const { listAnnouncements } = await import("@/server/service");
+  return listAnnouncements(await actor());
+});
+
+export const storeAnnouncement = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        title: z.string().min(2),
+        body: z.string(),
+        pinned: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveAnnouncement } = await import("@/server/service");
+    await saveAnnouncement(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteAnnouncement = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeAnnouncement } = await import("@/server/service");
+    await removeAnnouncement(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const getDocuments = createServerFn({ method: "GET" }).handler(async () => {
+  const { listDocuments } = await import("@/server/service");
+  return listDocuments(await actor());
+});
+
+export const storeDocument = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        title: z.string().min(2),
+        body: z.string().optional(),
+        url: z.string().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveDocument } = await import("@/server/service");
+    await saveDocument(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteDocument = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeDocument } = await import("@/server/service");
+    await removeDocument(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const getOrderFeedback = createServerFn({ method: "GET" }).handler(async () => {
+  const { listOrderFeedback } = await import("@/server/service");
+  return listOrderFeedback(await actor());
+});
+
+export const getTargets = createServerFn({ method: "GET" }).handler(async () => {
+  const { getTargets: load } = await import("@/server/service");
+  return load(await actor());
+});
+
+export const getSePayConfig = createServerFn({ method: "GET" }).handler(async () => {
+  const { getSePayConfig: load } = await import("@/server/service");
+  return load(await actor());
+});
+
+export const getCampaigns = createServerFn({ method: "GET" }).handler(async () => {
+  const { listCampaigns } = await import("@/server/service");
+  return listCampaigns(await actor());
+});
+
+export const storeCampaign = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        name: z.string().min(2),
+        note: z.string().optional(),
+        active: z.boolean().optional(),
+        sort: z.number().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveCampaign } = await import("@/server/service");
+    await saveCampaign(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteCampaign = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeCampaign } = await import("@/server/service");
+    await removeCampaign(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const getMessageTemplates = createServerFn({ method: "GET" }).handler(async () => {
+  const { listMessageTemplates } = await import("@/server/service");
+  return listMessageTemplates(await actor());
+});
+
+export const storeMessageTemplate = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        title: z.string().min(2),
+        body: z.string().min(1),
+        kind: z.enum(["remind", "status", "chat", "other"]),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveMessageTemplate } = await import("@/server/service");
+    await saveMessageTemplate(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteMessageTemplate = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeMessageTemplate } = await import("@/server/service");
+    await removeMessageTemplate(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const getNotifyPrefs = createServerFn({ method: "GET" }).handler(async () => {
+  const { getNotifyPrefs: load } = await import("@/server/service");
+  return load(await actor());
+});
+
+export const getPackages = createServerFn({ method: "GET" }).handler(async () => {
+  const { listPackages } = await import("@/server/service");
+  return listPackages(await actor());
+});
+
+export const storePackage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        name: z.string().min(2),
+        price: z.number().int().min(0),
+        description: z.string().optional(),
+        includes: z.string().optional(),
+        active: z.boolean().optional(),
+        sort: z.number().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { savePackage } = await import("@/server/service");
+    await savePackage(await actor(), data);
+    return { ok: true };
+  });
+
+export const deletePackage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removePackage } = await import("@/server/service");
+    await removePackage(await actor(), data.id);
     return { ok: true };
   });

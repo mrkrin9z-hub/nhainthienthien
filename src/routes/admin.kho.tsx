@@ -3,11 +3,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { GoodsLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PackageSearch } from "lucide-react";
+import { CircleCheck } from "lucide-react";
 import { formatMaybe } from "@/lib/brand";
 import { approvePrice, countStock, downloadExcel, getInventory, getMe, markInkOpened, receiveStock, saveMaterial } from "@/lib/admin.functions";
 
@@ -22,16 +27,34 @@ function StockPage() {
   const canIn = me.data?.role === "owner" || me.data?.role === "sale";
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
-  const [lowOnly, setLowOnly] = useState(false);
-  const materials = (stock.data?.materials ?? []).filter((material) => {
-    if (lowOnly && !material.low) return false;
+  const [stockFilter, setStockFilter] = useState("all");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [moveQ, setMoveQ] = useState("");
+  const allMaterials = stock.data?.materials ?? [];
+  const materials = allMaterials.filter((material) => {
+    const short = material.low || material.reorder;
+    if (stockFilter === "low" && !short) return false;
+    if (stockFilter === "ok" && short) return false;
     const needle = q.trim().toLowerCase();
     return !needle || material.name.toLowerCase().includes(needle);
   });
+  const stockChips: FilterChip[] = [
+    { id: "all", label: "Tất cả", count: allMaterials.length, ...ALL_TONE },
+    { id: "low", label: "Sắp hết", count: allMaterials.filter((material) => material.low || material.reorder).length, color: "#DC2626", icon: PackageSearch },
+    { id: "ok", label: "Đủ", count: allMaterials.filter((material) => !material.low && !material.reorder).length, color: "#059669", icon: CircleCheck },
+  ];
+  const list = useListPage(materials, `${q}|${stockFilter}`);
+  const movements = (stock.data?.movements ?? []).filter((move) => {
+    const needle = moveQ.trim().toLowerCase();
+    return !needle || `${move.materialName} ${move.reason} ${move.note}`.toLowerCase().includes(needle);
+  });
+  const moveList = useListPage(movements, moveQ);
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["stock"] });
   }
+
+  const opened = (stock.data?.materials ?? []).find((material) => material.id === openId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -44,15 +67,7 @@ function StockPage() {
         searchPlaceholder="Tìm vật tư…"
       />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          aria-pressed={lowOnly}
-          className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-sm font-semibold active:scale-95 ${lowOnly ? "border-destructive bg-destructive text-white" : "bg-card"}`}
-          onClick={() => setLowOnly((value) => !value)}
-        >
-          <PackageSearch className="size-4" />
-          Sắp hết
-        </button>
+        <FilterChips label="Tồn kho" value={stockFilter} chips={stockChips} onChange={setStockFilter} />
         <div className="flex gap-2">
           <Button className="min-h-12" variant="outline" onClick={() => markInkOpened().then(() => refresh()).then(() => toast.success("Đã trừ 1 lọ mực"))}>
             Mở lọ mực mới
@@ -71,49 +86,93 @@ function StockPage() {
           ) : null}
         </div>
       </div>
-      <div className="space-y-3">
-        {materials.map((material) => (
-          <article key={material.id} className={`rounded-3xl border p-4 ${material.low ? "border-destructive bg-destructive/10" : "glass-card"}`}>
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <h2 className="font-bold text-primary">{material.name}</h2>
-                <p className="text-sm text-muted-foreground">{material.buyLabel}</p>
-              </div>
-              <p className="text-xl font-extrabold">
-                {material.stock} {material.unit}
-              </p>
-            </div>
-            <p className="mt-1 text-sm">
-              30 ngày qua dùng {material.avgDaily} {material.unit}/ngày
-              {material.daysLeft === null ? " · chưa đủ nhịp để tính số ngày còn." : ` · còn khoảng ${material.daysLeft} ngày.`}
-            </p>
-            {material.reorder ? (
-              <p className="mt-1 text-sm font-semibold text-destructive">Nên đặt hàng: còn dưới {material.leadTimeDays} ngày chờ hàng.</p>
+      <p className="text-sm text-muted-foreground">Chọn một dòng để nhập kho, kiểm tồn hoặc sửa mức tối thiểu.</p>
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="vật tư" onPage={list.setPage} />
+      <div className="overflow-hidden rounded-md border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vật tư</TableHead>
+              <TableHead className="text-right">Tồn</TableHead>
+              <TableHead className="hidden text-right sm:table-cell">30 ngày</TableHead>
+              <TableHead className="text-right">Trạng thái</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.slice.map((material) => (
+              <TableRow key={material.id} className="cursor-pointer" onClick={() => setOpenId(material.id)}>
+                <TableCell>
+                  <p className="font-semibold">{material.name}</p>
+                  <p className="text-xs text-muted-foreground">{material.buyLabel}</p>
+                </TableCell>
+                <TableCell className="text-right font-semibold">
+                  {material.stock} {material.unit}
+                </TableCell>
+                <TableCell className="hidden text-right sm:table-cell">
+                  {material.avgDaily} {material.unit}/ngày
+                </TableCell>
+                <TableCell className={`text-right ${material.low || material.reorder ? "font-semibold text-destructive" : "text-muted-foreground"}`}>
+                  {material.low || material.reorder ? "Sắp hết" : "Đủ"}
+                </TableCell>
+              </TableRow>
+            ))}
+            {stock.data && materials.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                  Không có vật tư khớp.
+                </TableCell>
+              </TableRow>
             ) : null}
-            {owner ? (
-              <p className="mt-1 text-sm">
-                Giá mua: {material.packPrice === null ? "chưa có" : formatMaybe(material.packPrice)}
-                {material.pendingPrice !== null ? ` · chờ duyệt ${formatMaybe(material.pendingPrice)}` : ""}
-              </p>
-            ) : null}
-            {owner && material.pendingPrice !== null ? (
-              <Button className="mt-2 min-h-12" onClick={() => approvePrice({ data: { materialId: material.id } }).then(refresh)}>
-                Duyệt giá mua
-              </Button>
-            ) : null}
-            <MaterialForms material={material} owner={owner} canIn={canIn} onDone={refresh} />
-          </article>
-        ))}
+          </TableBody>
+        </Table>
       </div>
+      <Dialog open={opened !== null} onOpenChange={(open) => { if (!open) setOpenId(null); }}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          {opened ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{opened.name}</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">{opened.buyLabel}</p>
+              <p className="text-xl font-extrabold">
+                {opened.stock} {opened.unit}
+              </p>
+              <p className="text-sm">
+                30 ngày qua dùng {opened.avgDaily} {opened.unit}/ngày
+                {opened.daysLeft === null ? " · chưa đủ nhịp để tính số ngày còn." : ` · còn khoảng ${opened.daysLeft} ngày.`}
+              </p>
+              {opened.reorder ? (
+                <p className="text-sm font-semibold text-destructive">Nên đặt hàng: còn dưới {opened.leadTimeDays} ngày chờ hàng.</p>
+              ) : null}
+              {owner ? (
+                <p className="text-sm">
+                  Giá mua: {opened.packPrice === null ? "chưa có" : formatMaybe(opened.packPrice)}
+                  {opened.pendingPrice !== null ? ` · chờ duyệt ${formatMaybe(opened.pendingPrice)}` : ""}
+                </p>
+              ) : null}
+              {owner && opened.pendingPrice !== null ? (
+                <Button className="min-h-12" onClick={() => approvePrice({ data: { materialId: opened.id } }).then(refresh)}>
+                  Duyệt giá mua
+                </Button>
+              ) : null}
+              <MaterialForms key={opened.id} material={opened} owner={owner} canIn={canIn} onDone={refresh} />
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
       <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Nhập xuất gần đây</h2>
+        <h2 className="font-bold text-primary">Nhập xuất</h2>
+        <Input value={moveQ} onChange={(event) => setMoveQ(event.target.value)} placeholder="Tìm vật tư hoặc lý do…" aria-label="Tìm phiếu kho" className="mt-2 h-11" />
+        <div className="mt-2">
+          <ListPager page={moveList.page} pages={moveList.pages} total={moveList.total} start={moveList.start} count={moveList.slice.length} noun="phiếu" onPage={moveList.setPage} />
+        </div>
         <ul className="mt-2 space-y-1 text-sm">
-          {(stock.data?.movements ?? []).slice(0, 20).map((move) => (
+          {moveList.slice.map((move) => (
             <li key={move.id}>
               {move.materialName}: {move.qty} · {move.reason} {move.note}
             </li>
           ))}
-          {(stock.data?.movements ?? []).length === 0 ? <li className="text-muted-foreground">Chưa có phiếu.</li> : null}
+          {moveList.total === 0 ? <li className="text-muted-foreground">{(stock.data?.movements ?? []).length === 0 ? "Chưa có phiếu." : "Không có phiếu khớp bộ lọc."}</li> : null}
         </ul>
       </section>
     </div>

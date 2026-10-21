@@ -10,6 +10,9 @@ export const AUDIT_ACTIONS: { action: string; label: string }[] = [
   { action: "staff.password", label: "Đổi mật khẩu" },
   { action: "staff.update", label: "Tài khoản" },
   { action: "order.create", label: "Tạo đơn" },
+  { action: "order.revise", label: "Sửa đơn" },
+  { action: "order.upload_link", label: "Mã gửi ảnh" },
+  { action: "album.link", label: "Gắn album" },
   { action: "order.status", label: "Chuyển bước" },
   { action: "order.deposit", label: "Cọc" },
   { action: "order.import", label: "Nhập đơn sàn" },
@@ -29,6 +32,7 @@ export const AUDIT_ACTIONS: { action: string; label: string }[] = [
   { action: "cost.fixed", label: "Chi phí cố định" },
   { action: "cost.expense", label: "Chi phí" },
   { action: "wallet.adjust", label: "Điều chỉnh ví" },
+  { action: "cash.handover", label: "Nộp tiền mặt" },
   { action: "settings.update", label: "Cài đặt" },
   { action: "file.delete", label: "Xóa file" },
   { action: "backup.manual", label: "Sao lưu" },
@@ -100,6 +104,7 @@ const SETTING_LABEL: Record<string, string> = {
   repeatCustomerOrders: "Khách quay lại từ số đơn",
   remindAfterDays: "Nhắc khi đơn cuối cách đây (ngày)",
   remindMessage: "Mẫu tin nhắc khách",
+  bank: "Tài khoản nhận tiền",
   fixedCosts: "Chi phí cố định mặc định",
   rentFromJune2027: "Mặt bằng từ T6/2027",
 };
@@ -179,6 +184,12 @@ function detailOf(item: Pick<Audit, "action" | "entity" | "before" | "after">, s
       return statusSentence(actor, orderCode(shop, item.entity), before, after);
     case "order.create":
       return `tạo đơn ${text(after?.code) || orderCode(shop, item.entity)}${channelBit(after?.channel)}`;
+    case "order.revise":
+      return `sửa đơn ${orderCode(shop, item.entity)}${after?.items ? `: ${text(after.items)}` : ""}`;
+    case "order.upload_link":
+      return `${after?.rotated ? "đổi" : "tạo"} mã gửi ảnh đơn ${text(after?.code) || orderCode(shop, item.entity)}`;
+    case "album.link":
+      return `gắn album ${text(after?.phone)} vào đơn ${text(after?.code) || orderCode(shop, item.entity)}`;
     case "order.import":
       return `nhập đơn sàn ${text(after?.code) || orderCode(shop, item.entity)}${after?.platform ? ` mã ${text(after.platform)}` : ""}${channelBit(after?.channel)}`;
     case "order.deposit":
@@ -216,6 +227,8 @@ function detailOf(item: Pick<Audit, "action" | "entity" | "before" | "after">, s
       return `ghi chi phí ${text(after.name)}: ${dong(after.amount)}${walletBit(after.wallet)}`;
     case "wallet.adjust":
       return `điều chỉnh ví ${walletName(after?.wallet)}: ${dong(after?.amount)}${after?.note ? ` (${text(after.note)})` : ""}`;
+    case "cash.handover":
+      return `nộp ${dong(after?.amount)} tiền mặt của ${personLabel(text(after?.fromId), shop)} vào két${after?.note ? ` (${text(after.note)})` : ""}`;
     case "settings.update":
       return `sửa cài đặt: ${settingsBits(item.before, item.after, shop)}`;
     case "staff.update":
@@ -301,7 +314,7 @@ function settingsBits(before: unknown, after: unknown, shop: AuditShop): string 
       bits.push(...groupBits(oldRow[key], next[key], shop));
       continue;
     }
-    if (key === "fixedCosts" || key === "commissionTiers" || key === "kpiTargets" || key === "productPhotos" || key === "remindMessage") {
+    if (key === "fixedCosts" || key === "commissionTiers" || key === "kpiTargets" || key === "productPhotos" || key === "remindMessage" || key === "bank") {
       bits.push(`sửa ${SETTING_LABEL[key] ?? key}`);
       continue;
     }

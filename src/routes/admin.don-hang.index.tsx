@@ -1,14 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { AlarmClock, Columns3, Download, List, Plus } from "lucide-react";
+import { AlarmClock, Columns3, Download, FileSpreadsheet, HandCoins, List, Plus, Wallet } from "lucide-react";
 
+import { CreateOrderForm } from "@/components/admin/create-order-form";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { ClearFilters, FilterSheet, PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { OrderLinks } from "@/components/admin/sections";
-import { ALL_TONE, CHANNEL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
+import { ALL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
 import { formatMaybe } from "@/lib/brand";
 import { downloadExcel, getMe, getOrders } from "@/lib/admin.functions";
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL, type OrderStatus } from "@/domain/types";
+import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
 
 export const Route = createFileRoute("/admin/don-hang/")({
   validateSearch: (search: Record<string, unknown>): { status: string } => ({
@@ -28,8 +32,11 @@ function OrdersPage() {
   const [q, setQ] = useState("");
   const [channel, setChannel] = useState("all");
   const [lateOnly, setLateOnly] = useState(false);
+  const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [view, setView] = useState<"list" | "board">("list");
+  const queryClient = useQueryClient();
   useEffect(() => {
     if (window.localStorage.getItem("admin-orders-view") === "board") setView("board");
   }, []);
@@ -60,52 +67,63 @@ function OrdersPage() {
     ];
   }, [rows, flow]);
 
-  const channelChips = useMemo<FilterChip[]>(() => {
-    return [
-      { id: "all", label: "Mọi kênh", count: rows.length, ...ALL_TONE },
-      ...CHANNELS.map((id) => {
-        const tone = CHANNEL_TONE[id] ?? ALL_TONE;
-        return {
-          id,
-          label: CHANNEL_LABEL[id],
-          count: rows.filter((row) => row.channel === id).length,
-          color: tone.color,
-          icon: tone.icon,
-        };
-      }),
-    ];
-  }, [rows]);
-
+  const unpaidCount = rows.filter((order) => order.remain != null && order.remain > 0).length;
   const shown = rows.filter((order) => {
     if (status !== "all" && order.status !== status) return false;
     if (channel !== "all" && order.channel !== channel) return false;
     if (lateOnly && !order.late) return false;
+    if (unpaidOnly && !(order.remain != null && order.remain > 0)) return false;
     const needle = q.trim().toLowerCase();
     if (!needle) return true;
-    return [order.code, order.customerName, order.phone, order.itemSummary, order.channelLabel]
+    return [order.code, order.customerName, order.phone, order.itemSummary, channelLabelOf(order.channel, order.channelLabel)]
       .join(" ")
       .toLowerCase()
       .includes(needle);
   });
-  const filterCount = (status !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (lateOnly ? 1 : 0);
+  const filterCount = (status !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (lateOnly ? 1 : 0) + (unpaidOnly ? 1 : 0);
+  const list = useListPage(shown, `${status}|${channel}|${lateOnly}|${unpaidOnly}|${q}`);
+  const pageRows = list.slice;
 
   function clearFilters() {
     setStatus("all");
     setChannel("all");
     setLateOnly(false);
+    setUnpaidOnly(false);
   }
 
   function extraFilters() {
     return (
       <>
-        <FilterChips label="Kênh" value={channel} chips={channelChips} onChange={setChannel} wrap />
+        <select
+          className="h-9 min-w-[10rem] rounded-md border border-input bg-background px-3 text-[13px]"
+          aria-label="Lọc kênh"
+          value={channel}
+          onChange={(event) => setChannel(event.target.value)}
+        >
+          <option value="all">Mọi kênh ({rows.length})</option>
+          {CHANNELS.map((id) => (
+            <option key={id} value={id}>
+              {CHANNEL_LABEL[id]} ({rows.filter((row) => row.channel === id).length})
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          aria-pressed={unpaidOnly}
+          className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold active:scale-[0.97] ${unpaidOnly ? "border-primary bg-primary text-primary-foreground" : "bg-background"}`}
+          onClick={() => setUnpaidOnly((value) => !value)}
+        >
+          <HandCoins className="size-3.5" />
+          Chưa thu
+          <span className={`inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold ${unpaidOnly ? "bg-white/25" : "bg-muted"}`}>{unpaidCount}</span>
+        </button>
         <button
           type="button"
           aria-pressed={lateOnly}
-          className={`inline-flex min-h-11 items-center gap-1.5 self-start rounded-full border px-3 text-sm font-semibold active:scale-[0.97] ${lateOnly ? "border-destructive bg-destructive text-white" : "bg-background"}`}
+          className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold active:scale-[0.97] ${lateOnly ? "border-destructive bg-destructive text-white" : "bg-background"}`}
           onClick={() => setLateOnly((value) => !value)}
         >
-          <AlarmClock className="size-4" />
+          <AlarmClock className="size-3.5" />
           Trễ mốc
         </button>
         {filterCount > 0 ? <ClearFilters onClick={clearFilters} /> : null}
@@ -116,7 +134,7 @@ function OrdersPage() {
   const columns = (status === "all" ? flow : flow.filter((item) => item === status)).map((item) => ({
     status: item,
     label: STATUS_LABEL[item] ?? item,
-    rows: shown.filter((order) => order.status === item),
+    rows: pageRows.filter((order) => order.status === item),
   }));
 
   return (
@@ -149,7 +167,9 @@ function OrdersPage() {
                 }}
               />
             )}
-            {production ? null : <ToolbarLink label="Ghi đơn" icon={Plus} primary to="/admin/don-moi" />}
+            {production ? null : <ToolbarButton label="Tạo đơn" icon={Plus} primary onClick={() => setCreateOpen(true)} />}
+            {production ? null : <ToolbarLink label="Nhập Excel" icon={FileSpreadsheet} to="/admin/nhap-don" />}
+            {production ? null : <ToolbarLink label="Đối soát COD" icon={Wallet} to="/admin/cod" />}
           </>
         }
         below={
@@ -158,8 +178,21 @@ function OrdersPage() {
           </div>
         }
       />
-      <FilterChips label="Trạng thái đơn" value={status} chips={statusChips} onChange={setStatus} />
-      <p className="text-xs text-muted-foreground">{view === "board" ? "Dạng cột" : "Danh sách"} · {shown.length} đơn</p>
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Tạo đơn hàng mới</DialogTitle>
+          </DialogHeader>
+          <CreateOrderForm
+            onCreated={() => {
+              setCreateOpen(false);
+              void queryClient.invalidateQueries({ queryKey: ["orders"] });
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+      <FilterChips label="Trạng thái đơn" value={status} chips={statusChips} onChange={setStatus} wrap />
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={pageRows.length} noun="đơn" onPage={list.setPage} />
       {view === "board" ? (
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x" style={{ WebkitOverflowScrolling: "touch" }}>
           {columns.map((column) => {
@@ -185,38 +218,50 @@ function OrdersPage() {
       {view === "list" ? (
       <>
       <div className="grid gap-2 md:hidden">
-        {shown.map((order) => (
+        {pageRows.map((order) => (
           <OrderCard key={order.id} order={order} money={!production} />
         ))}
       </div>
-      <div className="hidden overflow-hidden rounded-2xl border border-border/70 bg-card md:block">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-muted/50 text-xs font-semibold text-muted-foreground">
+      <div className="hidden overflow-hidden rounded-md border bg-card md:block">
+        <table className="w-full text-left text-[13px]">
+          <thead className="bg-muted/40 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             <tr>
-              <th className="px-4 py-3">Mã đơn</th>
-              <th className="px-4 py-3">Khách</th>
-              <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3">Kênh</th>
-              {production ? null : <th className="px-4 py-3">Tiền</th>}
+              <th className="px-3 py-2.5">STT</th>
+              <th className="px-3 py-2.5">Mã đơn</th>
+              <th className="px-3 py-2.5">Khách hàng</th>
+              <th className="px-3 py-2.5">Trạng thái</th>
+              <th className="px-3 py-2.5">Kênh</th>
+              {production ? null : <th className="px-3 py-2.5 text-right">Số tiền</th>}
+              {production ? null : <th className="px-3 py-2.5 text-right">Đã thu</th>}
+              {production ? null : <th className="px-3 py-2.5 text-right">Còn lại</th>}
             </tr>
           </thead>
           <tbody>
-            {shown.map((order) => (
-              <tr key={order.id} className="border-t">
-                <td className="px-4 py-3 font-semibold">
+            {pageRows.map((order, index) => (
+              <tr
+                key={order.id}
+                className="cursor-pointer border-t hover:bg-muted/30"
+                onClick={() => navigate({ to: "/admin/don-hang/$code", params: { code: order.code } })}
+              >
+                <td className="px-3 py-2.5 text-muted-foreground">{list.start + index + 1}</td>
+                <td className="px-3 py-2.5 font-semibold">
                   <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="text-primary">
                     {order.code}
                   </Link>
-                  {order.late ? <span className="ml-2 text-xs font-bold text-destructive">Trễ</span> : null}
+                  {order.late ? <span className="ml-2 text-[11px] font-bold text-destructive">Trễ</span> : null}
                 </td>
-                <td className="px-4 py-3">
-                  <p>{order.customerName}</p>
-                  <p className="text-xs text-muted-foreground">{order.phone}</p>
+                <td className="px-3 py-2.5">
+                  <p className="font-medium">{order.customerName}</p>
+                  <p className="text-[11px] text-muted-foreground">{order.phone}</p>
                 </td>
-                <td className="px-4 py-3"><StatusPill status={order.status} label={order.statusLabel} /></td>
-                <td className="px-4 py-3">{order.channelLabel}</td>
+                <td className="px-3 py-2.5"><StatusPill status={order.status} label={statusLabelOf(order.status, order.statusLabel)} /></td>
+                <td className="px-3 py-2.5">{channelLabelOf(order.channel, order.channelLabel)}</td>
                 {production ? null : (
-                  <td className="px-4 py-3 font-semibold">{order.total == null ? `${order.fileCount} ảnh` : formatMaybe(order.total)}</td>
+                  <>
+                    <td className="px-3 py-2.5 text-right font-semibold">{order.total == null ? "Chưa có giá" : formatMaybe(order.total)}</td>
+                    <td className="px-3 py-2.5 text-right">{formatMaybe(order.depositPaid)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold">{order.remain == null ? "—" : formatMaybe(order.remain)}</td>
+                  </>
                 )}
               </tr>
             ))}
@@ -264,9 +309,12 @@ function OrderCard({
     statusLabel: string;
     customerName: string;
     phone: string;
+    channel: string;
     channelLabel: string;
     itemSummary: string;
     total: number | null;
+    depositPaid?: number | null;
+    remain?: number | null;
     fileCount: number;
     late: boolean;
   };
@@ -279,13 +327,16 @@ function OrderCard({
           <p className="font-semibold text-primary">{order.code}</p>
           <p className="truncate text-sm text-muted-foreground">{order.customerName} · {order.phone}</p>
         </div>
-        <StatusPill status={order.status} label={order.statusLabel} />
+        <StatusPill status={order.status} label={statusLabelOf(order.status, order.statusLabel)} />
       </div>
       <p className="line-clamp-2 text-sm">{order.itemSummary}</p>
       {order.late ? <p className="mt-1 text-sm font-semibold text-destructive">Trễ mốc</p> : null}
       <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm">
-        <span className="text-muted-foreground">{order.channelLabel}</span>
-        <span className="font-semibold">{money && order.total != null ? formatMaybe(order.total) : `${order.fileCount} ảnh`}</span>
+        <span className="text-muted-foreground">{channelLabelOf(order.channel, order.channelLabel)}</span>
+        <span className="text-right font-semibold">
+          {money && order.total != null ? formatMaybe(order.total) : `${order.fileCount} ảnh`}
+          {money && order.remain != null ? <span className="block text-xs font-normal text-muted-foreground">Còn {formatMaybe(order.remain)}</span> : null}
+        </span>
       </div>
     </Link>
   );

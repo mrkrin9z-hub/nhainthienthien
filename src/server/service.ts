@@ -24,53 +24,103 @@ import {
 } from "@/domain/calc";
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { workbookXml, type Sheet } from "@/domain/excel";
-import { imageBytesMatch, imageMimeAllowed } from "@/domain/images";
+import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/images";
+import { albumPhone, photoTooBig, publicUploadCard, uploadTokenShape } from "@/domain/order-upload";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
-import { filesToPurge } from "@/domain/files";
+import { marketplaceEditLocked, orderRevisionBlock } from "@/domain/order-edit";
+import {
+  cleanBank,
+  feedbackAnswer,
+  feedbackLabel,
+  feedbackOpensReprint,
+  hasPackingPhoto,
+  itemChangeNote,
+  packReady,
+  type FeedbackAnswer,
+  type LineSnap,
+  type PackCheck,
+} from "@/domain/print-shop";
+import { bytesStillShared, filesToPurge } from "@/domain/files";
 import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
-import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type PlannedItem } from "@/domain/marketplace";
+import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type ParsedLine, type PlannedItem, type PlannedOrder } from "@/domain/marketplace";
 import { applyRestore, restoreSummary } from "@/domain/restore";
-import { driveFolderParts } from "@/domain/drive-path";
+import { albumFolderParts, driveFolderParts } from "@/domain/drive-path";
+import {
+  CARRIER_NAME,
+  carrierIdFromName,
+  clampCod,
+  clampWeight,
+  ghnAuth,
+  ghtkAuth,
+  jtAuth,
+  pickupReady,
+  readPickup,
+  waybillBlock,
+  type CarrierId,
+  type WaybillDraft,
+} from "@/domain/carriers";
 import { defaultCarrier } from "@/domain/jt";
 import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
 import { publicContact } from "@/domain/public-contact";
+import { applyPriceDrafts, parsePriceRows, type PriceDraft } from "@/domain/price-sheet";
+import { applyShelfOffers, cloneChannelPrices, type ShelfOffer } from "@/domain/catalog-sync";
+import { rowsFromUpload } from "@/domain/sheet";
 import { buildWebProduct, type WebProductInput } from "@/domain/web-product";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
+import { DEFAULT_ROLE_MODULES, defaultNotifyPrefs, defaultSePay, modulesForStoredRole, sortBySortThenName } from "@/domain/org-desk";
+import { findOrderForSePay, sepayCollectAmount, sepayRejectReason, type SePayWebhookPayload } from "@/domain/sepay";
 import type {
+  Announcement,
+  Branch,
+  Campaign,
   Channel,
+  Department,
+  MessageTemplate,
+  MessageTemplateKind,
+  NotifyPrefs,
   Order,
   OrderFile,
   OrderStatus,
+  PhotoAlbum,
   Role,
+  RoleModules,
+  CashHandover,
+  SePayConfig,
+  ServicePackage,
+  ShopDocument,
   ShopState,
   Sku,
   SkuMap,
   Staff,
 } from "@/domain/types";
-import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL } from "@/domain/types";
+import { CHANNEL_LABEL, CHANNELS, MESSAGE_TEMPLATE_KINDS, ROLE_LABEL, STATUS_LABEL } from "@/domain/types";
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
-import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
+import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, handoverError, holderBalances, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
 import { getRequest } from "@tanstack/react-start/server";
 
 import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
 import { listBackups, readBackup, writeManualBackup } from "@/server/store";
 import { clearProductPhoto, readProductPhoto, writeProductPhoto } from "@/server/photos";
-import { integrationStatus, saveIntegrationSecret } from "@/server/secrets";
-import { deleteFromDrive, downloadFromDrive, driveConnected, uploadToDrive } from "@/server/drive";
+import { createGhnWaybill, createGhtkWaybill, createJtWaybill, quoteGhtkFee, trackGhn, trackGhtk, trackJt } from "@/server/carriers";
+import { integrationStatus, readIntegrationSecret, saveIntegrationSecret } from "@/server/secrets";
+import { deleteFromDrive, downloadDriveThumbnail, downloadFromDrive, driveConnected, inspectDriveUpload, openDriveUpload, uploadToDrive } from "@/server/drive";
 import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
 
 export type Actor = Pick<Staff, "id" | "name" | "email" | "role" | "mustChangePassword"> & {
   totpEnabled: boolean;
+  /** Path menu được phép — từ roleModules. */
+  modules: string[];
 };
 
 export type LoginResult = Actor | { needsTotp: true };
 
-function toActor(staff: Staff): Actor {
+function toActor(staff: Staff, modules?: string[] | null): Actor {
+  const fallback = DEFAULT_ROLE_MODULES.find((row) => row.role === staff.role)?.modules ?? ["/admin"];
   return {
     id: staff.id,
     name: staff.name,
@@ -78,6 +128,7 @@ function toActor(staff: Staff): Actor {
     role: staff.role,
     mustChangePassword: staff.mustChangePassword,
     totpEnabled: staff.totpEnabled === true,
+    modules: modules?.length ? modules : [...fallback],
   };
 }
 
@@ -207,7 +258,7 @@ export async function currentActor(staffId: string | null): Promise<Actor | null
   const state = await readState();
   const staff = state.staff.find((s) => s.id === staffId && s.active);
   if (!staff) return null;
-  return toActor(staff);
+  return toActor(staff, modulesForStoredRole(staff.role, state.roleModules));
 }
 
 export async function login(email: string, password: string, code?: string): Promise<LoginResult> {
@@ -235,7 +286,7 @@ export async function login(email: string, password: string, code?: string): Pro
   await mutate(async (draft) => {
     audit(draft, staff.id, "auth.login", staff.id, null, { email: staff.email });
   });
-  return toActor(staff);
+  return toActor(staff, modulesForStoredRole(staff.role, state.roleModules));
 }
 
 export async function changePassword(actor: Actor, current: string, next: string): Promise<void> {
@@ -518,8 +569,245 @@ export async function createWebOrder(input: {
 
 async function orderByToken(state: ShopState, orderId: string, accessToken: string) {
   const order = state.orders.find((item) => item.id === orderId);
-  if (!order || order.accessTokenHash !== (await sha256(accessToken))) throw new Error("Không có quyền với đơn hàng này.");
+  if (!order || !order.accessTokenHash || order.accessTokenHash !== (await sha256(accessToken))) {
+    throw new Error("Không có quyền với đơn hàng này.");
+  }
   return order;
+}
+
+async function orderByUploadToken(state: ShopState, token: string) {
+  if (!uploadTokenShape(token)) throw new Error("Mã không còn dùng được.");
+  const hash = await sha256(token);
+  const order = state.orders.find((item) => item.accessTokenHash === hash);
+  if (!order) throw new Error("Mã không còn dùng được.");
+  if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+  return order;
+}
+
+function freshUploadToken(): string {
+  return crypto.randomUUID().replaceAll("-", "");
+}
+
+/** Mã QR của một đơn. Giữ mã cũ trừ khi chủ hoặc sale đổi mã. */
+export async function orderUploadLink(actor: Actor, orderId: string, rotate = false) {
+  assertRole(actor, ["owner", "sale"]);
+  return mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) throw new Error("Không thấy đơn.");
+    if (order.status === "huy") throw new Error("Đơn đã hủy, không gửi mã.");
+    const creating = !uploadTokenShape(order.accessToken);
+    if (creating || rotate) {
+      const token = freshUploadToken();
+      order.accessToken = token;
+      order.accessTokenHash = await sha256(token);
+      order.updatedAt = nowIso();
+      audit(state, actor.id, "order.upload_link", order.id, null, { code: order.code, rotated: rotate && !creating });
+    }
+    return { token: order.accessToken, code: order.code };
+  });
+}
+
+/** Thẻ khách thấy khi mở mã của đơn: người đặt, sản phẩm, ảnh gốc đã gửi. */
+export async function publicUploadTarget(token: string) {
+  const state = await readState();
+  const order = await orderByUploadToken(state, token);
+  const customer = state.customers.find((item) => item.id === order.customerId);
+  return {
+    ...publicUploadCard({ order, customer }),
+    maxPhotoBytes: await photoByteLimit(),
+  };
+}
+
+/** Ảnh gốc của đúng đơn. Ảnh trên Drive lấy bản nhỏ Google tạo, không gửi file gốc. */
+export async function publicOrderPhoto(token: string, fileId: string, width: 480 | 1600): Promise<{ bytes: Uint8Array; mime: string }> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fileId)) {
+    throw new Error("Không thấy ảnh.");
+  }
+  const state = await readState();
+  const order = await orderByUploadToken(state, token);
+  const file = order.files.find((item) => item.id === fileId && !item.deletedAt && item.status === "complete" && item.kind === "original");
+  if (!file) throw new Error("Không thấy ảnh.");
+  if (file.storage === "drive" && file.driveFileId) return downloadDriveThumbnail(file.driveFileId, width);
+  if (file.storage === "kv") {
+    const kv = await shopKv();
+    const buf = kv ? await kv.get(file.path || `upload:${file.id}`, "arrayBuffer") : null;
+    if (!buf) throw new Error("Không thấy ảnh.");
+    return { bytes: new Uint8Array(buf), mime: file.mime || "image/jpeg" };
+  }
+  if (file.storage === "local") {
+    if (!(await usesDisk()) || file.path.split(/[/\\]/).includes("..")) throw new Error("Không thấy ảnh.");
+    const { readFile } = await import("node:fs/promises");
+    return { bytes: new Uint8Array(await readFile(path.join(process.cwd(), file.path))), mime: file.mime || "image/jpeg" };
+  }
+  if (file.storage === "r2") {
+    const bucket = await orderFiles();
+    const object = bucket ? await bucket.get(file.path) : null;
+    if (!object) throw new Error("Không thấy ảnh.");
+    return { bytes: new Uint8Array(await object.arrayBuffer()), mime: file.mime || "image/jpeg" };
+  }
+  throw new Error("Không thấy ảnh.");
+}
+
+function albumsOf(state: ShopState): PhotoAlbum[] {
+  state.albums ??= [];
+  return state.albums;
+}
+
+function findAlbum(state: ShopState, albumId: string): PhotoAlbum {
+  const album = albumsOf(state).find((item) => item.id === albumId);
+  if (!album) throw new Error("Không thấy album.");
+  return album;
+}
+
+/** Khách gửi ảnh vào album mang tên số điện thoại. Cùng số thì vào cùng album. */
+export async function createAlbumTicket(input: { phone: string; fileName: string; mimeType: string; sizeBytes: number }) {
+  const phone = albumPhone(input.phone);
+  if (!imageMimeAllowed(input.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
+  const limit = await photoByteLimit();
+  if (photoTooBig(input.sizeBytes, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
+  const fileId = nid();
+  const safe = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
+  return mutate(async (state) => {
+    const albums = albumsOf(state);
+    let album = albums.find((item) => item.phone === phone);
+    if (!album) {
+      album = { id: nid(), phone, createdAt: nowIso(), updatedAt: nowIso(), orderId: null, files: [] };
+      albums.unshift(album);
+    }
+    album.files.push({
+      id: fileId,
+      name: input.fileName,
+      mime: input.mimeType,
+      size: input.sizeBytes,
+      status: "uploading",
+      kind: "original",
+      storage: "local",
+      path: `albums/${phone}/${fileId}-${safe}`,
+      driveFileId: null,
+      createdAt: nowIso(),
+      deletedAt: null,
+    });
+    album.updatedAt = nowIso();
+    return { albumId: album.id, fileId, phone };
+  });
+}
+
+export async function saveAlbumUpload(input: { albumId: string; phone: string; fileId: string; bytes: Uint8Array; mime: string }) {
+  const phone = albumPhone(input.phone);
+  const limit = await photoByteLimit();
+  if (photoTooBig(input.bytes.byteLength, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (!imageMimeAllowed(input.mime) || !imageBytesMatch(input.mime, input.bytes)) {
+    throw new Error("Định dạng ảnh không được hỗ trợ.");
+  }
+  await mutate(async (state) => {
+    const album = findAlbum(state, input.albumId);
+    if (album.phone !== phone) throw new Error("Không có quyền với album này.");
+    const file = album.files.find((item) => item.id === input.fileId);
+    if (!file) throw new Error("Không thấy file của album.");
+    await putPhoto(
+      file,
+      { orderId: `albums/${phone}`, code: phone, customerName: phone, createdAt: album.createdAt, source: "web", channel: "tai_tiem" },
+      input.bytes,
+      input.mime,
+      albumFolderParts(phone),
+    );
+    file.status = "complete";
+    file.size = input.bytes.byteLength;
+    album.updatedAt = nowIso();
+  });
+}
+
+export async function prepareAlbumDriveUpload(input: { albumId: string; phone: string; fileId: string }) {
+  if (!(await driveConnected())) throw new Error("Chưa kết nối Google Drive.");
+  const phone = albumPhone(input.phone);
+  const state = await readState();
+  const album = (state.albums ?? []).find((item) => item.id === input.albumId);
+  if (!album || album.phone !== phone) throw new Error("Không có quyền với album này.");
+  const file = album.files.find((item) => item.id === input.fileId && !item.deletedAt);
+  if (!file) throw new Error("Không thấy file của album.");
+  if (file.status === "complete") throw new Error("Ảnh này đã gửi.");
+  return openDriveUpload({ name: file.name, mime: file.mime, sizeBytes: file.size, folders: albumFolderParts(phone) });
+}
+
+export async function finishAlbumDriveUpload(input: { albumId: string; phone: string; fileId: string; driveFileId: string }) {
+  if (!(await driveConnected())) throw new Error("Chưa kết nối Google Drive.");
+  const phone = albumPhone(input.phone);
+  const state = await readState();
+  const album = (state.albums ?? []).find((item) => item.id === input.albumId);
+  if (!album || album.phone !== phone) throw new Error("Không có quyền với album này.");
+  const file = album.files.find((item) => item.id === input.fileId && !item.deletedAt);
+  if (!file) throw new Error("Không thấy file của album.");
+  if (file.status === "complete" && file.driveFileId === input.driveFileId) return { ok: true as const };
+  const seen = await acceptDriveImage(input.driveFileId, albumFolderParts(phone), file.mime);
+  await mutate(async (next) => {
+    const current = findAlbum(next, input.albumId);
+    if (current.phone !== phone) throw new Error("Không có quyền với album này.");
+    const saved = current.files.find((item) => item.id === input.fileId && !item.deletedAt);
+    if (!saved) throw new Error("Không thấy file của album.");
+    saved.driveFileId = input.driveFileId;
+    saved.storage = "drive";
+    saved.path = input.driveFileId;
+    saved.status = "complete";
+    saved.size = seen;
+    current.updatedAt = nowIso();
+  });
+  return { ok: true as const };
+}
+
+export async function listPhotoAlbums(actor: Actor) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  const state = await readState();
+  return (state.albums ?? [])
+    .slice()
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map((album) => ({
+      id: album.id,
+      phone: album.phone,
+      fileCount: album.files.filter((file) => !file.deletedAt && file.status === "complete").length,
+      updatedAt: album.updatedAt,
+      orderId: album.orderId,
+      orderCode: state.orders.find((order) => order.id === album.orderId)?.code ?? "",
+    }));
+}
+
+export async function getPhotoAlbum(actor: Actor, albumId: string) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  const state = await readState();
+  const album = (state.albums ?? []).find((item) => item.id === albumId);
+  if (!album) throw new Error("Không thấy album.");
+  const order = state.orders.find((item) => item.id === album.orderId);
+  return {
+    id: album.id,
+    phone: album.phone,
+    updatedAt: album.updatedAt,
+    orderId: album.orderId,
+    orderCode: order?.code ?? "",
+    files: album.files
+      .filter((file) => !file.deletedAt && file.status === "complete")
+      .map((file) => ({ id: file.id, name: file.name, mime: file.mime, size: file.size, createdAt: file.createdAt })),
+  };
+}
+
+/** Gắn ảnh trong album vào một đơn đã có. Ảnh vẫn nằm trong album. */
+export async function linkAlbumToOrder(actor: Actor, albumId: string, code: string) {
+  assertRole(actor, ["owner", "sale"]);
+  return mutate(async (state) => {
+    const album = findAlbum(state, albumId);
+    const order = state.orders.find((item) => item.code.toUpperCase() === code.trim().toUpperCase());
+    if (!order) throw new Error("Không thấy đơn.");
+    if (order.status === "huy") throw new Error("Đơn đã hủy. Chọn đơn khác.");
+    const ready = album.files.filter((file) => !file.deletedAt && file.status === "complete");
+    if (!ready.length) throw new Error("Album chưa có ảnh.");
+    for (const file of ready) {
+      if (!order.files.some((item) => item.id === file.id)) order.files.push({ ...file });
+    }
+    album.orderId = order.id;
+    album.updatedAt = nowIso();
+    order.updatedAt = nowIso();
+    order.history.push({ at: nowIso(), from: order.status, to: order.status, by: actor.id, note: `Gắn album ${album.phone}` });
+    audit(state, actor.id, "album.link", order.id, null, { phone: album.phone, code: order.code });
+    return { orderCode: order.code, phone: album.phone, fileCount: ready.length };
+  });
 }
 
 const KV_UPLOAD_MAX = 10 * 1024 * 1024;
@@ -536,13 +824,17 @@ export async function createUploadTicket(input: {
   fileName: string;
   mimeType: string;
   sizeBytes: number;
+  comment?: string;
 }) {
   if (!imageMimeAllowed(input.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
   const limit = await photoByteLimit();
-  if (limit !== null && input.sizeBytes > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (photoTooBig(input.sizeBytes, limit)) {
+    throw new Error(limit === null ? "Ảnh quá lớn." : "Mỗi ảnh tối đa 10MB khi chưa nối Google Drive. Nối Drive để gửi ảnh không giới hạn dung lượng.");
+  }
   const fileId = nid();
   const safe = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
   const storagePath = `orders/${input.orderId}/originals/${fileId}-${safe}`;
+  const comment = (input.comment ?? "").trim().slice(0, 500);
   await mutate(async (state) => {
     const order = await orderByToken(state, input.orderId, input.accessToken);
     order.files.push({
@@ -557,6 +849,7 @@ export async function createUploadTicket(input: {
       driveFileId: null,
       createdAt: nowIso(),
       deletedAt: null,
+      ...(comment ? { comment } : {}),
     });
   });
   return { fileId, path: storagePath, mode: "server" as const };
@@ -567,13 +860,14 @@ async function putPhoto(
   folder: { orderId: string; code: string; customerName: string; createdAt: string; source: string; channel: string },
   bytes: Uint8Array,
   mime: string,
+  folders?: readonly string[],
 ) {
   if (await driveConnected()) {
     file.driveFileId = await uploadToDrive({
       name: file.name,
       mime: mime || file.mime,
       bytes,
-      folders: driveFolderParts(folder),
+      folders: folders ?? driveFolderParts(folder),
     });
     file.storage = "drive";
     file.path = file.driveFileId;
@@ -633,7 +927,7 @@ export async function saveDirectUpload(input: {
   mime: string;
 }) {
   const limit = await photoByteLimit();
-  if (limit !== null && input.bytes.byteLength > limit) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (photoTooBig(input.bytes.byteLength, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
   if (!imageMimeAllowed(input.mime) || !imageBytesMatch(input.mime, input.bytes)) {
     throw new Error("Định dạng ảnh không được hỗ trợ.");
   }
@@ -658,6 +952,69 @@ export async function saveDirectUpload(input: {
     file.status = "complete";
     file.size = input.bytes.byteLength;
   });
+}
+
+export async function prepareOrderDriveUpload(input: { orderId: string; accessToken: string; fileId: string }) {
+  if (!(await driveConnected())) throw new Error("Chưa kết nối Google Drive.");
+  const state = await readState();
+  const order = await orderByToken(state, input.orderId, input.accessToken);
+  if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+  const file = order.files.find((item) => item.id === input.fileId && !item.deletedAt);
+  if (!file) throw new Error("Không thấy file của đơn.");
+  if (file.status === "complete") throw new Error("Ảnh này đã gửi.");
+  const customer = state.customers.find((item) => item.id === order.customerId);
+  return openDriveUpload({
+    name: file.name,
+    mime: file.mime,
+    sizeBytes: file.size,
+    folders: driveFolderParts({
+      code: order.code,
+      customerName: customer?.name ?? "",
+      createdAt: order.createdAt,
+      source: order.source,
+      channel: order.channel,
+    }),
+  });
+}
+
+export async function finishOrderDriveUpload(input: { orderId: string; accessToken: string; fileId: string; driveFileId: string }) {
+  if (!(await driveConnected())) throw new Error("Chưa kết nối Google Drive.");
+  const state = await readState();
+  const order = await orderByToken(state, input.orderId, input.accessToken);
+  if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+  const file = order.files.find((item) => item.id === input.fileId && !item.deletedAt);
+  if (!file) throw new Error("Không thấy file của đơn.");
+  if (file.status === "complete" && file.driveFileId === input.driveFileId) return { ok: true as const };
+  const customer = state.customers.find((item) => item.id === order.customerId);
+  const folders = driveFolderParts({
+    code: order.code,
+    customerName: customer?.name ?? "",
+    createdAt: order.createdAt,
+    source: order.source,
+    channel: order.channel,
+  });
+  const seen = await acceptDriveImage(input.driveFileId, folders, file.mime);
+  await mutate(async (next) => {
+    const current = await orderByToken(next, input.orderId, input.accessToken);
+    const saved = current.files.find((item) => item.id === input.fileId && !item.deletedAt);
+    if (!saved) throw new Error("Không thấy file của đơn.");
+    saved.driveFileId = input.driveFileId;
+    saved.storage = "drive";
+    saved.path = input.driveFileId;
+    saved.status = "complete";
+    saved.size = seen;
+  });
+  return { ok: true as const };
+}
+
+async function acceptDriveImage(driveFileId: string, folders: readonly string[], mime: string): Promise<number> {
+  if (!/^[A-Za-z0-9_-]{8,200}$/.test(driveFileId)) throw new Error("Mã ảnh trên Drive không đúng.");
+  const seen = await inspectDriveUpload(driveFileId, folders);
+  if (!seen.inFolder || seen.size < 1 || !imageBytesMatch(mime, seen.head)) {
+    await deleteFromDrive(driveFileId).catch(() => undefined);
+    throw new Error("Định dạng ảnh không được hỗ trợ.");
+  }
+  return seen.size;
 }
 
 export async function markFileStatus(input: {
@@ -699,39 +1056,68 @@ export async function submitWebOrder(input: { orderId: string; accessToken: stri
   });
 }
 
+/** Khách bấm gửi xong trên trang mã QR. Đơn đang mở giữ nguyên bước. */
+export async function acknowledgeCustomerPhotos(input: { orderId: string; accessToken: string }) {
+  return mutate(async (state) => {
+    const order = await orderByToken(state, input.orderId, input.accessToken);
+    if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+    const done = order.files.filter((file) => !file.deletedAt && file.status === "complete");
+    if (!done.length) throw new Error("Chưa có ảnh nào được tải lên.");
+    if (order.status === "draft_upload" || order.status === "upload_error") {
+      const allDone = order.files.filter((file) => !file.deletedAt).every((file) => file.status === "complete");
+      const next = allDone ? "nhan_don" : "upload_error";
+      const from = order.status;
+      order.status = next;
+      order.updatedAt = nowIso();
+      order.history.push({
+        at: nowIso(),
+        from,
+        to: next,
+        by: null,
+        note: allDone ? "Khách gửi ảnh qua mã" : "Còn file lỗi khi tải lên",
+      });
+      return { code: order.code, fileCount: done.length, status: next };
+    }
+    order.updatedAt = nowIso();
+    order.history.push({
+      at: nowIso(),
+      from: order.status,
+      to: order.status,
+      by: null,
+      note: "Khách gửi ảnh qua mã",
+    });
+    return { code: order.code, fileCount: done.length, status: order.status };
+  });
+}
+
 export async function lookupOrder(code: string, phone: string) {
+  const { lookupByPhone } = await import("@/domain/order-lookup");
   const state = await readState();
-  const phoneNormalized = normalizePhone(phone);
-  const order = state.orders.find((item) => item.code.toUpperCase() === code.trim().toUpperCase());
-  const customer = order ? state.customers.find((item) => item.id === order.customerId) : undefined;
-  if (!order || !customer || customer.phoneNormalized !== phoneNormalized) {
-    throw new Error("Không tìm thấy đơn hàng khớp mã đơn và số điện thoại.");
+  return lookupByPhone({
+    phone,
+    code,
+    customers: state.customers,
+    orders: state.orders,
+  });
+}
+
+async function pullDueQuiet(actor: Actor) {
+  if (actor.role !== "owner" && actor.role !== "sale") return;
+  try {
+    const { pullDueMarketplace } = await import("@/server/marketplace-sync");
+    await pullDueMarketplace(actor);
+  } catch {
+    // Sàn lỗi thì sổ đang có vẫn mở. Lần mở sau sẽ lấy lại.
   }
-  return {
-    code: order.code,
-    status: order.status,
-    createdAt: order.createdAt,
-    total: order.total,
-    fulfillment: order.fulfillment,
-    address: order.address || null,
-    note: order.customerNote || null,
-    customerName: customer.name,
-    items: order.items.map((item) => ({
-      name: item.name,
-      variant: item.skuCode,
-      quantity: item.quantity,
-      lineTotal: item.lineTotal,
-    })),
-    fileCount: order.files.filter((file) => !file.deletedAt).length,
-    history: order.history.map((item) => ({ to: item.to, at: item.at, note: item.note })),
-  };
 }
 
 export async function dashboard(actor: Actor) {
+  await pullDueQuiet(actor);
   return visibleToRole(actor.role, buildDashboard(await readState(), actor));
 }
 
 export async function listOrders(actor: Actor) {
+  await pullDueQuiet(actor);
   const state = await readState();
   return visibleToRole(actor.role, {
     orders: state.orders
@@ -825,6 +1211,81 @@ export async function createManualOrder(
   });
 }
 
+export async function reviseOrder(
+  actor: Actor,
+  input: {
+    orderId: string;
+    fullName: string;
+    phone: string;
+    address: string;
+    fulfillment: "pickup" | "delivery";
+    note: string;
+    dueDate: string | null;
+    items?: { skuId: string; quantity: number; unitPrice?: number | null }[];
+  },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const name = input.fullName.trim();
+  if (name.length < 2) throw new Error("Tên khách cần ít nhất 2 ký tự.");
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === input.orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    if (marketplaceEditLocked(order.channel)) throw new Error("Đơn TikTok hoặc Shopee không sửa trên web.");
+    const changingItems = input.items != null;
+    const blocked = orderRevisionBlock(order, changingItems);
+    if (blocked) throw new Error(blocked);
+    const customer = upsertCustomer(state, { name, phone: input.phone, address: input.address });
+    const before = order.items.map((item) => `${item.quantity}× ${item.skuCode}`).join(", ");
+    const beforeLines: LineSnap[] = order.items.map((item) => ({ name: item.name, quantity: item.quantity, unitPrice: item.unitPrice }));
+    order.customerId = customer.id;
+    order.address = input.address.trim();
+    order.customerNote = input.note.trim();
+    order.fulfillment = input.fulfillment;
+    order.dueDate = input.dueDate;
+    if (input.items) {
+      const items = input.items.map((item) => {
+        const sku = skuOrThrow(state, item.skuId);
+        const group = state.groups.find((row) => row.id === sku.groupId);
+        const listed = priceOf(state.prices, sku.id, order.channel)?.price ?? null;
+        const previous = order.items.find((row) => row.skuId === sku.id);
+        let unitPrice = listed;
+        if (item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== listed) {
+          const kept = previous?.unitPrice === item.unitPrice;
+          if (actor.role !== "owner" && !kept) throw new Error("Chỉ chủ tiệm sửa được giá bán.");
+          unitPrice = item.unitPrice;
+        }
+        return {
+          id: previous?.id ?? nid(),
+          skuId: sku.id,
+          name: previous ? previous.name : `${group?.name ?? "Sản phẩm"} — ${sku.name}`,
+          skuCode: sku.code,
+          quantity: item.quantity,
+          unitPrice,
+          lineTotal: unitPrice === null ? null : unitPrice * item.quantity,
+          ...(previous?.listUnitPrice !== undefined ? { listUnitPrice: previous.listUnitPrice } : {}),
+        };
+      });
+      const totals = sumItems(items);
+      order.items = items;
+      order.subtotal = totals.subtotal;
+      order.total = totals.total;
+      refreshDeposit(state, order);
+    }
+    order.updatedAt = nowIso();
+    const after = order.items.map((item) => `${item.quantity}× ${item.skuCode}`).join(", ");
+    if (input.items) {
+      const afterLines: LineSnap[] = order.items.map((item) => ({ name: item.name, quantity: item.quantity, unitPrice: item.unitPrice }));
+      if (itemChangeNote(beforeLines, afterLines, true)) {
+        order.itemChanges = [
+          ...(order.itemChanges ?? []),
+          { at: order.updatedAt, by: actor.id, before: beforeLines, after: afterLines },
+        ];
+      }
+    }
+    audit(state, actor.id, "order.revise", order.id, { items: before }, { items: after, name });
+  });
+}
+
 export async function setOrderStatus(
   actor: Actor,
   input: { orderId: string; status: OrderStatus; note: string; ownerOverride?: boolean },
@@ -842,6 +1303,7 @@ export async function setOrderStatus(
       reason,
       depositRequired: order.depositRequired,
       depositPaid: order.depositPaid,
+      packReady: packReady(order.packCheck, hasPackingPhoto(order.files)),
     });
     if (blocked) throw new Error(blocked);
     const from = order.status;
@@ -862,6 +1324,7 @@ export async function addDeposit(actor: Actor, input: { orderId: string; amount:
   await mutate(async (state) => {
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
+    if (marketplaceEditLocked(order.channel)) throw new Error("Đơn TikTok hoặc Shopee không thu tiền trên web.");
     const before = order.depositPaid;
     const next = appendCollection(
       order,
@@ -880,6 +1343,148 @@ export async function addDeposit(actor: Actor, input: { orderId: string; amount:
     order.depositBy = next.depositBy;
     order.updatedAt = nowIso();
     audit(state, actor.id, "order.deposit", order.id, { depositPaid: before }, { depositPaid: order.depositPaid, method: input.method });
+  });
+}
+
+function markPrint(order: Order, fileId: string, print: boolean, by: string | null, who: string) {
+  const file = order.files.find((item) => item.id === fileId && !item.deletedAt && item.status === "complete" && item.kind === "original");
+  if (!file) throw new Error("Không thấy ảnh gốc.");
+  if (Boolean(file.print) === print) return;
+  file.print = print;
+  order.updatedAt = nowIso();
+  order.history.push({
+    at: order.updatedAt,
+    from: order.status,
+    to: order.status,
+    by,
+    note: `${who} ${print ? "chọn in" : "bỏ in"} ảnh ${file.name}`,
+  });
+}
+
+export async function setFilePrint(actor: Actor, orderId: string, fileId: string, print: boolean) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    markPrint(order, fileId, print, actor.id, actor.name);
+  });
+}
+
+export async function setCustomerFileComment(token: string, fileId: string, comment: string) {
+  const note = comment.trim().slice(0, 500);
+  await mutate(async (state) => {
+    const order = await orderByUploadToken(state, token);
+    const file = order.files.find((item) => item.id === fileId && !item.deletedAt && item.kind === "original");
+    if (!file) throw new Error("Không thấy ảnh.");
+    file.comment = note;
+    order.updatedAt = nowIso();
+  });
+}
+
+export async function setCustomerFilePrint(token: string, fileId: string, print: boolean) {
+  await mutate(async (state) => {
+    const order = await orderByUploadToken(state, token);
+    markPrint(order, fileId, print, null, "Khách");
+  });
+}
+
+export async function setOrderPackCheck(actor: Actor, orderId: string, check: PackCheck) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    if (order.status === "huy" || order.status === "xong") throw new Error("Đơn đã xong hoặc đã hủy.");
+    order.packCheck = { ep: check.ep, bo: check.bo, tem: check.tem };
+    order.updatedAt = nowIso();
+  });
+}
+
+export async function savePackingPhoto(actor: Actor, orderId: string, bytes: Uint8Array, mime: string) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  if (!imageMimeAllowed(mime) || !imageBytesMatch(mime, bytes)) throw new Error("Chỉ nhận ảnh JPG, PNG hoặc WEBP.");
+  if (bytes.byteLength > 4 * 1024 * 1024) throw new Error("Ảnh gói tối đa 4MB.");
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    if (order.status === "huy" || order.status === "xong") throw new Error("Đơn đã xong hoặc đã hủy.");
+    const stamp = nowIso();
+    for (const file of order.files) {
+      if (file.kind === "packing_photo" && !file.deletedAt) file.deletedAt = stamp;
+    }
+    const file: OrderFile = {
+      id: nid(),
+      name: `goi-${order.code}.jpg`,
+      mime,
+      size: bytes.byteLength,
+      status: "complete",
+      kind: "packing_photo",
+      storage: "local",
+      path: "",
+      driveFileId: null,
+      createdAt: stamp,
+      deletedAt: null,
+    };
+    await putPhoto(
+      file,
+      {
+        orderId: order.id,
+        code: order.code,
+        customerName: customerName(state, order.customerId).name,
+        createdAt: order.createdAt,
+        source: order.source,
+        channel: order.channel,
+      },
+      bytes,
+      mime,
+    );
+    order.files.push(file);
+    order.updatedAt = stamp;
+    audit(state, actor.id, "order.pack_photo", order.id, null, { code: order.code });
+  });
+}
+
+export async function publicFeedbackCard(token: string) {
+  const state = await readState();
+  const order = await orderByUploadToken(state, token);
+  return {
+    code: order.code,
+    status: order.status,
+    open: order.status === "giao" || order.status === "xong",
+    feedback: order.feedback ? { answer: order.feedback.answer, note: order.feedback.note } : null,
+  };
+}
+
+export async function submitOrderFeedback(token: string, answer: FeedbackAnswer, note: string) {
+  const text = note.trim().slice(0, 300);
+  return mutate(async (state) => {
+    const order = await orderByUploadToken(state, token);
+    if (order.status !== "giao" && order.status !== "xong") throw new Error("Đơn chưa giao xong.");
+    if (order.feedback) return { already: true as const, answer: order.feedback.answer };
+    const at = nowIso();
+    order.feedback = { at, answer, note: text };
+    order.updatedAt = at;
+    order.history.push({
+      at,
+      from: order.status,
+      to: order.status,
+      by: null,
+      note: `Khách đánh giá: ${feedbackLabel(answer)}${text ? ` · ${text}` : ""}`,
+    });
+    if (feedbackOpensReprint(answer)) {
+      state.reprints.unshift({
+        id: nid(),
+        orderId: order.id,
+        reportedAt: at,
+        reason: text || feedbackLabel(answer),
+        decision: null,
+        extraCost: null,
+        materialNote: "",
+        overdue: false,
+        by: null,
+        uses: [],
+      });
+    }
+    return { already: false as const, answer };
   });
 }
 
@@ -993,6 +1598,41 @@ export async function updateChannelPrice(
       row.note = input.note;
     }
     audit(state, actor.id, "price.update", `${sku.code}:${input.channel}`, before, input);
+  });
+}
+
+export async function createPriceSize(
+  actor: Actor,
+  input: {
+    groupId: string;
+    widthCm: number;
+    heightCm: number;
+    sheets: number;
+    prices: Partial<Record<Channel, number>>;
+  },
+) {
+  assertRole(actor, ["owner"]);
+  const draft: PriceDraft = {
+    code: null,
+    widthCm: input.widthCm,
+    heightCm: input.heightCm,
+    sheets: input.sheets,
+    prices: input.prices,
+  };
+  return mutate(async (state) => {
+    const result = applyPriceDrafts(state, input.groupId, [draft]);
+    audit(state, actor.id, "price.create", input.groupId, null, { ...input, ...result });
+    return result;
+  });
+}
+
+export async function importPriceSheet(actor: Actor, input: { groupId: string; filename: string; base64: string }) {
+  assertRole(actor, ["owner"]);
+  const drafts = parsePriceRows(rowsFromUpload(input.filename, bytesFromBase64(input.base64)));
+  return mutate(async (state) => {
+    const result = applyPriceDrafts(state, input.groupId, drafts);
+    audit(state, actor.id, "price.import", input.groupId, null, { filename: input.filename, ...result });
+    return result;
   });
 }
 
@@ -1199,6 +1839,7 @@ export async function saveCustomerNote(
   note: string,
   tags?: string[],
   specialDates?: SpecialDate[],
+  profile?: { name?: string; phone?: string; address?: string },
 ) {
   assertRole(actor, ["owner", "sale"]);
   await mutate(async (state) => {
@@ -1208,13 +1849,36 @@ export async function saveCustomerNote(
     const cleanDates = (specialDates ?? [])
       .map((date) => ({ label: date.label.trim(), month: date.month, day: date.day }))
       .filter((date) => date.label && date.month >= 1 && date.month <= 12 && date.day >= 1 && date.day <= 31);
+    const name = profile?.name?.trim();
+    if (profile?.name !== undefined && (!name || name.length < 2)) throw new Error("Tên khách cần ít nhất 2 ký tự.");
+    let phone = "";
+    let phoneNormalized = "";
+    if (profile?.phone !== undefined) {
+      const parsed = normalizeMarketplacePhone(profile.phone);
+      phoneNormalized = parsed.masked ? `masked:${parsed.phone}` : parsed.phone;
+      if (!parsed.masked && phoneNormalized.length < 8) throw new Error("Số điện thoại chưa đúng.");
+      const taken = state.customers.find((customer) => customer.phoneNormalized === phoneNormalized && !card.ids.includes(customer.id));
+      if (taken) throw new Error("Số này đang thuộc khách khác.");
+      phone = parsed.masked ? parsed.phone : profile.phone.trim();
+    }
+    const address = profile?.address?.trim();
     for (const customer of state.customers) {
       if (!card.ids.includes(customer.id)) continue;
       customer.note = note;
       if (tags) customer.tags = cleanTags;
       if (specialDates) customer.specialDates = cleanDates;
+      if (name) customer.name = name;
+      if (profile?.phone !== undefined) {
+        customer.phone = phone;
+        customer.phoneNormalized = phoneNormalized;
+      }
+      if (address !== undefined) {
+        customer.address = address;
+        const known = customer.addresses ?? [];
+        if (address && !known.includes(address)) customer.addresses = [...known, address];
+      }
     }
-    audit(state, actor.id, "customer.update", id, null, { note, tags: cleanTags });
+    audit(state, actor.id, "customer.update", id, null, { note, tags: cleanTags, name: name ?? card.name });
   });
 }
 
@@ -1521,6 +2185,38 @@ export async function adjustWallet(actor: Actor, input: { wallet: "tien_mat" | "
   });
 }
 
+export async function handCash(actor: Actor, input: { staffId?: string; amount: number; note: string }) {
+  assertRole(actor, ["owner", "sale"]);
+  const amount = Math.round(input.amount);
+  const fromId = actor.role === "owner" && input.staffId ? input.staffId : actor.id;
+  if (actor.role !== "owner" && input.staffId && input.staffId !== actor.id) {
+    throw new Error("Chỉ nộp tiền mặt của chính mình.");
+  }
+  await mutate(async (state) => {
+    if (!state.staff.some((person) => person.id === fromId)) throw new Error("Không thấy nhân viên.");
+    const held =
+      holderBalances({
+        orders: cashOrders(state),
+        expenses: state.expenses,
+        staff: state.staff.map((person) => ({ id: person.id, name: person.name })),
+        handovers: state.handovers ?? [],
+      }).find((row) => row.staffId === fromId)?.tien_mat ?? 0;
+    const error = handoverError({ held, amount });
+    if (error) throw new Error(error);
+    const row: CashHandover = {
+      id: nid(),
+      at: nowIso(),
+      fromId,
+      amount,
+      wallet: "tien_mat",
+      note: input.note.trim(),
+      by: actor.id,
+    };
+    state.handovers = [row, ...(state.handovers ?? [])];
+    audit(state, actor.id, "cash.handover", row.id, null, { fromId, amount, note: row.note });
+  });
+}
+
 function cashOrders(state: ShopState): CashOrder[] {
   return state.orders.map((order) => {
     const row: CashOrder = {
@@ -1531,24 +2227,32 @@ function cashOrders(state: ShopState): CashOrder[] {
       total: order.total,
       depositPaid: order.depositPaid,
       depositMethod: order.depositMethod,
+      depositBy: order.depositBy,
       createdAt: order.createdAt,
     };
     if (order.payments && order.payments.length > 0) {
-      row.payments = order.payments.map((payment) => ({ at: payment.at, amount: payment.amount, method: payment.method }));
+      row.payments = order.payments.map((payment) => ({ at: payment.at, amount: payment.amount, method: payment.method, by: payment.by }));
     }
     return row;
   });
 }
 
 export async function moneyDesk(actor: Actor, month: string) {
-  assertRole(actor, ["owner"]);
+  assertRole(actor, ["owner", "sale"]);
   const state = await readState();
+  const orders = cashOrders(state);
   const lines = buildLedger({
-    orders: cashOrders(state),
+    orders,
     expenses: state.expenses,
     adjusts: state.walletAdjusts ?? [],
   });
-  const monthLines = lines.filter((line) => vnMonth(line.at) === month);
+  const names = new Map(state.staff.map((person) => [person.id, person.name]));
+  const monthLines = lines
+    .filter((line) => vnMonth(line.at) === month)
+    .map((line) => ({
+      ...line,
+      holderName: line.holder ? (names.get(line.holder) ?? "Người đã nghỉ") : "",
+    }));
   const expenses = state.expenses
     .filter((row) => row.month === month)
     .map((row) => ({
@@ -1564,9 +2268,47 @@ export async function moneyDesk(actor: Actor, month: string) {
       walletLabel: walletLabel(row.wallet ?? ""),
     }))
     .sort((a, b) => b.at.localeCompare(a.at));
+  const holders = holderBalances({
+    orders,
+    expenses: state.expenses,
+    staff: state.staff.map((person) => ({ id: person.id, name: person.name })),
+    handovers: state.handovers ?? [],
+  });
+  if (actor.role === "sale") {
+    const mine = holders.find((row) => row.staffId === actor.id);
+    const myLines = monthLines.filter((line) => line.holder === actor.id);
+    return {
+      month,
+      scope: "mine" as const,
+      me: {
+        name: actor.name,
+        tien_mat: mine?.tien_mat ?? 0,
+        chuyen_khoan: mine?.chuyen_khoan ?? 0,
+      },
+      cards: [],
+      holders: mine ? [mine] : [],
+      handovers: [],
+      lines: myLines,
+      expenses: [],
+      report: expenseReport([], month),
+      collected: myLines.filter((line) => line.kind === "thu").reduce((sum, line) => sum + line.amount, 0),
+    };
+  }
   return {
     month,
+    scope: "shop" as const,
+    me: null,
     cards: walletCards(lines, month),
+    holders,
+    handovers: (state.handovers ?? []).slice(0, 100).map((row) => ({
+      id: row.id,
+      at: row.at,
+      fromId: row.fromId,
+      fromName: names.get(row.fromId) ?? "Người đã nghỉ",
+      amount: row.amount,
+      note: row.note,
+      byName: row.by ? (names.get(row.by) ?? "Người đã nghỉ") : "",
+    })),
     lines: monthLines,
     expenses,
     report: expenseReport(state.expenses, month),
@@ -1577,21 +2319,36 @@ export async function moneyDesk(actor: Actor, month: string) {
 export async function collectList(actor: Actor) {
   assertRole(actor, ["owner", "sale"]);
   const state = await readState();
-  return ordersToCollect(cashOrders(state)).map((order) => {
-    const full = state.orders.find((item) => item.id === order.id);
-    return {
-      id: order.id,
-      code: order.code,
-      customerName: order.customerName,
-      status: order.status,
-      statusLabel: STATUS_LABEL[order.status as keyof typeof STATUS_LABEL] ?? order.status,
-      channelLabel: full ? CHANNEL_LABEL[full.channel] : "",
-      total: order.total,
-      depositPaid: order.depositPaid,
-      remain: remainOf(order),
-      createdAt: order.createdAt,
-    };
-  });
+  const orders = cashOrders(state);
+  const mine = holderBalances({
+    orders,
+    expenses: state.expenses,
+    staff: [{ id: actor.id, name: actor.name }],
+    handovers: state.handovers ?? [],
+  }).find((row) => row.staffId === actor.id);
+  return {
+    me: {
+      name: actor.name,
+      tien_mat: mine?.tien_mat ?? 0,
+      chuyen_khoan: mine?.chuyen_khoan ?? 0,
+    },
+    rows: ordersToCollect(orders).map((order) => {
+      const full = state.orders.find((item) => item.id === order.id);
+      return {
+        id: order.id,
+        code: order.code,
+        customerName: order.customerName,
+        status: order.status,
+        statusLabel: STATUS_LABEL[order.status as keyof typeof STATUS_LABEL] ?? order.status,
+        channel: full?.channel ?? "",
+        channelLabel: full ? CHANNEL_LABEL[full.channel] : "",
+        total: order.total,
+        depositPaid: order.depositPaid,
+        remain: remainOf(order),
+        createdAt: order.createdAt,
+      };
+    }),
+  };
 }
 
 const SETTING_NUMBERS = [
@@ -1657,7 +2414,11 @@ export async function getSettings(actor: Actor) {
       active: person.active,
       probation: person.probation,
       hiredAt: person.hiredAt,
+      branchId: person.branchId ?? null,
+      departmentId: person.departmentId ?? null,
     })),
+    branches: sortBySortThenName(state.branches ?? []),
+    departments: sortBySortThenName(state.departments ?? []),
   };
 }
 
@@ -1720,23 +2481,80 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
       }));
     }
     if (Array.isArray(patch.kpiTargets)) state.settings.kpiTargets = (patch.kpiTargets as number[]).map(Number);
+    if ("bank" in patch) {
+      const next = cleanBank(patch.bank && typeof patch.bank === "object" ? (patch.bank as { id?: string; account?: string; holder?: string }) : null);
+      if (next) state.settings.bank = next;
+      else delete state.settings.bank;
+    }
+    if (patch["sepay"] && typeof patch["sepay"] === "object") {
+      const raw = patch["sepay"] as Partial<SePayConfig>;
+      const prev = state.settings.sepay ?? defaultSePay();
+      state.settings.sepay = {
+        enabled: typeof raw.enabled === "boolean" ? raw.enabled : prev.enabled,
+        apiKey: typeof raw.apiKey === "string" ? raw.apiKey.trim() : prev.apiKey,
+        accountHint: typeof raw.accountHint === "string" ? raw.accountHint.trim() : prev.accountHint,
+        webhookPath: typeof raw.webhookPath === "string" && raw.webhookPath.trim() ? raw.webhookPath.trim() : prev.webhookPath || "/api/public/sepay",
+        note: typeof raw.note === "string" ? raw.note.trim() : prev.note,
+      };
+    }
+    if (patch["notifyPrefs"] && typeof patch["notifyPrefs"] === "object") {
+      const raw = patch["notifyPrefs"] as Partial<NotifyPrefs>;
+      const prev = state.settings.notifyPrefs ?? defaultNotifyPrefs();
+      state.settings.notifyPrefs = {
+        lateOrders: typeof raw.lateOrders === "boolean" ? raw.lateOrders : prev.lateOrders,
+        marketplaceNew: typeof raw.marketplaceNew === "boolean" ? raw.marketplaceNew : prev.marketplaceNew,
+        feedbackReprint: typeof raw.feedbackReprint === "boolean" ? raw.feedbackReprint : prev.feedbackReprint,
+        cashHandover: typeof raw.cashHandover === "boolean" ? raw.cashHandover : prev.cashHandover,
+        browserPrompted: typeof raw.browserPrompted === "boolean" ? raw.browserPrompted : prev.browserPrompted,
+      };
+    }
     recalcBoms(state);
     audit(state, actor.id, "settings.update", "settings", before, state.settings);
   });
 }
 
-export async function saveStaff(actor: Actor, input: { id?: string; name: string; email: string; role: Role; password?: string; probation?: boolean; hiredAt?: string | null; active?: boolean }) {
+export async function saveStaff(
+  actor: Actor,
+  input: {
+    id?: string;
+    name: string;
+    email: string;
+    role: Role;
+    password?: string;
+    probation?: boolean;
+    hiredAt?: string | null;
+    active?: boolean;
+    branchId?: string | null;
+    departmentId?: string | null;
+  },
+) {
   assertRole(actor, ["owner"]);
   await mutate(async (state) => {
+    if (input.password && input.password.trim().length < 8) throw new Error("Mật khẩu cần ít nhất 8 ký tự.");
+    if (input.branchId) {
+      const ok = (state.branches ?? []).some((branch) => branch.id === input.branchId);
+      if (!ok) throw new Error("Chi nhánh không tồn tại.");
+    }
+    if (input.departmentId) {
+      const ok = (state.departments ?? []).some((dept) => dept.id === input.departmentId);
+      if (!ok) throw new Error("Bộ phận không tồn tại.");
+    }
     if (input.id) {
       const person = state.staff.find((item) => item.id === input.id);
       if (!person) throw new Error("Không thấy tài khoản.");
+      const nextActive = input.active === undefined ? person.active : input.active;
+      const leavingOwner = person.role === "owner" && person.active && (input.role !== "owner" || !nextActive);
+      if (leavingOwner && !state.staff.some((item) => item.id !== person.id && item.active && item.role === "owner")) {
+        throw new Error("Cần ít nhất một chủ đang làm.");
+      }
       person.name = input.name.trim();
       person.email = input.email.trim().toLowerCase();
       person.role = input.role;
       if (input.probation !== undefined) person.probation = input.probation;
       if (input.hiredAt !== undefined) person.hiredAt = input.hiredAt;
       if (input.active !== undefined) person.active = input.active;
+      if (input.branchId !== undefined) person.branchId = input.branchId;
+      if (input.departmentId !== undefined) person.departmentId = input.departmentId;
       if (input.password) {
         person.passwordHash = await hashPassword(input.password);
         person.mustChangePassword = true;
@@ -1755,6 +2573,8 @@ export async function saveStaff(actor: Actor, input: { id?: string; name: string
       mustChangePassword: true,
       probation: Boolean(input.probation),
       hiredAt: input.hiredAt ?? null,
+      branchId: input.branchId ?? null,
+      departmentId: input.departmentId ?? null,
     });
   });
 }
@@ -1780,8 +2600,8 @@ export async function purgeExpiredFiles(now = Date.now()): Promise<number> {
       const order = state.orders.find((item) => item.id === target.orderId);
       const file = order?.files.find((item) => item.id === target.fileId);
       if (!file || file.deletedAt) continue;
-      await removePhoto(file);
       file.deletedAt = new Date(now).toISOString();
+      if (!bytesStillShared(state, file)) await removePhoto(file);
       removed += 1;
     }
     return removed;
@@ -1795,7 +2615,7 @@ export async function deleteStoredFile(actor: Actor, fileId: string) {
       const file = order.files.find((item) => item.id === fileId);
       if (!file) continue;
       file.deletedAt = nowIso();
-      await removePhoto(file);
+      if (!bytesStillShared(state, file)) await removePhoto(file);
       audit(state, actor.id, "file.delete", file.id, { name: file.name }, { deletedAt: file.deletedAt });
       return;
     }
@@ -1803,11 +2623,21 @@ export async function deleteStoredFile(actor: Actor, fileId: string) {
   });
 }
 
-export async function fileForStaff(actor: Actor, fileId: string): Promise<{ name: string; mime: string; bytes?: Uint8Array; redirect?: string }> {
+export async function fileForStaff(
+  actor: Actor,
+  fileId: string,
+  preview: 480 | 1600 | null = null,
+): Promise<{ name: string; mime: string; bytes?: Uint8Array; redirect?: string }> {
   const state = await readState();
-  for (const order of state.orders) {
-    const file = order.files.find((item) => item.id === fileId && !item.deletedAt);
+  const pools = [...state.orders.map((order) => order.files), ...(state.albums ?? []).map((album) => album.files)];
+  for (const files of pools) {
+    const file = files.find((item) => item.id === fileId && !item.deletedAt);
     if (!file) continue;
+    if (preview && !imagePreviewable(file.name, file.mime)) throw new Error("Không phải ảnh.");
+    if (file.storage === "drive" && file.driveFileId && preview) {
+      const photo = await downloadDriveThumbnail(file.driveFileId, preview);
+      return { name: file.name, mime: photo.mime, bytes: photo.bytes };
+    }
     if (file.storage === "local") {
       if (!(await usesDisk())) throw new Error("File nằm trên đĩa local, không đọc được trên Workers.");
       const { readFile } = await import("node:fs/promises");
@@ -2149,17 +2979,15 @@ export async function previewMarketplaceFile(
   return { columns: EXPECTED_COLUMNS, ...plan };
 }
 
-export async function importMarketplaceFile(
-  actor: Actor,
-  input: { channel: MarketplaceChannel; filename: string; base64: string },
-) {
-  assertRole(actor, ["owner", "sale"]);
-  const preview = await marketplacePlan(await readState(), input.channel, input.filename, input.base64);
-  const codes = await mutate(async (state) => {
+async function commitMarketplaceOrders(actor: Actor, channel: MarketplaceChannel, orders: PlannedOrder[], note: string) {
+  if (!orders.length) return [];
+  return mutate(async (state) => {
     const made: string[] = [];
-    for (const planned of preview.orders) {
+    for (const planned of orders) {
       const taken = state.orders.some(
-        (order) => order.channel === input.channel && order.marketplaceCode === planned.platformOrderId,
+        (order) =>
+          (order.channel === channel && order.marketplaceCode === planned.platformOrderId) ||
+          order.idempotencyKey === `${channel}:${planned.platformOrderId}`,
       );
       if (taken) continue;
       const customer = upsertCustomer(state, {
@@ -2169,13 +2997,13 @@ export async function importMarketplaceFile(
         platformBuyer: planned.platformBuyer,
         fromMarketplace: true,
       });
-      const items = marketplaceItems(state, input.channel, planned.items);
+      const items = marketplaceItems(state, channel, planned.items);
       const totals = sumItems(items);
-      const notes = [`Nhập từ file ${input.channel}`, ...planned.flags];
+      const notes = [note, ...planned.flags];
       const order: Order = {
         id: nid(),
         code: nextCode(state),
-        channel: input.channel,
+        channel,
         source: "manual",
         customerId: customer.id,
         status: planned.status,
@@ -2187,7 +3015,7 @@ export async function importMarketplaceFile(
         marketplaceCode: planned.platformOrderId,
         recipientName: planned.buyer,
         shipping: {
-          carrier: planned.carrier.trim() || defaultCarrier({ channel: input.channel, source: "manual", fulfillment: "delivery" }),
+          carrier: planned.carrier.trim() || defaultCarrier({ channel, source: "manual", fulfillment: "delivery" }),
           tracking: planned.tracking,
           shipFee: planned.shipFee,
           codAmount: planned.codAmount,
@@ -2205,25 +3033,90 @@ export async function importMarketplaceFile(
         stockWarning: "",
         accessTokenHash: "",
         accessToken: "",
-        idempotencyKey: `${input.channel}:${planned.platformOrderId}`,
+        idempotencyKey: `${channel}:${planned.platformOrderId}`,
         createdAt: planned.createdAt ?? nowIso(),
         updatedAt: nowIso(),
         completedAt: null,
         files: [],
-        history: [{ at: nowIso(), from: null, to: "nhan_don", by: actor.id, note: "Nhập từ file sàn" }],
+        history: [{ at: nowIso(), from: null, to: "nhan_don", by: actor.id, note }],
       };
       refreshDeposit(state, order);
       state.orders.unshift(order);
       audit(state, actor.id, "order.import", order.id, null, {
         code: order.code,
         platform: planned.platformOrderId,
-        channel: input.channel,
+        channel,
       });
       made.push(order.code);
     }
     return made;
   });
+}
+
+export async function importMarketplaceFile(
+  actor: Actor,
+  input: { channel: MarketplaceChannel; filename: string; base64: string },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const preview = await marketplacePlan(await readState(), input.channel, input.filename, input.base64);
+  const codes = await commitMarketplaceOrders(actor, input.channel, preview.orders, "Nhập từ file sàn");
   return { codes, issues: preview.issues, duplicates: preview.duplicates, cancelled: preview.cancelled };
+}
+
+export async function importMarketplaceOrders(actor: Actor, channel: MarketplaceChannel, lines: ParsedLine[]) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const maps = (state.skuMaps ?? []).filter((row) => row.channel === channel);
+  const existingIds = state.orders.filter((order) => order.channel === channel && order.marketplaceCode).map((order) => order.marketplaceCode);
+  const plan = planMarketplaceImport({ lines, maps, existingIds });
+  const codes = await commitMarketplaceOrders(actor, channel, plan.orders, "Đổ từ API sàn");
+  return {
+    codes,
+    issues: plan.issues.slice(0, 30),
+    issueCount: plan.issues.length,
+    duplicates: plan.duplicates.slice(0, 30),
+    duplicateCount: plan.duplicates.length,
+    cancelled: plan.cancelled,
+  };
+}
+
+export async function importShelf(actor: Actor, offers: ShelfOffer[]) {
+  assertRole(actor, ["owner"]);
+  return mutate(async (state) => {
+    if (!state.skuMaps) state.skuMaps = [];
+    const result = applyShelfOffers(
+      { groups: state.groups, skus: state.skus, prices: state.prices, skuMaps: state.skuMaps },
+      offers,
+    );
+    audit(state, actor.id, "catalog.sync", offers[0]?.channel ?? "san", null, {
+      created: result.created,
+      priced: result.priced,
+      mapped: result.mapped,
+      skipped: result.skipped.length,
+    });
+    return { created: result.created, priced: result.priced, mapped: result.mapped, skipped: result.skipped.slice(0, 8) };
+  });
+}
+
+export async function cloneShelfPrices(
+  actor: Actor,
+  input: { groupId: string; from: "tiktok" | "shopee"; to: "tai_tiem" | "facebook"; overwrite: boolean },
+) {
+  assertRole(actor, ["owner"]);
+  return mutate(async (state) => {
+    const result = cloneChannelPrices(state, input);
+    audit(state, actor.id, "catalog.clone", input.groupId, null, { ...input, ...result });
+    return result;
+  });
+}
+
+export async function marketplaceSyncStatus(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const { parseShopeeLink, parseTiktokLink } = await import("@/domain/marketplace-api");
+  const { readIntegrationSecret } = await import("@/server/secrets");
+  const tiktok = parseTiktokLink(await readIntegrationSecret("tiktok_shop"));
+  const shopee = parseShopeeLink(await readIntegrationSecret("shopee_shop"));
+  return { tiktok: Boolean(tiktok), shopee: Boolean(shopee) };
 }
 
 export async function listSkuMaps(actor: Actor) {
@@ -2275,15 +3168,201 @@ export async function saveOrderShipping(
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
     const previous = orderShipping(order);
+    const tracking = input.tracking.trim();
     order.shipping = {
       carrier: input.carrier.trim(),
-      tracking: input.tracking.trim(),
+      tracking,
       shipFee: input.shipFee,
       codAmount: input.codAmount,
       codReceivedAt: previous.codReceivedAt,
+      ...(tracking === previous.tracking && previous.carrierStatus ? { carrierStatus: previous.carrierStatus } : {}),
     };
     audit(state, actor.id, "order.shipping", order.id, previous, order.shipping);
   });
+}
+
+export async function carrierDesk(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const status = await integrationStatus();
+  const state = await readState();
+  return {
+    ghn: Boolean(status.ghn_token && status.ghn_shop_id),
+    ghtk: Boolean(status.ghtk_token && status.ghtk_partner),
+    jt: Boolean(status.jt_api_account && status.jt_private_key && status.jt_customer_code && status.jt_password),
+    pickup: readPickup(state.settings.carrierPickup),
+  };
+}
+
+export async function saveCarrierPickup(
+  actor: Actor,
+  input: { name: string; phone: string; address: string; province: string; district: string; ward: string },
+) {
+  assertRole(actor, ["owner"]);
+  const pickup = readPickup(input);
+  if (!pickupReady(pickup)) throw new Error("Địa chỉ lấy hàng cần tên, số điện thoại, địa chỉ, tỉnh và phường.");
+  await mutate(async (state) => {
+    state.settings.carrierPickup = pickup;
+    audit(state, actor.id, "settings.pickup", "carrier", null, { name: pickup.name, province: pickup.province });
+  });
+}
+
+export async function openCarrierWaybill(
+  actor: Actor,
+  input: {
+    orderId: string;
+    carrier: CarrierId;
+    province: string;
+    district: string;
+    ward: string;
+    address: string;
+    weightGrams: number;
+    codAmount: number;
+  },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const order = state.orders.find((item) => item.id === input.orderId);
+  if (!order) throw new Error("Không tìm thấy đơn.");
+  const blocked = waybillBlock({
+    channel: order.channel,
+    status: order.status,
+    fulfillment: order.fulfillment,
+    tracking: orderShipping(order).tracking,
+  });
+  if (blocked) throw new Error(blocked);
+  const pickup = readPickup(state.settings.carrierPickup);
+  if (!pickupReady(pickup)) throw new Error("Chủ cần ghi địa chỉ lấy hàng ở trang Kết nối.");
+  const draft = waybillDraft(order, customerName(state, order.customerId), input);
+  const hit =
+    input.carrier === "ghn"
+      ? await createGhnWaybill(await loadGhn(), pickup, draft)
+      : input.carrier === "ghtk"
+        ? await createGhtkWaybill(await loadGhtk(), pickup, draft)
+        : await createJtWaybill(await loadJt(), pickup, draft);
+  await mutate(async (next) => {
+    const fresh = next.orders.find((item) => item.id === order.id);
+    if (!fresh) throw new Error("Không tìm thấy đơn.");
+    const previous = orderShipping(fresh);
+    if (previous.tracking && previous.tracking !== hit.tracking) throw new Error("Đơn vừa được ghi mã vận đơn khác.");
+    fresh.shipping = {
+      carrier: CARRIER_NAME[input.carrier],
+      tracking: hit.tracking,
+      shipFee: hit.fee === null ? previous.shipFee : hit.fee,
+      codAmount: draft.cod,
+      codReceivedAt: previous.codReceivedAt,
+      carrierStatus: hit.status.slice(0, 160),
+    };
+    fresh.updatedAt = nowIso();
+    audit(next, actor.id, "order.shipping", fresh.id, previous, fresh.shipping);
+  });
+  return { tracking: hit.tracking, fee: hit.fee, status: hit.status };
+}
+
+export async function quoteCarrierFee(
+  actor: Actor,
+  input: {
+    orderId: string;
+    carrier: CarrierId;
+    province: string;
+    district: string;
+    ward: string;
+    address: string;
+    weightGrams: number;
+    codAmount: number;
+  },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  if (input.carrier !== "ghtk") throw new Error("Chỉ GHTK báo phí trước khi tạo vận đơn.");
+  const state = await readState();
+  const order = state.orders.find((item) => item.id === input.orderId);
+  if (!order) throw new Error("Không tìm thấy đơn.");
+  if (order.channel === "tiktok" || order.channel === "shopee") throw new Error("Đơn sàn lấy phí từ sàn.");
+  if (!shipsOut(order)) throw new Error("Đơn này không giao đi.");
+  const pickup = readPickup(state.settings.carrierPickup);
+  if (!pickupReady(pickup)) throw new Error("Chủ cần ghi địa chỉ lấy hàng ở trang Kết nối.");
+  const draft = waybillDraft(order, customerName(state, order.customerId), input);
+  const fee = await quoteGhtkFee(await loadGhtk(), pickup, draft);
+  return { fee };
+}
+
+export async function refreshCarrierWaybill(actor: Actor, orderId: string) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const order = state.orders.find((item) => item.id === orderId);
+  if (!order) throw new Error("Không tìm thấy đơn.");
+  const ship = orderShipping(order);
+  const carrier = carrierIdFromName(ship.carrier);
+  if (!carrier) throw new Error("Hãng này chưa có API trạng thái.");
+  if (!ship.tracking) throw new Error("Đơn chưa có mã vận đơn.");
+  const hit =
+    carrier === "ghn"
+      ? await trackGhn(await loadGhn(), ship.tracking)
+      : carrier === "ghtk"
+        ? await trackGhtk(await loadGhtk(), ship.tracking)
+        : await trackJt(await loadJt(), ship.tracking);
+  const status = (hit.status || "Chưa có trạng thái").slice(0, 160);
+  await mutate(async (next) => {
+    const fresh = next.orders.find((item) => item.id === order.id);
+    if (!fresh) throw new Error("Không tìm thấy đơn.");
+    const previous = orderShipping(fresh);
+    fresh.shipping = { ...previous, carrierStatus: status };
+    fresh.updatedAt = nowIso();
+    audit(next, actor.id, "order.shipping", fresh.id, previous, fresh.shipping);
+  });
+  return { status };
+}
+
+async function loadGhn() {
+  const auth = ghnAuth(await readIntegrationSecret("ghn_token"), await readIntegrationSecret("ghn_shop_id"));
+  if (!auth) throw new Error("Chưa lưu đủ khóa GHN.");
+  return auth;
+}
+
+async function loadGhtk() {
+  const auth = ghtkAuth(await readIntegrationSecret("ghtk_token"), await readIntegrationSecret("ghtk_partner"));
+  if (!auth) throw new Error("Chưa lưu đủ khóa GHTK.");
+  return auth;
+}
+
+async function loadJt() {
+  const auth = jtAuth({
+    apiAccount: await readIntegrationSecret("jt_api_account"),
+    privateKey: await readIntegrationSecret("jt_private_key"),
+    customerCode: await readIntegrationSecret("jt_customer_code"),
+    password: await readIntegrationSecret("jt_password"),
+  });
+  if (!auth) throw new Error("Chưa lưu đủ khóa J&T.");
+  return auth;
+}
+
+function waybillDraft(
+  order: Order,
+  customer: { name: string; phone: string },
+  input: { province: string; district: string; ward: string; address: string; weightGrams: number; codAmount: number },
+): WaybillDraft {
+  const name = (order.recipientName || customer.name).trim();
+  if (name.length < 2) throw new Error("Đơn chưa có tên người nhận.");
+  const phone = customer.phone.trim();
+  if (phone.startsWith("masked:") || phone.replace(/\D/g, "").length < 8) throw new Error("Đơn chưa có số điện thoại người nhận.");
+  const address = (input.address || order.address).trim();
+  if (address.length < 4) throw new Error("Đơn chưa có địa chỉ giao.");
+  if (input.province.trim().length < 2 || input.ward.trim().length < 2) throw new Error("Cần tỉnh/thành và phường/xã.");
+  const items = order.items.map((item) => ({ name: item.name, quantity: item.quantity }));
+  return {
+    code: order.code,
+    name: name.slice(0, 120),
+    phone,
+    address: address.slice(0, 500),
+    province: input.province.trim().slice(0, 80),
+    district: input.district.trim().slice(0, 80),
+    ward: input.ward.trim().slice(0, 80),
+    weightGrams: clampWeight(input.weightGrams),
+    cod: clampCod(input.codAmount),
+    value: Math.max(0, Math.round(order.total ?? 0)),
+    content: items.map((item) => `${item.quantity}× ${item.name}`).join(", ").slice(0, 500) || "Ảnh in",
+    note: order.customerNote,
+    items,
+  };
 }
 
 export async function markCodReceived(actor: Actor, orderId: string, received: boolean) {
@@ -2317,6 +3396,7 @@ export async function deliveryBoard(actor: Actor) {
       itemSummary: order.items.map((item) => `${item.quantity}× ${item.name}`).join(", "),
       carrier: ship.carrier,
       tracking: ship.tracking,
+      carrierStatus: ship.carrierStatus ?? "",
       shipFee: money ? ship.shipFee : null,
       codAmount: money ? ship.codAmount : null,
       codReceivedAt: money ? ship.codReceivedAt : null,
@@ -2459,4 +3539,536 @@ export async function publicProductPhoto(slug: string) {
   const state = await readState();
   if (!state.settings.productPhotos?.[slug]) return null;
   return readProductPhoto(slug);
+}
+
+/* ── Org desk: chi nhánh / bộ phận / nhóm quyền / TB / tài liệu / feedback ── */
+
+export async function listOrg(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  return {
+    branches: sortBySortThenName(state.branches ?? []),
+    departments: sortBySortThenName(state.departments ?? []),
+    roleModules: (state.roleModules ?? DEFAULT_ROLE_MODULES).map((row) => ({
+      role: row.role,
+      label: ROLE_LABEL[row.role],
+      modules: [...row.modules],
+    })),
+    staff: state.staff.map((person) => ({
+      id: person.id,
+      name: person.name,
+      role: person.role,
+      branchId: person.branchId ?? null,
+      departmentId: person.departmentId ?? null,
+      active: person.active,
+    })),
+  };
+}
+
+export async function saveBranch(
+  actor: Actor,
+  input: { id?: string; name: string; address?: string; phone?: string; active?: boolean; sort?: number },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const name = input.name.trim();
+    if (name.length < 2) throw new Error("Tên cửa hàng cần ít nhất 2 ký tự.");
+    if (!state.branches) state.branches = [];
+    if (input.id) {
+      const row = state.branches.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy cửa hàng.");
+      row.name = name;
+      if (input.address !== undefined) row.address = input.address.trim();
+      if (input.phone !== undefined) row.phone = input.phone.replace(/\D/g, "");
+      if (input.active !== undefined) row.active = input.active;
+      if (input.sort !== undefined) row.sort = input.sort;
+      audit(state, actor.id, "branch.update", row.id, null, { name: row.name });
+      return;
+    }
+    const row: Branch = {
+      id: nid(),
+      name,
+      address: (input.address ?? "").trim(),
+      phone: (input.phone ?? "").replace(/\D/g, ""),
+      active: input.active !== false,
+      sort: input.sort ?? state.branches.length,
+    };
+    state.branches.push(row);
+    audit(state, actor.id, "branch.create", row.id, null, { name: row.name });
+  });
+}
+
+export async function removeBranch(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.branches ?? [];
+    if (list.length <= 1) throw new Error("Cần giữ ít nhất một cửa hàng.");
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy cửa hàng.");
+    const [removed] = list.splice(at, 1);
+    for (const person of state.staff) {
+      if (person.branchId === id) person.branchId = null;
+    }
+    audit(state, actor.id, "branch.remove", id, removed, null);
+  });
+}
+
+export async function saveDepartment(
+  actor: Actor,
+  input: { id?: string; name: string; note?: string; active?: boolean; sort?: number },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const name = input.name.trim();
+    if (name.length < 2) throw new Error("Tên bộ phận cần ít nhất 2 ký tự.");
+    if (!state.departments) state.departments = [];
+    if (input.id) {
+      const row = state.departments.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy bộ phận.");
+      row.name = name;
+      if (input.note !== undefined) row.note = input.note.trim();
+      if (input.active !== undefined) row.active = input.active;
+      if (input.sort !== undefined) row.sort = input.sort;
+      audit(state, actor.id, "department.update", row.id, null, { name: row.name });
+      return;
+    }
+    const row: Department = {
+      id: nid(),
+      name,
+      note: (input.note ?? "").trim(),
+      active: input.active !== false,
+      sort: input.sort ?? state.departments.length,
+    };
+    state.departments.push(row);
+    audit(state, actor.id, "department.create", row.id, null, { name: row.name });
+  });
+}
+
+export async function removeDepartment(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.departments ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy bộ phận.");
+    const [removed] = list.splice(at, 1);
+    for (const person of state.staff) {
+      if (person.departmentId === id) person.departmentId = null;
+    }
+    audit(state, actor.id, "department.remove", id, removed, null);
+  });
+}
+
+export async function saveRoleModules(actor: Actor, rows: RoleModules[]) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const next: RoleModules[] = [];
+    for (const role of ["owner", "sale", "production"] as Role[]) {
+      const found = rows.find((row) => row.role === role);
+      const modules = (found?.modules ?? DEFAULT_ROLE_MODULES.find((row) => row.role === role)?.modules ?? [])
+        .map((path) => path.trim())
+        .filter((path) => path.startsWith("/admin"));
+      if (modules.length === 0) throw new Error(`Nhóm ${ROLE_LABEL[role]} cần ít nhất một module.`);
+      next.push({ role, modules: [...new Set(modules)] });
+    }
+    state.roleModules = next;
+    audit(state, actor.id, "roleModules.update", "roleModules", null, next);
+  });
+}
+
+export async function listAnnouncements(actor: Actor) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  const state = await readState();
+  const rows = (state.announcements ?? []).slice().sort((a, b) => {
+    if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
+    return b.at.localeCompare(a.at);
+  });
+  return { announcements: rows };
+}
+
+export async function saveAnnouncement(
+  actor: Actor,
+  input: { id?: string; title: string; body: string; pinned?: boolean },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const title = input.title.trim();
+    const body = input.body.trim();
+    if (title.length < 2) throw new Error("Tiêu đề cần ít nhất 2 ký tự.");
+    if (!state.announcements) state.announcements = [];
+    if (input.id) {
+      const row = state.announcements.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy thông báo.");
+      row.title = title;
+      row.body = body;
+      if (input.pinned !== undefined) row.pinned = input.pinned;
+      audit(state, actor.id, "announcement.update", row.id, null, { title });
+      return;
+    }
+    const row: Announcement = {
+      id: nid(),
+      title,
+      body,
+      at: nowIso(),
+      by: actor.id,
+      pinned: Boolean(input.pinned),
+    };
+    state.announcements.unshift(row);
+    audit(state, actor.id, "announcement.create", row.id, null, { title });
+  });
+}
+
+export async function removeAnnouncement(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.announcements ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy thông báo.");
+    const [removed] = list.splice(at, 1);
+    audit(state, actor.id, "announcement.remove", id, removed, null);
+  });
+}
+
+export async function listDocuments(actor: Actor) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  const state = await readState();
+  const rows = (state.documents ?? []).slice().sort((a, b) => b.at.localeCompare(a.at));
+  return { documents: rows };
+}
+
+export async function saveDocument(
+  actor: Actor,
+  input: { id?: string; title: string; body?: string; url?: string },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const title = input.title.trim();
+    if (title.length < 2) throw new Error("Tiêu đề cần ít nhất 2 ký tự.");
+    if (!state.documents) state.documents = [];
+    if (input.id) {
+      const row = state.documents.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy tài liệu.");
+      row.title = title;
+      if (input.body !== undefined) row.body = input.body.trim();
+      if (input.url !== undefined) row.url = input.url.trim();
+      audit(state, actor.id, "document.update", row.id, null, { title });
+      return;
+    }
+    const row: ShopDocument = {
+      id: nid(),
+      title,
+      body: (input.body ?? "").trim(),
+      url: (input.url ?? "").trim(),
+      at: nowIso(),
+      by: actor.id,
+    };
+    state.documents.unshift(row);
+    audit(state, actor.id, "document.create", row.id, null, { title });
+  });
+}
+
+export async function removeDocument(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.documents ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy tài liệu.");
+    const [removed] = list.splice(at, 1);
+    audit(state, actor.id, "document.remove", id, removed, null);
+  });
+}
+
+export async function listOrderFeedback(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const rows = state.orders
+    .filter((order) => order.feedback)
+    .map((order) => {
+      const customer = customerName(state, order.customerId);
+      return {
+        code: order.code,
+        status: order.status,
+        statusLabel: STATUS_LABEL[order.status],
+        customerName: customer.name,
+        at: order.feedback!.at,
+        answer: order.feedback!.answer,
+        answerLabel: feedbackLabel(order.feedback!.answer),
+        note: order.feedback!.note,
+        opensReprint: feedbackOpensReprint(order.feedback!.answer),
+      };
+    })
+    .sort((a, b) => b.at.localeCompare(a.at));
+  return { feedback: rows };
+}
+
+export async function getTargets(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  const month = vnParts().month;
+  const target = kpiTarget(state.settings.shopOpenDate, month, state.settings.kpiTargets);
+  return {
+    shopOpenDate: state.settings.shopOpenDate,
+    month,
+    currentTarget: target,
+    kpiTargets: [...state.settings.kpiTargets],
+    labels: ["Tháng mở cửa", "Tháng 2", "Tháng 3", "Từ tháng 4"],
+  };
+}
+
+export async function getSePayConfig(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  const sepay = state.settings.sepay ?? defaultSePay();
+  return {
+    sepay,
+    bank: state.settings.bank ?? null,
+  };
+}
+
+/* ── Extend: chiến dịch / tin mẫu / thông báo prefs / gói ── */
+
+export async function listCampaigns(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const campaigns = sortBySortThenName(state.campaigns ?? []);
+  return {
+    campaigns: campaigns.map((row) => ({
+      ...row,
+      orderCount: state.orders.filter((order) => order.campaignId === row.id).length,
+      customerCount: state.customers.filter((customer) => customer.campaignId === row.id).length,
+    })),
+  };
+}
+
+export async function saveCampaign(
+  actor: Actor,
+  input: { id?: string; name: string; note?: string; active?: boolean; sort?: number },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const name = input.name.trim();
+    if (name.length < 2) throw new Error("Tên chiến dịch cần ít nhất 2 ký tự.");
+    if (!state.campaigns) state.campaigns = [];
+    if (input.id) {
+      const row = state.campaigns.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy chiến dịch.");
+      row.name = name;
+      if (input.note !== undefined) row.note = input.note.trim();
+      if (input.active !== undefined) row.active = input.active;
+      if (input.sort !== undefined) row.sort = input.sort;
+      audit(state, actor.id, "campaign.update", row.id, null, { name });
+      return;
+    }
+    const row: Campaign = {
+      id: nid(),
+      name,
+      note: (input.note ?? "").trim(),
+      active: input.active !== false,
+      sort: input.sort ?? state.campaigns.length,
+      createdAt: nowIso(),
+    };
+    state.campaigns.push(row);
+    audit(state, actor.id, "campaign.create", row.id, null, { name });
+  });
+}
+
+export async function removeCampaign(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.campaigns ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy chiến dịch.");
+    const [removed] = list.splice(at, 1);
+    for (const order of state.orders) {
+      if (order.campaignId === id) order.campaignId = null;
+    }
+    for (const customer of state.customers) {
+      if (customer.campaignId === id) customer.campaignId = null;
+    }
+    audit(state, actor.id, "campaign.remove", id, removed, null);
+  });
+}
+
+export async function listMessageTemplates(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const rows = (state.messageTemplates ?? []).slice().sort((a, b) => a.title.localeCompare(b.title, "vi"));
+  return { templates: rows };
+}
+
+export async function saveMessageTemplate(
+  actor: Actor,
+  input: { id?: string; title: string; body: string; kind: MessageTemplateKind },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const title = input.title.trim();
+    const body = input.body.trim();
+    if (title.length < 2) throw new Error("Tiêu đề cần ít nhất 2 ký tự.");
+    if (!body) throw new Error("Nội dung tin mẫu trống.");
+    if (!MESSAGE_TEMPLATE_KINDS.includes(input.kind)) throw new Error("Loại tin không hợp lệ.");
+    if (!state.messageTemplates) state.messageTemplates = [];
+    if (input.id) {
+      const row = state.messageTemplates.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy tin mẫu.");
+      row.title = title;
+      row.body = body;
+      row.kind = input.kind;
+      row.updatedAt = nowIso();
+      audit(state, actor.id, "template.update", row.id, null, { title });
+      return;
+    }
+    const row: MessageTemplate = {
+      id: nid(),
+      title,
+      body,
+      kind: input.kind,
+      updatedAt: nowIso(),
+    };
+    state.messageTemplates.unshift(row);
+    audit(state, actor.id, "template.create", row.id, null, { title });
+  });
+}
+
+export async function removeMessageTemplate(actor: Actor, id: string) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const list = state.messageTemplates ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy tin mẫu.");
+    const [removed] = list.splice(at, 1);
+    audit(state, actor.id, "template.remove", id, removed, null);
+  });
+}
+
+export async function getNotifyPrefs(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  return { notifyPrefs: state.settings.notifyPrefs ?? defaultNotifyPrefs() };
+}
+
+/** Webhook SePay: khớp mã CK với mã đơn → tự thu chuyển khoản. */
+export async function processSePayWebhook(payload: SePayWebhookPayload, authHeader: string | null): Promise<{ success: true; duplicate?: boolean; matched?: string; amount?: number; skipped?: string }> {
+  const state = await readState();
+  const cfg = state.settings.sepay ?? defaultSePay();
+  if (!cfg.enabled) return { success: true, skipped: "SePay chưa bật." };
+  const expected = cfg.apiKey.trim();
+  if (expected) {
+    const header = (authHeader ?? "").trim();
+    const ok =
+      header === expected ||
+      header === `Bearer ${expected}` ||
+      header === `Apikey ${expected}` ||
+      header.toLowerCase() === `apikey ${expected.toLowerCase()}`;
+    if (!ok) throw new Error("API key SePay không khớp.");
+  }
+  const txId = String(payload.id ?? "").trim();
+  if (!txId) throw new Error("Thiếu id giao dịch SePay.");
+  const seen = state.sepaySeen ?? [];
+  if (seen.includes(txId)) return { success: true, duplicate: true };
+
+  const candidates = state.orders.map((order) => ({
+    id: order.id,
+    code: order.code,
+    status: order.status,
+    channel: order.channel,
+    total: order.total,
+    depositPaid: order.depositPaid,
+  }));
+  const order = findOrderForSePay(candidates, payload);
+  const amountRaw = Number(payload.transferAmount) || 0;
+  const reject = sepayRejectReason(order, amountRaw, payload.transferType);
+  if (reject || !order) {
+    await mutate(async (draft) => {
+      draft.sepaySeen = [txId, ...(draft.sepaySeen ?? [])].slice(0, 500);
+      audit(draft, null, "sepay.skip", txId, null, { reason: reject ?? "unknown", content: payload.content, code: payload.code });
+    });
+    return { success: true, skipped: reject ?? "Không khớp." };
+  }
+
+  const amount = sepayCollectAmount(order, amountRaw);
+  await mutate(async (draft) => {
+    draft.sepaySeen = [txId, ...(draft.sepaySeen ?? [])].slice(0, 500);
+    const target = draft.orders.find((item) => item.id === order.id);
+    if (!target) return;
+    const before = target.depositPaid;
+    const next = appendCollection(
+      target,
+      {
+        id: nid(),
+        at: nowIso(),
+        amount,
+        method: "SePay / chuyển khoản",
+        by: null,
+      },
+      nid(),
+    );
+    target.payments = next.payments;
+    target.depositPaid = next.depositPaid;
+    target.depositMethod = next.depositMethod;
+    target.depositBy = next.depositBy;
+    target.updatedAt = nowIso();
+    target.history.push({
+      at: target.updatedAt,
+      from: target.status,
+      to: target.status,
+      by: null,
+      note: `SePay tự thu ${amount.toLocaleString("vi-VN")}đ · GD ${txId}`,
+    });
+    audit(draft, null, "sepay.collect", target.id, { depositPaid: before }, { depositPaid: target.depositPaid, txId, amount, reference: payload.referenceCode });
+  });
+  return { success: true, matched: order.code, amount };
+}
+
+export async function listPackages(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  return { packages: sortBySortThenName(state.packages ?? []) };
+}
+
+export async function savePackage(
+  actor: Actor,
+  input: { id?: string; name: string; price: number; description?: string; includes?: string; active?: boolean; sort?: number },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const name = input.name.trim();
+    if (name.length < 2) throw new Error("Tên gói cần ít nhất 2 ký tự.");
+    const price = Math.round(Number(input.price));
+    if (!Number.isFinite(price) || price < 0) throw new Error("Giá gói không hợp lệ.");
+    if (!state.packages) state.packages = [];
+    if (input.id) {
+      const row = state.packages.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy gói.");
+      row.name = name;
+      row.price = price;
+      if (input.description !== undefined) row.description = input.description.trim();
+      if (input.includes !== undefined) row.includes = input.includes.trim();
+      if (input.active !== undefined) row.active = input.active;
+      if (input.sort !== undefined) row.sort = input.sort;
+      audit(state, actor.id, "package.update", row.id, null, { name, price });
+      return;
+    }
+    const row: ServicePackage = {
+      id: nid(),
+      name,
+      price,
+      description: (input.description ?? "").trim(),
+      includes: (input.includes ?? "").trim(),
+      active: input.active !== false,
+      sort: input.sort ?? state.packages.length,
+    };
+    state.packages.push(row);
+    audit(state, actor.id, "package.create", row.id, null, { name, price });
+  });
+}
+
+export async function removePackage(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.packages ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy gói.");
+    const [removed] = list.splice(at, 1);
+    audit(state, actor.id, "package.remove", id, removed, null);
+  });
 }

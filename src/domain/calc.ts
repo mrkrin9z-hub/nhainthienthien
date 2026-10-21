@@ -8,6 +8,7 @@ import type {
   Settings,
   Sku,
 } from "./types.ts";
+import { needsPackCheck } from "./print-shop.ts";
 
 export const STANDARD_SIZES = [
   { code: "13x18", w: 13, h: 18 },
@@ -338,6 +339,8 @@ export function statusChangeError(input: {
   reason?: string;
   depositRequired: number | null;
   depositPaid: number;
+  /** false khi checklist đóng gói chưa xong. Thiếu thì không chặn, để đơn cũ vẫn chuyển được trong kiểm thử. */
+  packReady?: boolean;
 }): string | null {
   const reopening = (input.current === "huy" || input.current === "xong") && input.next !== input.current;
   if (reopening) {
@@ -352,6 +355,9 @@ export function statusChangeError(input: {
       return "Đơn Facebook có khổ từ 40×60 cần cọc 50%, nhưng chưa có giá bán để tính số cọc.";
     }
     return "Đơn Facebook chưa ghi đủ cọc 50%. Chưa chuyển sang thiết kế hoặc in.";
+  }
+  if (input.packReady === false && needsPackCheck(input.current, input.next) && !(input.role === "owner" && input.ownerOverride)) {
+    return "Trước khi giao cần đánh dấu đã ép, đã bo viền, đã dán tem và có một ảnh gói hàng.";
   }
   return null;
 }

@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
 
+import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
+import { PageToolbar } from "@/components/admin/page-toolbar";
 import { GoodsLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
@@ -23,17 +27,37 @@ function PhotosPage() {
 function PhotosBody() {
   const queryClient = useQueryClient();
   const photos = useQuery({ queryKey: ["group-photos"], queryFn: () => getGroupPhotos() });
+  const [q, setQ] = useState("");
+  const [kind, setKind] = useState("all");
+  const groups = photos.data ?? [];
+  const shown = groups.filter((group) => {
+    if (kind === "custom" && !group.custom) return false;
+    if (kind === "sample" && group.custom) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || group.name.toLowerCase().includes(needle);
+  });
+  const chips: FilterChip[] = [
+    { id: "all", label: "Tất cả", count: groups.length, ...ALL_TONE },
+    { id: "custom", label: "Ảnh đã tải", count: groups.filter((group) => group.custom).length, color: "#059669" },
+    { id: "sample", label: "Ảnh mẫu", count: groups.filter((group) => !group.custom).length, color: "#6B7280" },
+  ];
+  const list = useListPage(shown, `${q}|${kind}`);
   if (photos.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
   if (photos.isError) return <p className="font-semibold text-destructive">{(photos.error as Error).message}</p>;
   return (
     <div className="space-y-4">
       <GoodsLinks />
-      <h1 className="text-2xl font-semibold text-primary">Ảnh sản phẩm</h1>
-      <p className="text-sm text-muted-foreground">
-        Ảnh đang hiện là ảnh mẫu. Tải JPG, PNG hoặc WEBP (tối đa 2MB) để thay. Xóa ảnh tải lên thì web trở lại ảnh mẫu.
-      </p>
+      <PageToolbar
+        title="Ảnh sản phẩm"
+        hint="Ảnh đang hiện là ảnh mẫu. Tải JPG, PNG hoặc WEBP (tối đa 2MB) để thay. Xóa ảnh tải lên thì web trở lại ảnh mẫu."
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Tìm tên sản phẩm…"
+      />
+      <FilterChips label="Nguồn ảnh" value={kind} chips={chips} onChange={setKind} />
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="ảnh" onPage={list.setPage} />
       <div className="grid gap-4 sm:grid-cols-2">
-        {(photos.data ?? []).map((group) => {
+        {list.slice.map((group) => {
           const src = group.custom ? `/api/public/product-photo/${group.slug}` : productImage(group.slug);
           return (
             <article key={group.id} className="glass-card rounded-3xl p-4">

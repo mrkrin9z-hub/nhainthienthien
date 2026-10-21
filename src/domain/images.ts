@@ -8,6 +8,15 @@ export function imageMimeAllowed(mime: string): boolean {
   return IMAGE_MIME.includes(cleanMime(mime));
 }
 
+const IMAGE_EXT = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
+
+/** Ảnh thì có khung xem trước. Video và file khác giữ tên để tải. */
+export function imagePreviewable(name: string, mime = ""): boolean {
+  if (imageMimeAllowed(mime)) return true;
+  const lower = name.toLowerCase();
+  return IMAGE_EXT.some((ext) => lower.endsWith(ext));
+}
+
 function starts(bytes: Uint8Array, signature: number[]): boolean {
   if (bytes.length < signature.length) return false;
   return signature.every((value, index) => bytes[index] === value);
@@ -40,8 +49,9 @@ export function servedMime(mime: string): string {
 }
 
 /** Tên file an toàn trong Content-Disposition: bỏ ngoặc kép và xuống dòng. */
-export function contentDisposition(name: string): string {
+export function contentDisposition(name: string, download = false): string {
   const cleaned = name.replace(/[\r\n"\\]/g, "").slice(-120) || "tep";
   const asciiName = cleaned.replace(/[^\x20-\x7E]/g, "_");
-  return `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(cleaned)}`;
+  const kind = download ? "attachment" : "inline";
+  return `${kind}; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(cleaned)}`;
 }

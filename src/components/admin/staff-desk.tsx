@@ -1,0 +1,277 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ROLE_RIGHTS_ROWS } from "@/domain/org-desk";
+import { ROLE_LABEL, type Role } from "@/domain/types";
+import { loadSettings, storeStaff } from "@/lib/admin.functions";
+
+const ROLES: { role: Role; detail: string }[] = [
+  { role: "owner", detail: "Toàn bộ sổ: ví, két, chi phí, cài đặt, nhân viên, giá vốn." },
+  { role: "sale", detail: "Đơn, khách, giá bán, thu tiền, nộp tiền mặt đang giữ, KPI." },
+  { role: "production", detail: "In, đóng gói, giao, kho, chấm công." },
+];
+
+type Person = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  active: boolean;
+  probation: boolean;
+  hiredAt: string | null;
+};
+
+const empty = {
+  id: "",
+  name: "",
+  email: "",
+  password: "",
+  role: "sale" as Role,
+  active: true,
+  probation: false,
+  hiredAt: null as string | null,
+};
+
+export function StaffDesk() {
+  const queryClient = useQueryClient();
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => loadSettings() });
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(empty);
+  const [q, setQ] = useState("");
+  const [role, setRole] = useState("all");
+  const staff = (settings.data?.staff ?? []) as Person[];
+  const rows = staff.filter((person) => {
+    if (role !== "all" && person.role !== role) return false;
+    const needle = q.trim().toLowerCase();
+    return !needle || `${person.name} ${person.email}`.toLowerCase().includes(needle);
+  });
+  const roleChips: FilterChip[] = [
+    { id: "all", label: "Mọi vai trò", count: staff.length, ...ALL_TONE },
+    ...ROLES.map((item) => ({
+      id: item.role,
+      label: ROLE_LABEL[item.role],
+      count: staff.filter((person) => person.role === item.role).length,
+      color: "#1D4ED8",
+    })),
+  ];
+  const list = useListPage(rows, `${q}|${role}`);
+  const editing = Boolean(form.id);
+
+  function openNew() {
+    setForm(empty);
+    setOpen(true);
+  }
+
+  function openEdit(person: Person) {
+    setForm({
+      id: person.id,
+      name: person.name,
+      email: person.email,
+      password: "",
+      role: person.role,
+      active: person.active,
+      probation: person.probation,
+      hiredAt: person.hiredAt,
+    });
+    setOpen(true);
+  }
+
+  return (
+    <div className="space-y-3">
+      <section className="rounded-md border bg-card p-4" aria-label="Bảng phân quyền">
+        <h2 className="font-bold">Phân quyền</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Ba vai trò của xưởng in. Kênh bán (tại tiệm / online / TikTok / Shopee) là “nhánh” trên từng đơn — không gán cửa hàng riêng. Menu chỉnh ở{" "}
+          <a href="/admin/nhom-quyen" className="font-medium text-primary">
+            Nhóm quyền
+          </a>
+          .
+        </p>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[28rem] text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-2 pr-3 font-semibold">Việc</th>
+                <th className="px-3 py-2 font-semibold">Chủ</th>
+                <th className="px-3 py-2 font-semibold">Sale</th>
+                <th className="px-3 py-2 font-semibold">Sản xuất</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ROLE_RIGHTS_ROWS.map((row) => (
+                <tr key={row.job} className="border-b last:border-0">
+                  <td className="py-2 pr-3">{row.job}</td>
+                  <td className="px-3 py-2">{row.owner ? "Được" : "—"}</td>
+                  <td className="px-3 py-2">{row.sale ? "Được" : "—"}</td>
+                  <td className="px-3 py-2">{row.production ? "Được" : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button size="sm" onClick={openNew}>
+          <Plus className="mr-1 size-4" />
+          Thêm nhân viên
+        </Button>
+        <Input className="min-h-11 max-w-xs" placeholder="Tìm tên hoặc email" aria-label="Tìm nhân viên" value={q} onChange={(event) => setQ(event.target.value)} />
+      </div>
+      <FilterChips label="Vai trò" value={role} chips={roleChips} onChange={setRole} />
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="người" onPage={list.setPage} />
+      <div className="overflow-hidden rounded-md border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Họ tên</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Vai trò</TableHead>
+              <TableHead>Trạng thái</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.slice.map((person) => (
+              <TableRow key={person.id} className="cursor-pointer" onClick={() => openEdit(person)}>
+                <TableCell>{person.name}</TableCell>
+                <TableCell className="text-xs">{person.email}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {ROLE_LABEL[person.role]}
+                  </Badge>
+                  {person.probation ? <span className="ml-2 text-xs text-muted-foreground">Thử việc</span> : null}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={person.active ? "default" : "secondary"}>{person.active ? "Đang làm" : "Nghỉ"}</Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+            {settings.data && rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                  Chưa có nhân viên
+                </TableCell>
+              </TableRow>
+            ) : null}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Sửa nhân viên" : "Thêm nhân viên"}</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!editing && form.password.trim().length < 8) {
+                toast.error("Mật khẩu cần ít nhất 8 ký tự.");
+                return;
+              }
+              if (editing && form.password && form.password.trim().length < 8) {
+                toast.error("Mật khẩu cần ít nhất 8 ký tự.");
+                return;
+              }
+              setSaving(true);
+              try {
+                await storeStaff({
+                  data: {
+                    ...(form.id ? { id: form.id } : {}),
+                    name: form.name,
+                    email: form.email,
+                    role: form.role,
+                    ...(form.password ? { password: form.password } : {}),
+                    probation: form.probation,
+                    active: form.active,
+                    hiredAt: form.hiredAt,
+                  },
+                });
+                toast.success(editing ? "Đã cập nhật nhân viên" : "Đã tạo nhân viên và tài khoản");
+                setOpen(false);
+                await queryClient.invalidateQueries({ queryKey: ["settings"] });
+              } catch (error) {
+                toast.error((error as Error).message);
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Họ tên</Label>
+                <Input className="mt-1" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required minLength={2} />
+              </div>
+              <div>
+                <Label>Email đăng nhập</Label>
+                <Input className="mt-1" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} required />
+              </div>
+              <div className="sm:col-span-2">
+                <Label>{editing ? "Đặt lại mật khẩu" : "Mật khẩu"}</Label>
+                <Input
+                  className="mt-1"
+                  type="password"
+                  value={form.password}
+                  placeholder={editing ? "Để trống nếu giữ mật khẩu cũ" : "Ít nhất 8 ký tự"}
+                  onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+                  required={!editing}
+                  minLength={editing ? undefined : 8}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 border-t pt-3">
+              <Label>Phân quyền</Label>
+              <div className="space-y-2">
+                {ROLES.map((item) => (
+                  <label key={item.role} className="flex items-start gap-2 text-sm">
+                    <input
+                      type="radio"
+                      className="mt-1"
+                      name="staff-role"
+                      checked={form.role === item.role}
+                      onChange={() => setForm((current) => ({ ...current, role: item.role }))}
+                    />
+                    <span>
+                      <span className="font-medium">{ROLE_LABEL[item.role]}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">{item.detail}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">Mỗi người một vai trò. Đổi quyền có hiệu lực ở lần tải trang sau.</p>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.probation} onChange={(event) => setForm((current) => ({ ...current, probation: event.target.checked }))} />
+              Thử việc
+            </label>
+            {editing ? (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={form.active} onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))} />
+                Đang làm việc
+              </label>
+            ) : null}
+
+            <DialogFooter>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Đang lưu..." : "Lưu"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

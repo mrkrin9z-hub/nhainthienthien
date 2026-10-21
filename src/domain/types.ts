@@ -1,9 +1,10 @@
 export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee"] as const;
 export type Channel = (typeof CHANNELS)[number];
 
+/** Kênh bán = “nhánh” vận hành (offline / online / sàn). */
 export const CHANNEL_LABEL: Record<Channel, string> = {
-  tai_tiem: "Tại tiệm / Web",
-  facebook: "Facebook",
+  tai_tiem: "Tại tiệm (offline)",
+  facebook: "Online / Facebook",
   tiktok: "TikTok",
   shopee: "Shopee",
 };
@@ -139,6 +140,21 @@ export type Settings = {
   remindMessage?: string;
   fixedCosts: { key: string; name: string; amount: number; note: string }[];
   rentFromJune2027: number;
+  /** Tài khoản nhận chuyển khoản. Thiếu thì đơn không hiện mã QR. */
+  bank?: { id: string; account: string; holder: string };
+  /** Địa chỉ lấy hàng cho GHN, GHTK, J&T. Không phải khóa. */
+  carrierPickup?: {
+    name: string;
+    phone: string;
+    address: string;
+    province: string;
+    district: string;
+    ward: string;
+  };
+  /** SePay — biến động số dư → ví cửa hàng (cấu hình local). */
+  sepay?: SePayConfig;
+  /** Cảnh báo trong app (không phải Web Push). */
+  notifyPrefs?: NotifyPrefs;
 };
 
 export type Staff = {
@@ -151,10 +167,113 @@ export type Staff = {
   mustChangePassword: boolean;
   probation: boolean;
   hiredAt: string | null;
+  /** Chi nhánh / cửa hàng gán cho NV. Thiếu = chưa gán. */
+  branchId?: string | null;
+  /** Bộ phận (Sale / In ấn / Giao…). Thiếu = chưa gán. */
+  departmentId?: string | null;
   /** Bật thì lần đăng nhập sau bắt mã 6 số. Chủ cũng vậy, không ngoại lệ. */
   totpEnabled?: boolean;
   totpSecret?: string | null;
   totpPendingSecret?: string | null;
+};
+
+/** Cửa hàng / cơ sở in — filter đơn/ví theo chi nhánh (local). */
+export type Branch = {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  active: boolean;
+  sort: number;
+};
+
+/** Bộ phận vận hành (Sale / In ấn / Giao nhận…). */
+export type Department = {
+  id: string;
+  name: string;
+  note: string;
+  active: boolean;
+  sort: number;
+};
+
+/** Dòng ma trận quyền module (nhóm quyền). `modules` = path `/admin/...`. */
+export type RoleModules = {
+  role: Role;
+  modules: string[];
+};
+
+/** Thông báo nội bộ cho nhân viên. */
+export type Announcement = {
+  id: string;
+  title: string;
+  body: string;
+  at: string;
+  by: string | null;
+  pinned?: boolean;
+};
+
+/** Tài liệu nội bộ (link hoặc ghi chú). */
+export type ShopDocument = {
+  id: string;
+  title: string;
+  body: string;
+  url: string;
+  at: string;
+  by: string | null;
+};
+
+/** Cấu hình SePay — webhook tiền vào → tự thu đơn (mã CK = mã đơn). */
+export type SePayConfig = {
+  enabled: boolean;
+  /** API Key / Bearer SePay gửi kèm (xác thực webhook) */
+  apiKey: string;
+  /** Ghi chú / số TK trên SePay */
+  accountHint: string;
+  /** Path webhook công khai */
+  webhookPath: string;
+  note: string;
+};
+
+/** Gói dịch vụ bán tại xưởng (không phải subscription StudioBase). */
+export type ServicePackage = {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  includes: string;
+  active: boolean;
+  sort: number;
+};
+
+/** Nguồn / chiến dịch ads (local — gắn đơn hoặc khách). */
+export type Campaign = {
+  id: string;
+  name: string;
+  note: string;
+  active: boolean;
+  sort: number;
+  createdAt: string;
+};
+
+export const MESSAGE_TEMPLATE_KINDS = ["remind", "status", "chat", "other"] as const;
+export type MessageTemplateKind = (typeof MESSAGE_TEMPLATE_KINDS)[number];
+
+/** Tin mẫu chép tay (OAuth kênh vẫn trên StudioBase). */
+export type MessageTemplate = {
+  id: string;
+  title: string;
+  body: string;
+  kind: MessageTemplateKind;
+  updatedAt: string;
+};
+
+/** Tuỳ chọn cảnh báo trong app (Web Push VAPID vẫn Manage). */
+export type NotifyPrefs = {
+  lateOrders: boolean;
+  marketplaceNew: boolean;
+  feedbackReprint: boolean;
+  cashHandover: boolean;
+  browserPrompted?: boolean;
 };
 
 export type Group = {
@@ -235,6 +354,8 @@ export type Customer = {
   addresses?: string[];
   /** TikTok Buyer Username hoặc Shopee Người Mua. Chỉ để nhận khách khi số bị che. */
   platformBuyer?: string;
+  /** Chiến dịch / nguồn ads gắn khách. */
+  campaignId?: string | null;
 };
 
 export type OrderFile = {
@@ -243,12 +364,16 @@ export type OrderFile = {
   mime: string;
   size: number;
   status: "uploading" | "complete" | "error";
-  kind: "original" | "design" | "approval" | "packing_video";
+  kind: "original" | "design" | "approval" | "packing_video" | "packing_photo";
   storage: "supabase" | "drive" | "local" | "r2" | "kv";
   path: string;
   driveFileId: string | null;
   createdAt: string;
   deletedAt: string | null;
+  /** Ảnh gốc khách hoặc sale đánh dấu để in. Thiếu nghĩa là chưa chọn. */
+  print?: boolean;
+  /** Ghi chú chỉnh sửa / mong muốn của khách trên ảnh này. */
+  comment?: string;
 };
 
 export type OrderShipping = {
@@ -257,6 +382,8 @@ export type OrderShipping = {
   shipFee: number | null;
   codAmount: number | null;
   codReceivedAt: string | null;
+  /** Trạng thái đọc từ hãng. Không tạo vận đơn. */
+  carrierStatus?: string;
 };
 
 export type SkuMap = {
@@ -289,6 +416,8 @@ export type Order = {
   customerNote: string;
   internalNote: string;
   dueDate: string | null;
+  /** Chiến dịch / nguồn ads gắn đơn. */
+  campaignId?: string | null;
   marketplaceCode: string;
   /** Tên người nhận trên sàn. Không ghi đè tên khách đã nhập tại tiệm. */
   recipientName?: string;
@@ -313,6 +442,17 @@ export type Order = {
   completedAt: string | null;
   files: OrderFile[];
   history: { at: string; from: OrderStatus | null; to: OrderStatus; by: string | null; note: string }[];
+  /** Ba việc xưởng đánh dấu trước khi giao. Ảnh gói là file kind packing_photo. */
+  packCheck?: { ep: boolean; bo: boolean; tem: boolean };
+  /** Một câu khách trả sau khi giao. */
+  feedback?: { at: string; answer: "dung_y" | "sai_mau" | "sai_kho" | "khac"; note: string } | null;
+  /** Mỗi lần đổi khổ hoặc số lượng. */
+  itemChanges?: {
+    at: string;
+    by: string | null;
+    before: { name: string; quantity: number; unitPrice: number | null }[];
+    after: { name: string; quantity: number; unitPrice: number | null }[];
+  }[];
 };
 
 export type Reprint = {
@@ -397,6 +537,17 @@ export type WalletAdjust = {
   by: string | null;
 };
 
+/** Nhân viên nộp tiền mặt đang giữ vào két tiệm. Không tạo thêm dòng thu trên sổ ví cửa hàng. */
+export type CashHandover = {
+  id: string;
+  at: string;
+  fromId: string;
+  amount: number;
+  wallet: "tien_mat";
+  note: string;
+  by: string | null;
+};
+
 export type PayrollLock = { month: string; at: string; by: string };
 
 export type Audit = {
@@ -407,6 +558,15 @@ export type Audit = {
   entity: string;
   before: unknown;
   after: unknown;
+};
+
+export type PhotoAlbum = {
+  id: string;
+  phone: string;
+  createdAt: string;
+  updatedAt: string;
+  orderId: string | null;
+  files: OrderFile[];
 };
 
 export type ShopState = {
@@ -420,6 +580,7 @@ export type ShopState = {
   boms: BomLine[];
   customers: Customer[];
   orders: Order[];
+  albums?: PhotoAlbum[];
   reprints: Reprint[];
   movements: Movement[];
   counts: StockCount[];
@@ -427,8 +588,27 @@ export type ShopState = {
   leaves: Leave[];
   expenses: Expense[];
   walletAdjusts?: WalletAdjust[];
+  handovers?: CashHandover[];
   monthlyFixed: { month: string; key: string; amount: number }[];
   payrollLocks: PayrollLock[];
   audits: Audit[];
   skuMaps?: SkuMap[];
+  /** Chi nhánh / cửa hàng (optional — migrate seed nếu thiếu). */
+  branches?: Branch[];
+  /** Bộ phận (optional). */
+  departments?: Department[];
+  /** Ma trận module theo role — thiếu = dùng mặc định từ menu. */
+  roleModules?: RoleModules[];
+  /** Thông báo nội bộ. */
+  announcements?: Announcement[];
+  /** Kho tài liệu nội bộ. */
+  documents?: ShopDocument[];
+  /** Chiến dịch / nguồn ads (legacy — không còn menu). */
+  campaigns?: Campaign[];
+  /** Tin mẫu local (legacy — dùng StudioBase Chat). */
+  messageTemplates?: MessageTemplate[];
+  /** Gói dịch vụ bán tại xưởng. */
+  packages?: ServicePackage[];
+  /** Id giao dịch SePay đã xử lý (idempotent). */
+  sepaySeen?: string[];
 };

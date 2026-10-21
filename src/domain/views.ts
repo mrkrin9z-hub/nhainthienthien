@@ -1,6 +1,8 @@
 import { kpiTarget, quoteSku, vnParts, vnYmd, vnMonth } from "./calc.ts";
 import { commissionForSale } from "./commission.ts";
 import { materialForecast } from "./forecast.ts";
+import { depositEvents } from "./money.ts";
+import { bankLabel, deskAlerts, hasPackingPhoto, itemChangeNote, transferQrUrl } from "./print-shop.ts";
 import { orderShipping } from "./shipping.ts";
 import type { Order, OrderStatus, Role, ShopState } from "./types.ts";
 import { CHANNEL_LABEL, STATUS_LABEL, STATUS_REPLY } from "./types.ts";
@@ -38,9 +40,12 @@ export function orderSummary(state: ShopState, order: Order, role: Role) {
     address: order.address,
     itemSummary: order.items.map((item) => `${item.quantity}× ${item.name}`).join(", "),
     total: showMoney ? order.total : null,
+    depositPaid: showMoney ? order.depositPaid : null,
+    remain: showMoney && order.total !== null ? order.total - order.depositPaid : null,
     late: isLate(state, order),
     fileCount: order.files.filter((file) => !file.deletedAt && file.status === "complete").length,
     fulfillment: order.fulfillment,
+    dueDate: order.dueDate,
   };
 }
 
@@ -70,6 +75,16 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     (status) => ({ status, label: STATUS_LABEL[status], count: visible.filter((order) => order.status === status).length }),
   );
   const late = visible.filter((order) => isLate(state, order, clock)).map((order) => orderSummary(state, order, actor.role));
+  const prefs = state.settings.notifyPrefs;
+  const alerts = deskAlerts(
+    visible.map((order) => orderSummary(state, order, actor.role)),
+    Date.now(),
+  ).filter((alert) => {
+    if (!prefs) return true;
+    if (alert.kind === "tre") return prefs.lateOrders !== false;
+    if (alert.kind === "san") return prefs.marketplaceNew !== false;
+    return true;
+  });
   const lowStock = state.materials
     .filter((material) => material.minStock !== null && material.stock <= material.minStock)
     .map((material) => ({ id: material.id, name: material.name, stock: material.stock, unit: material.unit, min: material.minStock }));
@@ -89,6 +104,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
         .filter((order) => ["thiet_ke", "cho_duyet", "in", "dong_goi"].includes(order.status))
         .map((order) => orderSummary(state, order, actor.role)),
       late,
+      alerts,
       lowStock,
       onShift: onShift.filter((person) => person.id === actor.id),
       clockedIn: Boolean(mineOpen),
@@ -103,6 +119,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
       name: actor.name,
       byStatus,
       late,
+      alerts,
       lowStock,
       onShift,
       clockedIn: Boolean(mineOpen),
@@ -146,6 +163,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     name: actor.name,
     byStatus,
     late,
+    alerts,
     lowStock,
     onShift,
     clockedIn: Boolean(mineOpen),
@@ -249,6 +267,46 @@ export function orderDetail(state: ShopState, order: Order, role: Role) {
       toLabel: STATUS_LABEL[item.to],
     })),
     files: order.files.filter((file) => !file.deletedAt),
+    payments: showMoney
+      ? depositEvents({
+          id: order.id,
+          code: order.code,
+          customerName: "",
+          status: order.status,
+          total: order.total,
+          depositPaid: order.depositPaid,
+          depositMethod: order.depositMethod,
+          depositBy: order.depositBy,
+          createdAt: order.createdAt,
+          ...(order.payments ? { payments: order.payments } : {}),
+        }).map((payment) => ({
+          at: payment.at,
+          amount: payment.amount,
+          method: payment.method,
+          byName: state.staff.find((person) => person.id === payment.by)?.name ?? "",
+        }))
+      : [],
+    transfer: (() => {
+      if (!showMoney || order.channel === "tiktok" || order.channel === "shopee" || !state.settings.bank || order.total === null) return null;
+      const amount = order.total - order.depositPaid;
+      const image = transferQrUrl({ bank: state.settings.bank, amount, code: order.code });
+      if (!image) return null;
+      return { image, content: order.code, bank: bankLabel(state.settings.bank.id), holder: state.settings.bank.holder, amount };
+    })(),
+    packCheck: order.packCheck ?? { ep: false, bo: false, tem: false },
+    hasPackingPhoto: hasPackingPhoto(order.files),
+    feedback: order.feedback ?? null,
+    itemChanges: (order.itemChanges ?? []).flatMap((change) => {
+      const note = itemChangeNote(change.before, change.after, showMoney);
+      if (!note) return [];
+      return [
+        {
+          at: change.at,
+          byName: state.staff.find((person) => person.id === change.by)?.name ?? "",
+          note,
+        },
+      ];
+    }),
     reprints: state.reprints
       .filter((item) => item.orderId === order.id)
       .map((item) => (role === "owner" ? item : { ...item, extraCost: null })),

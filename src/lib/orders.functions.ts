@@ -34,7 +34,8 @@ const uploadTicketSchema = z.object({
   accessToken: z.string().min(10),
   fileName: z.string().min(1).max(200),
   mimeType: z.string().min(3).max(100),
-  sizeBytes: z.number().int().min(1).max(50 * 1024 * 1024),
+  sizeBytes: z.number().int().min(1),
+  comment: z.string().trim().max(500).optional().default(""),
 });
 
 export const createUploadTicket = createServerFn({ method: "POST" })
@@ -73,23 +74,146 @@ export const submitOrder = createServerFn({ method: "POST" })
   });
 
 const lookupSchema = z.object({
-  code: z.string().trim().min(4).max(30),
+  code: z.string().trim().max(30).refine((value) => value === "" || value.length >= 4, "Mã đơn chưa đúng."),
   phone: z.string().trim().min(8).max(20),
 });
 
 export type OrderLookupResult = {
-  code: string;
-  status: string;
-  createdAt: string;
-  total: number | null;
-  fulfillment: string;
-  address: string | null;
-  note: string | null;
   customerName: string;
-  items: { name: string; variant: string; quantity: number; lineTotal: number | null }[];
-  fileCount: number;
-  history: { to: string; at: string; note: string | null }[];
+  focus: string;
+  orders: {
+    code: string;
+    status: string;
+    createdAt: string;
+    total: number | null;
+    depositPaid: number;
+    remain: number | null;
+    fulfillment: string;
+    address: string | null;
+    note: string | null;
+    channel: string | null;
+    customerName: string;
+    items: { name: string; variant: string; quantity: number; lineTotal: number | null }[];
+    fileCount: number;
+    photoToken: string | null;
+    photos: { id: string; name: string; createdAt: string; print: boolean; comment: string }[];
+    shipping: { carrier: string; tracking: string; carrierStatus: string } | null;
+    history: { to: string; at: string; note: string }[];
+  }[];
 };
+
+const albumTicketSchema = z.object({
+  phone: z.string().trim().min(8).max(20),
+  fileName: z.string().min(1).max(200),
+  mimeType: z.string().min(3).max(100),
+  sizeBytes: z.number().int().min(1),
+});
+
+export const createAlbumTicket = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => albumTicketSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { createAlbumTicket: ticket } = await import("@/server/service");
+    return ticket(data);
+  });
+
+const driveFileSchema = z.object({
+  fileId: z.string().uuid(),
+  driveFileId: z.string().regex(/^[A-Za-z0-9_-]{8,200}$/),
+});
+
+export const prepareOrderDriveUpload = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), accessToken: z.string().min(10), fileId: z.string().uuid() }).parse(data))
+  .handler(async ({ data }) => {
+    const { prepareOrderDriveUpload: open } = await import("@/server/service");
+    return open(data);
+  });
+
+export const finishOrderDriveUpload = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => driveFileSchema.extend({ orderId: z.string().uuid(), accessToken: z.string().min(10) }).parse(data))
+  .handler(async ({ data }) => {
+    const { finishOrderDriveUpload: finish } = await import("@/server/service");
+    return finish(data);
+  });
+
+export const prepareAlbumDriveUpload = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ albumId: z.string().uuid(), phone: z.string().trim().min(8).max(20), fileId: z.string().uuid() }).parse(data))
+  .handler(async ({ data }) => {
+    const { prepareAlbumDriveUpload: open } = await import("@/server/service");
+    return open(data);
+  });
+
+export const finishAlbumDriveUpload = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => driveFileSchema.extend({ albumId: z.string().uuid(), phone: z.string().trim().min(8).max(20) }).parse(data))
+  .handler(async ({ data }) => {
+    const { finishAlbumDriveUpload: finish } = await import("@/server/service");
+    return finish(data);
+  });
+
+const uploadTargetSchema = z.object({
+  token: z.string().regex(/^[a-f0-9]{32}$/),
+});
+
+export const setCustomerPrint = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ token: z.string().regex(/^[a-f0-9]{32}$/), fileId: z.string().uuid(), print: z.boolean() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { setCustomerFilePrint } = await import("@/server/service");
+    await setCustomerFilePrint(data.token, data.fileId, data.print);
+    return { ok: true };
+  });
+
+export const setCustomerComment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        token: z.string().regex(/^[a-f0-9]{32}$/),
+        fileId: z.string().uuid(),
+        comment: z.string().max(500),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { setCustomerFileComment } = await import("@/server/service");
+    await setCustomerFileComment(data.token, data.fileId, data.comment);
+    return { ok: true };
+  });
+
+export const getFeedbackCard = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ token: z.string().regex(/^[a-f0-9]{32}$/) }).parse(data))
+  .handler(async ({ data }) => {
+    const { publicFeedbackCard } = await import("@/server/service");
+    return publicFeedbackCard(data.token);
+  });
+
+export const sendFeedback = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        token: z.string().regex(/^[a-f0-9]{32}$/),
+        answer: z.enum(["dung_y", "sai_mau", "sai_kho", "khac"]),
+        note: z.string().max(300).optional().default(""),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { submitOrderFeedback } = await import("@/server/service");
+    return submitOrderFeedback(data.token, data.answer, data.note);
+  });
+
+export const getUploadTarget = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => uploadTargetSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { publicUploadTarget } = await import("@/server/service");
+    return publicUploadTarget(data.token);
+  });
+
+export const acknowledgeCustomerPhotos = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => submitSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { acknowledgeCustomerPhotos: acknowledge } = await import("@/server/service");
+    return acknowledge(data);
+  });
 
 export const lookupOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => lookupSchema.parse(data))

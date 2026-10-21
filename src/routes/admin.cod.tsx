@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { OrderLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
@@ -36,8 +37,6 @@ function CodBody() {
   const [paid, setPaid] = useState("all");
   const queryClient = useQueryClient();
   const report = useQuery({ queryKey: ["cod", month], queryFn: () => getCod({ data: { month } }) });
-  if (report.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
-  if (report.isError) return <p className="font-semibold text-destructive">{(report.error as Error).message}</p>;
   const data = report.data;
   const lines = data?.lines ?? [];
   const chips: FilterChip[] = [
@@ -52,6 +51,9 @@ function CodBody() {
     if (!needle) return true;
     return `${line.code} ${line.customerName} ${line.carrier}`.toLowerCase().includes(needle);
   });
+  const list = useListPage(shown, `${month}|${q}|${paid}`);
+  if (report.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
+  if (report.isError) return <p className="font-semibold text-destructive">{(report.error as Error).message}</p>;
   return (
     <div className="space-y-4">
       <OrderLinks />
@@ -72,7 +74,8 @@ function CodBody() {
         ))}
       </ul>
       <div className="grid gap-3">
-        {shown.map((line) => (
+        <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="đơn COD" onPage={list.setPage} />
+        {list.slice.map((line) => (
           <article key={line.id} className="glass-card flex flex-wrap items-center justify-between gap-2 rounded-3xl p-4 text-sm">
             <div>
               <p className="font-bold text-primary">{line.code}</p>

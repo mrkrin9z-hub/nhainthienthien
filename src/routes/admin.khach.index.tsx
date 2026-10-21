@@ -4,7 +4,10 @@ import { useMemo, useState } from "react";
 import { RotateCcw, UserX } from "lucide-react";
 
 import { RoleGate } from "@/components/role-gate";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ALL_TONE, CHANNEL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
+import { ListPager, useListPage } from "@/components/admin/list-page";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { CustomerLinks } from "@/components/admin/sections";
 import { formatMaybe } from "@/lib/brand";
@@ -53,6 +56,7 @@ function CustomersBody() {
     if (channel !== "all" && !customer.channels.includes(CHANNEL_LABEL[channel as Channel])) return false;
     return true;
   });
+  const list = useListPage(shown, `${q}|${channel}|${repeatOnly}|${includeCancelled}`);
 
   return (
     <div className="space-y-3">
@@ -79,35 +83,58 @@ function CustomersBody() {
           onClick={() => setIncludeCancelled((value) => !value)}
         />
       </div>
-      <p className="text-xs text-muted-foreground">Hiển thị {shown.length} khách</p>
-      <ul className="space-y-2">
-        {shown.map((customer) => (
-          <li key={customer.id}>
-            <Link to="/admin/khach/$id" params={{ id: customer.id }} className="block rounded-2xl border border-border/70 bg-card p-4">
-              <p className="font-semibold text-primary">
-                {customer.name}
-                {customer.repeat ? <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">Quay lại</span> : null}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {customer.phone} · {customer.orderCount} đơn · {customer.totalSpent === null ? "Chưa có doanh số" : formatMaybe(customer.totalSpent)}
-                {customer.spentIncomplete ? " (thiếu giá một số đơn)" : ""}
-              </p>
-              {customer.channels.length ? <p className="text-sm">{customer.channels.join(", ")}</p> : null}
-              {customer.tags.length ? <p className="text-sm">{customer.tags.join(" · ")}</p> : null}
-            </Link>
-          </li>
-        ))}
-        {customers.data && shown.length === 0 ? <li className="text-sm text-muted-foreground">{rows.length === 0 ? "Chưa có khách." : "Không có khách khớp bộ lọc."}</li> : null}
-      </ul>
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="khách" onPage={list.setPage} />
+      <div className="overflow-hidden rounded-md border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 text-[11px] tracking-wide uppercase">
+              <TableHead className="w-14">STT</TableHead>
+              <TableHead>Khách hàng</TableHead>
+              <TableHead>SĐT</TableHead>
+              <TableHead>Kênh</TableHead>
+              <TableHead className="text-right">Đơn</TableHead>
+              <TableHead className="text-right">Doanh số</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.slice.map((customer, index) => (
+              <TableRow key={customer.id}>
+                <TableCell className="text-muted-foreground">{list.start + index + 1}</TableCell>
+                <TableCell>
+                  <Link to="/admin/khach/$id" params={{ id: customer.id }} className="font-medium text-primary">
+                    {customer.name}
+                  </Link>
+                  {customer.repeat ? <Badge variant="secondary" className="ml-2 text-[10px]">Quay lại</Badge> : null}
+                  {customer.tags.length ? <p className="text-xs text-muted-foreground">{customer.tags.join(" · ")}</p> : null}
+                </TableCell>
+                <TableCell>{customer.phone}</TableCell>
+                <TableCell className="text-xs">{customer.channels.join(", ") || "—"}</TableCell>
+                <TableCell className="text-right">{customer.orderCount}</TableCell>
+                <TableCell className="text-right">
+                  {customer.totalSpent === null ? "—" : formatMaybe(customer.totalSpent)}
+                  {customer.spentIncomplete ? <span className="block text-[11px] text-muted-foreground">Thiếu giá</span> : null}
+                </TableCell>
+              </TableRow>
+            ))}
+            {customers.data && shown.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                  {rows.length === 0 ? "Chưa có khách." : "Không có khách khớp bộ lọc."}
+                </TableCell>
+              </TableRow>
+            ) : null}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-card p-3">
+    <div className="rounded-md border bg-card p-3">
       <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-primary">{value}</p>
+      <p className="mt-1 text-xl font-semibold">{value}</p>
     </div>
   );
 }
