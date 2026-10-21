@@ -1,4 +1,13 @@
-import type { Branch, Department, Role, RoleModules, SePayConfig } from "./types.ts";
+import type {
+  Branch,
+  Campaign,
+  Department,
+  MessageTemplate,
+  NotifyPrefs,
+  Role,
+  RoleModules,
+  SePayConfig,
+} from "./types.ts";
 
 /** Module path mặc định theo vai — khớp menu Manage OS. */
 export const DEFAULT_ROLE_MODULES: RoleModules[] = [
@@ -33,12 +42,16 @@ export const DEFAULT_ROLE_MODULES: RoleModules[] = [
       "/admin/kpi",
       "/admin/muc-tieu",
       "/admin/sepay",
+      "/admin/chien-dich",
       "/admin/ket-noi",
+      "/admin/tin-mau",
       "/admin/sao-luu",
+      "/admin/thong-bao",
       "/admin/nhat-ky",
       "/admin/danh-gia",
       "/admin/thong-bao-noi-bo",
       "/admin/tai-lieu",
+      "/admin/goi",
       "/admin/huong-dan",
       "/admin/cai-dat",
     ],
@@ -65,6 +78,7 @@ export const DEFAULT_ROLE_MODULES: RoleModules[] = [
       "/admin/vi",
       "/admin/kpi",
       "/admin/danh-gia",
+      "/admin/tin-mau",
       "/admin/huong-dan",
     ],
   },
@@ -128,13 +142,52 @@ export function defaultSePay(): SePayConfig {
   };
 }
 
+export function defaultNotifyPrefs(): NotifyPrefs {
+  return {
+    lateOrders: true,
+    marketplaceNew: true,
+    feedbackReprint: true,
+    cashHandover: true,
+    browserPrompted: false,
+  };
+}
+
+export function defaultMessageTemplates(): MessageTemplate[] {
+  const at = new Date().toISOString();
+  return [
+    {
+      id: "tpl-remind",
+      title: "Nhắc khách lâu chưa in",
+      kind: "remind",
+      body: "Chào {ten}, Nhà In Thiên Thiên nhắc anh/chị. Lần in gần nhất cách đây {ngay} ngày. Cần in thêm thì nhắn lại giúp em nhé.",
+      updatedAt: at,
+    },
+    {
+      id: "tpl-status",
+      title: "Đơn đang in",
+      kind: "status",
+      body: "Đơn đang in, anh/chị chờ chút nhé. Cảm ơn anh/chị đã ủng hộ Nhà In Thiên Thiên.",
+      updatedAt: at,
+    },
+    {
+      id: "tpl-done",
+      title: "Đơn xong / giao",
+      kind: "status",
+      body: "Đơn đã hoàn tất. Cảm ơn anh/chị đã ủng hộ Nhà In Thiên Thiên.",
+      updatedAt: at,
+    },
+  ];
+}
+
 export function ensureOrgCollections(state: {
   branches?: Branch[];
   departments?: Department[];
   roleModules?: RoleModules[];
   announcements?: unknown[];
   documents?: unknown[];
-  settings: { sepay?: SePayConfig };
+  campaigns?: Campaign[];
+  messageTemplates?: MessageTemplate[];
+  settings: { sepay?: SePayConfig; notifyPrefs?: NotifyPrefs };
 }): boolean {
   let changed = false;
   if (!Array.isArray(state.branches) || state.branches.length === 0) {
@@ -160,12 +213,41 @@ export function ensureOrgCollections(state: {
     state.documents = [];
     changed = true;
   }
+  if (!Array.isArray(state.campaigns)) {
+    state.campaigns = [];
+    changed = true;
+  }
+  if (!Array.isArray(state.messageTemplates) || state.messageTemplates.length === 0) {
+    state.messageTemplates = defaultMessageTemplates();
+    changed = true;
+  }
   if (!state.settings.sepay) {
     state.settings.sepay = defaultSePay();
     changed = true;
   }
+  if (!state.settings.notifyPrefs) {
+    state.settings.notifyPrefs = defaultNotifyPrefs();
+    changed = true;
+  }
   return changed;
 }
+
+export const SUBSCRIPTION_FEATURES: { title: string; body: string; local: boolean }[] = [
+  { title: "Chat + đơn từ hội thoại", body: "Partner Chat API StudioBase.", local: true },
+  { title: "Đơn / QR / album / kho", body: "Domain xưởng in trên Workers/KV.", local: true },
+  { title: "Ví, chi phí, KPI, mục tiêu", body: "Sổ tiền và KPI local.", local: true },
+  { title: "Chi nhánh / bộ phận / quyền", body: "Tổ chức nhân sự local.", local: true },
+  { title: "Kết nối Fanpage / Zalo OAuth", body: "Cấu hình kênh trên StudioBase Manage.", local: false },
+  { title: "Web Push / VAPID", body: "Thông báo đẩy trình duyệt trên StudioBase.", local: false },
+  { title: "Gói thanh toán StudioBase", body: "Subscription owner trên Manage.", local: false },
+];
+
+export const MESSAGE_KIND_LABEL: Record<string, string> = {
+  remind: "Nhắc khách",
+  status: "Tình trạng đơn",
+  chat: "Chat",
+  other: "Khác",
+};
 
 export function modulesForStoredRole(role: Role, stored: RoleModules[] | undefined): string[] | null {
   const row = stored?.find((item) => item.role === role);

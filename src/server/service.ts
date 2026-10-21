@@ -70,12 +70,16 @@ import { buildWebProduct, type WebProductInput } from "@/domain/web-product";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
-import { DEFAULT_ROLE_MODULES, defaultSePay, sortBySortThenName } from "@/domain/org-desk";
+import { DEFAULT_ROLE_MODULES, defaultNotifyPrefs, defaultSePay, sortBySortThenName } from "@/domain/org-desk";
 import type {
   Announcement,
   Branch,
+  Campaign,
   Channel,
   Department,
+  MessageTemplate,
+  MessageTemplateKind,
+  NotifyPrefs,
   Order,
   OrderFile,
   OrderStatus,
@@ -90,7 +94,7 @@ import type {
   SkuMap,
   Staff,
 } from "@/domain/types";
-import { CHANNEL_LABEL, CHANNELS, ROLE_LABEL, STATUS_LABEL } from "@/domain/types";
+import { CHANNEL_LABEL, CHANNELS, MESSAGE_TEMPLATE_KINDS, ROLE_LABEL, STATUS_LABEL } from "@/domain/types";
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
 import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, handoverError, holderBalances, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
@@ -2486,6 +2490,17 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
         note: typeof raw.note === "string" ? raw.note.trim() : prev.note,
       };
     }
+    if (patch["notifyPrefs"] && typeof patch["notifyPrefs"] === "object") {
+      const raw = patch["notifyPrefs"] as Partial<NotifyPrefs>;
+      const prev = state.settings.notifyPrefs ?? defaultNotifyPrefs();
+      state.settings.notifyPrefs = {
+        lateOrders: typeof raw.lateOrders === "boolean" ? raw.lateOrders : prev.lateOrders,
+        marketplaceNew: typeof raw.marketplaceNew === "boolean" ? raw.marketplaceNew : prev.marketplaceNew,
+        feedbackReprint: typeof raw.feedbackReprint === "boolean" ? raw.feedbackReprint : prev.feedbackReprint,
+        cashHandover: typeof raw.cashHandover === "boolean" ? raw.cashHandover : prev.cashHandover,
+        browserPrompted: typeof raw.browserPrompted === "boolean" ? raw.browserPrompted : prev.browserPrompted,
+      };
+    }
     recalcBoms(state);
     audit(state, actor.id, "settings.update", "settings", before, state.settings);
   });
@@ -3800,4 +3815,126 @@ export async function getSePayConfig(actor: Actor) {
     sepay,
     bank: state.settings.bank ?? null,
   };
+}
+
+/* ── Extend: chiến dịch / tin mẫu / thông báo prefs / gói ── */
+
+export async function listCampaigns(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const campaigns = sortBySortThenName(state.campaigns ?? []);
+  return {
+    campaigns: campaigns.map((row) => ({
+      ...row,
+      orderCount: state.orders.filter((order) => order.campaignId === row.id).length,
+      customerCount: state.customers.filter((customer) => customer.campaignId === row.id).length,
+    })),
+  };
+}
+
+export async function saveCampaign(
+  actor: Actor,
+  input: { id?: string; name: string; note?: string; active?: boolean; sort?: number },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const name = input.name.trim();
+    if (name.length < 2) throw new Error("Tên chiến dịch cần ít nhất 2 ký tự.");
+    if (!state.campaigns) state.campaigns = [];
+    if (input.id) {
+      const row = state.campaigns.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy chiến dịch.");
+      row.name = name;
+      if (input.note !== undefined) row.note = input.note.trim();
+      if (input.active !== undefined) row.active = input.active;
+      if (input.sort !== undefined) row.sort = input.sort;
+      audit(state, actor.id, "campaign.update", row.id, null, { name });
+      return;
+    }
+    const row: Campaign = {
+      id: nid(),
+      name,
+      note: (input.note ?? "").trim(),
+      active: input.active !== false,
+      sort: input.sort ?? state.campaigns.length,
+      createdAt: nowIso(),
+    };
+    state.campaigns.push(row);
+    audit(state, actor.id, "campaign.create", row.id, null, { name });
+  });
+}
+
+export async function removeCampaign(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.campaigns ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy chiến dịch.");
+    const [removed] = list.splice(at, 1);
+    for (const order of state.orders) {
+      if (order.campaignId === id) order.campaignId = null;
+    }
+    for (const customer of state.customers) {
+      if (customer.campaignId === id) customer.campaignId = null;
+    }
+    audit(state, actor.id, "campaign.remove", id, removed, null);
+  });
+}
+
+export async function listMessageTemplates(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const rows = (state.messageTemplates ?? []).slice().sort((a, b) => a.title.localeCompare(b.title, "vi"));
+  return { templates: rows };
+}
+
+export async function saveMessageTemplate(
+  actor: Actor,
+  input: { id?: string; title: string; body: string; kind: MessageTemplateKind },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const title = input.title.trim();
+    const body = input.body.trim();
+    if (title.length < 2) throw new Error("Tiêu đề cần ít nhất 2 ký tự.");
+    if (!body) throw new Error("Nội dung tin mẫu trống.");
+    if (!MESSAGE_TEMPLATE_KINDS.includes(input.kind)) throw new Error("Loại tin không hợp lệ.");
+    if (!state.messageTemplates) state.messageTemplates = [];
+    if (input.id) {
+      const row = state.messageTemplates.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy tin mẫu.");
+      row.title = title;
+      row.body = body;
+      row.kind = input.kind;
+      row.updatedAt = nowIso();
+      audit(state, actor.id, "template.update", row.id, null, { title });
+      return;
+    }
+    const row: MessageTemplate = {
+      id: nid(),
+      title,
+      body,
+      kind: input.kind,
+      updatedAt: nowIso(),
+    };
+    state.messageTemplates.unshift(row);
+    audit(state, actor.id, "template.create", row.id, null, { title });
+  });
+}
+
+export async function removeMessageTemplate(actor: Actor, id: string) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const list = state.messageTemplates ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy tin mẫu.");
+    const [removed] = list.splice(at, 1);
+    audit(state, actor.id, "template.remove", id, removed, null);
+  });
+}
+
+export async function getNotifyPrefs(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  return { notifyPrefs: state.settings.notifyPrefs ?? defaultNotifyPrefs() };
 }

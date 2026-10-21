@@ -1,5 +1,13 @@
 import { ensureOrgCollections } from "./org-desk.ts";
-import type { Branch, Department, RoleModules, SePayConfig } from "./types.ts";
+import type {
+  Branch,
+  Campaign,
+  Department,
+  MessageTemplate,
+  NotifyPrefs,
+  RoleModules,
+  SePayConfig,
+} from "./types.ts";
 
 const LEGACY_ANH_THO = "Miễn phí khôi phục, thay áo, đổi nền. Không giới hạn số lần sửa.";
 const NEXT_ANH_THO = "Hỗ trợ chỉnh sửa ảnh cơ bản.";
@@ -30,6 +38,7 @@ type Migratable = {
     zaloDefaultMigrated?: boolean;
     groupListed?: Record<string, boolean>;
     sepay?: SePayConfig;
+    notifyPrefs?: NotifyPrefs;
   };
   groups?: ShopGroup[];
   skus?: { id: string; code: string; groupId: string }[];
@@ -39,6 +48,8 @@ type Migratable = {
   roleModules?: RoleModules[];
   announcements?: unknown[];
   documents?: unknown[];
+  campaigns?: Campaign[];
+  messageTemplates?: MessageTemplate[];
 };
 
 /** Đổi tên cũ đúng nguyên văn. Tên chủ đã sửa thì giữ. */

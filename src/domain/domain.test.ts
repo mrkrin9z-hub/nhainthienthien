@@ -491,6 +491,7 @@ test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và đ
       zaloDefaultMigrated: true,
       groupListed: { ep_go: false, trang_guong: true },
       sepay: { enabled: false, accountHint: "", webhookPath: "/api/webhooks/sepay", note: "" },
+      notifyPrefs: { lateOrders: true, marketplaceNew: true, feedbackReprint: true, cashHandover: true },
     },
     groups: [{ id: "trang_guong", name: "Tên chủ đã sửa", description: "x", turnaround: "3 ngày" }],
     skus: [{ id: "EG-40x60-C1", code: "EG-40x60-C1", groupId: "trang_guong" }],
@@ -499,6 +500,8 @@ test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và đ
     roleModules: [{ role: "owner" as const, modules: ["/admin"] }],
     announcements: [],
     documents: [],
+    campaigns: [],
+    messageTemplates: [{ id: "tpl", title: "x", body: "y", kind: "other" as const, updatedAt: "2026-01-01T00:00:00.000Z" }],
   };
   assert.equal(applyStoreMigrations(renamedByOwner), false);
   assert.equal(renamedByOwner.groups[0]?.name, "Tên chủ đã sửa");

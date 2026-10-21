@@ -1097,3 +1097,69 @@ export const getSePayConfig = createServerFn({ method: "GET" }).handler(async ()
   const { getSePayConfig: load } = await import("@/server/service");
   return load(await actor());
 });
+
+export const getCampaigns = createServerFn({ method: "GET" }).handler(async () => {
+  const { listCampaigns } = await import("@/server/service");
+  return listCampaigns(await actor());
+});
+
+export const storeCampaign = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        name: z.string().min(2),
+        note: z.string().optional(),
+        active: z.boolean().optional(),
+        sort: z.number().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveCampaign } = await import("@/server/service");
+    await saveCampaign(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteCampaign = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeCampaign } = await import("@/server/service");
+    await removeCampaign(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const getMessageTemplates = createServerFn({ method: "GET" }).handler(async () => {
+  const { listMessageTemplates } = await import("@/server/service");
+  return listMessageTemplates(await actor());
+});
+
+export const storeMessageTemplate = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        title: z.string().min(2),
+        body: z.string().min(1),
+        kind: z.enum(["remind", "status", "chat", "other"]),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveMessageTemplate } = await import("@/server/service");
+    await saveMessageTemplate(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteMessageTemplate = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeMessageTemplate } = await import("@/server/service");
+    await removeMessageTemplate(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const getNotifyPrefs = createServerFn({ method: "GET" }).handler(async () => {
+  const { getNotifyPrefs: load } = await import("@/server/service");
+  return load(await actor());
+});

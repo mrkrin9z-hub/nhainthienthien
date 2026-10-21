@@ -14,20 +14,28 @@ test("ensureOrgCollections seed cửa hàng / bộ phận / roleModules / sepay"
   const state = {
     settings: {},
   } as {
-    settings: { sepay?: { enabled: boolean; accountHint: string; webhookPath: string; note: string } };
+    settings: {
+      sepay?: { enabled: boolean; accountHint: string; webhookPath: string; note: string };
+      notifyPrefs?: { lateOrders: boolean; marketplaceNew: boolean; feedbackReprint: boolean; cashHandover: boolean };
+    };
     branches?: ReturnType<typeof defaultBranches>;
     departments?: ReturnType<typeof defaultDepartments>;
     roleModules?: typeof DEFAULT_ROLE_MODULES;
     announcements?: unknown[];
     documents?: unknown[];
+    campaigns?: unknown[];
+    messageTemplates?: { id: string }[];
   };
   assert.equal(ensureOrgCollections(state), true);
   assert.equal(state.branches?.length, 1);
   assert.equal(state.departments?.length, 3);
   assert.equal(state.roleModules?.length, 3);
   assert.ok(state.settings.sepay);
+  assert.ok(state.settings.notifyPrefs);
   assert.deepEqual(state.announcements, []);
   assert.deepEqual(state.documents, []);
+  assert.deepEqual(state.campaigns, []);
+  assert.ok((state.messageTemplates?.length ?? 0) >= 1);
   assert.equal(ensureOrgCollections(state), false);
 });
 

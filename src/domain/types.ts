@@ -152,6 +152,8 @@ export type Settings = {
   };
   /** SePay — biến động số dư → ví cửa hàng (cấu hình local). */
   sepay?: SePayConfig;
+  /** Cảnh báo trong app (không phải Web Push). */
+  notifyPrefs?: NotifyPrefs;
 };
 
 export type Staff = {
@@ -227,6 +229,37 @@ export type SePayConfig = {
   /** URL webhook (hiển thị để dán vào SePay) */
   webhookPath: string;
   note: string;
+};
+
+/** Nguồn / chiến dịch ads (local — gắn đơn hoặc khách). */
+export type Campaign = {
+  id: string;
+  name: string;
+  note: string;
+  active: boolean;
+  sort: number;
+  createdAt: string;
+};
+
+export const MESSAGE_TEMPLATE_KINDS = ["remind", "status", "chat", "other"] as const;
+export type MessageTemplateKind = (typeof MESSAGE_TEMPLATE_KINDS)[number];
+
+/** Tin mẫu chép tay (OAuth kênh vẫn trên StudioBase). */
+export type MessageTemplate = {
+  id: string;
+  title: string;
+  body: string;
+  kind: MessageTemplateKind;
+  updatedAt: string;
+};
+
+/** Tuỳ chọn cảnh báo trong app (Web Push VAPID vẫn Manage). */
+export type NotifyPrefs = {
+  lateOrders: boolean;
+  marketplaceNew: boolean;
+  feedbackReprint: boolean;
+  cashHandover: boolean;
+  browserPrompted?: boolean;
 };
 
 export type Group = {
@@ -307,6 +340,8 @@ export type Customer = {
   addresses?: string[];
   /** TikTok Buyer Username hoặc Shopee Người Mua. Chỉ để nhận khách khi số bị che. */
   platformBuyer?: string;
+  /** Chiến dịch / nguồn ads gắn khách. */
+  campaignId?: string | null;
 };
 
 export type OrderFile = {
@@ -367,6 +402,8 @@ export type Order = {
   customerNote: string;
   internalNote: string;
   dueDate: string | null;
+  /** Chiến dịch / nguồn ads gắn đơn. */
+  campaignId?: string | null;
   marketplaceCode: string;
   /** Tên người nhận trên sàn. Không ghi đè tên khách đã nhập tại tiệm. */
   recipientName?: string;
@@ -552,4 +589,8 @@ export type ShopState = {
   announcements?: Announcement[];
   /** Kho tài liệu nội bộ. */
   documents?: ShopDocument[];
+  /** Chiến dịch / nguồn ads. */
+  campaigns?: Campaign[];
+  /** Tin mẫu chép tay. */
+  messageTemplates?: MessageTemplate[];
 };
