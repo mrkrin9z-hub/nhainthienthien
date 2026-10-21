@@ -604,6 +604,8 @@ export const storeStaff = createServerFn({ method: "POST" })
         probation: z.boolean().optional(),
         hiredAt: z.string().nullable().optional(),
         active: z.boolean().optional(),
+        branchId: z.string().nullable().optional(),
+        departmentId: z.string().nullable().optional(),
       })
       .parse(data),
   )
@@ -943,3 +945,155 @@ export const removeFile = createServerFn({ method: "POST" })
     await deleteStoredFile(await actor(), data.fileId);
     return { ok: true };
   });
+
+export const getOrg = createServerFn({ method: "GET" }).handler(async () => {
+  const { listOrg } = await import("@/server/service");
+  return listOrg(await actor());
+});
+
+export const storeBranch = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        name: z.string().min(2),
+        address: z.string().optional(),
+        phone: z.string().optional(),
+        active: z.boolean().optional(),
+        sort: z.number().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveBranch } = await import("@/server/service");
+    await saveBranch(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteBranch = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeBranch } = await import("@/server/service");
+    await removeBranch(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const storeDepartment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        name: z.string().min(2),
+        note: z.string().optional(),
+        active: z.boolean().optional(),
+        sort: z.number().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveDepartment } = await import("@/server/service");
+    await saveDepartment(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteDepartment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeDepartment } = await import("@/server/service");
+    await removeDepartment(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const storeRoleModules = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        rows: z.array(
+          z.object({
+            role: z.enum(["owner", "sale", "production"]),
+            modules: z.array(z.string()),
+          }),
+        ),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveRoleModules } = await import("@/server/service");
+    await saveRoleModules(await actor(), data.rows);
+    return { ok: true };
+  });
+
+export const getAnnouncements = createServerFn({ method: "GET" }).handler(async () => {
+  const { listAnnouncements } = await import("@/server/service");
+  return listAnnouncements(await actor());
+});
+
+export const storeAnnouncement = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        title: z.string().min(2),
+        body: z.string(),
+        pinned: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveAnnouncement } = await import("@/server/service");
+    await saveAnnouncement(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteAnnouncement = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeAnnouncement } = await import("@/server/service");
+    await removeAnnouncement(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const getDocuments = createServerFn({ method: "GET" }).handler(async () => {
+  const { listDocuments } = await import("@/server/service");
+  return listDocuments(await actor());
+});
+
+export const storeDocument = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string().optional(),
+        title: z.string().min(2),
+        body: z.string().optional(),
+        url: z.string().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveDocument } = await import("@/server/service");
+    await saveDocument(await actor(), data);
+    return { ok: true };
+  });
+
+export const deleteDocument = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeDocument } = await import("@/server/service");
+    await removeDocument(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const getOrderFeedback = createServerFn({ method: "GET" }).handler(async () => {
+  const { listOrderFeedback } = await import("@/server/service");
+  return listOrderFeedback(await actor());
+});
+
+export const getTargets = createServerFn({ method: "GET" }).handler(async () => {
+  const { getTargets: load } = await import("@/server/service");
+  return load(await actor());
+});
+
+export const getSePayConfig = createServerFn({ method: "GET" }).handler(async () => {
+  const { getSePayConfig: load } = await import("@/server/service");
+  return load(await actor());
+});

@@ -70,20 +70,27 @@ import { buildWebProduct, type WebProductInput } from "@/domain/web-product";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
+import { DEFAULT_ROLE_MODULES, defaultSePay, sortBySortThenName } from "@/domain/org-desk";
 import type {
+  Announcement,
+  Branch,
   Channel,
+  Department,
   Order,
   OrderFile,
   OrderStatus,
   PhotoAlbum,
   Role,
+  RoleModules,
   CashHandover,
+  SePayConfig,
+  ShopDocument,
   ShopState,
   Sku,
   SkuMap,
   Staff,
 } from "@/domain/types";
-import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL } from "@/domain/types";
+import { CHANNEL_LABEL, CHANNELS, ROLE_LABEL, STATUS_LABEL } from "@/domain/types";
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
 import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, handoverError, holderBalances, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
@@ -2397,7 +2404,11 @@ export async function getSettings(actor: Actor) {
       active: person.active,
       probation: person.probation,
       hiredAt: person.hiredAt,
+      branchId: person.branchId ?? null,
+      departmentId: person.departmentId ?? null,
     })),
+    branches: sortBySortThenName(state.branches ?? []),
+    departments: sortBySortThenName(state.departments ?? []),
   };
 }
 
@@ -2465,15 +2476,47 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
       if (next) state.settings.bank = next;
       else delete state.settings.bank;
     }
+    if (patch["sepay"] && typeof patch["sepay"] === "object") {
+      const raw = patch["sepay"] as Partial<SePayConfig>;
+      const prev = state.settings.sepay ?? defaultSePay();
+      state.settings.sepay = {
+        enabled: typeof raw.enabled === "boolean" ? raw.enabled : prev.enabled,
+        accountHint: typeof raw.accountHint === "string" ? raw.accountHint.trim() : prev.accountHint,
+        webhookPath: typeof raw.webhookPath === "string" && raw.webhookPath.trim() ? raw.webhookPath.trim() : prev.webhookPath,
+        note: typeof raw.note === "string" ? raw.note.trim() : prev.note,
+      };
+    }
     recalcBoms(state);
     audit(state, actor.id, "settings.update", "settings", before, state.settings);
   });
 }
 
-export async function saveStaff(actor: Actor, input: { id?: string; name: string; email: string; role: Role; password?: string; probation?: boolean; hiredAt?: string | null; active?: boolean }) {
+export async function saveStaff(
+  actor: Actor,
+  input: {
+    id?: string;
+    name: string;
+    email: string;
+    role: Role;
+    password?: string;
+    probation?: boolean;
+    hiredAt?: string | null;
+    active?: boolean;
+    branchId?: string | null;
+    departmentId?: string | null;
+  },
+) {
   assertRole(actor, ["owner"]);
   await mutate(async (state) => {
     if (input.password && input.password.trim().length < 8) throw new Error("Mật khẩu cần ít nhất 8 ký tự.");
+    if (input.branchId) {
+      const ok = (state.branches ?? []).some((branch) => branch.id === input.branchId);
+      if (!ok) throw new Error("Chi nhánh không tồn tại.");
+    }
+    if (input.departmentId) {
+      const ok = (state.departments ?? []).some((dept) => dept.id === input.departmentId);
+      if (!ok) throw new Error("Bộ phận không tồn tại.");
+    }
     if (input.id) {
       const person = state.staff.find((item) => item.id === input.id);
       if (!person) throw new Error("Không thấy tài khoản.");
@@ -2488,6 +2531,8 @@ export async function saveStaff(actor: Actor, input: { id?: string; name: string
       if (input.probation !== undefined) person.probation = input.probation;
       if (input.hiredAt !== undefined) person.hiredAt = input.hiredAt;
       if (input.active !== undefined) person.active = input.active;
+      if (input.branchId !== undefined) person.branchId = input.branchId;
+      if (input.departmentId !== undefined) person.departmentId = input.departmentId;
       if (input.password) {
         person.passwordHash = await hashPassword(input.password);
         person.mustChangePassword = true;
@@ -2506,6 +2551,8 @@ export async function saveStaff(actor: Actor, input: { id?: string; name: string
       mustChangePassword: true,
       probation: Boolean(input.probation),
       hiredAt: input.hiredAt ?? null,
+      branchId: input.branchId ?? null,
+      departmentId: input.departmentId ?? null,
     });
   });
 }
@@ -3470,4 +3517,287 @@ export async function publicProductPhoto(slug: string) {
   const state = await readState();
   if (!state.settings.productPhotos?.[slug]) return null;
   return readProductPhoto(slug);
+}
+
+/* ── Org desk: chi nhánh / bộ phận / nhóm quyền / TB / tài liệu / feedback ── */
+
+export async function listOrg(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  return {
+    branches: sortBySortThenName(state.branches ?? []),
+    departments: sortBySortThenName(state.departments ?? []),
+    roleModules: (state.roleModules ?? DEFAULT_ROLE_MODULES).map((row) => ({
+      role: row.role,
+      label: ROLE_LABEL[row.role],
+      modules: [...row.modules],
+    })),
+    staff: state.staff.map((person) => ({
+      id: person.id,
+      name: person.name,
+      role: person.role,
+      branchId: person.branchId ?? null,
+      departmentId: person.departmentId ?? null,
+      active: person.active,
+    })),
+  };
+}
+
+export async function saveBranch(
+  actor: Actor,
+  input: { id?: string; name: string; address?: string; phone?: string; active?: boolean; sort?: number },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const name = input.name.trim();
+    if (name.length < 2) throw new Error("Tên cửa hàng cần ít nhất 2 ký tự.");
+    if (!state.branches) state.branches = [];
+    if (input.id) {
+      const row = state.branches.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy cửa hàng.");
+      row.name = name;
+      if (input.address !== undefined) row.address = input.address.trim();
+      if (input.phone !== undefined) row.phone = input.phone.replace(/\D/g, "");
+      if (input.active !== undefined) row.active = input.active;
+      if (input.sort !== undefined) row.sort = input.sort;
+      audit(state, actor.id, "branch.update", row.id, null, { name: row.name });
+      return;
+    }
+    const row: Branch = {
+      id: nid(),
+      name,
+      address: (input.address ?? "").trim(),
+      phone: (input.phone ?? "").replace(/\D/g, ""),
+      active: input.active !== false,
+      sort: input.sort ?? state.branches.length,
+    };
+    state.branches.push(row);
+    audit(state, actor.id, "branch.create", row.id, null, { name: row.name });
+  });
+}
+
+export async function removeBranch(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.branches ?? [];
+    if (list.length <= 1) throw new Error("Cần giữ ít nhất một cửa hàng.");
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy cửa hàng.");
+    const [removed] = list.splice(at, 1);
+    for (const person of state.staff) {
+      if (person.branchId === id) person.branchId = null;
+    }
+    audit(state, actor.id, "branch.remove", id, removed, null);
+  });
+}
+
+export async function saveDepartment(
+  actor: Actor,
+  input: { id?: string; name: string; note?: string; active?: boolean; sort?: number },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const name = input.name.trim();
+    if (name.length < 2) throw new Error("Tên bộ phận cần ít nhất 2 ký tự.");
+    if (!state.departments) state.departments = [];
+    if (input.id) {
+      const row = state.departments.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy bộ phận.");
+      row.name = name;
+      if (input.note !== undefined) row.note = input.note.trim();
+      if (input.active !== undefined) row.active = input.active;
+      if (input.sort !== undefined) row.sort = input.sort;
+      audit(state, actor.id, "department.update", row.id, null, { name: row.name });
+      return;
+    }
+    const row: Department = {
+      id: nid(),
+      name,
+      note: (input.note ?? "").trim(),
+      active: input.active !== false,
+      sort: input.sort ?? state.departments.length,
+    };
+    state.departments.push(row);
+    audit(state, actor.id, "department.create", row.id, null, { name: row.name });
+  });
+}
+
+export async function removeDepartment(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.departments ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy bộ phận.");
+    const [removed] = list.splice(at, 1);
+    for (const person of state.staff) {
+      if (person.departmentId === id) person.departmentId = null;
+    }
+    audit(state, actor.id, "department.remove", id, removed, null);
+  });
+}
+
+export async function saveRoleModules(actor: Actor, rows: RoleModules[]) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const next: RoleModules[] = [];
+    for (const role of ["owner", "sale", "production"] as Role[]) {
+      const found = rows.find((row) => row.role === role);
+      const modules = (found?.modules ?? DEFAULT_ROLE_MODULES.find((row) => row.role === role)?.modules ?? [])
+        .map((path) => path.trim())
+        .filter((path) => path.startsWith("/admin"));
+      if (modules.length === 0) throw new Error(`Nhóm ${ROLE_LABEL[role]} cần ít nhất một module.`);
+      next.push({ role, modules: [...new Set(modules)] });
+    }
+    state.roleModules = next;
+    audit(state, actor.id, "roleModules.update", "roleModules", null, next);
+  });
+}
+
+export async function listAnnouncements(actor: Actor) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  const state = await readState();
+  const rows = (state.announcements ?? []).slice().sort((a, b) => {
+    if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1;
+    return b.at.localeCompare(a.at);
+  });
+  return { announcements: rows };
+}
+
+export async function saveAnnouncement(
+  actor: Actor,
+  input: { id?: string; title: string; body: string; pinned?: boolean },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const title = input.title.trim();
+    const body = input.body.trim();
+    if (title.length < 2) throw new Error("Tiêu đề cần ít nhất 2 ký tự.");
+    if (!state.announcements) state.announcements = [];
+    if (input.id) {
+      const row = state.announcements.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy thông báo.");
+      row.title = title;
+      row.body = body;
+      if (input.pinned !== undefined) row.pinned = input.pinned;
+      audit(state, actor.id, "announcement.update", row.id, null, { title });
+      return;
+    }
+    const row: Announcement = {
+      id: nid(),
+      title,
+      body,
+      at: nowIso(),
+      by: actor.id,
+      pinned: Boolean(input.pinned),
+    };
+    state.announcements.unshift(row);
+    audit(state, actor.id, "announcement.create", row.id, null, { title });
+  });
+}
+
+export async function removeAnnouncement(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.announcements ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy thông báo.");
+    const [removed] = list.splice(at, 1);
+    audit(state, actor.id, "announcement.remove", id, removed, null);
+  });
+}
+
+export async function listDocuments(actor: Actor) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  const state = await readState();
+  const rows = (state.documents ?? []).slice().sort((a, b) => b.at.localeCompare(a.at));
+  return { documents: rows };
+}
+
+export async function saveDocument(
+  actor: Actor,
+  input: { id?: string; title: string; body?: string; url?: string },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const title = input.title.trim();
+    if (title.length < 2) throw new Error("Tiêu đề cần ít nhất 2 ký tự.");
+    if (!state.documents) state.documents = [];
+    if (input.id) {
+      const row = state.documents.find((item) => item.id === input.id);
+      if (!row) throw new Error("Không thấy tài liệu.");
+      row.title = title;
+      if (input.body !== undefined) row.body = input.body.trim();
+      if (input.url !== undefined) row.url = input.url.trim();
+      audit(state, actor.id, "document.update", row.id, null, { title });
+      return;
+    }
+    const row: ShopDocument = {
+      id: nid(),
+      title,
+      body: (input.body ?? "").trim(),
+      url: (input.url ?? "").trim(),
+      at: nowIso(),
+      by: actor.id,
+    };
+    state.documents.unshift(row);
+    audit(state, actor.id, "document.create", row.id, null, { title });
+  });
+}
+
+export async function removeDocument(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const list = state.documents ?? [];
+    const at = list.findIndex((item) => item.id === id);
+    if (at < 0) throw new Error("Không thấy tài liệu.");
+    const [removed] = list.splice(at, 1);
+    audit(state, actor.id, "document.remove", id, removed, null);
+  });
+}
+
+export async function listOrderFeedback(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const rows = state.orders
+    .filter((order) => order.feedback)
+    .map((order) => {
+      const customer = customerName(state, order.customerId);
+      return {
+        code: order.code,
+        status: order.status,
+        statusLabel: STATUS_LABEL[order.status],
+        customerName: customer.name,
+        at: order.feedback!.at,
+        answer: order.feedback!.answer,
+        answerLabel: feedbackLabel(order.feedback!.answer),
+        note: order.feedback!.note,
+        opensReprint: feedbackOpensReprint(order.feedback!.answer),
+      };
+    })
+    .sort((a, b) => b.at.localeCompare(a.at));
+  return { feedback: rows };
+}
+
+export async function getTargets(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  const month = vnParts().month;
+  const target = kpiTarget(state.settings.shopOpenDate, month, state.settings.kpiTargets);
+  return {
+    shopOpenDate: state.settings.shopOpenDate,
+    month,
+    currentTarget: target,
+    kpiTargets: [...state.settings.kpiTargets],
+    labels: ["Tháng mở cửa", "Tháng 2", "Tháng 3", "Từ tháng 4"],
+  };
+}
+
+export async function getSePayConfig(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const state = await readState();
+  const sepay = state.settings.sepay ?? defaultSePay();
+  return {
+    sepay,
+    bank: state.settings.bank ?? null,
+  };
 }

@@ -150,6 +150,8 @@ export type Settings = {
     district: string;
     ward: string;
   };
+  /** SePay — biến động số dư → ví cửa hàng (cấu hình local). */
+  sepay?: SePayConfig;
 };
 
 export type Staff = {
@@ -162,10 +164,69 @@ export type Staff = {
   mustChangePassword: boolean;
   probation: boolean;
   hiredAt: string | null;
+  /** Chi nhánh / cửa hàng gán cho NV. Thiếu = chưa gán. */
+  branchId?: string | null;
+  /** Bộ phận (Sale / In ấn / Giao…). Thiếu = chưa gán. */
+  departmentId?: string | null;
   /** Bật thì lần đăng nhập sau bắt mã 6 số. Chủ cũng vậy, không ngoại lệ. */
   totpEnabled?: boolean;
   totpSecret?: string | null;
   totpPendingSecret?: string | null;
+};
+
+/** Cửa hàng / cơ sở in — filter đơn/ví theo chi nhánh (local). */
+export type Branch = {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  active: boolean;
+  sort: number;
+};
+
+/** Bộ phận vận hành (Sale / In ấn / Giao nhận…). */
+export type Department = {
+  id: string;
+  name: string;
+  note: string;
+  active: boolean;
+  sort: number;
+};
+
+/** Dòng ma trận quyền module (nhóm quyền). `modules` = path `/admin/...`. */
+export type RoleModules = {
+  role: Role;
+  modules: string[];
+};
+
+/** Thông báo nội bộ cho nhân viên. */
+export type Announcement = {
+  id: string;
+  title: string;
+  body: string;
+  at: string;
+  by: string | null;
+  pinned?: boolean;
+};
+
+/** Tài liệu nội bộ (link hoặc ghi chú). */
+export type ShopDocument = {
+  id: string;
+  title: string;
+  body: string;
+  url: string;
+  at: string;
+  by: string | null;
+};
+
+/** Cấu hình SePay cục bộ (webhook → ví). OAuth đầy đủ vẫn trên StudioBase. */
+export type SePayConfig = {
+  enabled: boolean;
+  /** Ghi chú / mã tài khoản nhận trên SePay */
+  accountHint: string;
+  /** URL webhook (hiển thị để dán vào SePay) */
+  webhookPath: string;
+  note: string;
 };
 
 export type Group = {
@@ -481,4 +542,14 @@ export type ShopState = {
   payrollLocks: PayrollLock[];
   audits: Audit[];
   skuMaps?: SkuMap[];
+  /** Chi nhánh / cửa hàng (optional — migrate seed nếu thiếu). */
+  branches?: Branch[];
+  /** Bộ phận (optional). */
+  departments?: Department[];
+  /** Ma trận module theo role — thiếu = dùng mặc định từ menu. */
+  roleModules?: RoleModules[];
+  /** Thông báo nội bộ. */
+  announcements?: Announcement[];
+  /** Kho tài liệu nội bộ. */
+  documents?: ShopDocument[];
 };

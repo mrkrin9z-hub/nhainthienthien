@@ -2,6 +2,7 @@ import { APPROVED_PRICES } from "./approved-prices.ts";
 import { DEFAULT_REMIND_MESSAGE } from "./crm.ts";
 import { formulaQty } from "./calc.ts";
 import { CAR_MAGNET_SIZES, FRIDGE_MAGNET_SIZES, PHOTO_PRINT_SIZES } from "./sizes.ts";
+import { DEFAULT_ROLE_MODULES, defaultBranches, defaultDepartments, defaultSePay } from "./org-desk.ts";
 import type {
   BomLine,
   Channel,
@@ -108,6 +109,7 @@ export const DEFAULT_SETTINGS: Settings = {
     { key: "khac", name: "Khác", amount: 75000, note: "Cộng các khoản mặc định là 29.400.000đ/tháng." },
     { key: "vat_tu_phu", name: "Vật tư phụ khoán", amount: 500000, note: "" },
   ],
+  sepay: defaultSePay(),
 };
 
 function sizeCm(code: string): { code: string; w: number; h: number } {
@@ -517,6 +519,11 @@ export async function buildSeed(): Promise<ShopState> {
     monthlyFixed: [],
     payrollLocks: [],
     audits: [],
+    branches: defaultBranches(),
+    departments: defaultDepartments(),
+    roleModules: DEFAULT_ROLE_MODULES.map((row) => ({ role: row.role, modules: [...row.modules] })),
+    announcements: [],
+    documents: [],
   };
 }
 

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ROLE_RIGHTS_ROWS } from "@/domain/org-desk";
 import { ROLE_LABEL, type Role } from "@/domain/types";
 import { loadSettings, storeStaff } from "@/lib/admin.functions";
 
@@ -18,16 +19,6 @@ const ROLES: { role: Role; detail: string }[] = [
   { role: "owner", detail: "Toàn bộ sổ: ví, két, chi phí, cài đặt, nhân viên, giá vốn." },
   { role: "sale", detail: "Đơn, khách, giá bán, thu tiền, nộp tiền mặt đang giữ, KPI." },
   { role: "production", detail: "In, đóng gói, giao, kho, chấm công." },
-];
-
-const RIGHTS: { job: string; owner: boolean; sale: boolean; production: boolean }[] = [
-  { job: "Đơn hàng", owner: true, sale: true, production: true },
-  { job: "Khách hàng", owner: true, sale: true, production: false },
-  { job: "Sản xuất, kho, giao", owner: true, sale: true, production: true },
-  { job: "Bảng giá, thu tiền", owner: true, sale: true, production: false },
-  { job: "Nộp tiền mặt vào két", owner: true, sale: true, production: false },
-  { job: "Ví cửa hàng, chi phí, giá vốn", owner: true, sale: false, production: false },
-  { job: "Phân quyền, cài đặt", owner: true, sale: false, production: false },
 ];
 
 type Person = {
@@ -38,6 +29,8 @@ type Person = {
   active: boolean;
   probation: boolean;
   hiredAt: string | null;
+  branchId?: string | null;
+  departmentId?: string | null;
 };
 
 const empty = {
@@ -49,6 +42,8 @@ const empty = {
   active: true,
   probation: false,
   hiredAt: null as string | null,
+  branchId: "" as string,
+  departmentId: "" as string,
 };
 
 export function StaffDesk() {
@@ -60,6 +55,8 @@ export function StaffDesk() {
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
   const staff = (settings.data?.staff ?? []) as Person[];
+  const branches = settings.data?.branches ?? [];
+  const departments = settings.data?.departments ?? [];
   const rows = staff.filter((person) => {
     if (role !== "all" && person.role !== role) return false;
     const needle = q.trim().toLowerCase();
@@ -78,7 +75,11 @@ export function StaffDesk() {
   const editing = Boolean(form.id);
 
   function openNew() {
-    setForm(empty);
+    setForm({
+      ...empty,
+      branchId: branches[0]?.id ?? "",
+      departmentId: departments[0]?.id ?? "",
+    });
     setOpen(true);
   }
 
@@ -92,6 +93,8 @@ export function StaffDesk() {
       active: person.active,
       probation: person.probation,
       hiredAt: person.hiredAt,
+      branchId: person.branchId ?? "",
+      departmentId: person.departmentId ?? "",
     });
     setOpen(true);
   }
@@ -100,7 +103,13 @@ export function StaffDesk() {
     <div className="space-y-3">
       <section className="rounded-md border bg-card p-4" aria-label="Bảng phân quyền">
         <h2 className="font-bold">Phân quyền</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Ba vai trò của xưởng in. Mỗi người một vai. Sản xuất làm việc trên đơn và kho, giá bán nằm ở chủ và sale.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Ba vai trò của xưởng in. Chi tiết chỉnh ở{" "}
+          <a href="/admin/nhom-quyen" className="font-medium text-primary">
+            Nhóm quyền
+          </a>
+          .
+        </p>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[28rem] text-sm">
             <thead>
@@ -112,7 +121,7 @@ export function StaffDesk() {
               </tr>
             </thead>
             <tbody>
-              {RIGHTS.map((row) => (
+              {ROLE_RIGHTS_ROWS.map((row) => (
                 <tr key={row.job} className="border-b last:border-0">
                   <td className="py-2 pr-3">{row.job}</td>
                   <td className="px-3 py-2">{row.owner ? "Được" : "—"}</td>
@@ -199,6 +208,8 @@ export function StaffDesk() {
                     probation: form.probation,
                     active: form.active,
                     hiredAt: form.hiredAt,
+                    branchId: form.branchId || null,
+                    departmentId: form.departmentId || null,
                   },
                 });
                 toast.success(editing ? "Đã cập nhật nhân viên" : "Đã tạo nhân viên và tài khoản");
@@ -254,6 +265,41 @@ export function StaffDesk() {
                 ))}
               </div>
               <p className="text-[11px] text-muted-foreground">Mỗi người một vai trò. Đổi quyền có hiệu lực ở lần tải trang sau.</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 border-t pt-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="staff-branch">Cửa hàng</Label>
+                <select
+                  id="staff-branch"
+                  className="mt-1 min-h-11 w-full rounded-md border bg-background px-2"
+                  value={form.branchId}
+                  onChange={(event) => setForm((current) => ({ ...current, branchId: event.target.value }))}
+                >
+                  <option value="">Chưa gán</option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="staff-dept">Bộ phận</Label>
+                <select
+                  id="staff-dept"
+                  className="mt-1 min-h-11 w-full rounded-md border bg-background px-2"
+                  value={form.departmentId}
+                  onChange={(event) => setForm((current) => ({ ...current, departmentId: event.target.value }))}
+                >
+                  <option value="">Chưa gán</option>
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <label className="flex items-center gap-2 text-sm">

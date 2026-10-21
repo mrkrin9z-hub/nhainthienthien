@@ -1,3 +1,6 @@
+import { ensureOrgCollections } from "./org-desk.ts";
+import type { Branch, Department, RoleModules, SePayConfig } from "./types.ts";
+
 const LEGACY_ANH_THO = "Miễn phí khôi phục, thay áo, đổi nền. Không giới hạn số lần sửa.";
 const NEXT_ANH_THO = "Hỗ trợ chỉnh sửa ảnh cơ bản.";
 const GLOSS_NAME = "Ảnh ép gỗ tráng gương bo viền";
@@ -26,10 +29,16 @@ type Migratable = {
     showZalo?: boolean;
     zaloDefaultMigrated?: boolean;
     groupListed?: Record<string, boolean>;
+    sepay?: SePayConfig;
   };
   groups?: ShopGroup[];
   skus?: { id: string; code: string; groupId: string }[];
   orders?: { items: { name: string }[] }[];
+  branches?: Branch[];
+  departments?: Department[];
+  roleModules?: RoleModules[];
+  announcements?: unknown[];
+  documents?: unknown[];
 };
 
 /** Đổi tên cũ đúng nguyên văn. Tên chủ đã sửa thì giữ. */
@@ -132,5 +141,6 @@ export function applyStoreMigrations(state: Migratable): boolean {
       changed = true;
     }
   }
+  if (ensureOrgCollections(state)) changed = true;
   return changed;
 }
