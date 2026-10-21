@@ -1,39 +1,31 @@
-# Chat + đơn in (StudioBase Partner Chat)
+# Facebook login qua StudioBase (không dùng data StudioBase)
 
-Ứ dụng inbox tư vấn và **tạo đơn gắn hội thoại** cho xưởng in Thiên Thiên. Kênh Fanpage/Zalo kết nối trên StudioBase; app chỉ dùng API key.
+Hai hệ thống **độc lập**.
 
-## Map thuật ngữ
-
-| StudioBase | UI xưởng in |
-|---|---|
-| Ngày chụp (`photo_date`) | Ngày nhận / hẹn in (`is_photo_date_tbd` nếu chưa chốt) |
-| Đã chụp | Đã nhận file từ khách |
-| Gửi ảnh gốc | Khách duyệt file / chọn size |
-| Chỉnh sửa | Retouch trước in |
-| Đã gửi in | Đưa vào máy in |
-| Đã có hình / giao | In xong / đã giao |
+| | Thiên Thiên | StudioBase |
+|---|---|---|
+| Chat / tin nhắn | Local (KV / ShopState) | Không kéo sang |
+| Đơn, khách, ví… | Local | Không kéo sang |
+| Facebook Developer App | Không cần đăng ký mới | Cho mượn app Meta để **ủy quyền login / nối Fanpage** |
 
 ## Cấu hình
 
-1. StudioBase → `/manage/settings/partner-chat` tạo API key.
-2. Thiên Thiên → **Quản trị → Kết nối → StudioBase Partner Chat** lưu:
-   - Chat API key
-   - Supabase anon / publishable key
+1. Chủ lấy khóa ủy quyền tại StudioBase (Partner / khóa Meta app).
+2. Thiên Thiên → **Quản trị → Kết nối → Facebook login (qua StudioBase)**:
+   - Khóa ủy quyền StudioBase
    - Webhook secret (tuỳ chọn)
-3. Đăng ký webhook HTTPS: `{origin}/api/public/studiobase-webhook`  
-   Header: `X-StudioBase-Signature: sha256=<HMAC-SHA256(raw_body, secret)>`
-
-Env dự phòng (không bắt buộc nếu đã lưu KV): `STUDIOBASE_CHAT_API_KEY`, `STUDIOBASE_ANON_KEY`, `STUDIOBASE_WEBHOOK_SECRET`.
+   - Token trang Facebook (local)
+3. Webhook (nếu dùng): `{origin}/api/public/studiobase-webhook`  
+   Sự kiện Meta chỉ được **ghi vào chat local**, không mở inbox StudioBase.
 
 ## App
 
-- Menu **Chat** (`/admin/chat`) — owner & sale
-- Layout 3 cột: hội thoại | khung chat | panel thông tin/đơn
-- Poll 5–8s; webhook ghi nhận idempotent (client vẫn poll)
+- Menu **Chat** (`/admin/chat`) — inbox Thiên Thiên (owner & sale)
+- Menu **Tin mẫu** (`/admin/tin-mau`) — local
+- Không còn màn “Mở trên StudioBase” / bridge Manage cho chi nhánh, lịch, …
 
 ## Code
 
-- Client API: `src/server/studiobase.ts`
-- Server fn: `src/lib/chat.functions.ts`
-- UI: `src/routes/admin.chat.tsx`
-- Webhook: `src/routes/api/public/studiobase-webhook.ts`
+- Chat local: `src/domain/shop-chat.ts`, `src/lib/chat.functions.ts`, `src/routes/admin.chat.tsx`
+- Ủy quyền: `src/server/studiobase.ts` (không còn Partner Chat list/send)
+- Webhook → local: `src/routes/api/public/studiobase-webhook.ts`

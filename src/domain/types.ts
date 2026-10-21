@@ -1,3 +1,7 @@
+import type { ShopChatMessage, ShopConversation } from "./shop-chat.ts";
+
+export type { ChatChannel, ShopChatMessage, ShopConversation } from "./shop-chat.ts";
+
 export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee"] as const;
 export type Channel = (typeof CHANNELS)[number];
 
@@ -258,7 +262,7 @@ export type Campaign = {
 export const MESSAGE_TEMPLATE_KINDS = ["remind", "status", "chat", "other"] as const;
 export type MessageTemplateKind = (typeof MESSAGE_TEMPLATE_KINDS)[number];
 
-/** Tin mẫu chép tay (OAuth kênh vẫn trên StudioBase). */
+/** Tin mẫu chép tay trong app Thiên Thiên. */
 export type MessageTemplate = {
   id: string;
   title: string;
@@ -267,7 +271,7 @@ export type MessageTemplate = {
   updatedAt: string;
 };
 
-/** Tuỳ chọn cảnh báo trong app (Web Push VAPID vẫn Manage). */
+/** Tuỳ chọn cảnh báo trong app (PC / PWA). */
 export type NotifyPrefs = {
   lateOrders: boolean;
   marketplaceNew: boolean;
@@ -453,6 +457,8 @@ export type Order = {
     before: { name: string; quantity: number; unitPrice: number | null }[];
     after: { name: string; quantity: number; unitPrice: number | null }[];
   }[];
+  /** Hội thoại chat local gắn đơn (nếu tạo từ Chat). */
+  chatConversationId?: string | null;
 };
 
 export type Reprint = {
@@ -605,8 +611,12 @@ export type ShopState = {
   documents?: ShopDocument[];
   /** Chiến dịch / nguồn ads (legacy — không còn menu). */
   campaigns?: Campaign[];
-  /** Tin mẫu local (legacy — dùng StudioBase Chat). */
+  /** Tin mẫu local. */
   messageTemplates?: MessageTemplate[];
+  /** Hội thoại chat Thiên Thiên (độc lập StudioBase). */
+  chatConversations?: ShopConversation[];
+  /** Tin nhắn chat Thiên Thiên. */
+  chatMessages?: ShopChatMessage[];
   /** Gói dịch vụ bán tại xưởng. */
   packages?: ServicePackage[];
   /** Id giao dịch SePay đã xử lý (idempotent). */

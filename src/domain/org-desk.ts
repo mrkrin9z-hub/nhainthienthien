@@ -33,7 +33,7 @@ export const DEFAULT_ROLE_MODULES: RoleModules[] = [
       "/admin/muc-tieu",
       "/admin/sepay",
       "/admin/ket-noi",
-      "/admin/studio/tin-mau",
+      "/admin/tin-mau",
       "/admin/sao-luu",
       "/admin/thong-bao",
       "/admin/nhat-ky",
@@ -64,7 +64,7 @@ export const DEFAULT_ROLE_MODULES: RoleModules[] = [
       "/admin/vi",
       "/admin/kpi",
       "/admin/danh-gia",
-      "/admin/studio/tin-mau",
+      "/admin/tin-mau",
     ],
   },
   {
@@ -144,10 +144,16 @@ export function ensureOrgCollections(state: {
       "/admin/thong-bao-noi-bo",
       "/admin/tai-lieu",
       "/admin/huong-dan",
-      "/admin/tin-mau",
+      "/admin/studio/tin-mau",
     ]);
     for (const row of state.roleModules) {
-      const next = [...new Set(row.modules.map((path) => (path === "/admin/tin-mau" ? "/admin/studio/tin-mau" : path)).filter((path) => !removed.has(path)))];
+      const next = [
+        ...new Set(
+          row.modules
+            .map((path) => (path === "/admin/studio/tin-mau" ? "/admin/tin-mau" : path))
+            .filter((path) => !removed.has(path)),
+        ),
+      ];
       if (next.join("\0") !== row.modules.join("\0")) {
         row.modules = next;
         changed = true;
@@ -175,6 +181,13 @@ export function ensureOrgCollections(state: {
   }
   return changed;
 }
+
+export const MESSAGE_KIND_LABEL: Record<string, string> = {
+  remind: "Nhắc khách",
+  status: "Tình trạng đơn",
+  chat: "Chat",
+  other: "Khác",
+};
 
 export function modulesForStoredRole(role: Role, stored: RoleModules[] | undefined): string[] | null {
   const row = stored?.find((item) => item.role === role);

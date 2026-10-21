@@ -72,6 +72,7 @@ import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
 import { DEFAULT_ROLE_MODULES, defaultNotifyPrefs, defaultSePay, modulesForStoredRole, sortBySortThenName } from "@/domain/org-desk";
 import { findOrderForSePay, sepayCollectAmount, sepayRejectReason, type SePayWebhookPayload } from "@/domain/sepay";
+import { extractVietnamPhone, normalizeChatChannel, type ChatChannel, type ShopChatMessage, type ShopConversation } from "@/domain/shop-chat";
 import type {
   Announcement,
   Branch,
@@ -3938,6 +3939,238 @@ export async function removeMessageTemplate(actor: Actor, id: string) {
     const [removed] = list.splice(at, 1);
     audit(state, actor.id, "template.remove", id, removed, null);
   });
+}
+
+function ensureChatCollections(state: ShopState) {
+  if (!state.chatConversations) state.chatConversations = [];
+  if (!state.chatMessages) state.chatMessages = [];
+}
+
+export async function listShopConversations(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  ensureChatCollections(state);
+  const rows = state.chatConversations!
+    .slice()
+    .sort((a, b) => String(b.lastMessageAt || b.updatedAt).localeCompare(String(a.lastMessageAt || a.updatedAt)));
+  return { conversations: rows };
+}
+
+export async function listShopChatMessages(actor: Actor, conversationId: string) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  ensureChatCollections(state);
+  const conversation = state.chatConversations!.find((item) => item.id === conversationId);
+  if (!conversation) throw new Error("Không thấy hội thoại.");
+  const messages = state
+    .chatMessages!.filter((item) => item.conversationId === conversationId)
+    .slice()
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  await mutate(async (draft) => {
+    ensureChatCollections(draft);
+    const row = draft.chatConversations!.find((item) => item.id === conversationId);
+    if (row && row.unreadCount > 0) {
+      row.unreadCount = 0;
+      row.updatedAt = nowIso();
+    }
+  });
+  const phones = messages
+    .map((item) => extractVietnamPhone(item.content))
+    .filter((item): item is string => Boolean(item));
+  return {
+    messages,
+    suggestedPhone: conversation.customerPhone || phones[phones.length - 1] || null,
+  };
+}
+
+export async function sendShopChatMessage(
+  actor: Actor,
+  input: { conversationId: string; content: string; externalCommentId?: string },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const content = input.content.trim();
+  if (!content) throw new Error("Tin nhắn trống.");
+  await mutate(async (state) => {
+    ensureChatCollections(state);
+    const conversation = state.chatConversations!.find((item) => item.id === input.conversationId);
+    if (!conversation) throw new Error("Không thấy hội thoại.");
+    const at = nowIso();
+    const message: ShopChatMessage = {
+      id: nid(),
+      conversationId: conversation.id,
+      direction: "outbound",
+      content,
+      contentType: "text",
+      mediaUrl: null,
+      externalCommentId: input.externalCommentId ?? null,
+      createdAt: at,
+      byStaffId: actor.id,
+    };
+    state.chatMessages!.push(message);
+    conversation.lastMessageAt = at;
+    conversation.lastMessagePreview = content.slice(0, 160);
+    conversation.updatedAt = at;
+    const phone = extractVietnamPhone(content);
+    if (phone && !conversation.customerPhone) conversation.customerPhone = phone;
+    audit(state, actor.id, "chat.send", conversation.id, null, { preview: content.slice(0, 80) });
+  });
+  return { ok: true as const };
+}
+
+export async function createManualConversation(
+  actor: Actor,
+  input: { customerName: string; customerPhone?: string; pageName?: string; channel?: ChatChannel; firstMessage?: string },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const name = input.customerName.trim() || "Khách";
+  const phone = (input.customerPhone || "").replace(/\D/g, "");
+  let conversationId = "";
+  await mutate(async (state) => {
+    ensureChatCollections(state);
+    const at = nowIso();
+    const conversation: ShopConversation = {
+      id: nid(),
+      channel: input.channel ?? "manual",
+      pageName: (input.pageName || "Nội bộ").trim() || "Nội bộ",
+      customerName: name,
+      customerPhone: phone,
+      externalUserId: null,
+      lastMessageAt: null,
+      lastMessagePreview: "",
+      unreadCount: 0,
+      orderCodes: [],
+      createdAt: at,
+      updatedAt: at,
+    };
+    const first = (input.firstMessage || "").trim();
+    if (first) {
+      state.chatMessages!.push({
+        id: nid(),
+        conversationId: conversation.id,
+        direction: "outbound",
+        content: first,
+        contentType: "text",
+        createdAt: at,
+        byStaffId: actor.id,
+      });
+      conversation.lastMessageAt = at;
+      conversation.lastMessagePreview = first.slice(0, 160);
+    }
+    state.chatConversations!.unshift(conversation);
+    conversationId = conversation.id;
+    audit(state, actor.id, "chat.create", conversation.id, null, { name });
+  });
+  return { id: conversationId };
+}
+
+/** Ghi tin inbound (webhook Meta / StudioBase chỉ chuyển sự kiện — lưu local). */
+export async function ingestInboundChatEvent(input: {
+  externalId?: string;
+  channel?: string;
+  pageName?: string;
+  customerName?: string;
+  customerPhone?: string;
+  externalUserId?: string;
+  content: string;
+  mediaUrl?: string | null;
+  externalCommentId?: string | null;
+  createdAt?: string;
+}) {
+  const content = input.content.trim();
+  if (!content && !input.mediaUrl) return { ok: false as const, reason: "empty" };
+  let conversationId = "";
+  await mutate(async (state) => {
+    ensureChatCollections(state);
+    const channel = normalizeChatChannel(input.channel);
+    const externalUserId = input.externalUserId?.trim() || null;
+    let conversation =
+      (externalUserId
+        ? state.chatConversations!.find((item) => item.externalUserId === externalUserId && item.channel === channel)
+        : undefined) ||
+      (input.customerPhone
+        ? state.chatConversations!.find((item) => item.customerPhone && item.customerPhone === input.customerPhone.replace(/\D/g, ""))
+        : undefined);
+    const at = input.createdAt || nowIso();
+    if (!conversation) {
+      conversation = {
+        id: nid(),
+        channel,
+        pageName: (input.pageName || "Facebook").trim() || "Facebook",
+        customerName: (input.customerName || "Khách").trim() || "Khách",
+        customerPhone: (input.customerPhone || "").replace(/\D/g, ""),
+        externalUserId,
+        lastMessageAt: at,
+        lastMessagePreview: (content || "[ảnh]").slice(0, 160),
+        unreadCount: 1,
+        orderCodes: [],
+        createdAt: at,
+        updatedAt: at,
+      };
+      state.chatConversations!.unshift(conversation);
+    } else {
+      conversation.lastMessageAt = at;
+      conversation.lastMessagePreview = (content || "[ảnh]").slice(0, 160);
+      conversation.unreadCount += 1;
+      conversation.updatedAt = at;
+      if (input.customerName?.trim()) conversation.customerName = input.customerName.trim();
+      if (input.customerPhone) conversation.customerPhone = input.customerPhone.replace(/\D/g, "");
+      if (input.pageName?.trim()) conversation.pageName = input.pageName.trim();
+    }
+    conversationId = conversation.id;
+    const messageId = input.externalId?.trim() || nid();
+    if (state.chatMessages!.some((item) => item.id === messageId)) return;
+    state.chatMessages!.push({
+      id: messageId,
+      conversationId: conversation.id,
+      direction: "inbound",
+      content: content || (input.mediaUrl ? "[ảnh]" : ""),
+      contentType: input.mediaUrl ? "image" : "text",
+      mediaUrl: input.mediaUrl ?? null,
+      externalCommentId: input.externalCommentId ?? null,
+      createdAt: at,
+      byStaffId: null,
+    });
+    const phone = extractVietnamPhone(content);
+    if (phone && !conversation.customerPhone) conversation.customerPhone = phone;
+  });
+  return { ok: true as const, conversationId };
+}
+
+export async function ordersForConversation(actor: Actor, conversationId: string) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  ensureChatCollections(state);
+  const conversation = state.chatConversations!.find((item) => item.id === conversationId);
+  if (!conversation) throw new Error("Không thấy hội thoại.");
+  const codes = new Set(conversation.orderCodes);
+  const orders = state.orders
+    .filter((order) => order.chatConversationId === conversationId || codes.has(order.code))
+    .map((order) => ({
+      id: order.id,
+      code: order.code,
+      status: order.status,
+      statusLabel: STATUS_LABEL[order.status] || order.status,
+      total: order.total,
+      depositPaid: order.depositPaid,
+      customerNote: order.customerNote,
+    }));
+  return { orders };
+}
+
+export async function linkOrderToConversation(actor: Actor, conversationId: string, orderCode: string) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    ensureChatCollections(state);
+    const conversation = state.chatConversations!.find((item) => item.id === conversationId);
+    if (!conversation) throw new Error("Không thấy hội thoại.");
+    const order = state.orders.find((item) => item.code === orderCode || item.id === orderCode);
+    if (!order) throw new Error("Không thấy đơn.");
+    order.chatConversationId = conversation.id;
+    if (!conversation.orderCodes.includes(order.code)) conversation.orderCodes.push(order.code);
+    conversation.updatedAt = nowIso();
+    audit(state, actor.id, "chat.link_order", conversation.id, null, { code: order.code });
+  });
+  return { ok: true as const };
 }
 
 export async function getNotifyPrefs(actor: Actor) {

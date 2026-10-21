@@ -1,9 +1,8 @@
 import type { Role } from "@/domain/types";
 
 /**
- * Menu Manage OS xưởng in.
- * Kênh bán (tai_tiem / facebook / tiktok / shopee) = “nhánh” — không có màn chi nhánh/bộ phận riêng.
- * Tin mẫu & OAuth kênh → StudioBase Chat. Garment / AI tools ẩn.
+ * Menu Manage OS xưởng in — toàn bộ live local, độc lập StudioBase.
+ * StudioBase chỉ dùng ở Kết nối để ủy quyền Facebook (không đăng ký Dev App mới).
  *
  * @see docs/MANAGE_OS.md
  * @see docs/STUDIOBASE_CHAT.md
@@ -14,7 +13,7 @@ export type AdminModule = {
   roles: Role[];
   managePath?: string;
   printShopOnly?: boolean;
-  mode?: "live" | "bridge";
+  mode?: "live";
 };
 
 export type AdminModuleGroup = {
@@ -30,7 +29,7 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
   {
     title: "Kinh doanh",
     items: [
-      { to: "/admin/chat", label: "Chat", roles: ["owner", "sale"], managePath: "/manage/conversations", mode: "live" },
+      { to: "/admin/chat", label: "Chat", roles: ["owner", "sale"], mode: "live" },
       { to: "/admin/don-hang", label: "Đơn hàng", roles: ["owner", "sale", "production"], managePath: "/manage/orders", mode: "live" },
       { to: "/admin/khach", label: "Khách hàng", roles: ["owner", "sale"], managePath: "/manage/customers", mode: "live" },
       { to: "/admin/thu", label: "Thu tiền", roles: ["owner", "sale"], managePath: "/manage/wallet", mode: "live" },
@@ -78,7 +77,7 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
     title: "Hệ thống",
     items: [
       { to: "/admin/ket-noi", label: "Kết nối", roles: ["owner"], mode: "live", printShopOnly: true },
-      { to: "/admin/studio/tin-mau", label: "Tin mẫu & kênh", roles: ["owner", "sale"], managePath: "/manage/messages/settings", mode: "bridge" },
+      { to: "/admin/tin-mau", label: "Tin mẫu", roles: ["owner", "sale"], mode: "live" },
       { to: "/admin/sao-luu", label: "Sao lưu", roles: ["owner"], managePath: "/manage/settings/backup", mode: "live" },
       { to: "/admin/thong-bao", label: "Thông báo đẩy", roles: ["owner"], managePath: "/manage/settings/notifications", mode: "live" },
       { to: "/admin/nhat-ky", label: "Nhật ký", roles: ["owner"], managePath: "/manage/activity-log", mode: "live" },

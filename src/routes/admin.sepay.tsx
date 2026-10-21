@@ -54,7 +54,7 @@ function SePayBody() {
     <div className="space-y-4">
       <PageToolbar
         title="SePay"
-        hint="Webhook tiền vào → khớp mã CK (mã đơn VietQR, ví dụ TT251021-001) → tự ghi thu chuyển khoản như StudioBase."
+        hint="Webhook tiền vào → khớp mã CK (mã đơn VietQR, ví dụ TT251021-001) → tự ghi thu chuyển khoản trong app."
       />
       {cfg.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       <div className="space-y-2 rounded-md border bg-card px-4 py-3 text-sm">

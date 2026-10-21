@@ -13,9 +13,6 @@ export const Route = createFileRoute("/admin/ket-noi")({
   component: ConnectPage,
 });
 
-const FIELDS: { id: "meta"; label: string; hint: string }[] = [
-  { id: "meta", label: "Meta / Facebook", hint: "Token trang hoặc ứng dụng, chưa đồng bộ đơn." },
-];
 
 function ConnectPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
@@ -81,50 +78,57 @@ function ConnectPage() {
         <SecretField field={{ id: "shopee_partner_id", label: "Partner ID", hint: "Số partner_id của app." }} saved={Boolean(status.data?.shopee_partner_id)} inputType="text" />
         <SecretField field={{ id: "shopee_partner_key", label: "Partner key", hint: "Khóa ký. Không hiện lại sau khi lưu." }} saved={Boolean(status.data?.shopee_partner_key)} />
       </ShopCard>
-      <StudioBaseCard
+      <StudioBaseFacebookCard
         apiSaved={Boolean(status.data?.studiobase_chat_api_key)}
-        anonSaved={Boolean(status.data?.studiobase_anon_key)}
         hookSaved={Boolean(status.data?.studiobase_webhook_secret)}
+        metaSaved={Boolean(status.data?.meta)}
       />
       <CarrierCards status={status.data} />
-      {FIELDS.map((field) => (
-        <div key={field.id} className="glass-card rounded-3xl p-4">
-          <SecretField field={field} saved={Boolean(status.data?.[field.id])} />
-        </div>
-      ))}
     </div>
   );
 }
 
-function StudioBaseCard({ apiSaved, anonSaved, hookSaved }: { apiSaved: boolean; anonSaved: boolean; hookSaved: boolean }) {
+function StudioBaseFacebookCard({
+  apiSaved,
+  hookSaved,
+  metaSaved,
+}: {
+  apiSaved: boolean;
+  hookSaved: boolean;
+  metaSaved: boolean;
+}) {
   const [origin, setOrigin] = useState("");
   useEffect(() => setOrigin(window.location.origin), []);
   const webhook = `${origin}/api/public/studiobase-webhook`;
   return (
     <section className="glass-card space-y-3 rounded-3xl p-4">
-      <h2 className="font-bold text-primary">StudioBase Partner Chat</h2>
+      <h2 className="font-bold text-primary">Facebook login (qua StudioBase)</h2>
       <p className="text-xs text-muted-foreground">
-        Inbox Messenger / Comment / Zalo và tạo đơn gắn hội thoại. Owner tạo API key tại StudioBase → Cài đặt → Partner Chat. App không OAuth Meta/Zalo.
+        Hai hệ thống độc lập. StudioBase chỉ cho Thiên Thiên <strong>ủy quyền Facebook</strong> bằng app Meta sẵn có — không cần đăng ký Facebook Developer App mới. Chat, đơn, khách, ví… đều lưu local trong app Thiên Thiên; không kéo tin nhắn hay data StudioBase sang đây.
       </p>
       <SecretField
-        field={{ id: "studiobase_chat_api_key", label: "Chat API key", hint: "Bearer sbchat_live_… Không hiện lại sau khi lưu." }}
+        field={{
+          id: "studiobase_chat_api_key",
+          label: "Khóa ủy quyền StudioBase",
+          hint: "Dùng để login / nối Fanpage qua app Meta của StudioBase. Không phải inbox StudioBase.",
+        }}
         saved={apiSaved}
       />
       <SecretField
-        field={{ id: "studiobase_anon_key", label: "Supabase anon / publishable key", hint: "Header apikey công khai của project StudioBase." }}
-        saved={anonSaved}
-      />
-      <SecretField
-        field={{ id: "studiobase_webhook_secret", label: "Webhook secret", hint: "Ký X-StudioBase-Signature (sha256 HMAC)." }}
+        field={{ id: "studiobase_webhook_secret", label: "Webhook secret (tuỳ chọn)", hint: "Nếu StudioBase chuyển sự kiện Meta về app — ký X-StudioBase-Signature." }}
         saved={hookSaved}
       />
-      <p className="break-all text-xs text-muted-foreground">Webhook URL: {origin ? webhook : "/api/public/studiobase-webhook"}</p>
-      <p className="text-sm font-semibold">{apiSaved && anonSaved ? "Đã có khóa Chat — mở mục Chat trên menu." : "Chưa đủ khóa Chat."}</p>
-      {apiSaved && anonSaved ? (
-        <Button asChild variant="outline" className="min-h-11">
-          <a href="/admin/chat">Mở Chat</a>
-        </Button>
-      ) : null}
+      <SecretField
+        field={{ id: "meta", label: "Token trang Facebook (local)", hint: "Page token lưu tại Thiên Thiên để gửi/nhận Messenger trên chat riêng." }}
+        saved={metaSaved}
+      />
+      <p className="break-all text-xs text-muted-foreground">Webhook URL (ghi vào chat local): {origin ? webhook : "/api/public/studiobase-webhook"}</p>
+      <p className="text-sm font-semibold">
+        {apiSaved || metaSaved ? "Đã có khóa Facebook — Chat Thiên Thiên vẫn mở bình thường (data local)." : "Chưa có khóa Facebook (chat nội bộ vẫn dùng được)."}
+      </p>
+      <Button asChild variant="outline" className="min-h-11">
+        <a href="/admin/chat">Mở Chat Thiên Thiên</a>
+      </Button>
     </section>
   );
 }
