@@ -233,7 +233,15 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(price("NCT-6x9-10", "tiktok"), 85000);
   assert.equal(price("NCT-6x9-1", "tai_tiem"), null);
   assert.equal(price("NCT-6x9-1", "tiktok"), null);
+  assert.equal(price("TG-13x18-C2", "tai_tiem"), 69000);
   assert.equal(price("TG-13x18-C2", "tiktok"), 69000);
+  assert.equal(price("TG-13x18-C3", "tai_tiem"), 89000);
+  assert.equal(price("TG-13x18-C5", "facebook"), 119000);
+  assert.match(state.prices.find((row) => row.skuId === "TG-13x18-C2" && row.channel === "tai_tiem")?.note ?? "", /xác nhận/);
+  assert.deepEqual(
+    state.staff.map((person) => person.name),
+    ["Admin", "Sale", "Sản xuất"],
+  );
   assert.equal(price("LUA-6x9-10", "tai_tiem"), 17000);
   assert.equal(price("LUA-6x9-10", "tiktok"), null);
   assert.equal(price("NX-9x19-C1", "tai_tiem"), null);
@@ -301,8 +309,9 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(fixed, 23900000);
   assert.equal(state.settings.breakevenMonth, 45126608);
   assert.equal(state.settings.breakevenDay, 1735646);
-  assert.equal(state.settings.hrDraft?.pendingOwnerApproval, true);
-  assert.equal(state.settings.kpiTargets[0], 25000000);
+  assert.equal(state.settings.hrDraft?.pendingOwnerApproval, false);
+  assert.deepEqual(state.settings.kpiTargets, [25000000, 20000000, 40000000, 60000000]);
+  assert.equal(state.settings.hrApproved20261022, true);
   assert.equal(state.settings.catalogImport20261022, true);
   assert.equal(state.skus.some((row) => row.code.includes("10x25")), false);
   const car = state.boms.find((row) => row.skuId === "NX-9x19-C1");

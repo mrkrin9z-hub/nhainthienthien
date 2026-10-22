@@ -104,7 +104,7 @@ import { CHANNEL_LABEL, CHANNELS, MESSAGE_TEMPLATE_KINDS, ROLE_LABEL, STATUS_LAB
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
 import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, handoverError, holderBalances, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
-import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
+import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, navCounts, orderDetail, orderSummary } from "@/domain/views";
 import { getRequest } from "@tanstack/react-start/server";
 
 import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
@@ -1148,6 +1148,11 @@ async function pullDueQuiet(actor: Actor) {
 export async function dashboard(actor: Actor) {
   await pullDueQuiet(actor);
   return visibleToRole(actor.role, buildDashboard(await readState(), actor));
+}
+
+export async function navBadges(actor: Actor) {
+  void actor;
+  return navCounts(await readState());
 }
 
 export async function listOrders(actor: Actor) {

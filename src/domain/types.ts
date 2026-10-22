@@ -135,8 +135,12 @@ export type Settings = {
   publicHours: string;
   /** Đã nhập bảng giá 22/10 một lần. Không chạy lại. */
   catalogImport20261022?: boolean;
-  /** Đề xuất lương, KPI, hoa hồng. Không thay số đang trả. */
+  /** Đề xuất lương, KPI, hoa hồng. Khi pendingOwnerApproval = false thì số đã vào kpiTargets / lương / hoa hồng. */
   hrDraft?: HrDraft;
+  /** Đã chép đề xuất nhân sự vào số đang dùng. Không chạy lại. */
+  hrApproved20261022?: boolean;
+  /** Đã thêm Lên đơn, COD, Nhập đơn vào menu một lần. */
+  menuLinks20261022?: boolean;
   /** Phí sàn để đối chiếu. Không thay mức 27% + 11.000đ. */
   platformFeeNote?: string;
   showAnhThe: boolean;
@@ -176,9 +180,9 @@ export type Settings = {
   shopChannels?: { id: Channel; enabled: boolean; label: string }[];
 };
 
-/** Đề xuất nhân sự chờ chủ duyệt. */
+/** Đề xuất nhân sự. pendingOwnerApproval false = chủ đã duyệt, số đang dùng. */
 export type HrDraft = {
-  pendingOwnerApproval: true;
+  pendingOwnerApproval: boolean;
   note: string;
   saleBase: number;
   probationPercent: number;

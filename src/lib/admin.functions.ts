@@ -55,6 +55,11 @@ export const getDashboard = createServerFn({ method: "GET" }).handler(async () =
   return dashboard(await actor());
 });
 
+export const getNavCounts = createServerFn({ method: "GET" }).handler(async () => {
+  const { navBadges } = await import("@/server/service");
+  return navBadges(await actor());
+});
+
 export const getOrders = createServerFn({ method: "GET" }).handler(async () => {
   const { listOrders } = await import("@/server/service");
   return listOrders(await actor());

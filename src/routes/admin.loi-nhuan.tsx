@@ -35,7 +35,7 @@ function ProfitBody() {
     <div className="space-y-4">
       <MoneyLinks />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-primary">Thu chi</h1>
+        <h1 className="text-2xl font-semibold text-primary">Lợi nhuận</h1>
         <Button
           variant="outline"
           className="min-h-11"

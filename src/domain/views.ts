@@ -197,6 +197,32 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
   };
 }
 
+const OPEN_STATUS = new Set(["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao"]);
+const MAKE_STATUS = new Set(["thiet_ke", "cho_duyet", "in", "dong_goi"]);
+
+/** Số trên menu. Đơn thử và đơn nháp không tính. */
+export function navCounts(state: ShopState): Record<string, number> {
+  const orders = state.orders.filter((order) => order.status !== "draft_upload" && order.status !== "upload_error" && !order.isTest);
+  const open = orders.filter((order) => OPEN_STATUS.has(order.status)).length;
+  const making = orders.filter((order) => MAKE_STATUS.has(order.status)).length;
+  const delivery = orders.filter((order) => order.fulfillment === "delivery" && (order.status === "dong_goi" || order.status === "giao")).length;
+  const cod = orders.filter((order) => {
+    const amount = order.shipping?.codAmount ?? 0;
+    return order.status !== "huy" && amount > 0 && !order.shipping?.codReceivedAt;
+  }).length;
+  const low = state.materials.filter((material) => material.minStock !== null && material.stock > 0 && material.stock <= material.minStock).length;
+  const chat = (state.chatConversations ?? []).reduce((sum, row) => sum + (row.unreadCount > 0 ? row.unreadCount : 0), 0);
+  return {
+    "/admin/don-hang": open,
+    "/admin/chat": chat,
+    "/admin/giao-hang": delivery,
+    "/admin/cod": cod,
+    "/admin/san-xuat": making,
+    "/admin/cong-viec": open,
+    "/admin/kho": low,
+  };
+}
+
 export function stockLabel(material: { stock: number; minStock: number | null; openingCounted?: boolean }): string {
   if (material.stock < 0) return "Tồn âm — chưa nhập tồn đầu";
   if (material.stock === 0 && material.openingCounted !== true) return "Chưa đếm";

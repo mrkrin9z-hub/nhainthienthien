@@ -41,7 +41,7 @@ function ReportBody() {
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Báo cáo chi phí</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Chi trong tháng, tách theo nhóm và theo ví. Tiền thu đơn trừ chi phí phát sinh chưa phải lợi nhuận — lợi nhuận nằm ở Thu chi, sau giá vốn và chi phí cố định.
+          Chi trong tháng, tách theo nhóm và theo ví. Tiền thu đơn trừ chi phí phát sinh chưa phải lợi nhuận — lợi nhuận nằm ở trang Lợi nhuận, sau giá vốn và chi phí cố định.
         </p>
       </div>
       <Input className="min-h-12 max-w-xs" type="month" aria-label="Tháng báo cáo chi" value={month} onChange={(e) => setMonth(e.target.value)} />

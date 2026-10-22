@@ -1,14 +1,16 @@
 import { ensureOrgCollections } from "./org-desk.ts";
 import {
+  applyApprovedHr,
   applyFeeSettings,
   channelPriceFor,
+  confirmedComboNote,
   DESK_PRODUCT_DESCRIPTION,
   DESK_PRODUCT_NAME,
   masterByCode,
   MIN_STOCK_20261022,
 } from "./price-import.ts";
 import { repairMojibake } from "./text-repair.ts";
-import type { ChannelPrice, Material, NotifyPrefs, Order, RoleModules, SePayConfig, ServicePackage, Settings, Sku } from "./types.ts";
+import type { ChannelPrice, Material, NotifyPrefs, Order, Role, RoleModules, SePayConfig, ServicePackage, Settings, Sku } from "./types.ts";
 
 const LEGACY_ANH_THO = "Miễn phí khôi phục, thay áo, đổi nền. Không giới hạn số lần sửa.";
 const NEXT_ANH_THO = "Hỗ trợ chỉnh sửa ảnh cơ bản.";
@@ -53,6 +55,7 @@ type Migratable = {
   materials?: Material[];
   orders?: (Order | { code?: string; isTest?: boolean; customerId?: string; items: { name: string }[]; history?: { note: string }[]; customerNote?: string; internalNote?: string; stockWarning?: string })[];
   customers?: { id: string; name: string; phone: string }[];
+  staff?: { id: string; email: string; name: string; role: Role | string }[];
   movements?: { reason: string; note: string }[];
   roleModules?: RoleModules[];
   packages?: ServicePackage[];
@@ -163,6 +166,10 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (repairStoredText(state)) changed = true;
   if (markKnownTestOrders(state)) changed = true;
   if (importCatalogOnce(state)) changed = true;
+  if (approveHrOnce(state)) changed = true;
+  if (confirmDeskCombos(state)) changed = true;
+  if (renameDeskStaff(state)) changed = true;
+  if (grantDeskLinks(state)) changed = true;
   if (ensureOrgCollections(state)) changed = true;
   return changed;
 }
@@ -299,5 +306,60 @@ function importCatalogOnce(state: Migratable): boolean {
     state.settings.groupListed.tkb = true;
     state.settings.groupListed.lua = true;
   }
+  return true;
+}
+
+function approveHrOnce(state: Migratable): boolean {
+  const settings = state.settings as Settings;
+  if (settings.hrApproved20261022) return false;
+  if (!settings.fixedCosts) return false;
+  applyApprovedHr(settings);
+  return true;
+}
+
+function confirmDeskCombos(state: Migratable): boolean {
+  if (!state.prices?.length) return false;
+  let changed = false;
+  for (const price of state.prices) {
+    const note = confirmedComboNote(price.skuId);
+    if (!note || price.note === note) continue;
+    price.note = note;
+    changed = true;
+  }
+  return changed;
+}
+
+const DESK_STAFF_NAMES: Record<string, string> = {
+  "Chủ tiệm": "Admin",
+  "Nhân viên sale": "Sale",
+  "Nhân viên sản xuất": "Sản xuất",
+};
+
+function renameDeskStaff(state: Migratable): boolean {
+  let changed = false;
+  for (const person of state.staff ?? []) {
+    const next = DESK_STAFF_NAMES[person.name];
+    if (!next || next === person.name) continue;
+    person.name = next;
+    changed = true;
+  }
+  return changed;
+}
+
+const ADDED_MENU_LINKS: Record<string, string[]> = {
+  owner: ["/admin/don-moi", "/admin/cod", "/admin/nhap-don"],
+  sale: ["/admin/don-moi", "/admin/cod", "/admin/nhap-don"],
+};
+
+function grantDeskLinks(state: Migratable): boolean {
+  const settings = state.settings as Settings;
+  if (settings.menuLinks20261022) return false;
+  if (!settings.fixedCosts || !state.roleModules?.length) return false;
+  for (const row of state.roleModules) {
+    for (const path of ADDED_MENU_LINKS[row.role] ?? []) {
+      if (!row.modules.includes(path)) row.modules.push(path);
+    }
+  }
+  settings.menuLinks20261022 = true;
   return true;
 }

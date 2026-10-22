@@ -6,11 +6,18 @@ import { ADMIN_MODULE_GROUPS, MANAGE_SKIP, modulesForRole } from "../admin-os/mo
 
 test("menu đủ nhóm vận hành và ẩn garment/tools", () => {
   const titles = ADMIN_MODULE_GROUPS.map((group) => group.title);
-  assert.ok(titles.includes("Kinh doanh"));
-  assert.ok(titles.includes("Sản xuất"));
-  assert.ok(titles.includes("Vận hành"));
-  assert.ok(titles.includes("Tài chính"));
-  assert.ok(titles.includes("Hệ thống"));
+  assert.deepEqual(titles, ["Tổng quan", "Bán hàng", "Sản xuất", "Sản phẩm & Giá", "Tài chính", "Nhân sự", "Hệ thống"]);
+  const selling = ADMIN_MODULE_GROUPS.find((group) => group.title === "Bán hàng")?.items.map((item) => item.label) ?? [];
+  assert.ok(selling.includes("Đơn hàng"));
+  assert.ok(selling.includes("Lên đơn"));
+  assert.ok(selling.includes("Giao hàng"));
+  assert.ok(selling.includes("COD"));
+  assert.ok(selling.includes("Khách hàng"));
+  assert.ok(selling.includes("Chat"));
+  const making = ADMIN_MODULE_GROUPS.find((group) => group.title === "Sản xuất")?.items.map((item) => item.to) ?? [];
+  assert.ok(making.includes("/admin/cong-viec"));
+  assert.ok(making.includes("/admin/lich"));
+  assert.ok(making.includes("/admin/kho"));
   assert.deepEqual([...MANAGE_SKIP].sort(), ["/manage/garments", "/manage/tools"].sort());
 });
 

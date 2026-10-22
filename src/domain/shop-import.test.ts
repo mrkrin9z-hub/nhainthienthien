@@ -4,7 +4,7 @@ import test from "node:test";
 import { sheetMargin } from "./calc.ts";
 import { applyStoreMigrations } from "./migrate-shop.ts";
 import { amountDue, codExpected, remainOf } from "./money.ts";
-import { parseMasterSheet, sheetCodeToApp } from "./price-import.ts";
+import { inactiveSkuRows, parseMasterSheet, sheetCodeToApp } from "./price-import.ts";
 import { buildSeed, DEFAULT_SETTINGS } from "./seed.ts";
 import { repairMojibake } from "./text-repair.ts";
 
@@ -84,6 +84,15 @@ test("sổ cũ được nhập một lần, sổ không có giá thì không đ�
     note: "",
     createdAt: "2026-10-22T00:00:00.000Z",
   });
+  legacy.staff.find((person) => person.role === "owner")!.name = "Chủ tiệm";
+  legacy.staff.find((person) => person.role === "sale")!.name = "Nhân viên sale";
+  legacy.staff.find((person) => person.role === "production")!.name = "Nhân viên sản xuất";
+  legacy.settings.hrApproved20261022 = false;
+  legacy.settings.menuLinks20261022 = false;
+  legacy.settings.kpiTargets = [25000000, 40000000, 49100000, 49100000];
+  for (const row of legacy.roleModules) {
+    row.modules = row.modules.filter((path) => path !== "/admin/don-moi" && path !== "/admin/cod" && path !== "/admin/nhap-don");
+  }
   assert.equal(applyStoreMigrations(legacy), true);
   assert.equal(legacy.settings.catalogImport20261022, true);
   assert.equal(legacy.settings.breakevenMonth, 45126608);
@@ -97,6 +106,18 @@ test("sổ cũ được nhập một lần, sổ không có giá thì không đ�
   assert.match(legacy.orders.at(-1)?.items[0]?.name ?? "", /để bàn — 13×18/);
   assert.equal(legacy.materials.find((row) => row.id === "tui")?.packPrice, 500);
   assert.equal(legacy.materials.find((row) => row.id === "giay-pp")?.stock, 0);
+  assert.deepEqual(legacy.settings.kpiTargets, [25000000, 20000000, 40000000, 60000000]);
+  assert.equal(legacy.settings.hrDraft?.pendingOwnerApproval, false);
+  assert.deepEqual(
+    legacy.staff.map((person) => person.name),
+    ["Admin", "Sale", "Sản xuất"],
+  );
+  assert.ok(legacy.roleModules.find((row) => row.role === "owner")?.modules.includes("/admin/don-moi"));
+  assert.ok(legacy.roleModules.find((row) => row.role === "sale")?.modules.includes("/admin/cod"));
+  assert.equal(legacy.roleModules.find((row) => row.role === "production")?.modules.includes("/admin/don-moi"), false);
+  assert.match(legacy.prices.find((row) => row.skuId === "TG-13x18-C3" && row.channel === "tai_tiem")?.note ?? "", /89\.000/);
+  const inactive = inactiveSkuRows(legacy.skus, legacy.prices, legacy.groups);
+  assert.equal(inactive.length, 81);
   assert.equal(applyStoreMigrations(legacy), false);
 
   const bare = {

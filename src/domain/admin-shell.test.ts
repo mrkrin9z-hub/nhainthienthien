@@ -100,7 +100,9 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../routes/admin.cong-viec.tsx", import.meta.url), "utf8"), /Công việc xưởng/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Nhân viên đang giữ/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Trong ví cửa hàng/);
-  assert.match(modules, /Kinh doanh/);
+  assert.match(modules, /Bán hàng/);
+  assert.match(desk, /aria-expanded/);
+  assert.match(desk, /Tổng quan/);
   assert.match(readFileSync(new URL("../routes/admin.tin-mau.tsx", import.meta.url), "utf8"), /Tin mẫu/);
   assert.match(readFileSync(new URL("../routes/admin.chat.tsx", import.meta.url), "utf8"), /Chat Thiên Thiên/);
   const chat = readFileSync(new URL("../routes/admin.chat.tsx", import.meta.url), "utf8");

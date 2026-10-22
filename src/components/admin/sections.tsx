@@ -109,7 +109,7 @@ export function MoneyLinks() {
         { to: "/admin/chi-phi", label: "Chi phí" },
         { to: "/admin/vi", label: "Ví tiền" },
         { to: "/admin/bao-cao-chi", label: "Báo cáo chi" },
-        { to: "/admin/loi-nhuan", label: "Thu chi" },
+        { to: "/admin/loi-nhuan", label: "Lợi nhuận" },
         { to: "/admin/bao-cao", label: "Báo cáo" },
         { to: "/admin/kpi", label: "KPI" },
       ]}

@@ -52,7 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
   saleBase: 8000000,
   saleProbationPercent: 85,
   productionBase: 11000000,
-  kpiTargets: [25000000, 40000000, 49100000, 49100000],
+  kpiTargets: [25000000, 20000000, 40000000, 60000000],
   commissionTiers: [
     { upto: 100000000, percent: 3 },
     { upto: 200000000, percent: 5 },
@@ -67,6 +67,8 @@ export const DEFAULT_SETTINGS: Settings = {
   zaloDefaultMigrated: true,
   publicHours: "08:00–18:00",
   catalogImport20261022: true,
+  hrApproved20261022: true,
+  menuLinks20261022: true,
   platformFeeNote:
     "Hoạch toán sàn: 27% + 11.000đ/đơn. Bảng phí từng hạng mục trong file Phi-san ghi chưa xác minh, chỉ để đối chiếu.",
   showAnhThe: false,
@@ -108,8 +110,8 @@ export const DEFAULT_SETTINGS: Settings = {
   notifyPrefs: defaultNotifyPrefs(),
   shopChannels: defaultShopChannels(),
   hrDraft: {
-    pendingOwnerApproval: true,
-    note: "Đề xuất từ tab lương/KPI. KPI 20/40/60 triệu là doanh thu, không phải mốc hoa hồng. Tháng 1 trong mô tả việc cũ là 25 triệu; bảng hòa vốn bắt đầu từ tháng 2.",
+    pendingOwnerApproval: false,
+    note: "Chủ đã duyệt 22/10. Tháng mở cửa lấy 25 triệu theo mô tả việc cũ. Tháng 2 = 20 triệu, tháng 3 = 40 triệu, từ tháng 4 = 60 triệu. Hoa hồng 3% đến 100 triệu, 5% phần 100–200 triệu, 7% phần trên — không phải mốc KPI.",
     saleBase: 8000000,
     probationPercent: 85,
     productionBase: 11000000,
@@ -489,13 +491,13 @@ export async function buildSeed(): Promise<ShopState> {
     version: 1,
     settings,
     staff: [
-      { ...staffBase, id: "staff-owner", email: "chu@nhainthienthien.local", name: "Chủ tiệm", role: "owner" },
-      { ...staffBase, id: "staff-sale", email: "sale@nhainthienthien.local", name: "Nhân viên sale", role: "sale" },
+      { ...staffBase, id: "staff-owner", email: "chu@nhainthienthien.local", name: "Admin", role: "owner" },
+      { ...staffBase, id: "staff-sale", email: "sale@nhainthienthien.local", name: "Sale", role: "sale" },
       {
         ...staffBase,
         id: "staff-sx",
         email: "sx@nhainthienthien.local",
-        name: "Nhân viên sản xuất",
+        name: "Sản xuất",
         role: "production",
       },
     ],
