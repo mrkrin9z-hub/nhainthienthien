@@ -93,6 +93,9 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(modules, /Kinh doanh/);
   assert.match(readFileSync(new URL("../routes/admin.tin-mau.tsx", import.meta.url), "utf8"), /Tin mẫu/);
   assert.match(readFileSync(new URL("../routes/admin.chat.tsx", import.meta.url), "utf8"), /Chat Thiên Thiên/);
+  assert.match(readFileSync(new URL("../routes/admin.chat.tsx", import.meta.url), "utf8"), /Không lấy tin nhắn từ studiobase/);
+  assert.match(readFileSync(new URL("../routes/admin.ket-noi.tsx", import.meta.url), "utf8"), /Fanpage Nhà In/);
+  assert.match(readFileSync(new URL("../routes/api/public/meta-webhook.ts", import.meta.url), "utf8"), /meta-webhook/);
   assert.match(readFileSync(new URL("../routes/gui-anh.\$token.tsx", import.meta.url), "utf8"), /Gửi ảnh/);
   assert.match(readFileSync(new URL("../components/admin/order-qr-dialog.tsx", import.meta.url), "utf8"), /gui-anh|QR|upload/i);
   assert.match(modules, /Tài chính/);

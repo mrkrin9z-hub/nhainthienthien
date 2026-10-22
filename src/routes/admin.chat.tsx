@@ -48,13 +48,13 @@ function ChatInboxPage() {
 
   return (
     <ChatWorkspace
-      facebookLogin={Boolean(status.data?.facebookLoginViaStudioBase)}
-      metaToken={Boolean(status.data?.metaPageTokenSaved)}
+      pageConnected={Boolean(status.data?.pageConnected)}
+      pageName={status.data?.pageName ?? null}
     />
   );
 }
 
-function ChatWorkspace({ facebookLogin, metaToken }: { facebookLogin: boolean; metaToken: boolean }) {
+function ChatWorkspace({ pageConnected, pageName }: { pageConnected: boolean; pageName: string | null }) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<ChannelFilter>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -119,17 +119,19 @@ function ChatWorkspace({ facebookLogin, metaToken }: { facebookLogin: boolean; m
         <div>
           <h1 className="text-2xl font-extrabold text-primary">Chat Thiên Thiên</h1>
           <p className="text-sm text-muted-foreground">
-            Hộp thoại riêng của xưởng — lưu tại app, không lấy tin nhắn hay data StudioBase.
+            Hội thoại của Fanpage Nhà In — lưu local. Không lấy tin nhắn từ studiobase.vn.
           </p>
-          {!facebookLogin && !metaToken ? (
+          {pageConnected ? (
+            <p className="mt-1 text-xs font-semibold text-primary">Đang nối: {pageName || "Fanpage Thiên Thiên"}</p>
+          ) : (
             <p className="mt-1 text-xs text-muted-foreground">
-              Muốn nhận Messenger qua Facebook: vào{" "}
+              Chưa nối Fanpage. Vào{" "}
               <Link to="/admin/ket-noi" className="font-semibold text-primary underline">
                 Kết nối
               </Link>{" "}
-              → ủy quyền Facebook (app Meta StudioBase, không đăng ký Dev App mới).
+              dán Page token của page Nhà In (app Meta chỉ để có sẵn quyền, không kéo inbox StudioBase).
             </p>
-          ) : null}
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" className="min-h-11" onClick={() => setComposeOpen(true)}>
