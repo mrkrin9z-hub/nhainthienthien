@@ -129,7 +129,7 @@ function ChatWorkspace({ pageConnected, pageName }: { pageConnected: boolean; pa
               <Link to="/admin/ket-noi" className="font-semibold text-primary underline">
                 Kết nối
               </Link>{" "}
-              dán Page token của page Nhà In (app Meta chỉ để có sẵn quyền, không kéo inbox StudioBase).
+              bấm Kết nối Fanpage bằng Facebook (không lấy inbox StudioBase).
             </p>
           )}
         </div>

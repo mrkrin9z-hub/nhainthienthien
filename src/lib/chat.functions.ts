@@ -26,8 +26,25 @@ export const chatStatus = createServerFn({ method: "GET" }).handler(async () => 
     pageName: page.pageName,
     pageId: page.pageId,
     metaAppIdSaved: page.metaAppIdSaved,
+    oauthReady: page.oauthReady,
   };
 });
+
+export const metaConnectStatus = createServerFn({ method: "GET" }).handler(async () => {
+  const actor = await assertChatRole();
+  if (actor.role !== "owner") throw new Error("Chỉ chủ xem.");
+  const { metaPageStatus } = await import("@/server/service");
+  return metaPageStatus(actor);
+});
+
+export const chooseShopMetaPage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ pageId: z.string().trim().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const actor = await assertChatRole();
+    if (actor.role !== "owner") throw new Error("Chỉ chủ nối Fanpage.");
+    const { chooseMetaOauthPage } = await import("@/server/service");
+    return chooseMetaOauthPage(actor, data.pageId);
+  });
 
 export const connectShopMetaPage = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
