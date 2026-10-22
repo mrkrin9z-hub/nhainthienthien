@@ -26,6 +26,7 @@ function BonusPage() {
     return <p className="text-sm">Sản xuất không có thưởng sản phẩm. Lương cứng nằm ở Check lương.</p>;
   }
   const rows = (payroll.data?.rows ?? []).filter((row) => {
+    if (row.role !== "sale") return false;
     const needle = q.trim().toLowerCase();
     return !needle || row.name.toLowerCase().includes(needle);
   });
@@ -33,7 +34,7 @@ function BonusPage() {
     <div className="space-y-3">
       <PageToolbar
         title="Check thưởng"
-        hint="Thưởng đang dùng là hoa hồng sale 3% / 5% / 7% trên doanh thu đã thu. Sản xuất không có thưởng sản phẩm."
+        hint="Chỉ hoa hồng sale (3% / 5% / 7%). Sản xuất không có thưởng sản phẩm."
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm tên"
@@ -53,7 +54,7 @@ function BonusPage() {
             <DialogTitle>Cách tính thưởng</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Hoa hồng sale: 3% đến 100 triệu doanh thu đã thu, 5% từ 100 đến 200 triệu, 7% từ 200 triệu. Sản xuất nhận lương cứng, không thưởng theo sản phẩm. Tháng trước khai trương thì thưởng bằng 0.
+            Trang này chỉ tính hoa hồng sale: 3% đến 100 triệu doanh thu đã thu, 5% từ 100 đến 200 triệu, 7% từ 200 triệu. Sản xuất không có thưởng sản phẩm; lương cứng của sản xuất nằm ở Check lương. Tháng trước khai trương thì hoa hồng bằng 0.
           </p>
         </DialogContent>
       </Dialog>
@@ -67,7 +68,7 @@ function BonusPage() {
                 {row.kpiPercent != null ? ` · ${row.kpiPercent}% mục tiêu` : ""}
               </p>
             </div>
-            <p className="font-semibold">{row.role === "sale" ? formatMaybe(row.commission) : "0đ"}</p>
+            <p className="font-semibold">{formatMaybe(row.commission)}</p>
           </li>
         ))}
       </ul>

@@ -3,7 +3,7 @@ import { commissionForSale } from "./commission.ts";
 import { materialForecast } from "./forecast.ts";
 import { depositEvents, remainOf } from "./money.ts";
 import { bankLabel, deskAlerts, hasPackingPhoto, itemChangeNote, transferQrUrl } from "./print-shop.ts";
-import { orderShipping } from "./shipping.ts";
+import { onDeliveryDesk, orderShipping } from "./shipping.ts";
 import type { Order, OrderStatus, Role, ShopState } from "./types.ts";
 import { CHANNEL_LABEL, STATUS_LABEL, STATUS_REPLY } from "./types.ts";
 
@@ -205,7 +205,7 @@ export function navCounts(state: ShopState): Record<string, number> {
   const orders = state.orders.filter((order) => order.status !== "draft_upload" && order.status !== "upload_error" && !order.isTest);
   const open = orders.filter((order) => OPEN_STATUS.has(order.status)).length;
   const making = orders.filter((order) => MAKE_STATUS.has(order.status)).length;
-  const delivery = orders.filter((order) => order.fulfillment === "delivery" && (order.status === "dong_goi" || order.status === "giao")).length;
+  const delivery = orders.filter((order) => onDeliveryDesk(order) && order.status !== "xong").length;
   const cod = orders.filter((order) => {
     const amount = order.shipping?.codAmount ?? 0;
     return order.status !== "huy" && amount > 0 && !order.shipping?.codReceivedAt;

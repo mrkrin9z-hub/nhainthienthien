@@ -3532,6 +3532,7 @@ export async function deliveryBoard(actor: Actor) {
       statusLabel: STATUS_LABEL[order.status],
       channel: order.channel,
       channelLabel: CHANNEL_LABEL[order.channel],
+      fulfillment: order.fulfillment,
       customerName: customer.name,
       recipientName: order.recipientName ?? "",
       phone: customer.phone,

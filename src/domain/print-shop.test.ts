@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { readFileSync } from "node:fs";
+
 import { statusChangeError } from "./calc.ts";
+import { onDeliveryDesk } from "./shipping.ts";
 import {
   cleanBank,
   deskAlerts,
@@ -69,6 +72,59 @@ test("chưa ép, bo, tem và ảnh gói thì không sang giao", () => {
     }),
     null,
   );
+});
+
+test("nhận tại tiệm vào bảng giao; khách đã nhận không vượt cổng ảnh duyệt và checklist", () => {
+  assert.equal(onDeliveryDesk({ status: "giao", fulfillment: "pickup" }), true);
+  assert.equal(onDeliveryDesk({ status: "dong_goi", fulfillment: "pickup" }), true);
+  assert.equal(onDeliveryDesk({ status: "xong", fulfillment: "delivery" }), true);
+  assert.equal(onDeliveryDesk({ status: "nhan_don", fulfillment: "pickup" }), false);
+  assert.equal(onDeliveryDesk({ status: "huy", fulfillment: "pickup" }), false);
+  assert.equal(onDeliveryDesk({ status: "giao", fulfillment: "pickup", isTest: true }), false);
+  assert.match(
+    statusChangeError({
+      role: "sale",
+      ownerOverride: false,
+      current: "cho_duyet",
+      next: "in",
+      depositRequired: 0,
+      depositPaid: 0,
+      approvalReady: false,
+    }) ?? "",
+    /ảnh khách đã duyệt/,
+  );
+  assert.match(
+    statusChangeError({
+      role: "sale",
+      ownerOverride: false,
+      current: "dong_goi",
+      next: "giao",
+      depositRequired: 0,
+      depositPaid: 0,
+      packReady: false,
+    }) ?? "",
+    /ảnh gói/,
+  );
+  assert.equal(
+    statusChangeError({
+      role: "sale",
+      ownerOverride: false,
+      current: "giao",
+      next: "xong",
+      depositRequired: 0,
+      depositPaid: 0,
+      approvalReady: false,
+      packReady: false,
+    }),
+    null,
+  );
+  const desk = readFileSync(new URL("../routes/admin.giao-hang.tsx", import.meta.url), "utf8");
+  assert.match(desk, /Nhận tại tiệm/);
+  assert.match(desk, /Khách đã nhận/);
+  assert.equal(desk.includes("ownerOverride"), false);
+  const bonus = readFileSync(new URL("../routes/admin.thuong.tsx", import.meta.url), "utf8");
+  assert.match(bonus, /Sản xuất không có thưởng sản phẩm/);
+  assert.match(bonus, /row\.role !== "sale"/);
 });
 
 test("báo đơn sàn mới và đơn trễ, không báo đơn đã giao", () => {

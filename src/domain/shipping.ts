@@ -8,10 +8,9 @@ export function orderShipping(order: { shipping?: OrderShipping | null }): Order
   return { ...blankShipping(), ...(order.shipping ?? {}) };
 }
 
-/** Bảng giao hàng: chỉ đơn giao, từ đóng gói trở đi. Không gồm nhận tại tiệm, đơn hủy, đơn thử. */
+/** Bảng giao hàng: giao tận nơi và nhận tại tiệm, từ đóng gói trở đi. Không gồm đơn hủy, đơn thử. */
 export function onDeliveryDesk(order: Pick<Order, "status" | "fulfillment"> & { isTest?: boolean }): boolean {
   if (order.isTest) return false;
-  if (order.fulfillment !== "delivery") return false;
   return order.status === "dong_goi" || order.status === "giao" || order.status === "xong";
 }
 
