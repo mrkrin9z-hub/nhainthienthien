@@ -24,7 +24,7 @@ export const Route = createFileRoute("/tra-cuu")({
       { title: "Tra cứu đơn in — Nhà In Thiên Thiên" },
       {
         name: "description",
-        content: "Nhập số điện thoại để xem lịch sử đặt in, tiền đã trả, ảnh đã gửi và tiến trình từng đơn tại Nhà In Thiên Thiên.",
+        content: "Nhập mã đơn hoặc số điện thoại để xem tiến trình đơn tại Nhà In Thiên Thiên.",
       },
       { property: "og:title", content: "Tra cứu đơn in — Nhà In Thiên Thiên" },
       { property: "og:description", content: "Xem các đơn đã đặt, ảnh và tiến trình in ảnh." },
@@ -93,7 +93,7 @@ function LookupPage() {
       <main className="mx-auto max-w-2xl px-4 py-10 md:px-6">
         <h1 className="text-3xl font-extrabold text-primary md:text-4xl">Tra cứu đơn hàng</h1>
         <p className="mt-2 text-muted-foreground">
-          Nhập số điện thoại đã đặt để xem đơn, tiền đã trả / còn nợ, ảnh đã gửi và tiến trình xưởng (đã in, đã ship…).
+          Nhập mã đơn hoặc số điện thoại đã đặt để xem đơn, tiền đã trả, ảnh đã gửi và tiến trình (đã in, đang giao).
         </p>
 
         <form onSubmit={onSubmit} className="glass-card mt-6 space-y-4 rounded-3xl p-5">
@@ -185,7 +185,7 @@ function LookupPage() {
                 Khách hàng: {opened.customerName}
                 {channelLabel(opened.channel) ? ` · ${channelLabel(opened.channel)}` : ""}
                 {" · "}
-                {opened.fulfillment === "delivery" ? "Giao tận nơi" : "Nhận tại xưởng"}
+                {opened.fulfillment === "delivery" ? "Giao hàng" : "Nhận tại tiệm"}
                 {" · "}
                 {opened.fileCount} ảnh
               </p>

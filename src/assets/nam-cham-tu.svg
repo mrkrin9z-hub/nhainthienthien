@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#e8eef5"/>
+  <rect x="250" y="40" width="300" height="520" rx="12" fill="#d5dde8" stroke="#8aa0b8" stroke-width="6"/>
+  <rect x="280" y="160" width="110" height="150" rx="8" fill="#fff" stroke="#3d6ea8" stroke-width="6"/>
+  <text x="335" y="245" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#3d6ea8">6×9</text>
+  <rect x="410" y="180" width="110" height="150" rx="8" fill="#fff7e8" stroke="#c47b2b" stroke-width="6"/>
+  <circle cx="465" cy="255" r="18" fill="#c47b2b"/>
+  <text x="400" y="420" text-anchor="middle" font-family="sans-serif" font-size="26" fill="#244">Nam châm tç l¡nh</text>
+</svg>

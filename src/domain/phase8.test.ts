@@ -43,10 +43,11 @@ test("báo cáo: lãi ròng trừ chi phí cố định và tỉ lệ hủy", ()
   assert.equal(report.orderCount, 1);
   assert.equal(report.averageOrder, 100000);
   assert.equal(report.gross, 92600);
-  assert.equal(report.fixedSum, 29400000);
+  assert.equal(report.fixedSum, 23900000);
+  assert.equal(report.fixedCharged, 0);
   assert.equal(report.extraSum, 0);
   assert.deepEqual(report.extras, []);
-  assert.equal(report.net, 92600 - 29400000);
+  assert.equal(report.net, 92600);
   const withExtra = businessReport(
     shop({
       skus: [sku],
@@ -60,9 +61,9 @@ test("báo cáo: lãi ròng trừ chi phí cố định và tỉ lệ hủy", ()
   );
   assert.equal(withExtra.extraSum, 50000);
   assert.equal(withExtra.extras[0]?.name, "Điện phát sinh");
-  assert.equal(withExtra.net, 92600 - 29400000 - 50000);
+  assert.equal(withExtra.net, 92600 - 50000);
   assert.equal(withExtra.breakEvenPercent, report.breakEvenPercent);
-  assert.equal(report.breakEvenPercent, Math.round((92600 / 29400000) * 1000) / 10);
+  assert.equal(report.breakEvenPercent, Math.round((100000 / 45126608) * 1000) / 10);
   assert.equal(report.cancelled, 1);
   assert.equal(report.placed, 2);
   assert.equal(report.cancelRate, 50);

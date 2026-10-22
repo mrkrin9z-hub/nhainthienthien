@@ -41,7 +41,7 @@ function ReportBody() {
       <div>
         <h1 className="text-2xl font-extrabold text-primary">Báo cáo</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Doanh thu và lãi gộp lấy đơn đã xong. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh. Mặc định chi phí cố định 29.400.000đ/tháng. Chi phí phát sinh ghi ở Chi phí.
+          Doanh thu và lãi gộp lấy đơn đã xong, trừ đơn thử. Lãi ròng trừ định phí chỉ từ tháng khai trương. Định phí kế hoạch 23.900.000đ/tháng. Doanh thu hòa vốn mix khoảng 45,1 triệu — khác mục tiêu KPI.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

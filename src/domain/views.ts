@@ -1,7 +1,7 @@
-import { kpiTarget, quoteSku, vnParts, vnYmd, vnMonth } from "./calc.ts";
+import { fixedCostsApply, isWeeklyOff, kpiTarget, quoteSku, vnParts, vnYmd, vnMonth } from "./calc.ts";
 import { commissionForSale } from "./commission.ts";
 import { materialForecast } from "./forecast.ts";
-import { depositEvents } from "./money.ts";
+import { depositEvents, remainOf } from "./money.ts";
 import { bankLabel, deskAlerts, hasPackingPhoto, itemChangeNote, transferQrUrl } from "./print-shop.ts";
 import { orderShipping } from "./shipping.ts";
 import type { Order, OrderStatus, Role, ShopState } from "./types.ts";
@@ -41,7 +41,8 @@ export function orderSummary(state: ShopState, order: Order, role: Role) {
     itemSummary: order.items.map((item) => `${item.quantity}× ${item.name}`).join(", "),
     total: showMoney ? order.total : null,
     depositPaid: showMoney ? order.depositPaid : null,
-    remain: showMoney && order.total !== null ? order.total - order.depositPaid : null,
+    remain: showMoney ? remainOf(order) : null,
+    isTest: Boolean(order.isTest),
     late: isLate(state, order),
     fileCount: order.files.filter((file) => !file.deletedAt && file.status === "complete").length,
     fulfillment: order.fulfillment,
@@ -86,15 +87,18 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     return true;
   });
   const lowStock = state.materials
-    .filter((material) => material.minStock !== null && material.stock <= material.minStock)
+    .filter((material) => material.minStock !== null && material.stock > 0 && material.stock <= material.minStock)
     .map((material) => ({ id: material.id, name: material.name, stock: material.stock, unit: material.unit, min: material.minStock }));
   const onShift = state.staff
     .filter((person) =>
       state.punches.some((punch) => punch.staffId === person.id && !punch.outAt && vnYmd(punch.inAt) === clock.ymd),
     )
     .map((person) => ({ id: person.id, name: person.name, role: person.role }));
-  const mineOpen = state.punches.find((punch) => punch.staffId === actor.id && !punch.outAt) ?? null;
-  const clockedInAt = mineOpen?.inAt ?? null;
+  const mineToday = state.punches.find((punch) => punch.staffId === actor.id && !punch.outAt && vnYmd(punch.inAt) === clock.ymd) ?? null;
+  const stalePunch = state.punches.find((punch) => punch.staffId === actor.id && !punch.outAt && vnYmd(punch.inAt) !== clock.ymd) ?? null;
+  const clockedInAt = mineToday?.inAt ?? null;
+  const clockedIn = Boolean(mineToday);
+  const stalePunchAt = stalePunch?.inAt ?? null;
   if (actor.role === "production") {
     return {
       role: actor.role,
@@ -107,8 +111,9 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
       alerts,
       lowStock,
       onShift: onShift.filter((person) => person.id === actor.id),
-      clockedIn: Boolean(mineOpen),
+      clockedIn,
       clockedInAt,
+      stalePunchAt,
     };
   }
   if (actor.role === "sale") {
@@ -122,15 +127,18 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
       alerts,
       lowStock,
       onShift,
-      clockedIn: Boolean(mineOpen),
+      clockedIn,
       clockedInAt,
+      stalePunchAt,
       orders: visible.slice(0, 12).map((order) => orderSummary(state, order, actor.role)),
       kpiPercent: target > 0 ? Math.round((pay.revenue / target) * 1000) / 10 : null,
       commission: pay.commission,
       commissionBasis: pay.basis,
     };
   }
-  const doneMonth = state.orders.filter((order) => order.status === "xong" && vnMonth(order.completedAt ?? "") === clock.month);
+  const doneMonth = state.orders.filter(
+    (order) => order.status === "xong" && !order.isTest && vnMonth(order.completedAt ?? "") === clock.month,
+  );
   const revenueMonth = doneMonth.reduce((sum, order) => sum + (order.total ?? 0), 0);
   const revenueToday = doneMonth
     .filter((order) => vnYmd(order.completedAt ?? "") === clock.ymd)
@@ -158,6 +166,11 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     }
   }
   const fixed = fixedTotal(state, clock.month);
+  const beforeOpen = !fixedCostsApply(state.settings.shopOpenDate, clock.month);
+  const dayOff = isWeeklyOff(clock.ymd, state.settings.weeklyOff);
+  const workingDays = state.settings.workingDays || 26;
+  const dayTarget = workingDays > 0 ? Math.round(state.settings.breakevenMonth / workingDays) : state.settings.breakevenDay;
+  const fixedCharged = beforeOpen ? 0 : fixed;
   return {
     role: actor.role,
     name: actor.name,
@@ -166,18 +179,29 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     alerts,
     lowStock,
     onShift,
-    clockedIn: Boolean(mineOpen),
+    clockedIn,
     clockedInAt,
+    stalePunchAt,
     revenueToday,
     revenueMonth,
     breakevenPercent: state.settings.breakevenMonth ? Math.round((revenueMonth / state.settings.breakevenMonth) * 1000) / 10 : null,
-    todayGap: Math.max(0, state.settings.breakevenDay - revenueToday),
+    todayGap: beforeOpen || dayOff ? 0 : Math.max(0, dayTarget - revenueToday),
+    beforeOpen,
+    dayOff,
     gross: Math.round(gross),
     grossIncomplete,
     fixed,
-    profit: grossIncomplete ? null : Math.round(gross - fixed - extraTotal(state, clock.month)),
+    fixedCharged,
+    profit: grossIncomplete ? null : Math.round(gross - fixedCharged - extraTotal(state, clock.month)),
     orders: visible.slice(0, 12).map((order) => orderSummary(state, order, actor.role)),
   };
+}
+
+export function stockLabel(material: { stock: number; minStock: number | null; openingCounted?: boolean }): string {
+  if (material.stock < 0) return "Tồn âm — chưa nhập tồn đầu";
+  if (material.stock === 0 && material.openingCounted !== true) return "Chưa đếm";
+  if (material.minStock !== null && material.stock <= material.minStock) return "Sắp hết";
+  return "Đủ";
 }
 
 export function inventoryView(state: ShopState, role: Role) {
@@ -190,6 +214,7 @@ export function inventoryView(state: ShopState, role: Role) {
       buyLabel: material.buyLabel,
       unit: material.unit,
       stock: material.stock,
+      stockLabel: stockLabel(material),
       minStock: material.minStock,
       supplier: material.supplier,
       avgDaily: forecast.get(material.id)?.avgDaily ?? 0,
@@ -250,6 +275,7 @@ export function orderDetail(state: ShopState, order: Order, role: Role) {
         codReceivedAt: showMoney ? ship.codReceivedAt : null,
       };
     })(),
+    discount: showMoney ? (order.discount ?? null) : null,
     depositRequired: showMoney ? order.depositRequired : null,
     depositPaid: showMoney ? order.depositPaid : null,
     depositMethod: showMoney ? order.depositMethod : "",

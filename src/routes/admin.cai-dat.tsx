@@ -332,7 +332,7 @@ function SettingsBody() {
       {panel === "kenh" ? (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Kênh bán = nhánh cửa hàng Thiên Thiên. Bật kênh đang dùng và đặt tên hiển thị — không lấy cấu hình từ StudioBase.
+            Kênh bán của cửa hàng. Bật kênh đang dùng và đặt tên hiển thị.
           </p>
           <ul className="space-y-3">
             {shopChannels.map((row) => (

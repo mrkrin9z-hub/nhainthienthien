@@ -14,6 +14,7 @@ import {
   listChatConversations,
   listChatMessages,
   listConversationOrders,
+  listInquiries,
   sendChatMessage,
 } from "@/lib/chat.functions";
 import { formatMaybe } from "@/lib/brand";
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/admin/chat")({
   component: ChatInboxPage,
 });
 
-type ChannelFilter = "all" | "messenger" | "comment" | "zalo_oa" | "zalo" | "manual";
+type ChannelFilter = "all" | "messenger" | "comment" | "manual";
 
 function formatWhen(value?: string | null) {
   if (!value) return "";
@@ -66,6 +67,11 @@ function ChatWorkspace({ pageConnected, pageName }: { pageConnected: boolean; pa
     queryKey: ["chat-conversations"],
     queryFn: () => listChatConversations(),
     refetchInterval: 8_000,
+  });
+  const inquiries = useQuery({
+    queryKey: ["inquiries"],
+    queryFn: () => listInquiries(),
+    refetchInterval: 30_000,
   });
 
   const rows = useMemo(() => {
@@ -119,7 +125,7 @@ function ChatWorkspace({ pageConnected, pageName }: { pageConnected: boolean; pa
         <div>
           <h1 className="text-2xl font-extrabold text-primary">Chat Thiên Thiên</h1>
           <p className="text-sm text-muted-foreground">
-            Hội thoại của Fanpage Nhà In — lưu local. Không lấy tin nhắn từ studiobase.vn.
+            Hội thoại Fanpage Nhà In, lưu trên app này. Chưa nối Fanpage thì dùng hội thoại nội bộ.
           </p>
           {pageConnected ? (
             <p className="mt-1 text-xs font-semibold text-primary">Đang nối: {pageName || "Fanpage Thiên Thiên"}</p>
@@ -129,7 +135,7 @@ function ChatWorkspace({ pageConnected, pageName }: { pageConnected: boolean; pa
               <Link to="/admin/ket-noi" className="font-semibold text-primary underline">
                 Kết nối
               </Link>{" "}
-              bấm Kết nối Fanpage bằng Facebook (không lấy inbox StudioBase).
+              bấm Kết nối Fanpage bằng Facebook.
             </p>
           )}
         </div>
@@ -165,8 +171,6 @@ function ChatWorkspace({ pageConnected, pageName }: { pageConnected: boolean; pa
             ["all", "Tất cả"],
             ["messenger", "Messenger"],
             ["comment", "Comment"],
-            ["zalo_oa", "Zalo OA"],
-            ["zalo", "Zalo CN"],
             ["manual", "Nội bộ"],
           ] as const
         ).map(([id, label]) => (
@@ -180,6 +184,23 @@ function ChatWorkspace({ pageConnected, pageName }: { pageConnected: boolean; pa
           </button>
         ))}
       </div>
+
+      {(inquiries.data?.length ?? 0) > 0 ? (
+        <section className="max-h-40 overflow-y-auto rounded-2xl border bg-card px-3 py-2">
+          <p className="text-sm font-semibold">Tin từ trang Liên hệ ({inquiries.data?.length})</p>
+          <ul className="mt-1 space-y-2">
+            {(inquiries.data ?? []).slice(0, 12).map((row) => (
+              <li key={row.id} className="text-sm">
+                <span className="font-semibold">{row.name}</span>
+                <span className="text-muted-foreground"> · {formatWhen(row.at)}</span>
+                {row.orderCode ? <span className="text-muted-foreground"> · đơn {row.orderCode}</span> : null}
+                {row.phone ? <span className="text-muted-foreground"> · gọi lại {row.phone}</span> : null}
+                <p className="text-foreground/90">{row.message}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[minmax(16rem,0.9fr)_minmax(0,1.3fr)_minmax(16rem,1fr)]">
         <section className={`min-h-0 overflow-hidden rounded-2xl border bg-card ${mobilePane === "list" ? "block" : "hidden md:block"}`}>
@@ -353,7 +374,7 @@ function ComposeSheet({ onClose, onCreated }: { onClose: () => void; onCreated: 
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 sm:items-center">
       <div className="w-full max-w-md space-y-3 rounded-3xl bg-background p-4 shadow-xl">
         <h2 className="text-lg font-extrabold text-primary">Hội thoại nội bộ</h2>
-        <p className="text-xs text-muted-foreground">Lưu trong app Thiên Thiên. Không đồng bộ StudioBase.</p>
+        <p className="text-xs text-muted-foreground">Lưu trên app Nhà In.</p>
         <div className="space-y-1">
           <Label>Tên khách</Label>
           <Input className="min-h-11" value={name} onChange={(e) => setName(e.target.value)} />

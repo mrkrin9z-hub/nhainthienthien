@@ -103,7 +103,10 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(modules, /Kinh doanh/);
   assert.match(readFileSync(new URL("../routes/admin.tin-mau.tsx", import.meta.url), "utf8"), /Tin mẫu/);
   assert.match(readFileSync(new URL("../routes/admin.chat.tsx", import.meta.url), "utf8"), /Chat Thiên Thiên/);
-  assert.match(readFileSync(new URL("../routes/admin.chat.tsx", import.meta.url), "utf8"), /Không lấy tin nhắn từ studiobase/);
+  const chat = readFileSync(new URL("../routes/admin.chat.tsx", import.meta.url), "utf8");
+  assert.match(chat, /Tin từ trang Liên hệ/);
+  assert.doesNotMatch(chat, /Zalo OA|StudioBase|studiobase/i);
+  assert.match(readFileSync(new URL("../routes/admin.phieu.$code.tsx", import.meta.url), "utf8"), /Phiếu giao nhận/);
   const ketNoi = readFileSync(new URL("../routes/admin.ket-noi.tsx", import.meta.url), "utf8");
   assert.match(ketNoi, /Fanpage Nhà In/);
   assert.match(ketNoi, /Kết nối Fanpage bằng Facebook/);

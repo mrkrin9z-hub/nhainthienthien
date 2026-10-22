@@ -113,7 +113,7 @@ function FanpageCard({ pageSaved }: { pageSaved: boolean }) {
     <section className="glass-card space-y-3 rounded-3xl p-4">
       <h2 className="font-bold text-primary">Fanpage Nhà In (Messenger)</h2>
       <p className="text-xs text-muted-foreground">
-        Bấm nút bên dưới để đăng nhập Facebook và chọn page của Nhà In. App Meta mượn quyền đã cấp sẵn (không đăng ký Dev App mới) — inbox lưu local, không lấy tin từ studiobase.vn.
+        Bấm nút bên dưới để đăng nhập Facebook và chọn page Nhà In. Dùng App Meta đã có, không tạo app mới. Tin nhắn lưu trên app này.
       </p>
       <p className="text-sm font-semibold">
         {connected
@@ -157,7 +157,7 @@ function FanpageCard({ pageSaved }: { pageSaved: boolean }) {
           </Button>
         ) : (
           <p className="text-sm text-amber-800">
-            Chưa có App Meta để mở Facebook. Mở cấu hình nâng cao bên dưới (một lần) — dùng App ID/Secret đã được StudioBase cấp quyền.
+            Chưa có App Meta để mở Facebook. Mở cấu hình nâng cao bên dưới và nhập App ID với App Secret đã có.
           </p>
         )}
         {connected ? (
@@ -198,7 +198,7 @@ function FanpageCard({ pageSaved }: { pageSaved: boolean }) {
             Chỉ cần khi Worker chưa có META_APP_ID / META_APP_SECRET. Lưu một lần rồi dùng nút Facebook ở trên.
           </p>
           <SecretField
-            field={{ id: "meta_app_id", label: "Meta App ID", hint: "App đã được StudioBase cấp quyền." }}
+            field={{ id: "meta_app_id", label: "Meta App ID", hint: "App Meta dùng để ủy quyền Fanpage." }}
             saved={Boolean(meta.data?.metaAppIdSaved)}
             inputType="text"
           />

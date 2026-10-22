@@ -22,7 +22,7 @@ type Prefs = {
 
 const LABELS: { key: keyof Prefs; label: string; hint: string }[] = [
   { key: "lateOrders", label: "Đơn trễ hẹn giao", hint: "Cảnh báo trên Trang chủ / Lịch (PC + PWA)." },
-  { key: "marketplaceNew", label: "Đơn sàn mới", hint: "TikTok / Shopee vừa nhập." },
+  { key: "marketplaceNew", label: "Đơn sàn mới", hint: "Chỉ hiện khi TikTok hoặc Shopee đã nối. Chưa nối thì bỏ qua." },
   { key: "feedbackReprint", label: "Đánh giá mở in lại", hint: "Khách báo sai màu / sai khổ." },
   { key: "cashHandover", label: "Nộp tiền mặt", hint: "Nhắc khi sale giữ tiền mặt." },
 ];
@@ -57,10 +57,10 @@ function NotifyBody() {
     <div className="space-y-4">
       <PageToolbar
         title="Thông báo đẩy"
-        hint="Cấp quyền trình duyệt (PC) hoặc cài PWA trên điện thoại để nhận thông báo khi mở / cài app. Service worker đã đăng ký sẵn."
+        hint="Bấm Bật báo. Nếu trình duyệt từ chối, mở lại phần cài đặt trang (biểu tượng khóa cạnh địa chỉ) và cho phép thông báo."
       />
       <p className="rounded-md border bg-card px-4 py-3 text-sm text-muted-foreground">
-        Trạng thái: quyền <strong className="text-foreground">{perm}</strong>
+        Trạng thái quyền trình duyệt: <strong className="text-foreground">{perm === "denied" ? "bị chặn — mở cài đặt trang để cho phép lại" : perm === "granted" ? "đã cho phép" : "chưa hỏi"}</strong>
         {standalone ? " · đang chạy PWA (standalone)" : " · mở trong tab trình duyệt (có thể Add to Home Screen)"}
       </p>
       {data.isLoading || !prefs ? <p className="text-muted-foreground">Đang tải…</p> : null}

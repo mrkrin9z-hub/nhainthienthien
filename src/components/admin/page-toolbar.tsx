@@ -32,10 +32,15 @@ export function PageToolbar({
   const showSearch = onSearch != null;
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-          {hint ? <p className="mt-0.5 text-[13px] text-muted-foreground">{hint}</p> : null}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#e0eefe]">
+            <span className="size-2.5 rounded-sm bg-[#2563eb]" />
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+            {hint ? <p className="mt-0.5 text-[13px] text-muted-foreground">{hint}</p> : null}
+          </div>
         </div>
         {actions ? <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div> : null}
       </div>

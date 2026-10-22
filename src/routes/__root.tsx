@@ -82,7 +82,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Nhà In Thiên Thiên — In đẹp từng khoảnh khắc" },
       {
         name: "description",
-        content: "In ảnh ép gỗ, ảnh thờ, giấy khen và nam châm — giá xưởng tại Xuân Lộc, Đồng Nai.",
+        content: "In ảnh ép gỗ, ảnh thờ, giấy khen và nam châm. Gửi ảnh online, theo dõi tiến trình trên web.",
       },
       { name: "author", content: "Nhà In Thiên Thiên" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
@@ -93,7 +93,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "Nhà In Thiên Thiên — In đẹp từng khoảnh khắc" },
       {
         property: "og:description",
-        content: "Gửi ảnh online 3 bước, in đẹp giá xưởng tại Xuân Lộc, Đồng Nai.",
+        content: "Gửi ảnh online 3 bước và theo dõi tiến trình trên web.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

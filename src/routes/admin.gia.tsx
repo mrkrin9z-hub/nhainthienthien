@@ -57,7 +57,7 @@ function PricePage() {
       <GoodsLinks />
       <PageToolbar
         title="Bảng giá theo kênh"
-        hint="Web khách lấy giá kênh Tại tiệm / Web. Giá TikTok và Shopee lấy từ sàn. Kênh lẻ và Facebook nhập riêng, hoặc nhân bản từ sàn."
+        hint="Giá chung cho tại tiệm, web và Facebook. TikTok/Shopee: giá bán là giá sau giảm, niêm yết để đối chiếu. Lãi tính từ vốn bảng 22/10, mực 4,4%, hoa hồng 3% tại tiệm và Facebook, sàn 27% + 11.000đ, quảng cáo Facebook 10% và đóng gói 8.000đ."
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm mã hoặc quy cách…"
@@ -125,11 +125,12 @@ function PricePage() {
       <FilterChips label="Giá kênh đang chọn" value={priced} chips={priceChips} onChange={setPriced} />
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="khổ" onPage={list.setPage} />
       <div className="overflow-hidden rounded-md border bg-card">
-        <div className="hidden grid-cols-[3rem_7rem_minmax(0,1.4fr)_8rem_minmax(0,1fr)] gap-2 border-b bg-muted/40 px-3 py-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase md:grid">
+        <div className="hidden grid-cols-[3rem_7rem_minmax(0,1.2fr)_8rem_7rem_minmax(0,1fr)] gap-2 border-b bg-muted/40 px-3 py-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase md:grid">
           <span>STT</span>
           <span>Mã SP</span>
           <span>Tên sản phẩm</span>
-          <span>Giá</span>
+          <span>Giá bán</span>
+          <span>Lãi</span>
           <span>Trạng thái</span>
         </div>
         <div className="divide-y">
@@ -216,7 +217,8 @@ function PriceRow({
     code: string;
     name: string;
     piecesPerPack: number | null;
-    prices: Record<string, { price: number | null; status: string; note: string }>;
+    sheetCost?: number | null;
+    prices: Record<string, { price: number | null; listPrice?: number | null; status: string; note: string; profit?: number | null; marginPercent?: number | null }>;
   };
   channel: Channel;
   owner: boolean;
@@ -224,6 +226,10 @@ function PriceRow({
 }) {
   const queryClient = useQueryClient();
   const cell = row.prices[channel] ?? { price: null, status: "dang_ban", note: "" };
+  const margin =
+    cell.profit === null || cell.profit === undefined
+      ? "Chưa đủ số"
+      : `${formatMaybe(cell.profit)}${cell.marginPercent === null || cell.marginPercent === undefined ? "" : ` · ${cell.marginPercent}%`}`;
   const [price, setPrice] = useState(cell.price === null ? "" : String(cell.price));
   const [status, setStatus] = useState(cell.status);
   const [pieces, setPieces] = useState(row.piecesPerPack === null ? "" : String(row.piecesPerPack));
@@ -265,16 +271,23 @@ function PriceRow({
   ) : null;
 
   return (
-    <article className="grid gap-3 p-3 md:grid-cols-[3rem_7rem_minmax(0,1.4fr)_8rem_minmax(0,1fr)] md:items-center md:gap-2 md:px-3">
+    <article className="grid gap-3 p-3 md:grid-cols-[3rem_7rem_minmax(0,1.2fr)_8rem_7rem_minmax(0,1fr)] md:items-center md:gap-2 md:px-3">
       <p className="hidden text-[13px] text-muted-foreground md:block">{stt}</p>
       <p className="font-semibold md:text-[13px]">
         <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[12px]">{row.code}</span>
       </p>
       <div className="text-[13px]">
         <p className="font-medium">{row.name}</p>
+        <p className="text-xs text-muted-foreground">Vốn {formatMaybe(row.sheetCost)}</p>
         {pack}
       </div>
-      <Input className="h-9 md:w-full" inputMode="numeric" value={price} placeholder="Chưa có" disabled={!owner} aria-label={`Giá ${row.name}`} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
+      <div>
+        <Input className="h-9 md:w-full" inputMode="numeric" value={price} placeholder="Chưa có" disabled={!owner} aria-label={`Giá ${row.name}`} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
+        {cell.listPrice != null && cell.listPrice !== cell.price ? (
+          <p className="mt-1 text-xs text-muted-foreground">Niêm yết {formatMaybe(cell.listPrice)}</p>
+        ) : null}
+      </div>
+      <p className="text-xs font-semibold">{margin}</p>
       <div className="flex gap-2">
         <select className="min-h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-[13px]" value={status} disabled={!owner} aria-label={`Trạng thái ${row.name}`} onChange={(e) => setStatus(e.target.value)}>
           <option value="dang_ban">Đang bán</option>

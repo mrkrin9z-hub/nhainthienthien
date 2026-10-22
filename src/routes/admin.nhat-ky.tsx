@@ -101,7 +101,7 @@ function AuditPage() {
     <div className="space-y-3">
       <PageToolbar
         title="Nhật ký"
-        hint="200 dòng mới nhất. Lọc theo người, việc hoặc ngày."
+        hint="Mỗi trang 30 dòng. Lọc theo người, việc hoặc ngày."
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm trong dòng nhật ký…"

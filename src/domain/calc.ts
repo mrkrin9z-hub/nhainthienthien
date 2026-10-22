@@ -160,13 +160,17 @@ export function feeLines(
     return lines;
   }
   if (channel === "facebook") {
-    return [
+    const lines = [
       pct("Thuế", settings.fbTaxPercent),
       pct("Hoa hồng sale", settings.fbCommissionPercent),
       pct("Quảng cáo", settings.fbAdsPercent),
       pct("Phí thu hộ COD", settings.fbCodPercent),
-      fixed("Phí ship Facebook", settings.fbShipping),
     ];
+    if (settings.fbPackFixed !== undefined && settings.fbPackFixed !== null) {
+      lines.push(fixed("Đóng gói Facebook", settings.fbPackFixed));
+    }
+    lines.push(fixed("Phí ship Facebook", settings.fbShipping));
+    return lines;
   }
   return [pct("Hoa hồng sale", settings.walkinCommissionPercent)];
 }
@@ -241,6 +245,31 @@ export function quoteSku(input: {
     tone,
     lines,
   };
+}
+
+/** Lãi trên vốn bảng giá (VT+gói), không lấy định mức BOM. Phí ship để trống thì bỏ qua, không bịa. */
+export function sheetMargin(
+  channel: Channel,
+  price: number | null,
+  sheetCost: number | null,
+  settings: Settings,
+): { profit: number | null; marginPercent: number | null } {
+  if (price === null || sheetCost === null) return { profit: null, marginPercent: null };
+  const ink = (price * settings.inkPercent) / 100;
+  const fees = feeLines(channel, price, settings, false);
+  const known = fees.filter((fee) => !(fee.name.startsWith("Phí ship") && fee.amount === null));
+  if (known.some((fee) => fee.amount === null)) return { profit: null, marginPercent: null };
+  const feeSum = known.reduce((sum, fee) => sum + (fee.amount ?? 0), 0);
+  const profit = money(price - sheetCost - ink - feeSum);
+  return {
+    profit,
+    marginPercent: price === 0 ? null : Math.round((profit / price) * 1000) / 10,
+  };
+}
+
+/** Tháng trước ngày khai trương thì chưa tính mặt bằng, lương, khấu hao. */
+export function fixedCostsApply(openDate: string, month: string): boolean {
+  return month >= openDate.slice(0, 7);
 }
 
 export function perSheet(price: number, sheets: number): number {
@@ -341,14 +370,30 @@ export function statusChangeError(input: {
   depositPaid: number;
   /** false khi checklist đóng gói chưa xong. Thiếu thì không chặn, để đơn cũ vẫn chuyển được trong kiểm thử. */
   packReady?: boolean;
+  /** false khi sang in từ chờ duyệt mà chưa có ảnh khách duyệt. Thiếu thì không chặn. */
+  approvalReady?: boolean;
 }): string | null {
   const reopening = (input.current === "huy" || input.current === "xong") && input.next !== input.current;
   if (reopening) {
     if (input.role !== "owner") return "Chỉ chủ mở lại đơn đã hủy hoặc đã xong.";
     if (!input.reason?.trim()) return "Mở lại đơn đã hủy hoặc đã xong cần ghi lý do.";
   }
+  if (input.next === "huy" && input.role === "production") return "Sản xuất không hủy đơn.";
+  if (input.next === "huy" && input.current !== "huy" && !input.reason?.trim()) return "Hủy đơn cần ghi lý do.";
   if (input.role === "production" && (!isProductionStep(input.current) || !isProductionStep(input.next))) {
     return "Sản xuất chỉ chuyển đơn đang in, đóng gói hoặc giao giữa ba bước đó.";
+  }
+  if (!reopening && input.current !== input.next && PROGRESS.includes(input.current) && PROGRESS.includes(input.next)) {
+    const delta = statusRank(input.next) - statusRank(input.current);
+    if (Math.abs(delta) !== 1) return "Chỉ chuyển sang bước kế trước hoặc kế sau. Không nhảy bước.";
+  }
+  if (
+    input.current === "cho_duyet" &&
+    input.next === "in" &&
+    input.approvalReady === false &&
+    !(input.role === "owner" && input.ownerOverride)
+  ) {
+    return "Chuyển sang in cần một ảnh khách đã duyệt, hoặc chủ ghi đè.";
   }
   if (depositBlocks(input.next, input.depositRequired, input.depositPaid) && !(input.role === "owner" && input.ownerOverride)) {
     if (input.depositRequired === null) {

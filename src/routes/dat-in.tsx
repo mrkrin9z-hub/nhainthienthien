@@ -17,6 +17,7 @@ import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct } fr
 import { postFormWithProgress, putDriveFile } from "@/lib/drive-put";
 import { createOrder, createUploadTicket, finishOrderDriveUpload, markFileStatus, prepareOrderDriveUpload, submitOrder } from "@/lib/orders.functions";
 import { formatVnd } from "@/lib/brand";
+import { catalogImage } from "@/lib/product-images";
 
 export const Route = createFileRoute("/dat-in")({
   validateSearch: (search: Record<string, unknown>): { product?: string; items?: string } => {
@@ -79,6 +80,7 @@ function OrderPage() {
 
   const initialQuantities = useMemo(() => parseItems(presetItems), [presetItems]);
   const [step, setStep] = useState(Object.keys(initialQuantities).length ? 2 : 1);
+  const [stepTried, setStepTried] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>(initialQuantities);
 
   const [activeSlug, setActiveSlug] = useState<string>(presetSlug ?? products[0]?.slug ?? "");
@@ -148,8 +150,15 @@ function OrderPage() {
   const phoneDigits = phone.replace(/\D/g, "");
   const contactOk = fullName.trim().length > 1 && phoneDigits.length >= 8 && (fulfillment !== "delivery" || address.trim().length >= 8);
   const canNext = step === 1 ? selected.length > 0 : step === 2 ? files.length > 0 : contactOk;
-  const stepHint =
-    step === 1 ? "Chọn ít nhất một khổ." : step === 2 ? "Thêm ít nhất một ảnh." : fulfillment === "delivery" && address.trim().length < 8 ? "Nhập địa chỉ nhận hàng." : "Nhập họ tên và số điện thoại.";
+  const stepHint = !stepTried
+    ? ""
+    : step === 1
+      ? "Chọn ít nhất một khổ."
+      : step === 2
+        ? "Thêm ít nhất một ảnh."
+        : fulfillment === "delivery" && address.trim().length < 8
+          ? "Nhập địa chỉ nhận hàng."
+          : "Nhập họ tên và số điện thoại.";
 
   async function handleSubmit() {
     setError(null);
@@ -326,6 +335,16 @@ function OrderPage() {
                         onClick={() => setActiveSlug(product.slug)}
                         className="flex min-h-16 w-full items-center gap-3 p-3 text-left"
                       >
+                        <img
+                          src={catalogImage(product.slug, product.cover_path)}
+                          alt=""
+                          width={64}
+                          height={64}
+                          className="size-16 shrink-0 rounded-2xl object-cover"
+                          onError={(event) => {
+                            event.currentTarget.src = catalogImage(product.slug, null);
+                          }}
+                        />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[11px] font-bold uppercase tracking-wide text-accent">{product.category}</span>
                           <span className="block font-extrabold leading-tight text-foreground">{product.name}</span>
@@ -380,7 +399,7 @@ function OrderPage() {
                     {(
                       [
                         ["pickup", "Nhận tại xưởng"],
-                        ["delivery", "Giao tận nơi"],
+                        ["delivery", "Giao hàng"],
                       ] as const
                     ).map(([value, label]) => (
                       <button
@@ -476,7 +495,14 @@ function OrderPage() {
               step={step}
               busy={busy}
               onBack={() => setStep((s) => Math.max(1, s - 1))}
-              onNext={() => setStep((s) => Math.min(3, s + 1))}
+              onNext={() => {
+                if (!canNext) {
+                  setStepTried(true);
+                  return;
+                }
+                setStepTried(false);
+                setStep((s) => Math.min(3, s + 1));
+              }}
               onSubmit={handleSubmit}
               canNext={canNext}
               hint={canNext ? "" : stepHint}
@@ -493,7 +519,14 @@ function OrderPage() {
           busy={busy}
           compact
           onBack={() => setStep((s) => Math.max(1, s - 1))}
-          onNext={() => setStep((s) => Math.min(3, s + 1))}
+          onNext={() => {
+            if (!canNext) {
+              setStepTried(true);
+              return;
+            }
+            setStepTried(false);
+            setStep((s) => Math.min(3, s + 1));
+          }}
           onSubmit={handleSubmit}
           canNext={canNext}
           hint={canNext ? "" : stepHint}
@@ -567,16 +600,16 @@ function ProductOptions({
                 <button
                   type="button"
                   aria-label={`Giảm ${showOptions ? sheetOptionLabel(variant.sheets) : variant.name}`}
-                  className="grid size-11 place-items-center text-muted-foreground"
+                  className="grid size-11 place-items-center bg-muted text-foreground"
                   onClick={() => setQty(variant.id, qty - 1)}
                 >
                   <Minus className="size-4" />
                 </button>
-                <span className="w-8 text-center text-sm font-bold">{qty}</span>
+                <span className={`w-8 text-center text-sm font-bold ${qty === 0 ? "text-muted-foreground" : "text-foreground"}`}>{qty}</span>
                 <button
                   type="button"
                   aria-label={`Tăng ${showOptions ? sheetOptionLabel(variant.sheets) : variant.name}`}
-                  className="grid size-11 place-items-center text-muted-foreground"
+                  className="grid size-11 place-items-center bg-muted text-foreground"
                   onClick={() => setQty(variant.id, qty + 1)}
                 >
                   <Plus className="size-4" />

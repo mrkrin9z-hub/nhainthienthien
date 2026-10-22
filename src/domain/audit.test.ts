@@ -153,13 +153,13 @@ test("cọc Facebook chặn thiết kế và in, chủ được ghi đè", () =>
     statusChangeError({ role: "sale", ownerOverride: false, current: "nhan_don", next: "thiet_ke", depositRequired: null, depositPaid: 0 }) ?? "",
     /chưa có giá/,
   );
-  assert.equal(
-    statusChangeError({ role: "owner", ownerOverride: true, current: "nhan_don", next: "in", depositRequired: null, depositPaid: 0 }),
-    null,
+  assert.match(
+    statusChangeError({ role: "owner", ownerOverride: true, current: "nhan_don", next: "in", depositRequired: null, depositPaid: 0 }) ?? "",
+    /Không nhảy bước/,
   );
-  assert.equal(
-    statusChangeError({ role: "sale", ownerOverride: false, current: "nhan_don", next: "in", depositRequired: 0, depositPaid: 0 }),
-    null,
+  assert.match(
+    statusChangeError({ role: "sale", ownerOverride: false, current: "nhan_don", next: "in", depositRequired: 0, depositPaid: 0 }) ?? "",
+    /Không nhảy bước/,
   );
   assert.match(
     statusChangeError({ role: "production", ownerOverride: false, current: "in", next: "xong", depositRequired: 0, depositPaid: 0 }) ?? "",
@@ -176,14 +176,22 @@ test("sản xuất chỉ chuyển đơn đang in, đóng gói hoặc giao; chỉ
   assert.match(move({ ...base, role: "production", current: "thiet_ke", next: "in" }) ?? "", /Sản xuất/);
   assert.equal(move({ ...base, role: "production", current: "in", next: "dong_goi" }), null);
   assert.equal(move({ ...base, role: "production", current: "dong_goi", next: "giao" }), null);
-  assert.equal(move({ ...base, role: "production", current: "giao", next: "in" }), null);
+  assert.match(move({ ...base, role: "production", current: "giao", next: "in" }) ?? "", /Không nhảy bước/);
+  assert.equal(move({ ...base, role: "production", current: "giao", next: "dong_goi" }), null);
   assert.match(move({ ...base, role: "production", current: "in", next: "huy" }) ?? "", /Sản xuất/);
   assert.match(move({ ...base, role: "sale", current: "xong", next: "nhan_don", reason: "khách đổi" }) ?? "", /Chỉ chủ/);
   assert.match(move({ ...base, role: "owner", current: "xong", next: "nhan_don", reason: "  " }) ?? "", /lý do/);
   assert.equal(move({ ...base, role: "owner", current: "xong", next: "in", reason: "khách đổi" }), null);
   assert.equal(move({ ...base, role: "owner", current: "huy", next: "in", reason: "bấm nhầm" }), null);
   assert.equal(move({ ...base, role: "owner", current: "xong", next: "xong" }), null);
-  assert.equal(move({ ...base, role: "sale", current: "in", next: "xong" }), null);
+  assert.match(move({ ...base, role: "sale", current: "in", next: "xong" }) ?? "", /Không nhảy bước/);
+  assert.match(move({ ...base, role: "sale", current: "nhan_don", next: "huy" }) ?? "", /lý do/);
+  assert.equal(move({ ...base, role: "sale", current: "nhan_don", next: "huy", reason: "khách hủy" }), null);
+  assert.match(
+    move({ ...base, role: "sale", current: "cho_duyet", next: "in", approvalReady: false }) ?? "",
+    /ảnh khách đã duyệt/,
+  );
+  assert.equal(move({ ...base, role: "owner", ownerOverride: true, current: "cho_duyet", next: "in", approvalReady: false }), null);
 });
 
 test("hai lần ghi cùng lúc không mất dữ liệu", async () => {

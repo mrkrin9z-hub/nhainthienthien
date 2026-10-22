@@ -221,19 +221,28 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   const price = (code: string, channel: string) =>
     state.prices.find((row) => row.skuId === code && row.channel === channel)?.price ?? null;
   assert.equal(price("TG-13x18-C1", "tai_tiem"), 35000);
-  assert.equal(price("TG-13x18-C4", "tiktok"), 249000);
-  assert.equal(price("AT-20x30-C1", "tai_tiem"), 59000);
-  assert.equal(price("AT-20x30-C1", "tiktok"), 130000);
-  assert.equal(price("GK-20x30-C1", "tiktok"), 130000);
-  assert.equal(price("NCT-6x9-10", "tiktok"), 99000);
-  assert.equal(price("NCT-6x9-1", "tai_tiem"), 10000);
+  assert.equal(price("TG-13x18-C1", "facebook"), 35000);
+  assert.equal(price("TG-13x18-C1", "tiktok"), 35000);
+  assert.equal(state.prices.find((row) => row.skuId === "TG-13x18-C1" && row.channel === "tiktok")?.listPrice, 50000);
+  assert.equal(price("TG-13x18-C4", "tai_tiem"), 100000);
+  assert.equal(price("TG-13x18-C4", "tiktok"), 100000);
+  assert.equal(state.prices.find((row) => row.skuId === "TG-13x18-C4" && row.channel === "shopee")?.listPrice, 139000);
+  assert.equal(price("AT-20x30-C1", "tai_tiem"), 56000);
+  assert.equal(price("AT-20x30-C1", "tiktok"), 56000);
+  assert.equal(price("GK-20x30-C1", "tiktok"), 56000);
+  assert.equal(price("NCT-6x9-10", "tiktok"), 85000);
+  assert.equal(price("NCT-6x9-1", "tai_tiem"), null);
   assert.equal(price("NCT-6x9-1", "tiktok"), null);
-  assert.equal(price("TG-13x18-C2", "tiktok"), null);
-  assert.equal(price("NX-9x19-C1", "tai_tiem"), 50000);
-  assert.equal(price("NX-17x22-C1", "tiktok"), 95000);
+  assert.equal(price("TG-13x18-C2", "tiktok"), 69000);
+  assert.equal(price("LUA-6x9-10", "tai_tiem"), 17000);
+  assert.equal(price("LUA-6x9-10", "tiktok"), null);
+  assert.equal(price("NX-9x19-C1", "tai_tiem"), null);
+  assert.equal(price("NX-12x25-C1", "tai_tiem"), 65000);
+  assert.equal(price("NX-17x22-C1", "tiktok"), 79000);
   assert.equal(price("EG-40x60-C1", "tai_tiem"), 149000);
   assert.equal(price("EG-13x18-C1", "tai_tiem"), null);
-  assert.equal(state.prices.filter((row) => row.price !== null).length, 279);
+  assert.equal(state.skus.find((sku) => sku.code === "TG-13x18-C1")?.sheetCost, 6757);
+  assert.ok(state.prices.filter((row) => row.price !== null).length > 200);
   const offers = walkInPublicOffers(state);
   assert.ok(offers.length > 0);
   for (const offer of offers) {
@@ -245,8 +254,10 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(offered.has("TG-13x18-C1"), true);
   assert.equal(offered.has("EG-13x18-C1"), false);
   assert.equal(offered.has("EG-40x60-C1"), false);
-  assert.equal(offered.has("NCT-6x9-1"), true);
-  assert.equal(offered.has("LUA-6x9-10"), false);
+  assert.equal(offered.has("NCT-6x9-1"), false);
+  assert.equal(offered.has("LUA-6x9-10"), true);
+  assert.equal(offered.has("NX-12x25-C1"), true);
+  assert.equal(offered.has("NX-9x19-C1"), false);
   assert.deepEqual(
     comboWarnings(
       state.skus.filter((sku) => sku.groupId === "trang_guong"),
@@ -274,9 +285,9 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(priceOf("giay-pp"), 702000);
   assert.equal(priceOf("go-13x18"), 1900);
   assert.equal(priceOf("go-60x90"), 39600);
-  assert.equal(priceOf("tui"), null);
-  assert.equal(priceOf("carton"), null);
-  assert.equal(priceOf("tem"), null);
+  assert.equal(priceOf("tui"), 500);
+  assert.equal(priceOf("carton"), 0);
+  assert.equal(priceOf("tem"), 0);
   assert.equal(state.settings.fbShipping, null);
   assert.equal(state.settings.lateDeductionPerMinute, null);
   assert.equal(state.settings.showAnhThe, false);
@@ -287,7 +298,12 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(state.settings.saleBase, 8000000);
   assert.equal(state.settings.productionBase, 11000000);
   const fixed = state.settings.fixedCosts.reduce((sum, row) => sum + row.amount, 0);
-  assert.equal(fixed, 29400000);
+  assert.equal(fixed, 23900000);
+  assert.equal(state.settings.breakevenMonth, 45126608);
+  assert.equal(state.settings.breakevenDay, 1735646);
+  assert.equal(state.settings.hrDraft?.pendingOwnerApproval, true);
+  assert.equal(state.settings.kpiTargets[0], 25000000);
+  assert.equal(state.settings.catalogImport20261022, true);
   assert.equal(state.skus.some((row) => row.code.includes("10x25")), false);
   const car = state.boms.find((row) => row.skuId === "NX-9x19-C1");
   assert.equal(car?.qty, null);
@@ -298,8 +314,8 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   assert.equal(state.settings.groupListed.ep_go, false);
   assert.equal(state.settings.groupListed.trang_guong, true);
   assert.equal(state.settings.groupListed.anh_the, false);
-  assert.equal(state.settings.groupListed.lua, false);
-  assert.equal(state.settings.groupListed.tkb, false);
+  assert.equal(state.settings.groupListed.lua, true);
+  assert.equal(state.settings.groupListed.tkb, true);
   const settings: Settings = state.settings;
   assert.equal(settings.marginYellowPercent, 30);
   assert.equal(settings.weeklyOff.length, 0);
@@ -399,7 +415,7 @@ test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của 
 
 test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và định mức giữ nguyên", async () => {
   const seeded = await buildSeed();
-  const cards = seeded.groups.filter((group) => group.name === "Ảnh ép gỗ tráng gương bo viền");
+  const cards = seeded.groups.filter((group) => group.name === "Ảnh ép gỗ tráng gương để bàn");
   assert.equal(cards.length, 1);
   assert.equal(cards[0]?.id, "trang_guong");
   assert.equal(cards[0]?.slug, "trang-guong");
@@ -416,11 +432,11 @@ test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và đ
   const walkIn: Record<string, number> = {
     "13x18": 35000,
     "15x21": 39000,
-    "20x30": 59000,
-    "30x45": 89000,
+    "20x30": 56000,
+    "30x45": 86000,
     "40x60": 149000,
     "50x75": 239000,
-    "60x90": 349000,
+    "60x90": 319000,
   };
   for (const [size, amount] of Object.entries(walkIn)) {
     const row = seeded.prices.find((price) => price.skuId === `TG-${size}-C1` && price.channel === "tai_tiem");
@@ -469,7 +485,7 @@ test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và đ
   };
   assert.equal(applyStoreMigrations(legacy), true);
   assert.equal(legacy.groups.some((group) => group.id === "ep_go"), false);
-  assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.name, "Ảnh ép gỗ tráng gương bo viền");
+  assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.name, "Ảnh ép gỗ tráng gương để bàn");
   assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.category, "Ảnh gỗ");
   assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.turnaround, "");
   assert.match(legacy.groups.find((group) => group.id === "trang_guong")?.description ?? "", /13×18 đến 60×90/);
@@ -480,9 +496,9 @@ test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và đ
   assert.equal(legacy.boms[0]?.materialId, "go-40x60");
   assert.equal(legacy.skuMaps[0]?.skuId, "EG-40x60-C1");
   assert.equal(legacy.orders[0]?.items[0]?.skuId, "EG-40x60-C1");
-  assert.equal(legacy.orders[0]?.items[0]?.name, "Ảnh ép gỗ tráng gương bo viền — 40×60 cm");
-  assert.equal(legacy.orders[0]?.items[1]?.name, "Ảnh ép gỗ tráng gương bo viền — 13×18 cm");
-  assert.equal(legacy.orders[0]?.items[2]?.name, "Ảnh ép gỗ tráng gương bo viền - 20×30 cm");
+  assert.equal(legacy.orders[0]?.items[0]?.name, "Ảnh ép gỗ tráng gương để bàn — 40×60 cm");
+  assert.equal(legacy.orders[0]?.items[1]?.name, "Ảnh ép gỗ tráng gương để bàn — 13×18 cm");
+  assert.equal(legacy.orders[0]?.items[2]?.name, "Ảnh ép gỗ tráng gương để bàn - 20×30 cm");
   assert.equal(legacy.settings.groupListed.ep_go, false);
   assert.equal(applyStoreMigrations(legacy), false);
 

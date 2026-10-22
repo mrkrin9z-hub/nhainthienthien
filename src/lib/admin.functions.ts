@@ -97,7 +97,13 @@ const itemSchema = z.object({
   skuId: z.string().min(2),
   quantity: z.number().int().min(1).max(500),
   unitPrice: z.number().int().min(0).nullable().optional(),
+  priceReason: z.string().max(300).optional(),
 });
+
+const moneyAdjust = {
+  discount: z.number().int().min(0).max(100_000_000).nullable().optional(),
+  customerShip: z.number().int().min(0).max(100_000_000).nullable().optional(),
+};
 
 export const createDeskOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
@@ -113,6 +119,7 @@ export const createDeskOrder = createServerFn({ method: "POST" })
         marketplaceCode: z.string().optional().default(""),
         depositPaid: z.number().int().min(0).max(100_000_000).optional().default(0),
         depositMethod: z.string().optional().default(""),
+        ...moneyAdjust,
         items: z.array(itemSchema).min(1),
       })
       .parse(data),
@@ -133,6 +140,7 @@ export const reviseOrder = createServerFn({ method: "POST" })
         fulfillment: z.enum(["pickup", "delivery"]),
         note: z.string().optional().default(""),
         dueDate: z.string().nullable().optional().default(null),
+        ...moneyAdjust,
         items: z.array(itemSchema).min(1).optional(),
       })
       .parse(data),
@@ -165,6 +173,14 @@ export const setPrintChoice = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { setFilePrint } = await import("@/server/service");
     await setFilePrint(await actor(), data.orderId, data.fileId, data.print);
+    return { ok: true };
+  });
+
+export const markApproval = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), fileId: z.string().uuid() }).parse(data))
+  .handler(async ({ data }) => {
+    const { markFileApproval } = await import("@/server/service");
+    await markFileApproval(await actor(), data.orderId, data.fileId);
     return { ok: true };
   });
 
@@ -800,6 +816,7 @@ export const storeShipping = createServerFn({ method: "POST" })
         tracking: z.string(),
         shipFee: z.number().nullable(),
         codAmount: z.number().nullable(),
+        customerShip: z.number().int().min(0).max(100_000_000).nullable().optional(),
       })
       .parse(data),
   )

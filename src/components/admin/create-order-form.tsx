@@ -56,6 +56,8 @@ export function CreateOrderForm({
             marketplaceCode: value.marketplaceCode,
             depositPaid: value.depositPaid,
             depositMethod: value.depositMethod,
+            discount: value.discount,
+            customerShip: value.customerShip,
             items: value.items ?? [],
           },
         });

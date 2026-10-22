@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { AlarmClock, Columns3, Download, FileSpreadsheet, HandCoins, List, Plus, Wallet } from "lucide-react";
 
+import { DateRangeField, vnDayOf } from "@/components/admin/date-range";
 import { ListPager, useListPage } from "@/components/admin/list-page";
 import { ClearFilters, FilterSheet, PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
 import { OrderLinks } from "@/components/admin/sections";
@@ -31,6 +32,8 @@ function OrdersPage() {
   const [channel, setChannel] = useState("all");
   const [lateOnly, setLateOnly] = useState(false);
   const [unpaidOnly, setUnpaidOnly] = useState(false);
+  const [fromDay, setFromDay] = useState("");
+  const [toDay, setToDay] = useState("");
   const [sheet, setSheet] = useState(false);
   const [view, setView] = useState<"list" | "board">("list");
   useEffect(() => {
@@ -69,6 +72,9 @@ function OrdersPage() {
     if (channel !== "all" && order.channel !== channel) return false;
     if (lateOnly && !order.late) return false;
     if (unpaidOnly && !(order.remain != null && order.remain > 0)) return false;
+    const day = vnDayOf(order.createdAt);
+    if (fromDay && day && day < fromDay) return false;
+    if (toDay && day && day > toDay) return false;
     const needle = q.trim().toLowerCase();
     if (!needle) return true;
     return [order.code, order.customerName, order.phone, order.itemSummary, channelLabelOf(order.channel, order.channelLabel)]
@@ -76,8 +82,8 @@ function OrdersPage() {
       .toLowerCase()
       .includes(needle);
   });
-  const filterCount = (status !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (lateOnly ? 1 : 0) + (unpaidOnly ? 1 : 0);
-  const list = useListPage(shown, `${status}|${channel}|${lateOnly}|${unpaidOnly}|${q}`);
+  const filterCount = (status !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (lateOnly ? 1 : 0) + (unpaidOnly ? 1 : 0) + (fromDay || toDay ? 1 : 0);
+  const list = useListPage(shown, `${status}|${channel}|${lateOnly}|${unpaidOnly}|${q}|${fromDay}|${toDay}`);
   const pageRows = list.slice;
 
   function clearFilters() {
@@ -85,11 +91,14 @@ function OrdersPage() {
     setChannel("all");
     setLateOnly(false);
     setUnpaidOnly(false);
+    setFromDay("");
+    setToDay("");
   }
 
   function extraFilters() {
     return (
       <>
+        <DateRangeField from={fromDay} to={toDay} onChange={(from, to) => { setFromDay(from); setToDay(to); }} />
         <select
           className="h-9 min-w-[10rem] rounded-md border border-input bg-background px-3 text-[13px]"
           aria-label="Lọc kênh"

@@ -1,42 +1,33 @@
-import { APPROVED_PRICES } from "./approved-prices.ts";
 import { DEFAULT_REMIND_MESSAGE } from "./crm.ts";
+import { catalogPrices, DESK_PRODUCT_DESCRIPTION, DESK_PRODUCT_NAME, MIN_STOCK_20261022, stampSheetCosts } from "./price-import.ts";
 import { formulaQty } from "./calc.ts";
 import { CAR_MAGNET_SIZES, FRIDGE_MAGNET_SIZES, PHOTO_PRINT_SIZES } from "./sizes.ts";
 import { DEFAULT_ROLE_MODULES, defaultNotifyPrefs, defaultSePay, defaultShopChannels } from "./org-desk.ts";
-import type {
-  BomLine,
-  Channel,
-  ChannelPrice,
-  Group,
-  Material,
-  Settings,
-  ShopState,
-  Sku,
-} from "./types.ts";
-import { CHANNELS } from "./types.ts";
+import type { BomLine, ChannelPrice, Group, Material, Settings, ShopState, Sku } from "./types.ts";
 
 export const INITIAL_PASSWORD = "ThienThien#2026";
 
 export const DEFAULT_SETTINGS: Settings = {
   inkPercent: 4.4,
-  tiktokFeePercent: 14.5,
-  tiktokExtraPercent: 6,
-  tiktokFixed: 3000,
-  tiktokTaxPercent: 1.5,
-  tiktokCommissionPercent: 3,
-  tiktokAffiliatePercent: 10,
-  shopeeFeePercent: 16,
-  shopeeExtraPercent: 6,
-  shopeeInfra: 3000,
-  shopeePiship: 2700,
-  shopeeTaxPercent: 1.5,
-  shopeeCommissionPercent: 3,
-  shopeeAffiliatePercent: 10,
-  fbTaxPercent: 1.5,
+  tiktokFeePercent: 27,
+  tiktokExtraPercent: 0,
+  tiktokFixed: 11000,
+  tiktokTaxPercent: 0,
+  tiktokCommissionPercent: 0,
+  tiktokAffiliatePercent: 0,
+  shopeeFeePercent: 27,
+  shopeeExtraPercent: 0,
+  shopeeInfra: 11000,
+  shopeePiship: 0,
+  shopeeTaxPercent: 0,
+  shopeeCommissionPercent: 0,
+  shopeeAffiliatePercent: 0,
+  fbTaxPercent: 0,
   fbCommissionPercent: 3,
   fbAdsPercent: 10,
-  fbCodPercent: 1.2,
+  fbCodPercent: 0,
   fbShipping: null,
+  fbPackFixed: 8000,
   walkinCommissionPercent: 3,
   marginYellowPercent: 30,
   marginRedPercent: 0,
@@ -49,8 +40,9 @@ export const DEFAULT_SETTINGS: Settings = {
   foamRollLengthM: 100,
   depositMinTotal: 300000,
   depositPercent: 50,
-  breakevenMonth: 49100000,
-  breakevenDay: 1640000,
+  breakevenMonth: 45126608,
+  breakevenDay: 1735646,
+  workingDays: 26,
   workStart: "08:00",
   workEnd: "18:00",
   weeklyOff: [],
@@ -73,7 +65,10 @@ export const DEFAULT_SETTINGS: Settings = {
   zaloPhone: "",
   showZalo: false,
   zaloDefaultMigrated: true,
-  publicHours: "08:00 – 20:00",
+  publicHours: "08:00–18:00",
+  catalogImport20261022: true,
+  platformFeeNote:
+    "Hoạch toán sàn: 27% + 11.000đ/đơn. Bảng phí từng hạng mục trong file Phi-san ghi chưa xác minh, chỉ để đối chiếu.",
   showAnhThe: false,
   showAlbum: false,
   groupListed: {
@@ -83,8 +78,8 @@ export const DEFAULT_SETTINGS: Settings = {
     nam_cham_xe: true,
     nam_cham_tu: true,
     trang_guong: true,
-    tkb: false,
-    lua: false,
+    tkb: true,
+    lua: true,
     anh_the: false,
     album: false,
   },
@@ -100,18 +95,34 @@ export const DEFAULT_SETTINGS: Settings = {
     { key: "nuoc", name: "Nước", amount: 100000, note: "" },
     { key: "wifi", name: "Wifi / điện thoại", amount: 200000, note: "" },
     { key: "vpp", name: "Văn phòng phẩm", amount: 300000, note: "" },
-    { key: "luong_sx", name: "Lương NV sản xuất", amount: 11000000, note: "" },
+    { key: "luong_sx", name: "Lương NV sản xuất", amount: 5500000, note: "Lương sản xuất 11.000.000đ. Tiệm chịu 50% vì chia với Mơ Home. Duyệt 22/10." },
     { key: "luong_sale", name: "Lương sale", amount: 8000000, note: "Phương án A, lương cứng." },
     { key: "bao_tri", name: "Bảo trì máy", amount: 500000, note: "" },
     { key: "khau_hao", name: "Khấu hao máy", amount: 125000, note: "30 triệu ÷ 240 tháng" },
     { key: "marketing", name: "Marketing", amount: 3000000, note: "" },
     { key: "phan_mem", name: "Phần mềm", amount: 100000, note: "" },
-    { key: "khac", name: "Khác", amount: 75000, note: "Cộng các khoản mặc định là 29.400.000đ/tháng." },
+    { key: "khac", name: "Khác", amount: 75000, note: "Cộng các khoản là 23.900.000đ/tháng." },
     { key: "vat_tu_phu", name: "Vật tư phụ khoán", amount: 500000, note: "" },
   ],
   sepay: defaultSePay(),
   notifyPrefs: defaultNotifyPrefs(),
   shopChannels: defaultShopChannels(),
+  hrDraft: {
+    pendingOwnerApproval: true,
+    note: "Đề xuất từ tab lương/KPI. KPI 20/40/60 triệu là doanh thu, không phải mốc hoa hồng. Tháng 1 trong mô tả việc cũ là 25 triệu; bảng hòa vốn bắt đầu từ tháng 2.",
+    saleBase: 8000000,
+    probationPercent: 85,
+    productionBase: 11000000,
+    olderJdMonth1: 25000000,
+    kpiMonth2: 20000000,
+    kpiMonth3: 40000000,
+    kpiFromMonth4: 60000000,
+    commissionTiers: [
+      { upto: 100000000, percent: 3 },
+      { upto: 200000000, percent: 5 },
+      { upto: null, percent: 7 },
+    ],
+  },
 };
 
 function sizeCm(code: string): { code: string; w: number; h: number } {
@@ -147,7 +158,8 @@ function material(
     packSize,
     packPrice,
     stock: 0,
-    minStock: null,
+    minStock: MIN_STOCK_20261022[id] ?? null,
+    openingCounted: false,
     supplier: "",
     pendingPrice: null,
   };
@@ -180,7 +192,7 @@ function groups(): Group[] {
       name: "Ảnh nam châm dán xe",
       slug: "nam-cham-xe",
       category: "Nam châm",
-      description: "Ảnh ép lụa nam châm dán xe. Size 9×19 và 17×22.",
+      description: "Ảnh ép lụa nam châm dán xe. Size 12×25 và 17×22. Size 9×19 giữ mã cũ, chưa có giá.",
       turnaround: "",
       sort: 4,
       gate: null,
@@ -190,17 +202,17 @@ function groups(): Group[] {
       name: "Nam châm tủ lạnh 6×9 Bản Đặc Biệt",
       slug: "nam-cham-tu-lanh",
       category: "Nam châm",
-      description: "Nam châm tủ lạnh tráng gương 6×9, Bản Đặc Biệt. Tại xưởng có bán lẻ một tấm. Kênh khác chỉ bán theo gói.",
+      description: "Nam châm tủ lạnh tráng gương 6×9, Bản Đặc Biệt. Bán theo gói. Tấm lẻ chưa có giá.",
       turnaround: "",
       sort: 5,
       gate: null,
     },
     {
       id: "trang_guong",
-      name: "Ảnh ép gỗ tráng gương bo viền",
+      name: DESK_PRODUCT_NAME,
       slug: "trang-guong",
       category: "Ảnh gỗ",
-      description: "Khổ 13×18 đến 60×90. Để bàn với khổ từ 20×30 trở xuống có chân dựng. Từ 30×45 có móc treo tường.",
+      description: DESK_PRODUCT_DESCRIPTION,
       turnaround: "",
       sort: 1,
       gate: null,
@@ -231,7 +243,7 @@ function groups(): Group[] {
       slug: "anh-the",
       category: "Ẩn",
       description: "Chưa mở bán. Bật trong Cài đặt khi tiệm nhận in ảnh thẻ.",
-      turnaround: "Trong ngày",
+      turnaround: "",
       sort: 9,
       gate: "anh_the",
     },
@@ -395,11 +407,12 @@ function materials(): Material[] {
     material("chan", "Chân nhựa để bàn", "cái", "cái", 1, 1000),
     material("moc", "Móc treo", "cái", "cái", 1, 0),
     material("oc", "Ốc vít", "cái", "cái", 1, 0),
-    material("tui", "Túi bọc ảnh", "cái", "cái", 1, null),
+    material("tui", "Túi bọc ảnh", "cái — ước tính 500đ", "cái", 1, 500),
     material("xop", "Xốp wrap", "cuộn 140cm × 100m", "m2", 140, 500000),
-    material("carton", "Carton bọc", "tấm/cuộn", "m2", null, null),
+    material("carton", "Carton bọc", "không tính riêng, nằm trong khoán 500.000đ", "m2", 1, 0),
     material("bang-keo", "Băng keo", "cuộn", "cuộn", 1, 28000),
-    material("tem", "Tem / nhãn vận đơn", "cuộn giấy in nhiệt", "tem", null, null),
+    material("tem", "Tem / nhãn vận đơn", "không tính riêng, nằm trong khoán 500.000đ", "tem", 1, 0),
+    material("bien-nhan", "Giấy in biên nhận", "xấp/ram — chưa có giá", "xấp", 1, null),
   ];
   for (const size of SIZES) {
     list.push(
@@ -409,28 +422,8 @@ function materials(): Material[] {
   return list;
 }
 
-const APPROVED_PRICE = new Map(APPROVED_PRICES.map((row) => [`${row.code}|${row.channel}`, row.price]));
-
 function prices(skus: Sku[]): ChannelPrice[] {
-  const rows: ChannelPrice[] = [];
-  for (const sku of skus) {
-    for (const channel of CHANNELS) {
-      const known = APPROVED_PRICE.get(`${sku.code}|${channel}`) ?? null;
-      rows.push({
-        skuId: sku.id,
-        channel: channel as Channel,
-        price: known,
-        status: known === null ? "nhap" : "dang_ban",
-        note:
-          known === null
-            ? ""
-            : channel === "shopee"
-              ? "Shopee chưa có giá riêng — tạm bằng TikTok (BANG-GIA-THEO-KENH-v2)."
-              : "Bảng giá chủ duyệt 17/10/2026.",
-      });
-    }
-  }
-  return rows;
+  return catalogPrices(skus);
 }
 
 /** Workers từ chối PBKDF2 trên 100000 vòng. Hash mới ghi số vòng vào giữa. */
@@ -480,6 +473,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
 export async function buildSeed(): Promise<ShopState> {
   const settings = structuredClone(DEFAULT_SETTINGS);
   const { skus, boms } = buildCatalog(settings);
+  stampSheetCosts(skus);
   const passwordHash = await hashPassword(INITIAL_PASSWORD);
   const staffBase = {
     passwordHash,

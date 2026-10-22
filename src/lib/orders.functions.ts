@@ -14,6 +14,20 @@ const createOrderSchema = z.object({
     .max(20),
 });
 
+const inquirySchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  message: z.string().trim().min(5).max(2000),
+  orderCode: z.string().trim().max(40).optional().default(""),
+  phone: z.string().trim().max(20).optional().default(""),
+});
+
+export const submitInquiry = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => inquirySchema.parse(data))
+  .handler(async ({ data }) => {
+    const { submitInquiry: save } = await import("@/server/service");
+    return save(data);
+  });
+
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => createOrderSchema.parse(data))
   .handler(async ({ data }) => {

@@ -1,4 +1,4 @@
-import { quoteSku, vnMonth, vnYmd } from "./calc.ts";
+import { fixedCostsApply, quoteSku, vnMonth, vnYmd } from "./calc.ts";
 import { fixedRows } from "./views.ts";
 import type { Channel, Order, ShopState } from "./types.ts";
 import { CHANNEL_LABEL } from "./types.ts";
@@ -23,6 +23,8 @@ export type BusinessReport = {
   gross: number | null;
   incomplete: boolean;
   fixedSum: number;
+  /** Phần định phí đã tính vào lãi. Trước ngày khai trương thì 0. */
+  fixedCharged: number;
   fixed: { key: string; name: string; amount: number; note: string }[];
   extraSum: number;
   extras: { name: string; amount: number; note: string }[];
@@ -90,11 +92,12 @@ function lineProfit(state: ShopState, order: Order): LineProfit {
 }
 
 export function businessReport(state: ShopState, month: string, grain: ReportGrain = "day"): BusinessReport {
-  const placedOrders = state.orders.filter((order) => !OPEN.has(order.status) && monthOf(order.createdAt) === month);
+  const placedOrders = state.orders.filter((order) => !order.isTest && !OPEN.has(order.status) && monthOf(order.createdAt) === month);
   const cancelled = placedOrders.filter((order) => order.status === "huy").length;
-  const done = state.orders.filter((order) => order.status === "xong" && monthOf(doneStamp(order)) === month);
+  const done = state.orders.filter((order) => order.status === "xong" && !order.isTest && monthOf(doneStamp(order)) === month);
   const fixed = fixedRows(state, month);
   const fixedSum = fixed.reduce((sum, row) => sum + row.amount, 0);
+  const fixedCharged = fixedCostsApply(state.settings.shopOpenDate, month) ? fixedSum : 0;
   const extras = (state.expenses ?? [])
     .filter((row) => row.month === month)
     .map((row) => ({ name: row.name, amount: row.amount, note: row.note }));
@@ -152,11 +155,13 @@ export function businessReport(state: ShopState, month: string, grain: ReportGra
     gross: knownGross,
     incomplete,
     fixedSum,
+    fixedCharged,
     fixed,
     extraSum,
     extras,
-    net: knownGross === null ? null : knownGross - fixedSum - extraSum,
-    breakEvenPercent: knownGross === null || fixedSum <= 0 ? null : Math.round((knownGross / fixedSum) * 1000) / 10,
+    net: knownGross === null ? null : knownGross - fixedCharged - extraSum,
+    breakEvenPercent:
+      state.settings.breakevenMonth > 0 ? Math.round((revenue / state.settings.breakevenMonth) * 1000) / 10 : null,
     cancelRate: placedOrders.length ? Math.round((cancelled / placedOrders.length) * 1000) / 10 : null,
     cancelled,
     placed: placedOrders.length,

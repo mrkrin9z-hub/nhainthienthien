@@ -43,7 +43,7 @@ function TemplatesBody() {
     <div className="space-y-4">
       <PageToolbar
         title="Tin mẫu"
-        hint="Soạn tin mẫu trong app Thiên Thiên. Độc lập StudioBase."
+        hint="Soạn tin mẫu gửi khách trong app."
         actions={
           <ToolbarButton
             label="Thêm tin"

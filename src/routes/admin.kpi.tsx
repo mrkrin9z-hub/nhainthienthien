@@ -35,7 +35,7 @@ function KpiBody() {
       <div>
         <h1 className="text-2xl font-extrabold text-primary">KPI sale</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {me.data?.role === "sale" ? "Chỉ số của bạn." : "Mỗi sale chỉ thấy số của mình. Chủ thấy cả nhóm."} Hoa hồng tính một lần trên doanh thu đã thu trong tháng, bậc 3% đến 100 triệu, 5% từ 100 đến 200 triệu, 7% phần trên 200 triệu. Cách tính do chủ chọn ở Cài đặt. Không hiện giá vốn.
+          {me.data?.role === "sale" ? "Chỉ số của bạn." : "Mỗi sale chỉ thấy số của mình. Chủ thấy cả nhóm."} Hoa hồng lũy tiến 3% đến 100 triệu, 5% phần 100–200 triệu, 7% phần trên 200 triệu. Đó không phải mốc KPI. Đề xuất KPI tháng 2/3/4 (20/40/60 triệu) đang chờ chủ duyệt, chưa thay mục tiêu đang dùng.
         </p>
       </div>
       <Input className="min-h-12 max-w-xs" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
