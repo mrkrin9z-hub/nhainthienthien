@@ -492,6 +492,12 @@ test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và đ
       groupListed: { ep_go: false, trang_guong: true },
       sepay: { enabled: false, apiKey: "", accountHint: "", webhookPath: "/api/public/sepay", note: "" },
       notifyPrefs: { lateOrders: true, marketplaceNew: true, feedbackReprint: true, cashHandover: true },
+      shopChannels: [
+        { id: "tai_tiem" as const, enabled: true, label: "Tại tiệm (offline)" },
+        { id: "facebook" as const, enabled: true, label: "Online / Facebook" },
+        { id: "tiktok" as const, enabled: true, label: "TikTok" },
+        { id: "shopee" as const, enabled: true, label: "Shopee" },
+      ],
     },
     groups: [{ id: "trang_guong", name: "Tên chủ đã sửa", description: "x", turnaround: "3 ngày" }],
     skus: [{ id: "EG-40x60-C1", code: "EG-40x60-C1", groupId: "trang_guong" }],
