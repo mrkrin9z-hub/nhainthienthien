@@ -15,6 +15,7 @@ import { Route as BangGiaRouteImport } from './routes/bang-gia'
 import { Route as DatInRouteImport } from './routes/dat-in'
 import { Route as HuongDanRouteImport } from './routes/huong-dan'
 import { Route as LienHeRouteImport } from './routes/lien-he'
+import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as SanPhamRouteImport } from './routes/san-pham'
 import { Route as TraCuuRouteImport } from './routes/tra-cuu'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -56,6 +57,7 @@ import { Route as AdminViRouteImport } from './routes/admin.vi'
 import { Route as DanhGiaTokenRouteImport } from './routes/danh-gia.$token'
 import { Route as GuiAnhIndexRouteImport } from './routes/gui-anh.index'
 import { Route as GuiAnhTokenRouteImport } from './routes/gui-anh.$token'
+import { Route as OrdersCreateRouteImport } from './routes/orders.create'
 import { Route as AdminAlbumIndexRouteImport } from './routes/admin.album.index'
 import { Route as AdminAlbumIdRouteImport } from './routes/admin.album.$id'
 import { Route as AdminDonHangIndexRouteImport } from './routes/admin.don-hang.index'
@@ -109,6 +111,11 @@ const HuongDanRoute = HuongDanRouteImport.update({
 const LienHeRoute = LienHeRouteImport.update({
   id: '/lien-he',
   path: '/lien-he',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdersRoute = OrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SanPhamRoute = SanPhamRouteImport.update({
@@ -316,6 +323,11 @@ const GuiAnhTokenRoute = GuiAnhTokenRouteImport.update({
   path: '/gui-anh/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrdersCreateRoute = OrdersCreateRouteImport.update({
+  id: '/create',
+  path: '/create',
+  getParentRoute: () => OrdersRoute,
+} as any)
 const AdminAlbumIndexRoute = AdminAlbumIndexRouteImport.update({
   id: '/album/',
   path: '/album/',
@@ -447,6 +459,7 @@ export interface FileRoutesByFullPath {
   '/dat-in': typeof DatInRoute
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
+  '/orders': typeof OrdersRouteWithChildren
   '/san-pham': typeof SanPhamRoute
   '/tra-cuu': typeof TraCuuRoute
   '/admin/anh': typeof AdminAnhRoute
@@ -486,6 +499,7 @@ export interface FileRoutesByFullPath {
   '/admin/vi': typeof AdminViRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
+  '/orders/create': typeof OrdersCreateRoute
   '/admin/': typeof AdminIndexRoute
   '/gui-anh/': typeof GuiAnhIndexRoute
   '/admin/album/$id': typeof AdminAlbumIdRoute
@@ -519,6 +533,7 @@ export interface FileRoutesByTo {
   '/dat-in': typeof DatInRoute
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
+  '/orders': typeof OrdersRouteWithChildren
   '/san-pham': typeof SanPhamRoute
   '/tra-cuu': typeof TraCuuRoute
   '/admin/anh': typeof AdminAnhRoute
@@ -558,6 +573,7 @@ export interface FileRoutesByTo {
   '/admin/vi': typeof AdminViRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
+  '/orders/create': typeof OrdersCreateRoute
   '/admin': typeof AdminIndexRoute
   '/gui-anh': typeof GuiAnhIndexRoute
   '/admin/album/$id': typeof AdminAlbumIdRoute
@@ -593,6 +609,7 @@ export interface FileRoutesById {
   '/dat-in': typeof DatInRoute
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
+  '/orders': typeof OrdersRouteWithChildren
   '/san-pham': typeof SanPhamRoute
   '/tra-cuu': typeof TraCuuRoute
   '/admin/anh': typeof AdminAnhRoute
@@ -632,6 +649,7 @@ export interface FileRoutesById {
   '/admin/vi': typeof AdminViRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
+  '/orders/create': typeof OrdersCreateRoute
   '/admin/': typeof AdminIndexRoute
   '/gui-anh/': typeof GuiAnhIndexRoute
   '/admin/album/$id': typeof AdminAlbumIdRoute
@@ -668,6 +686,7 @@ export interface FileRouteTypes {
     | '/dat-in'
     | '/huong-dan'
     | '/lien-he'
+    | '/orders'
     | '/san-pham'
     | '/tra-cuu'
     | '/admin/anh'
@@ -707,6 +726,7 @@ export interface FileRouteTypes {
     | '/admin/vi'
     | '/danh-gia/$token'
     | '/gui-anh/$token'
+    | '/orders/create'
     | '/admin/'
     | '/gui-anh/'
     | '/admin/album/$id'
@@ -740,6 +760,7 @@ export interface FileRouteTypes {
     | '/dat-in'
     | '/huong-dan'
     | '/lien-he'
+    | '/orders'
     | '/san-pham'
     | '/tra-cuu'
     | '/admin/anh'
@@ -779,6 +800,7 @@ export interface FileRouteTypes {
     | '/admin/vi'
     | '/danh-gia/$token'
     | '/gui-anh/$token'
+    | '/orders/create'
     | '/admin'
     | '/gui-anh'
     | '/admin/album/$id'
@@ -813,6 +835,7 @@ export interface FileRouteTypes {
     | '/dat-in'
     | '/huong-dan'
     | '/lien-he'
+    | '/orders'
     | '/san-pham'
     | '/tra-cuu'
     | '/admin/anh'
@@ -852,6 +875,7 @@ export interface FileRouteTypes {
     | '/admin/vi'
     | '/danh-gia/$token'
     | '/gui-anh/$token'
+    | '/orders/create'
     | '/admin/'
     | '/gui-anh/'
     | '/admin/album/$id'
@@ -887,6 +911,7 @@ export interface RootRouteChildren {
   DatInRoute: typeof DatInRoute
   HuongDanRoute: typeof HuongDanRoute
   LienHeRoute: typeof LienHeRoute
+  OrdersRoute: typeof OrdersRouteWithChildren
   SanPhamRoute: typeof SanPhamRoute
   TraCuuRoute: typeof TraCuuRoute
   DanhGiaTokenRoute: typeof DanhGiaTokenRoute
@@ -953,6 +978,13 @@ declare module '@tanstack/react-router' {
       path: '/lien-he'
       fullPath: '/lien-he'
       preLoaderRoute: typeof LienHeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orders': {
+      id: '/orders'
+      path: '/orders'
+      fullPath: '/orders'
+      preLoaderRoute: typeof OrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/san-pham': {
@@ -1242,6 +1274,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuiAnhTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/orders/create': {
+      id: '/orders/create'
+      path: '/create'
+      fullPath: '/orders/create'
+      preLoaderRoute: typeof OrdersCreateRouteImport
+      parentRoute: typeof OrdersRoute
+    }
     '/admin/album/': {
       id: '/admin/album/'
       path: '/album'
@@ -1507,6 +1546,17 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface OrdersRouteChildren {
+  OrdersCreateRoute: typeof OrdersCreateRoute
+}
+
+const OrdersRouteChildren: OrdersRouteChildren = {
+  OrdersCreateRoute: OrdersCreateRoute,
+}
+
+const OrdersRouteWithChildren =
+  OrdersRoute._addFileChildren(OrdersRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
@@ -1514,6 +1564,7 @@ const rootRouteChildren: RootRouteChildren = {
   DatInRoute: DatInRoute,
   HuongDanRoute: HuongDanRoute,
   LienHeRoute: LienHeRoute,
+  OrdersRoute: OrdersRouteWithChildren,
   SanPhamRoute: SanPhamRoute,
   TraCuuRoute: TraCuuRoute,
   DanhGiaTokenRoute: DanhGiaTokenRoute,

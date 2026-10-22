@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { MapPin, Phone, Plus, Trash2, UserRound } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -12,7 +12,8 @@ import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { getCustomers } from "@/lib/admin.functions";
 import { formatMaybe, formatVnd } from "@/lib/brand";
 
-const control = "min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm";
+const control = "min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm";
+const card = "space-y-3 rounded-2xl border border-border/70 bg-card p-4 shadow-sm";
 
 export type DeskSku = {
   id: string;
@@ -62,6 +63,7 @@ export function OrderDesk({
   itemsLocked,
   lockNote,
   catalog,
+  channelOptions,
   initial,
   paidSoFar,
   payments = [],
@@ -75,6 +77,7 @@ export function OrderDesk({
   itemsLocked: boolean;
   lockNote: string;
   catalog: DeskSku[];
+  channelOptions?: { id: Channel; label: string }[];
   initial: {
     channel: Channel;
     fullName: string;
@@ -119,6 +122,10 @@ export function OrderDesk({
     enabled: mode === "create" && fullName.trim().length >= 2,
   });
 
+  const channelList = channelOptions?.length
+    ? channelOptions
+    : (Object.keys(CHANNEL_LABEL) as Channel[]).map((id) => ({ id, label: CHANNEL_LABEL[id] }));
+
   const priced = useMemo(() => {
     return lines.map((line) => {
       const sku = catalog.find((item) => item.id === line.skuId);
@@ -148,18 +155,21 @@ export function OrderDesk({
 
   function addSkus(skuIds: string[]) {
     setLines((current) => {
-      const next = [...current.filter((line) => line.skuId), ...skuIds.map((skuId) => {
-        const sku = catalog.find((item) => item.id === skuId);
-        const listed = sku?.prices?.[channel] ?? null;
-        return {
-          key: crypto.randomUUID(),
-          skuId,
-          query: "",
-          quantity: 1,
-          unitPrice: listed === null ? "" : String(listed),
-          priceTouched: false,
-        } satisfies Line;
-      })];
+      const next = [
+        ...current.filter((line) => line.skuId),
+        ...skuIds.map((skuId) => {
+          const sku = catalog.find((item) => item.id === skuId);
+          const listed = sku?.prices?.[channel] ?? null;
+          return {
+            key: crypto.randomUUID(),
+            skuId,
+            query: "",
+            quantity: 1,
+            unitPrice: listed === null ? "" : String(listed),
+            priceTouched: false,
+          } satisfies Line;
+        }),
+      ];
       return next.length ? next : current;
     });
   }
@@ -220,16 +230,17 @@ export function OrderDesk({
       }}
     >
       <div className="space-y-4 xl:col-span-2">
-        {lockNote ? <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">{lockNote}</p> : null}
-        <section className="space-y-4 rounded-md border bg-card p-4">
-          <h2 className="text-base font-semibold">Thông tin khách hàng</h2>
+        {lockNote ? <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">{lockNote}</p> : null}
+
+        <section className={card}>
+          <h2 className="text-base font-bold">Thông tin khách hàng</h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Field label="Kênh">
+            <Field label="Kênh cửa hàng" required>
               {mode === "create" ? (
                 <select className={control} value={channel} disabled={fieldsLocked} onChange={(event) => changeChannel(event.target.value as Channel)}>
-                  {(Object.keys(CHANNEL_LABEL) as Channel[]).map((item) => (
-                    <option key={item} value={item}>
-                      {CHANNEL_LABEL[item]}
+                  {channelList.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
                     </option>
                   ))}
                 </select>
@@ -243,14 +254,15 @@ export function OrderDesk({
                 <option value="delivery">Giao hàng</option>
               </select>
             </Field>
-            <div className="relative">
-              <Field label="Khách">
+            <div className="relative md:col-span-2">
+              <Field label="Khách hàng" required icon={<UserRound className="size-3.5" />}>
                 <Input
                   className="min-h-11"
                   value={fullName}
                   required
                   disabled={fieldsLocked}
                   autoComplete="name"
+                  placeholder="Nhập tên hoặc SĐT khách hàng…"
                   onFocus={() => setSuggestOpen(true)}
                   onBlur={() => window.setTimeout(() => setSuggestOpen(false), 150)}
                   onChange={(event) => {
@@ -285,42 +297,70 @@ export function OrderDesk({
                 </ul>
               ) : null}
             </div>
-            <Field label="Số điện thoại">
+            <Field label="Số điện thoại" required icon={<Phone className="size-3.5" />}>
               <Input className="min-h-11" value={phone} required disabled={fieldsLocked} inputMode="tel" autoComplete="tel" onChange={(event) => setPhone(event.target.value)} />
             </Field>
-            <Field label="Hẹn giao">
-              <Input className="min-h-11" type="date" value={dueDate} disabled={fieldsLocked} onChange={(event) => setDueDate(event.target.value)} />
+            <Field label="Họ tên">
+              <Input className="min-h-11" value={fullName} disabled={fieldsLocked} onChange={(event) => setFullName(event.target.value)} />
             </Field>
-            <Field label="Địa chỉ">
-              <Input className="min-h-11" value={address} disabled={fieldsLocked} required={fulfillment === "delivery" && !fieldsLocked} onChange={(event) => setAddress(event.target.value)} />
-            </Field>
+            <div className="md:col-span-2">
+              <Field label="Địa chỉ" icon={<MapPin className="size-3.5" />}>
+                <Input className="min-h-11" value={address} disabled={fieldsLocked} required={fulfillment === "delivery" && !fieldsLocked} onChange={(event) => setAddress(event.target.value)} />
+              </Field>
+            </div>
             {channel === "tiktok" || channel === "shopee" ? (
               <Field label="Mã đơn sàn">
                 <Input className="min-h-11" value={marketplaceCode} disabled={mode === "edit" || fieldsLocked} onChange={(event) => setMarketplaceCode(event.target.value)} />
               </Field>
             ) : null}
-            <div className="md:col-span-2">
-              <Field label="Ghi chú">
-                <Textarea value={note} disabled={fieldsLocked} placeholder="Ghi chú cho đơn hàng..." onChange={(event) => setNote(event.target.value)} />
-              </Field>
-            </div>
           </div>
         </section>
 
-        <section className="rounded-md border bg-card p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">Danh sách sản phẩm</h2>
-            {itemsLocked ? null : (
-              <Button type="button" size="sm" onClick={() => setPickerOpen(true)}>
-                <Plus className="mr-1 size-3" />
-                Thêm sản phẩm
-              </Button>
-            )}
+        <div className="grid gap-4 md:grid-cols-2">
+          <section className={card}>
+            <h2 className="text-base font-bold">Phân loại đơn hàng</h2>
+            <Field label="Kênh kết nối" required>
+              <select className={control} value={channel} disabled={fieldsLocked || mode === "edit"} onChange={(event) => changeChannel(event.target.value as Channel)}>
+                {channelList.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Hình thức nhận">
+              <select className={control} value={fulfillment} disabled={fieldsLocked} onChange={(event) => setFulfillment(event.target.value as "pickup" | "delivery")}>
+                <option value="pickup">Nhận tại tiệm</option>
+                <option value="delivery">Giao tận nơi</option>
+              </select>
+            </Field>
+          </section>
+
+          <section className={card}>
+            <h2 className="text-base font-bold">Trạng thái đơn hàng</h2>
+            <span className="inline-flex rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground">
+              {mode === "create" ? "MỚI TẠO" : "ĐANG SỬA"}
+            </span>
+            <Field label="Ghi chú">
+              <Textarea className="min-h-28" value={note} disabled={fieldsLocked} placeholder="Ghi chú cho đơn hàng…" onChange={(event) => setNote(event.target.value)} />
+            </Field>
+          </section>
+        </div>
+
+        <section className={card}>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <h2 className="text-base font-bold">Danh sách sản phẩm</h2>
           </div>
           {priced.length === 0 ? (
-            <p className="rounded-md border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">
-              Chưa có sản phẩm. Bấm Thêm sản phẩm để chọn từ bảng giá.
-            </p>
+            <div className="rounded-xl border border-dashed px-3 py-10 text-center">
+              <p className="text-sm text-muted-foreground">Chưa có sản phẩm trong đơn.</p>
+              {itemsLocked ? null : (
+                <Button type="button" className="mt-3" onClick={() => setPickerOpen(true)}>
+                  <Plus className="mr-1 size-4" />
+                  Thêm sản phẩm
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="space-y-3">
               {priced.map((line, index) => (
@@ -339,134 +379,150 @@ export function OrderDesk({
                   onRemove={() => setLines((current) => current.filter((item) => item.key !== line.key))}
                 />
               ))}
+              {itemsLocked ? null : (
+                <Button type="button" variant="outline" className="w-full" onClick={() => setPickerOpen(true)}>
+                  <Plus className="mr-1 size-4" />
+                  Thêm sản phẩm
+                </Button>
+              )}
             </div>
           )}
           {itemsLocked ? null : (
-            <ProductPickerDialog
-              open={pickerOpen}
-              onOpenChange={setPickerOpen}
-              catalog={catalog}
-              channel={channel}
-              onConfirm={addSkus}
-            />
+            <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} catalog={catalog} channel={channel} onConfirm={addSkus} />
           )}
         </section>
       </div>
 
-      <aside className="space-y-3 rounded-md border bg-card p-4 xl:sticky xl:top-4">
-        <h2 className="text-base font-semibold">Thanh toán</h2>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Tạm tính</span>
-            <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(goods)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Đã thu</span>
-            <span className="font-medium">{formatVnd(paid)}</span>
-          </div>
-          {payments.length > 0 ? (
-            <ul className="space-y-1 border-t pt-2 text-xs text-muted-foreground">
-              {payments.map((payment, index) => (
-                <li key={`${payment.at}-${index}`} className="flex justify-between gap-2">
-                  <span>
-                    {new Date(payment.at).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
-                    {" · "}
-                    {payment.method}
-                    {payment.byName ? ` · ${payment.byName}` : ""}
-                  </span>
-                  <span className="shrink-0 font-semibold text-foreground">{formatVnd(payment.amount)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {transfer ? (
-            <div className="rounded-lg border bg-background p-3 text-center">
-              <img src={transfer.image} alt={`Mã chuyển khoản ${transfer.content}`} className="mx-auto h-40 w-40" />
-              <p className="mt-2 text-xs text-muted-foreground">
-                {transfer.bank} · {transfer.holder}. Nội dung chuyển khoản: <strong className="text-foreground">{transfer.content}</strong>
-              </p>
+      <aside className="space-y-4 xl:sticky xl:top-4">
+        <section className={card}>
+          <h2 className="text-base font-bold">Lịch trình đơn hàng</h2>
+          <Field label="Ngày hẹn giao / nhận" required={mode === "create"}>
+            <Input className="min-h-11" type="date" value={dueDate} disabled={fieldsLocked} onChange={(event) => setDueDate(event.target.value)} />
+          </Field>
+          <p className="text-xs text-muted-foreground">
+            {fulfillment === "delivery" ? "Giao hàng — cần địa chỉ khách." : "Khách nhận tại tiệm."}
+          </p>
+        </section>
+
+        <section className={card}>
+          <h2 className="text-base font-bold">Tổng thanh toán</h2>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tổng thanh toán</span>
+              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(goods)}</span>
             </div>
-          ) : null}
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">{remain !== null && remain < 0 ? "Dư tiền" : "Còn lại"}</span>
-            <span className="font-semibold">{remain === null ? "—" : formatVnd(Math.abs(remain))}</span>
-          </div>
-        </div>
-        {mode === "create" ? (
-          <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
-            <p className="text-sm font-medium">Thu tiền lần 1</p>
-            <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn.</p>
-            <div className="flex items-end gap-2">
-              <div className="min-w-0 flex-1">
-                <Field label="Số tiền">
-                  <Input inputMode="numeric" placeholder="Số tiền" value={deposit} disabled={fieldsLocked} onChange={(event) => setDeposit(event.target.value.replace(/[^\d]/g, ""))} />
-                </Field>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Đã thanh toán</span>
+              <span className="font-medium">{formatVnd(paid)}</span>
+            </div>
+            {payments.length > 0 ? (
+              <ul className="space-y-1 border-t pt-2 text-xs text-muted-foreground">
+                {payments.map((payment, index) => (
+                  <li key={`${payment.at}-${index}`} className="flex justify-between gap-2">
+                    <span>
+                      {new Date(payment.at).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+                      {" · "}
+                      {payment.method}
+                      {payment.byName ? ` · ${payment.byName}` : ""}
+                    </span>
+                    <span className="shrink-0 font-semibold text-foreground">{formatVnd(payment.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {transfer ? (
+              <div className="rounded-lg border bg-background p-3 text-center">
+                <img src={transfer.image} alt={`Mã chuyển khoản ${transfer.content}`} className="mx-auto h-40 w-40" />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {transfer.bank} · {transfer.holder}. Nội dung chuyển khoản: <strong className="text-foreground">{transfer.content}</strong>
+                </p>
               </div>
-              <div className="w-36 shrink-0">
-                <Field label="Nguồn thu">
-                  <select className={control} value={method} disabled={fieldsLocked} onChange={(event) => setMethod(event.target.value)}>
-                    <option>Tiền mặt</option>
-                    <option>Chuyển khoản</option>
-                  </select>
-                </Field>
-              </div>
+            ) : null}
+            <div className="flex justify-between border-t pt-2">
+              <span className="text-muted-foreground">{remain !== null && remain < 0 ? "Dư tiền" : "Còn lại"}</span>
+              <span className="font-semibold">{remain === null ? "—" : formatVnd(Math.abs(remain))}</span>
             </div>
           </div>
-        ) : (
-          <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
-            <p className="text-sm font-medium">Thu tiền</p>
-            <p className="text-[12px] text-muted-foreground">Ghi nhận sẽ cộng vào ví của bạn.</p>
-            <div className="flex items-end gap-2">
-              <div className="min-w-0 flex-1">
-                <Field label="Số tiền">
-                  <Input inputMode="numeric" placeholder="Số tiền" value={deposit} disabled={fieldsLocked || !onCollect} onChange={(event) => setDeposit(event.target.value.replace(/[^\d]/g, ""))} />
-                </Field>
-              </div>
-              <div className="w-36 shrink-0">
-                <Field label="Nguồn thu">
-                  <select className={control} value={method} disabled={fieldsLocked || !onCollect} onChange={(event) => setMethod(event.target.value)}>
-                    <option>chuyển khoản</option>
-                    <option>tiền mặt</option>
-                  </select>
-                </Field>
+          {mode === "create" ? (
+            <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
+              <p className="text-sm font-medium">Thanh toán lần 1</p>
+              <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn.</p>
+              <div className="flex items-end gap-2">
+                <div className="min-w-0 flex-1">
+                  <Field label="Số tiền">
+                    <Input inputMode="numeric" placeholder="0" value={deposit} disabled={fieldsLocked} onChange={(event) => setDeposit(event.target.value.replace(/[^\d]/g, ""))} />
+                  </Field>
+                </div>
+                <div className="w-36 shrink-0">
+                  <Field label="Hình thức">
+                    <select className={control} value={method} disabled={fieldsLocked} onChange={(event) => setMethod(event.target.value)}>
+                      <option>Tiền mặt</option>
+                      <option>Chuyển khoản</option>
+                    </select>
+                  </Field>
+                </div>
               </div>
             </div>
-            <Button
-              type="button"
-              className="w-full"
-              disabled={fieldsLocked || !onCollect || collecting || !deposit}
-              onClick={() => {
-                if (!onCollect) return;
-                setCollecting(true);
-                void onCollect(Number(deposit), method)
-                  .then(() => setDeposit(""))
-                  .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không ghi được tiền."))
-                  .finally(() => setCollecting(false));
-              }}
-            >
-              {collecting ? "Đang ghi…" : "Ghi nhận vào ví của bạn"}
-            </Button>
-          </div>
-        )}
-        <p className="text-[11px] text-muted-foreground">
-          {fieldsLocked
-            ? "Đơn sàn không thu thêm và không sửa giá trên web."
-            : channel === "facebook"
-              ? "Đơn Facebook có thể cần cọc trước khi in."
-              : "Cọc có thể để trống, ghi thêm được sau khi mở đơn."}
-        </p>
-        <Button type="submit" className="w-full" disabled={saving || fieldsLocked}>
-          {saving ? "Đang lưu..." : mode === "create" ? "Lưu đơn" : "Cập nhật"}
-        </Button>
+          ) : (
+            <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
+              <p className="text-sm font-medium">Thu tiền</p>
+              <p className="text-[12px] text-muted-foreground">Ghi nhận sẽ cộng vào ví của bạn.</p>
+              <div className="flex items-end gap-2">
+                <div className="min-w-0 flex-1">
+                  <Field label="Số tiền">
+                    <Input inputMode="numeric" placeholder="Số tiền" value={deposit} disabled={fieldsLocked || !onCollect} onChange={(event) => setDeposit(event.target.value.replace(/[^\d]/g, ""))} />
+                  </Field>
+                </div>
+                <div className="w-36 shrink-0">
+                  <Field label="Nguồn thu">
+                    <select className={control} value={method} disabled={fieldsLocked || !onCollect} onChange={(event) => setMethod(event.target.value)}>
+                      <option>chuyển khoản</option>
+                      <option>tiền mặt</option>
+                    </select>
+                  </Field>
+                </div>
+              </div>
+              <Button
+                type="button"
+                className="w-full"
+                disabled={fieldsLocked || !onCollect || collecting || !deposit}
+                onClick={() => {
+                  if (!onCollect) return;
+                  setCollecting(true);
+                  void onCollect(Number(deposit), method)
+                    .then(() => setDeposit(""))
+                    .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không ghi được tiền."))
+                    .finally(() => setCollecting(false));
+                }}
+              >
+                {collecting ? "Đang ghi…" : "Ghi nhận vào ví của bạn"}
+              </Button>
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            {fieldsLocked
+              ? "Đơn sàn không thu thêm và không sửa giá trên web."
+              : channel === "facebook"
+                ? "Đơn Facebook có thể cần cọc trước khi in."
+                : "Cọc có thể để trống, ghi thêm được sau khi mở đơn."}
+          </p>
+          <Button type="submit" className="min-h-12 w-full text-base font-bold" disabled={saving || fieldsLocked}>
+            {saving ? "Đang lưu..." : mode === "create" ? "Lưu đơn hàng" : "Cập nhật"}
+          </Button>
+        </section>
       </aside>
     </form>
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, required, icon }: { label: string; children: ReactNode; required?: boolean; icon?: ReactNode }) {
   return (
     <Label className="block space-y-1 text-sm font-semibold">
-      <span>{label}</span>
+      <span className="inline-flex items-center gap-1.5">
+        {icon ? <span className="text-muted-foreground">{icon}</span> : null}
+        {label}
+        {required ? <span className="text-destructive">*</span> : null}
+      </span>
       {children}
     </Label>
   );
@@ -511,7 +567,7 @@ function ProductLine({
   }
 
   return (
-    <div className="rounded-lg border p-3">
+    <div className="rounded-xl border p-3">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground">Dòng {index + 1}</p>
         {canRemove ? (
