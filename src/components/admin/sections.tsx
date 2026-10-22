@@ -50,10 +50,7 @@ export function CustomerLinks() {
   return (
     <SectionLinks
       label="Khách hàng"
-      items={[
-        { to: "/admin/khach", label: "Khách hàng" },
-        { to: "/admin/nhac-khach", label: "Nhắc khách" },
-      ]}
+      items={[{ to: "/admin/khach", label: "Khách hàng" }]}
     />
   );
 }

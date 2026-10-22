@@ -37,16 +37,13 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
       { to: "/admin/cod", label: "COD", roles: ["owner", "sale"], mode: "live" },
       { to: "/admin/khach", label: "Khách hàng", roles: ["owner", "sale"], managePath: "/manage/customers", mode: "live" },
       { to: "/admin/chat", label: "Chat", roles: ["owner", "sale"], mode: "live" },
-      { to: "/admin/nhac-khach", label: "Nhắc khách", roles: ["owner", "sale"], mode: "live", printShopOnly: true },
       { to: "/admin/nhap-don", label: "Nhập đơn sàn", roles: ["owner", "sale"], mode: "live" },
-      { to: "/admin/danh-gia", label: "Đánh giá", roles: ["owner", "sale"], managePath: "/manage/order-feedback", mode: "live" },
     ],
   },
   {
     title: "Sản xuất",
     items: [
       { to: "/admin/san-xuat", label: "Lệnh sản xuất", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },
-      { to: "/admin/cong-viec", label: "Công việc", roles: ["owner", "sale", "production"], managePath: "/manage/tasks", mode: "live" },
       { to: "/admin/lich", label: "Lịch", roles: ["owner", "sale", "production"], managePath: "/manage/calendar", mode: "live" },
       { to: "/admin/kho", label: "Tồn kho", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },
       { to: "/admin/album", label: "Album / file ảnh", roles: ["owner", "sale", "production"], managePath: "/manage/photos", mode: "live" },
@@ -58,7 +55,6 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
       { to: "/admin/san-pham", label: "Sản phẩm", roles: ["owner"], managePath: "/manage/products", mode: "live" },
       { to: "/admin/gia", label: "Bảng giá theo kênh", roles: ["owner", "sale"], managePath: "/manage/products", mode: "live" },
       { to: "/admin/cai-dat", label: "Giá vốn", roles: ["owner"], search: { m: "chi-phi" }, mode: "live" },
-      { to: "/admin/goi", label: "Gói dịch vụ", roles: ["owner", "sale"], mode: "live", printShopOnly: true },
     ],
   },
   {
@@ -70,7 +66,6 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
       { to: "/admin/bao-cao", label: "Báo cáo", roles: ["owner"], managePath: "/manage/statistics", mode: "live" },
       { to: "/admin/bao-cao-chi", label: "Báo cáo chi", roles: ["owner"], managePath: "/manage/expenses", mode: "live" },
       { to: "/admin/loi-nhuan", label: "Lợi nhuận", roles: ["owner"], managePath: "/manage/expenses", mode: "live" },
-      { to: "/admin/sepay", label: "SePay", roles: ["owner"], managePath: "/manage/settings/sepay", mode: "live" },
     ],
   },
   {

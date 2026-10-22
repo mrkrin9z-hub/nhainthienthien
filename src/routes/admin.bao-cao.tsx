@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { MoneyLinks } from "@/components/admin/sections";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { vnMonth } from "@/domain/calc";
 import { formatMaybe } from "@/lib/brand";
@@ -167,26 +168,81 @@ function FixedEditor({
   rows: { key: string; name: string; amount: number; note: string }[];
   onSave: (rows: { key: string; amount: number }[]) => Promise<void>;
 }) {
+  const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(rows.map((row) => ({ ...row })));
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave(draft.map((row) => ({ key: row.key, amount: Number.isFinite(row.amount) ? row.amount : 0 })));
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div className="mt-3 space-y-2">
-      {draft.map((row, index) => (
-        <label key={row.key} className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="w-48">{row.name}</span>
-          <Input
-            className="h-11 w-36"
-            value={String(row.amount)}
-            onChange={(e) => {
-              const next = [...draft];
-              next[index] = { ...row, amount: Number(e.target.value) };
-              setDraft(next);
-            }}
-          />
-        </label>
-      ))}
-      <Button className="min-h-11" onClick={() => onSave(draft.map((row) => ({ key: row.key, amount: Number.isFinite(row.amount) ? row.amount : 0 })))}>
-        Lưu chi phí tháng này
-      </Button>
+    <div className="mt-3 space-y-3">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          className="min-h-11"
+          onClick={() => {
+            setDraft(rows.map((row) => ({ ...row })));
+            setOpen(true);
+          }}
+        >
+          Sửa
+        </Button>
+      </div>
+      <div className="overflow-hidden rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <tr>
+              <th className="px-3 py-2">Khoản</th>
+              <th className="px-3 py-2 text-right">Số tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className="border-t">
+                <td className="px-3 py-2">{row.name}</td>
+                <td className="px-3 py-2 text-right font-semibold">{formatMaybe(row.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sửa chi phí tháng</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {draft.map((row, index) => (
+              <label key={row.key} className="block text-sm font-semibold">
+                {row.name}
+                <Input
+                  className="mt-1 min-h-11"
+                  inputMode="numeric"
+                  value={String(row.amount)}
+                  onChange={(event) => {
+                    const next = [...draft];
+                    next[index] = { ...row, amount: Number(event.target.value.replace(/[^\d]/g, "")) };
+                    setDraft(next);
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button type="button" className="min-h-11" disabled={saving} onClick={() => void save()}>
+              {saving ? "Đang lưu…" : "Lưu chi phí tháng này"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

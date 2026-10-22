@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Bell,
   Building2,
@@ -21,6 +21,7 @@ import { parseSettingsPanel, SETTINGS_HUB_GROUPS, type SettingsHubCard, type Set
 import { ListPager, useListPage } from "@/components/admin/list-page";
 import { canPreviewPhoto, PhotoViewer, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RoleGate } from "@/components/role-gate";
@@ -153,44 +154,40 @@ function SettingsBody() {
   const queryClient = useQueryClient();
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => loadSettings() });
   const files = useQuery({ queryKey: ["due-files"], queryFn: () => dueFiles(), enabled: panel === "tep" });
-  const [draft, setDraft] = useState<Record<string, string> | null>(null);
-  const [channels, setChannels] = useState<{ id: Channel; enabled: boolean; label: string }[] | null>(null);
   const [fileQ, setFileQ] = useState("");
   const [auditQ, setAuditQ] = useState("");
   const [openFile, setOpenFile] = useState<string | null>(null);
 
   const data = settings.data;
-  const values =
-    draft ??
-    (data
-      ? Object.fromEntries(
-          NUMBER_FIELDS.map((field) => {
-            const raw = (data.settings as Record<string, unknown>)[field.key];
-            if (raw === null || raw === undefined) {
-              if (field.key === "repeatCustomerOrders") return [field.key, String(DEFAULT_REPEAT_ORDERS)];
-              if (field.key === "remindAfterDays") return [field.key, String(DEFAULT_REMIND_DAYS)];
-              return [field.key, ""];
-            }
-            return [field.key, String(raw)];
-          }),
-        )
-      : null);
+  const values = data
+    ? Object.fromEntries(
+        NUMBER_FIELDS.map((field) => {
+          const raw = (data.settings as Record<string, unknown>)[field.key];
+          if (raw === null || raw === undefined) {
+            if (field.key === "repeatCustomerOrders") return [field.key, String(DEFAULT_REPEAT_ORDERS)];
+            if (field.key === "remindAfterDays") return [field.key, String(DEFAULT_REMIND_DAYS)];
+            return [field.key, ""];
+          }
+          return [field.key, String(raw)];
+        }),
+      )
+    : null;
 
   if (settings.isError) return <p className="font-semibold text-destructive">{(settings.error as Error).message}</p>;
   if (!data || !values) return <p className="text-muted-foreground">Đang tải cài đặt…</p>;
 
-  const shopChannels = channels ?? normalizeShopChannels(data.settings.shopChannels);
+  const shopChannels = normalizeShopChannels(data.settings.shopChannels);
 
-  async function saveNumbersAndStore(extra: Record<string, unknown> = {}) {
+  async function saveNumbersAndStore(next: Record<string, string>, extra: Record<string, unknown> = {}) {
     const patch: Record<string, unknown> = { ...extra };
+    const merged = { ...values, ...next };
     for (const field of NUMBER_FIELDS) {
-      const raw = (values![field.key] ?? "").trim();
+      const raw = (merged[field.key] ?? "").trim();
       patch[field.key] = raw === "" ? null : Number(raw);
     }
     await storeSettings({ data: patch });
     await runRecalc();
     toast.success("Đã lưu cài đặt");
-    setDraft(null);
     await queryClient.invalidateQueries({ queryKey: ["settings"] });
   }
 
@@ -259,18 +256,15 @@ function SettingsBody() {
             hint="Mực, hao hụt và ngưỡng lãi. Ô được phép trống thì để trống — hệ thống không tự bịa số."
             keys={COST_KEYS}
             values={values}
-            onChange={(next) => setDraft(next)}
+            onSave={(next) => saveNumbersAndStore(next)}
           />
           <NumberGroup
             title="Phí sàn"
             hint="Phí, thuế và hoa hồng theo kênh. Máy tính giá ở Bảng giá dùng các số này."
             keys={FEE_KEYS}
             values={values}
-            onChange={(next) => setDraft(next)}
+            onSave={(next) => saveNumbersAndStore(next)}
           />
-          <Button className="min-h-12 bg-accent text-accent-foreground" onClick={() => void saveNumbersAndStore()}>
-            Lưu cài đặt chi phí
-          </Button>
         </div>
       ) : null}
 
@@ -281,25 +275,20 @@ function SettingsBody() {
             hint="Lương cứng, thử việc, ân hạn và mức trừ. Mức trừ để trống thì chưa trừ."
             keys={SALARY_KEYS}
             values={values}
-            onChange={(next) => setDraft(next)}
-          />
-          <label className="block text-sm font-semibold">
-            Cách tính hoa hồng
-            <select id="commissionBasis" className="mt-1 min-h-12 w-full rounded-xl border bg-card px-3" defaultValue={data.settings.commissionBasis ?? "shop"}>
-              <option value="shop">Toàn tiệm — một sale làm hết</option>
-              <option value="handled">Theo đơn người đó xử lý — từ hai sale</option>
-            </select>
-          </label>
-          <Button
-            className="min-h-12 bg-accent text-accent-foreground"
-            onClick={() =>
-              void saveNumbersAndStore({
-                commissionBasis: (document.getElementById("commissionBasis") as HTMLSelectElement).value,
-              })
+            onSave={async (next) => {
+              const basis = (document.getElementById("commissionBasis") as HTMLSelectElement | null)?.value;
+              await saveNumbersAndStore(next, basis ? { commissionBasis: basis } : {});
+            }}
+            dialogExtra={
+              <label className="block text-sm font-semibold">
+                Cách tính hoa hồng
+                <select id="commissionBasis" className="mt-1 min-h-12 w-full rounded-xl border bg-card px-3" defaultValue={data.settings.commissionBasis ?? "shop"}>
+                  <option value="shop">Toàn tiệm — một sale làm hết</option>
+                  <option value="handled">Theo đơn người đó xử lý — từ hai sale</option>
+                </select>
+              </label>
             }
-          >
-            Lưu lương và công
-          </Button>
+          />
         </div>
       ) : null}
 
@@ -310,98 +299,27 @@ function SettingsBody() {
             hint="Cọc, hòa vốn, định mức kho và nhắc khách. Chi phí cố định từng tháng sửa ở Báo cáo."
             keys={OPS_KEYS}
             values={values}
-            onChange={(next) => setDraft(next)}
-          />
-          <label className="block text-sm font-semibold">
-            Mẫu tin nhắc khách. Chỗ trống: {"{ten}"} {"{so_don}"} {"{ngay}"} {"{dip}"} {"{so_dt}"}. Không tự gửi.
-            <textarea id="remindMessage" className="mt-1 min-h-24 w-full rounded-xl border bg-card px-3 py-2" defaultValue={data.settings.remindMessage || DEFAULT_REMIND_MESSAGE} />
-          </label>
-          <Button
-            className="min-h-12 bg-accent text-accent-foreground"
-            onClick={() =>
-              void saveNumbersAndStore({
-                remindMessage: (document.getElementById("remindMessage") as HTMLTextAreaElement).value,
-              })
+            onSave={async (next) => {
+              const remind = (document.getElementById("remindMessage") as HTMLTextAreaElement | null)?.value;
+              await saveNumbersAndStore(next, remind !== undefined && remind !== null ? { remindMessage: remind } : {});
+            }}
+            dialogExtra={
+              <label className="block text-sm font-semibold">
+                Mẫu tin nhắc khách. Chỗ trống: {"{ten}"} {"{so_don}"} {"{ngay}"} {"{dip}"} {"{so_dt}"}. Không tự gửi.
+                <textarea id="remindMessage" className="mt-1 min-h-24 w-full rounded-xl border bg-card px-3 py-2" defaultValue={data.settings.remindMessage || DEFAULT_REMIND_MESSAGE} />
+              </label>
             }
-          >
-            Lưu số liệu vận hành
-          </Button>
+          />
         </div>
       ) : null}
 
-      {panel === "kenh" ? (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Kênh bán của cửa hàng. Bật kênh đang dùng và đặt tên hiển thị.
-          </p>
-          <ul className="space-y-3">
-            {shopChannels.map((row) => (
-              <li key={row.id} className="rounded-2xl border bg-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="flex items-center gap-2 text-sm font-semibold">
-                    <input
-                      type="checkbox"
-                      checked={row.enabled}
-                      onChange={(e) =>
-                        setChannels(shopChannels.map((item) => (item.id === row.id ? { ...item, enabled: e.target.checked } : item)))
-                      }
-                    />
-                    {CHANNEL_LABEL[row.id]}
-                  </label>
-                  <span className="text-xs text-muted-foreground">{row.id}</span>
-                </div>
-                <Label className="mt-3 block text-sm">Tên hiển thị</Label>
-                <Input
-                  className="mt-1 min-h-11"
-                  value={row.label}
-                  onChange={(e) => setChannels(shopChannels.map((item) => (item.id === row.id ? { ...item, label: e.target.value } : item)))}
-                />
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs text-muted-foreground">Phải bật ít nhất một kênh. Các kênh cố định: {CHANNELS.join(", ")}.</p>
-          <Button
-            className="min-h-12 bg-accent text-accent-foreground"
-            onClick={async () => {
-              if (!shopChannels.some((row) => row.enabled)) {
-                toast.error("Cần bật ít nhất một kênh cửa hàng.");
-                return;
-              }
-              await storeSettings({ data: { shopChannels: normalizeShopChannels(shopChannels) } });
-              toast.success("Đã lưu kênh cửa hàng");
-              setChannels(null);
-              await queryClient.invalidateQueries({ queryKey: ["settings"] });
-            }}
-          >
-            Lưu kênh cửa hàng
-          </Button>
-        </div>
-      ) : null}
+      {panel === "kenh" ? <ChannelPanel rows={shopChannels} onSaved={async () => { await queryClient.invalidateQueries({ queryKey: ["settings"] }); }} /> : null}
 
       {panel === "cua-hang" ? (
         <StorePanel
           data={data}
-          onSave={async () => {
-            const read = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
-            const checked = (id: string) => (document.getElementById(id) as HTMLInputElement).checked;
-            await storeSettings({
-              data: {
-                zaloPhone: read("zalo"),
-                showZalo: checked("showZalo"),
-                publicHours: read("hours"),
-                workStart: read("workStart"),
-                workEnd: read("workEnd"),
-                weeklyOff: read("weeklyOff")
-                  .split(",")
-                  .map((part) => part.trim())
-                  .filter(Boolean)
-                  .map(Number),
-                showAnhThe: checked("anhThe"),
-                showAlbum: checked("album"),
-                groupListed: Object.fromEntries(data.groups.map((group) => [group.id, checked(`g-${group.id}`)])),
-                bank: { id: read("bankId"), account: read("bankAccount"), holder: read("bankHolder") },
-              },
-            });
+          onSave={async (patch) => {
+            await storeSettings({ data: { ...patch, showZalo: false } });
             toast.success("Đã lưu thông tin cửa hàng");
             await queryClient.invalidateQueries({ queryKey: ["settings"] });
           }}
@@ -440,35 +358,195 @@ function NumberGroup({
   hint,
   keys,
   values,
-  onChange,
+  onSave,
+  dialogExtra,
 }: {
   title: string;
   hint: string;
   keys: readonly string[];
   values: Record<string, string>;
-  onChange: (next: Record<string, string>) => void;
+  onSave: (next: Record<string, string>) => void | Promise<void>;
+  dialogExtra?: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [local, setLocal] = useState(values);
+  const [saving, setSaving] = useState(false);
+  const rows = keys
+    .map((key) => NUMBER_FIELDS.find((item) => item.key === key))
+    .filter((field): field is (typeof NUMBER_FIELDS)[number] => Boolean(field))
+    .filter((field) => !q.trim() || field.label.toLowerCase().includes(q.trim().toLowerCase()));
+
+  function begin() {
+    setLocal(values);
+    setOpen(true);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave(local);
+      setOpen(false);
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
-      <h2 className="font-semibold text-primary">{title}</h2>
-      <p className="text-sm text-muted-foreground">{hint}</p>
-      <div className="grid gap-3 md:grid-cols-2">
-        {keys.map((key) => {
-          const field = NUMBER_FIELDS.find((item) => item.key === key);
-          if (!field) return null;
-          return (
-            <label key={field.key} className="text-sm font-semibold">
-              {field.label}
-              <Input
-                className="mt-1 min-h-11"
-                value={values[field.key] ?? ""}
-                placeholder={field.nullable ? "Chưa có" : ""}
-                onChange={(e) => onChange({ ...values, [field.key]: e.target.value })}
-              />
-            </label>
-          );
-        })}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold text-primary">{title}</h2>
+        <Button type="button" className="min-h-11" onClick={begin}>Sửa</Button>
       </div>
+      <p className="text-sm text-muted-foreground">{hint}</p>
+      <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Lọc chỉ số…" aria-label={`Lọc ${title}`} className="h-11 max-w-xs" />
+      <div className="overflow-hidden rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <tr>
+              <th className="px-3 py-2">Chỉ số</th>
+              <th className="px-3 py-2 text-right">Giá trị</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((field) => (
+              <tr key={field.key} className="border-t">
+                <td className="px-3 py-2">{field.label}</td>
+                <td className="px-3 py-2 text-right font-semibold">{values[field.key] ? values[field.key] : "Chưa có"}</td>
+              </tr>
+            ))}
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={2} className="px-3 py-4 text-center text-muted-foreground">Không khớp.</td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sửa {title}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            {keys.map((key) => {
+              const field = NUMBER_FIELDS.find((item) => item.key === key);
+              if (!field) return null;
+              return (
+                <label key={field.key} className="text-sm font-semibold">
+                  {field.label}
+                  <Input
+                    className="mt-1 min-h-11"
+                    value={local[field.key] ?? ""}
+                    placeholder={field.nullable ? "Chưa có" : ""}
+                    onChange={(event) => setLocal({ ...local, [field.key]: event.target.value })}
+                  />
+                </label>
+              );
+            })}
+            {dialogExtra}
+          </div>
+          <DialogFooter>
+            <Button type="button" className="min-h-11" disabled={saving} onClick={() => void save()}>
+              {saving ? "Đang lưu…" : "Lưu"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
+
+function ChannelPanel({
+  rows,
+  onSaved,
+}: {
+  rows: { id: Channel; enabled: boolean; label: string }[];
+  onSaved: () => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [local, setLocal] = useState(rows);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!local.some((row) => row.enabled)) {
+      toast.error("Cần bật ít nhất một kênh cửa hàng.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await storeSettings({ data: { shopChannels: normalizeShopChannels(local) } });
+      toast.success("Đã lưu kênh cửa hàng");
+      setOpen(false);
+      await onSaved();
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold text-primary">Kênh cửa hàng</h2>
+        <Button type="button" className="min-h-11" onClick={() => { setLocal(rows); setOpen(true); }}>Sửa</Button>
+      </div>
+      <p className="text-sm text-muted-foreground">Kênh bán đang bật. Phải bật ít nhất một kênh. Các kênh cố định: {CHANNELS.join(", ")}.</p>
+      <div className="overflow-hidden rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <tr>
+              <th className="px-3 py-2">Kênh</th>
+              <th className="px-3 py-2">Tên hiển thị</th>
+              <th className="px-3 py-2 text-right">Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-t">
+                <td className="px-3 py-2 font-semibold">{CHANNEL_LABEL[row.id]}</td>
+                <td className="px-3 py-2">{row.label}</td>
+                <td className="px-3 py-2 text-right">{row.enabled ? "Đang bật" : "Tắt"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sửa kênh cửa hàng</DialogTitle>
+          </DialogHeader>
+          <ul className="space-y-3">
+            {local.map((row) => (
+              <li key={row.id} className="rounded-xl border p-3">
+                <label className="flex items-center gap-2 text-sm font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={row.enabled}
+                    onChange={(event) => setLocal(local.map((item) => (item.id === row.id ? { ...item, enabled: event.target.checked } : item)))}
+                  />
+                  {CHANNEL_LABEL[row.id]}
+                </label>
+                <Label className="mt-3 block text-sm">Tên hiển thị</Label>
+                <Input
+                  className="mt-1 min-h-11"
+                  value={row.label}
+                  onChange={(event) => setLocal(local.map((item) => (item.id === row.id ? { ...item, label: event.target.value } : item)))}
+                />
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button type="button" className="min-h-11" disabled={saving} onClick={() => void save()}>
+              {saving ? "Đang lưu…" : "Lưu kênh cửa hàng"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -478,70 +556,162 @@ function StorePanel({
   onSave,
 }: {
   data: NonNullable<Awaited<ReturnType<typeof loadSettings>>>;
-  onSave: () => void | Promise<void>;
+  onSave: (patch: {
+    publicHours: string;
+    workStart: string;
+    workEnd: string;
+    weeklyOff: number[];
+    showAnhThe: boolean;
+    showAlbum: boolean;
+    groupListed: Record<string, boolean>;
+    bank: { id: string; account: string; holder: string };
+  }) => void | Promise<void>;
 }) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [hours, setHours] = useState(data.settings.publicHours);
+  const [workStart, setWorkStart] = useState(data.settings.workStart);
+  const [workEnd, setWorkEnd] = useState(data.settings.workEnd);
+  const [weeklyOff, setWeeklyOff] = useState(data.settings.weeklyOff.join(","));
+  const [anhThe, setAnhThe] = useState(data.settings.showAnhThe);
+  const [album, setAlbum] = useState(data.settings.showAlbum);
+  const [listed, setListed] = useState<Record<string, boolean>>({});
+  const [bankId, setBankId] = useState(data.settings.bank?.id ?? "");
+  const [bankAccount, setBankAccount] = useState(data.settings.bank?.account ?? "");
+  const [bankHolder, setBankHolder] = useState(data.settings.bank?.holder ?? "");
+  const bankName = TRANSFER_BANKS.find((bank) => bank.id === data.settings.bank?.id)?.label ?? "Chưa gắn";
+
+  function begin() {
+    setHours(data.settings.publicHours);
+    setWorkStart(data.settings.workStart);
+    setWorkEnd(data.settings.workEnd);
+    setWeeklyOff(data.settings.weeklyOff.join(","));
+    setAnhThe(data.settings.showAnhThe);
+    setAlbum(data.settings.showAlbum);
+    setListed(Object.fromEntries(data.groups.map((group) => [group.id, data.settings.groupListed[group.id] !== false])));
+    setBankId(data.settings.bank?.id ?? "");
+    setBankAccount(data.settings.bank?.account ?? "");
+    setBankHolder(data.settings.bank?.holder ?? "");
+    setOpen(true);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave({
+        publicHours: hours,
+        workStart,
+        workEnd,
+        weeklyOff: weeklyOff.split(",").map((part) => part.trim()).filter(Boolean).map(Number),
+        showAnhThe: anhThe,
+        showAlbum: album,
+        groupListed: listed,
+        bank: { id: bankId, account: bankAccount, holder: bankHolder },
+      });
+      setOpen(false);
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
-      <label className="block text-sm font-semibold">
-        Zalo
-        <Input className="mt-1 min-h-11" defaultValue={data.settings.zaloPhone} id="zalo" />
-      </label>
-      <label className="flex items-center gap-2 text-sm font-semibold">
-        <input type="checkbox" id="showZalo" defaultChecked={data.settings.showZalo === true} /> Hiện số Zalo trên web
-      </label>
-      <label className="block text-sm font-semibold">
-        Giờ mở cửa (hiện trên web)
-        <Input className="mt-1 min-h-11" defaultValue={data.settings.publicHours} id="hours" />
-      </label>
-      <label className="block text-sm font-semibold">
-        Giờ vào ca
-        <Input className="mt-1 min-h-11" defaultValue={data.settings.workStart} id="workStart" />
-      </label>
-      <label className="block text-sm font-semibold">
-        Giờ ra ca
-        <Input className="mt-1 min-h-11" defaultValue={data.settings.workEnd} id="workEnd" />
-      </label>
-      <label className="block text-sm font-semibold">
-        Ngày nghỉ trong tuần (0=CN … 6=T7, cách nhau bởi dấu phẩy). Để trống = làm cả tuần.
-        <Input className="mt-1 min-h-11" defaultValue={data.settings.weeklyOff.join(",")} id="weeklyOff" />
-      </label>
-      <label className="flex items-center gap-2 text-sm font-semibold">
-        <input type="checkbox" id="anhThe" defaultChecked={data.settings.showAnhThe} /> Hiện ảnh thẻ trên web
-      </label>
-      <label className="flex items-center gap-2 text-sm font-semibold">
-        <input type="checkbox" id="album" defaultChecked={data.settings.showAlbum} /> Hiện album trên web
-      </label>
-      <div className="space-y-1">
-        {data.groups.map((group) => (
-          <label key={group.id} className="flex items-center gap-2 text-sm">
-            <input type="checkbox" id={`g-${group.id}`} defaultChecked={data.settings.groupListed[group.id] !== false} />
-            Hiện {group.name}
-          </label>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold text-primary">Thông tin cửa hàng</h2>
+        <Button type="button" className="min-h-11" onClick={begin}>Sửa</Button>
       </div>
-      <label className="block text-sm font-semibold">
-        Ngân hàng nhận chuyển khoản
-        <select id="bankId" className="mt-1 min-h-12 w-full rounded-xl border bg-card px-3" defaultValue={data.settings.bank?.id ?? ""}>
-          <option value="">Chưa gắn</option>
-          {TRANSFER_BANKS.map((bank) => (
-            <option key={bank.id} value={bank.id}>
-              {bank.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block text-sm font-semibold">
-        Số tài khoản
-        <Input className="mt-1 min-h-11" id="bankAccount" inputMode="numeric" defaultValue={data.settings.bank?.account ?? ""} />
-      </label>
-      <label className="block text-sm font-semibold">
-        Tên chủ tài khoản
-        <Input className="mt-1 min-h-11" id="bankHolder" defaultValue={data.settings.bank?.holder ?? ""} />
-      </label>
-      <Button className="min-h-12 bg-accent text-accent-foreground" onClick={() => void onSave()}>
-        Lưu thông tin cửa hàng
-      </Button>
+      <dl className="divide-y rounded-md border text-sm">
+        <Info label="Giờ mở cửa" value={data.settings.publicHours || "Chưa có"} />
+        <Info label="Giờ ca" value={`${data.settings.workStart} – ${data.settings.workEnd}`} />
+        <Info label="Ngày nghỉ" value={data.settings.weeklyOff.length ? data.settings.weeklyOff.join(", ") : "Làm cả tuần"} />
+        <Info label="Ảnh thẻ trên web" value={data.settings.showAnhThe ? "Hiện" : "Ẩn"} />
+        <Info label="Album trên web" value={data.settings.showAlbum ? "Hiện" : "Ẩn"} />
+        {data.groups.map((group) => (
+          <Info key={group.id} label={group.name} value={data.settings.groupListed[group.id] === false ? "Ẩn" : "Hiện"} />
+        ))}
+        <Info label="Ngân hàng" value={bankName} />
+        <Info label="Số tài khoản" value={data.settings.bank?.account || "Chưa có"} />
+        <Info label="Chủ tài khoản" value={data.settings.bank?.holder || "Chưa có"} />
+      </dl>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sửa thông tin cửa hàng</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold">
+              Giờ mở cửa (hiện trên web)
+              <Input className="mt-1 min-h-11" value={hours} onChange={(event) => setHours(event.target.value)} />
+            </label>
+            <label className="block text-sm font-semibold">
+              Giờ vào ca
+              <Input className="mt-1 min-h-11" value={workStart} onChange={(event) => setWorkStart(event.target.value)} />
+            </label>
+            <label className="block text-sm font-semibold">
+              Giờ ra ca
+              <Input className="mt-1 min-h-11" value={workEnd} onChange={(event) => setWorkEnd(event.target.value)} />
+            </label>
+            <label className="block text-sm font-semibold">
+              Ngày nghỉ trong tuần (0=CN … 6=T7, cách nhau bởi dấu phẩy). Để trống = làm cả tuần.
+              <Input className="mt-1 min-h-11" value={weeklyOff} onChange={(event) => setWeeklyOff(event.target.value)} />
+            </label>
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={anhThe} onChange={(event) => setAnhThe(event.target.checked)} /> Hiện ảnh thẻ trên web
+            </label>
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={album} onChange={(event) => setAlbum(event.target.checked)} /> Hiện album trên web
+            </label>
+            <div className="space-y-1">
+              {data.groups.map((group) => (
+                <label key={group.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={listed[group.id] !== false}
+                    onChange={(event) => setListed({ ...listed, [group.id]: event.target.checked })}
+                  />
+                  Hiện {group.name}
+                </label>
+              ))}
+            </div>
+            <label className="block text-sm font-semibold">
+              Ngân hàng nhận chuyển khoản
+              <select className="mt-1 min-h-12 w-full rounded-xl border bg-card px-3" value={bankId} onChange={(event) => setBankId(event.target.value)}>
+                <option value="">Chưa gắn</option>
+                {TRANSFER_BANKS.map((bank) => (
+                  <option key={bank.id} value={bank.id}>
+                    {bank.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-semibold">
+              Số tài khoản
+              <Input className="mt-1 min-h-11" inputMode="numeric" value={bankAccount} onChange={(event) => setBankAccount(event.target.value)} />
+            </label>
+            <label className="block text-sm font-semibold">
+              Tên chủ tài khoản
+              <Input className="mt-1 min-h-11" value={bankHolder} onChange={(event) => setBankHolder(event.target.value)} />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button type="button" className="min-h-11 bg-accent text-accent-foreground" disabled={saving} onClick={() => void save()}>
+              {saving ? "Đang lưu…" : "Lưu thông tin cửa hàng"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
+  );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 px-3 py-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-right font-semibold">{value}</dd>
+    </div>
   );
 }
 

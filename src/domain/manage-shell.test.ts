@@ -15,7 +15,8 @@ test("menu đủ nhóm vận hành và ẩn garment/tools", () => {
   assert.ok(selling.includes("Khách hàng"));
   assert.ok(selling.includes("Chat"));
   const making = ADMIN_MODULE_GROUPS.find((group) => group.title === "Sản xuất")?.items.map((item) => item.to) ?? [];
-  assert.ok(making.includes("/admin/cong-viec"));
+  assert.ok(making.includes("/admin/san-xuat"));
+  assert.ok(!making.includes("/admin/cong-viec"));
   assert.ok(making.includes("/admin/lich"));
   assert.ok(making.includes("/admin/kho"));
   assert.deepEqual([...MANAGE_SKIP].sort(), ["/manage/garments", "/manage/tools"].sort());
@@ -28,8 +29,11 @@ test("không còn bridge StudioBase; tin mẫu local", () => {
   assert.ok(!paths.includes("/admin/bo-phan"));
   assert.ok(!paths.includes("/admin/studio/tin-mau"));
   assert.ok(paths.includes("/admin/tin-mau"));
-  assert.ok(paths.includes("/admin/goi"));
-  assert.ok(paths.includes("/admin/sepay"));
+  assert.ok(!paths.includes("/admin/goi"));
+  assert.ok(!paths.includes("/admin/sepay"));
+  assert.ok(!paths.includes("/admin/danh-gia"));
+  assert.ok(!paths.includes("/admin/nhac-khach"));
+  assert.ok(!paths.includes("/admin/cong-viec"));
   assert.ok(paths.includes("/admin/nhom-quyen"));
   assert.ok(paths.includes("/admin/thong-bao"));
   assert.ok(paths.includes("/admin/chat"));
@@ -42,17 +46,19 @@ test("không còn bridge StudioBase; tin mẫu local", () => {
 test("modulesForRole tôn trọng danh sách allowed", () => {
   const sale = modulesForRole("sale").flatMap((g) => g.items).map((i) => i.to);
   assert.ok(sale.includes("/admin/chat"));
-  assert.ok(sale.includes("/admin/goi"));
+  assert.ok(!sale.includes("/admin/goi"));
   assert.ok(sale.includes("/admin/tin-mau"));
   assert.ok(!sale.includes("/admin/sepay"));
+  assert.ok(!sale.includes("/admin/danh-gia"));
   const trimmed = modulesForRole("sale", ["/admin", "/admin/chat"]).flatMap((g) => g.items).map((i) => i.to);
   assert.deepEqual(trimmed.sort(), ["/admin", "/admin/chat"].sort());
 });
 
-test("owner thấy SePay, gói, nhóm quyền; không thấy chi nhánh", () => {
+test("owner thấy nhóm quyền; không thấy SePay, gói hay chi nhánh", () => {
   const owner = modulesForRole("owner").flatMap((group) => group.items).map((item) => item.to);
-  assert.ok(owner.includes("/admin/sepay"));
-  assert.ok(owner.includes("/admin/goi"));
+  assert.ok(!owner.includes("/admin/sepay"));
+  assert.ok(!owner.includes("/admin/goi"));
+  assert.ok(!owner.includes("/admin/danh-gia"));
   assert.ok(owner.includes("/admin/nhom-quyen"));
   assert.ok(owner.includes("/admin/thong-bao"));
   assert.ok(owner.includes("/admin/tin-mau"));

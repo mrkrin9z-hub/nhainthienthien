@@ -21,7 +21,9 @@ test("cài đặt là hub nút truy cập; giá vốn trong chi phí; có kênh 
   assert.match(src, /Kênh cửa hàng/);
   assert.match(hub, /title: "Cài đặt chi phí"/);
   assert.match(hub, /title: "Kênh cửa hàng"/);
-  assert.match(hub, /title: "Kết nối SePay"/);
+  assert.doesNotMatch(hub, /title: "Kết nối SePay"/);
+  assert.doesNotMatch(src, /id="zalo"/);
+  assert.match(src, /showZalo: false/);
   assert.match(src, /COST_KEYS/);
   assert.match(src, /inkPercent/);
   assert.match(src, /FEE_KEYS/);
@@ -90,8 +92,11 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(modules, /mode: "live"/);
   assert.doesNotMatch(modules, /mode: "bridge"/);
   assert.match(modules, /to: "\/admin\/lich"/);
-  assert.match(modules, /to: "\/admin\/cong-viec"/);
-  assert.match(modules, /to: "\/admin\/goi"/);
+  assert.doesNotMatch(modules, /to: "\/admin\/cong-viec"/);
+  assert.doesNotMatch(modules, /to: "\/admin\/goi"/);
+  assert.doesNotMatch(modules, /to: "\/admin\/danh-gia"/);
+  assert.doesNotMatch(modules, /to: "\/admin\/nhac-khach"/);
+  assert.doesNotMatch(modules, /to: "\/admin\/sepay"/);
   assert.match(modules, /to: "\/admin\/tin-mau"/);
   assert.doesNotMatch(modules, /to: "\/admin\/studio\/tin-mau"/);
   assert.doesNotMatch(modules, /to: "\/admin\/chien-dich"/);
@@ -108,7 +113,10 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   const chat = readFileSync(new URL("../routes/admin.chat.tsx", import.meta.url), "utf8");
   assert.match(chat, /Tin từ trang Liên hệ/);
   assert.doesNotMatch(chat, /Zalo OA|StudioBase|studiobase/i);
-  assert.match(readFileSync(new URL("../routes/admin.phieu.$code.tsx", import.meta.url), "utf8"), /Phiếu giao nhận/);
+  const slip = readFileSync(new URL("../routes/admin.phieu.$code.tsx", import.meta.url), "utf8");
+  assert.match(slip, /Phiếu giao nhận/);
+  assert.match(slip, /80mm auto/);
+  assert.match(slip, /K80/);
   const ketNoi = readFileSync(new URL("../routes/admin.ket-noi.tsx", import.meta.url), "utf8");
   assert.match(ketNoi, /Fanpage Nhà In/);
   assert.match(ketNoi, /Kết nối Fanpage bằng Facebook/);
@@ -124,6 +132,8 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   const prices = readFileSync(new URL("../routes/admin.gia.tsx", import.meta.url), "utf8");
   assert.match(prices, /Tạo từ Excel/);
   assert.match(prices, /Tạo khổ giá/);
+  assert.match(prices, /Sửa giá/);
+  assert.match(readFileSync(new URL("../routes/admin.cai-dat.tsx", import.meta.url), "utf8"), /Sửa kênh cửa hàng/);
   assert.match(readFileSync(new URL("../routes/admin.kho.tsx", import.meta.url), "utf8"), /cursor-pointer/);
   assert.match(readFileSync(new URL("../components/admin/list-page.tsx", import.meta.url), "utf8"), /Hiển thị/);
   for (const file of ["admin.don-hang.index.tsx", "admin.kho.tsx", "admin.gia.tsx", "admin.thu.tsx", "admin.chi-phi.tsx", "admin.san-pham.tsx", "admin.san-xuat.tsx", "admin.khach.index.tsx", "admin.khach.$id.tsx", "admin.cai-dat.tsx"]) {

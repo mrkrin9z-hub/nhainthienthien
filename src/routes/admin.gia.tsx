@@ -206,6 +206,12 @@ function ShelfTools({ groupId, channel }: { groupId: string; channel: Channel })
   );
 }
 
+const PRICE_STATUS: Record<string, string> = {
+  dang_ban: "Đang bán",
+  nhap: "Chưa có giá",
+  cho_duyet: "Chờ duyệt",
+};
+
 function PriceRow({
   row,
   channel,
@@ -230,11 +236,24 @@ function PriceRow({
     cell.profit === null || cell.profit === undefined
       ? "Chưa đủ số"
       : `${formatMaybe(cell.profit)}${cell.marginPercent === null || cell.marginPercent === undefined ? "" : ` · ${cell.marginPercent}%`}`;
-  const [price, setPrice] = useState(cell.price === null ? "" : String(cell.price));
+  const [open, setOpen] = useState(false);
+  const [price, setPrice] = useState("");
   const [status, setStatus] = useState(cell.status);
-  const [pieces, setPieces] = useState(row.piecesPerPack === null ? "" : String(row.piecesPerPack));
+  const [note, setNote] = useState(cell.note);
+  const [pieces, setPieces] = useState("");
+  const [saving, setSaving] = useState(false);
+  const pack = row.code.endsWith("-GOI");
+
+  function begin() {
+    setPrice(cell.price === null ? "" : String(cell.price));
+    setStatus(cell.status);
+    setNote(cell.note);
+    setPieces(row.piecesPerPack === null ? "" : String(row.piecesPerPack));
+    setOpen(true);
+  }
 
   async function save() {
+    setSaving(true);
     try {
       await savePrice({
         data: {
@@ -242,36 +261,24 @@ function PriceRow({
           channel,
           price: price.trim() === "" ? null : Number(price),
           status: status as "dang_ban" | "nhap" | "cho_duyet",
-          note: cell.note,
+          note,
         },
       });
+      if (pack) {
+        await savePieces({ data: { skuId: row.skuId, pieces: pieces.trim() === "" ? null : Number(pieces) } });
+      }
       toast.success("Đã lưu giá");
+      setOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["prices"] });
     } catch (error) {
       toast.error((error as Error).message);
+    } finally {
+      setSaving(false);
     }
   }
 
-  const pack = row.code.endsWith("-GOI") ? (
-    <div className="mt-1 flex items-center gap-2">
-      <Input className="h-10 w-24" placeholder="Số miếng" value={pieces} onChange={(e) => setPieces(e.target.value)} disabled={!owner} />
-      {owner ? (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={async () => {
-            await savePieces({ data: { skuId: row.skuId, pieces: pieces.trim() === "" ? null : Number(pieces) } });
-            toast.success("Đã lưu số miếng gói");
-          }}
-        >
-          Lưu gói
-        </Button>
-      ) : null}
-    </div>
-  ) : null;
-
   return (
-    <article className="grid gap-3 p-3 md:grid-cols-[3rem_7rem_minmax(0,1.2fr)_8rem_7rem_minmax(0,1fr)] md:items-center md:gap-2 md:px-3">
+    <article className="grid gap-2 p-3 md:grid-cols-[3rem_7rem_minmax(0,1.2fr)_8rem_7rem_minmax(0,1fr)] md:items-center md:gap-2 md:px-3">
       <p className="hidden text-[13px] text-muted-foreground md:block">{stt}</p>
       <p className="font-semibold md:text-[13px]">
         <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[12px]">{row.code}</span>
@@ -279,27 +286,60 @@ function PriceRow({
       <div className="text-[13px]">
         <p className="font-medium">{row.name}</p>
         <p className="text-xs text-muted-foreground">Vốn {formatMaybe(row.sheetCost)}</p>
-        {pack}
+        {pack ? <p className="text-xs text-muted-foreground">Gói {row.piecesPerPack ?? "—"} miếng</p> : null}
       </div>
       <div>
-        <Input className="h-9 md:w-full" inputMode="numeric" value={price} placeholder="Chưa có" disabled={!owner} aria-label={`Giá ${row.name}`} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
+        <p className="text-[13px] font-semibold">{cell.price === null ? "Chưa có" : formatMaybe(cell.price)}</p>
         {cell.listPrice != null && cell.listPrice !== cell.price ? (
           <p className="mt-1 text-xs text-muted-foreground">Niêm yết {formatMaybe(cell.listPrice)}</p>
         ) : null}
       </div>
       <p className="text-xs font-semibold">{margin}</p>
-      <div className="flex gap-2">
-        <select className="min-h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-[13px]" value={status} disabled={!owner} aria-label={`Trạng thái ${row.name}`} onChange={(e) => setStatus(e.target.value)}>
-          <option value="dang_ban">Đang bán</option>
-          <option value="nhap">Chưa có giá</option>
-          <option value="cho_duyet">Chờ duyệt</option>
-        </select>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px]">{PRICE_STATUS[cell.status] ?? cell.status}</span>
         {owner ? (
-          <Button className="min-h-9 shrink-0" onClick={save}>
-            Lưu
+          <Button type="button" variant="outline" className="min-h-9 shrink-0" onClick={begin}>
+            Sửa
           </Button>
         ) : null}
       </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sửa giá · {row.code}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{row.name} · {CHANNEL_LABEL[channel]}</p>
+            <label className="block text-sm font-semibold">
+              Giá bán
+              <Input className="mt-1 min-h-11" inputMode="numeric" value={price} placeholder="Chưa có" aria-label={`Giá ${row.name}`} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
+            </label>
+            <label className="block text-sm font-semibold">
+              Trạng thái
+              <select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm" value={status} aria-label={`Trạng thái ${row.name}`} onChange={(e) => setStatus(e.target.value)}>
+                <option value="dang_ban">Đang bán</option>
+                <option value="nhap">Chưa có giá</option>
+                <option value="cho_duyet">Chờ duyệt</option>
+              </select>
+            </label>
+            <label className="block text-sm font-semibold">
+              Ghi chú
+              <Input className="mt-1 min-h-11" value={note} onChange={(e) => setNote(e.target.value)} />
+            </label>
+            {pack ? (
+              <label className="block text-sm font-semibold">
+                Số miếng trong gói
+                <Input className="mt-1 min-h-11" inputMode="numeric" value={pieces} placeholder="Chưa có" onChange={(e) => setPieces(e.target.value.replace(/[^\d]/g, ""))} />
+              </label>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button type="button" className="min-h-11" disabled={saving} onClick={() => void save()}>
+              {saving ? "Đang lưu…" : "Lưu giá"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </article>
   );
 }
@@ -617,23 +657,61 @@ function BomEditor({ skus }: { skus: { skuId: string; code: string }[] }) {
 }
 
 function BomLine({ line }: { line: { id: string; materialName: string; unit: string; qty: number | null; phase: string; scope: string } }) {
-  const [qty, setQty] = useState(line.qty === null ? "" : String(line.qty));
+  const [open, setOpen] = useState(false);
+  const [qty, setQty] = useState("");
+  const [saving, setSaving] = useState(false);
+  const where = `${line.phase === "print" ? "Khi in" : "Khi đóng gói"} · ${line.scope === "sheet" ? "mỗi tấm" : "mỗi kiện"}`;
+
+  async function save() {
+    setSaving(true);
+    try {
+      await saveBomQty({ data: { bomId: line.id, qty: qty.trim() === "" ? null : Number(qty) } });
+      toast.success("Đã lưu định mức");
+      setOpen(false);
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <li className="flex flex-wrap items-center gap-2 rounded-2xl bg-background px-3 py-2 text-sm">
-      <span className="min-w-40 font-semibold">{line.materialName}</span>
-      <span className="text-muted-foreground">{line.phase === "print" ? "Khi in" : "Khi đóng gói"} · {line.scope === "sheet" ? "mỗi tấm" : "mỗi kiện"}</span>
-      <Input className="h-10 w-28" value={qty} placeholder="Chưa có" onChange={(e) => setQty(e.target.value)} />
-      <span>{line.unit}</span>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={async () => {
-          await saveBomQty({ data: { bomId: line.id, qty: qty.trim() === "" ? null : Number(qty) } });
-          toast.success("Đã lưu định mức");
-        }}
-      >
-        Lưu
-      </Button>
+    <li className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-background px-3 py-2 text-sm">
+      <div>
+        <p className="font-semibold">{line.materialName}</p>
+        <p className="text-muted-foreground">{where}</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="font-semibold">{line.qty === null ? "Chưa có" : `${line.qty} ${line.unit}`}</span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setQty(line.qty === null ? "" : String(line.qty));
+            setOpen(true);
+          }}
+        >
+          Sửa
+        </Button>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sửa định mức · {line.materialName}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{where}</p>
+          <label className="block text-sm font-semibold">
+            Số lượng ({line.unit})
+            <Input className="mt-1 min-h-11" value={qty} placeholder="Chưa có" onChange={(e) => setQty(e.target.value)} />
+          </label>
+          <DialogFooter>
+            <Button type="button" className="min-h-11" disabled={saving} onClick={() => void save()}>
+              {saving ? "Đang lưu…" : "Lưu định mức"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </li>
   );
 }

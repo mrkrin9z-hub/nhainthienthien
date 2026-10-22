@@ -25,7 +25,7 @@ export const SETTINGS_HUB_GROUPS: SettingsHubGroup[] = [
       {
         id: "cua-hang",
         title: "Thông tin cửa hàng",
-        blurb: "Zalo, giờ mở cửa, giờ ca, sản phẩm hiện trên web, tài khoản nhận CK.",
+        blurb: "Giờ mở cửa, giờ ca, sản phẩm hiện trên web, tài khoản nhận CK.",
         to: "/admin/cai-dat",
         search: { m: "cua-hang" },
         icon: "store",
@@ -72,13 +72,6 @@ export const SETTINGS_HUB_GROUPS: SettingsHubGroup[] = [
         blurb: "KPI / mục tiêu doanh thu cửa hàng và nhân viên.",
         to: "/admin/muc-tieu",
         icon: "target",
-      },
-      {
-        id: "sepay",
-        title: "Kết nối SePay",
-        blurb: "Biến động số dư ngân hàng → tự ghi thu vào ví cửa hàng.",
-        to: "/admin/sepay",
-        icon: "wallet",
       },
       {
         id: "luong",
