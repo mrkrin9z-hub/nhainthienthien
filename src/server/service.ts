@@ -4071,16 +4071,33 @@ export async function disconnectMetaPage(actor: Actor) {
 export async function metaPageStatus(actor: Actor) {
   assertRole(actor, ["owner", "sale"]);
   const { readMetaPageLink } = await import("@/server/meta-messenger");
+  const { resolveMetaAppCredentials, readMetaPendingPages } = await import("@/server/meta-oauth");
   const link = await readMetaPageLink();
-  const appId = (await readIntegrationSecret("meta_app_id")).trim();
+  const creds = await resolveMetaAppCredentials();
+  const pending = actor.role === "owner" ? await readMetaPendingPages() : [];
   return {
     connected: Boolean(link?.pageToken),
     pageId: link?.pageId || null,
     pageName: link?.pageName || null,
     hasVerifyToken: Boolean(link?.verifyToken),
-    /** App ID Meta (thường là app đã được StudioBase cấp quyền — không phải inbox StudioBase). */
-    metaAppIdSaved: Boolean(appId),
+    /** Có đủ App ID + Secret (env hoặc đã lưu) để mở OAuth Facebook. */
+    oauthReady: Boolean(creds.appId && creds.appSecret),
+    metaAppIdSaved: Boolean(creds.appId),
+    metaAppSecretSaved: Boolean(creds.appSecret),
+    appFromEnv: creds.source === "env",
+    pendingPages: pending.map((page) => ({ id: page.id, name: page.name })),
   };
+}
+
+export async function chooseMetaOauthPage(actor: Actor, pageId: string) {
+  assertRole(actor, ["owner"]);
+  const { readMetaPendingPages, clearMetaPendingPages } = await import("@/server/meta-oauth");
+  const pages = await readMetaPendingPages();
+  const hit = pages.find((page) => page.id === pageId);
+  if (!hit) throw new Error("Hết hạn chọn Fanpage — bấm Kết nối Facebook lại.");
+  const result = await connectMetaPage(actor, { pageToken: hit.accessToken, pageName: hit.name });
+  await clearMetaPendingPages();
+  return result;
 }
 
 export async function createManualConversation(

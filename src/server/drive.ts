@@ -11,16 +11,16 @@ export async function driveConnected(): Promise<boolean> {
 }
 
 async function driveCreds(): Promise<DriveCreds | null> {
-  const clientId = (await readIntegrationSecret("google_client_id")).trim();
-  const clientSecret = (await readIntegrationSecret("google_client_secret")).trim();
+  const clientId = (process.env.GOOGLE_CLIENT_ID || "").trim() || (await readIntegrationSecret("google_client_id")).trim();
+  const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || "").trim() || (await readIntegrationSecret("google_client_secret")).trim();
   const refreshToken = (await readIntegrationSecret("google_drive")).trim();
   if (!clientId || !clientSecret || !refreshToken) return null;
   return { clientId, clientSecret, refreshToken };
 }
 
 export async function exchangeDriveCode(input: { code: string; redirectUri: string }): Promise<string> {
-  const clientId = (await readIntegrationSecret("google_client_id")).trim();
-  const clientSecret = (await readIntegrationSecret("google_client_secret")).trim();
+  const clientId = (process.env.GOOGLE_CLIENT_ID || "").trim() || (await readIntegrationSecret("google_client_id")).trim();
+  const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || "").trim() || (await readIntegrationSecret("google_client_secret")).trim();
   if (!clientId || !clientSecret) throw new Error("Chưa có Client ID hoặc Client secret.");
   const body = new URLSearchParams({
     code: input.code,

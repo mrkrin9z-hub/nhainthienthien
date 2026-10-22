@@ -75,6 +75,8 @@ import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiStaffPackingPhotoRouteImport } from './routes/api/staff/packing-photo'
 import { Route as ApiAdminDriveCallbackRouteImport } from './routes/api/admin/drive.callback'
 import { Route as ApiAdminDriveStartRouteImport } from './routes/api/admin/drive.start'
+import { Route as ApiAdminMetaCallbackRouteImport } from './routes/api/admin/meta.callback'
+import { Route as ApiAdminMetaStartRouteImport } from './routes/api/admin/meta.start'
 import { Route as ApiAdminShopeeCallbackRouteImport } from './routes/api/admin/shopee.callback'
 import { Route as ApiAdminShopeeStartRouteImport } from './routes/api/admin/shopee.start'
 import { Route as ApiAdminTiktokCallbackRouteImport } from './routes/api/admin/tiktok.callback'
@@ -414,6 +416,16 @@ const ApiAdminDriveStartRoute = ApiAdminDriveStartRouteImport.update({
   path: '/api/admin/drive/start',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminMetaCallbackRoute = ApiAdminMetaCallbackRouteImport.update({
+  id: '/api/admin/meta/callback',
+  path: '/api/admin/meta/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminMetaStartRoute = ApiAdminMetaStartRouteImport.update({
+  id: '/api/admin/meta/start',
+  path: '/api/admin/meta/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminShopeeCallbackRoute = ApiAdminShopeeCallbackRouteImport.update({
   id: '/api/admin/shopee/callback',
   path: '/api/admin/shopee/callback',
@@ -519,6 +531,8 @@ export interface FileRoutesByFullPath {
   '/admin/khach/': typeof AdminKhachIndexRoute
   '/api/admin/drive/callback': typeof ApiAdminDriveCallbackRoute
   '/api/admin/drive/start': typeof ApiAdminDriveStartRoute
+  '/api/admin/meta/callback': typeof ApiAdminMetaCallbackRoute
+  '/api/admin/meta/start': typeof ApiAdminMetaStartRoute
   '/api/admin/shopee/callback': typeof ApiAdminShopeeCallbackRoute
   '/api/admin/shopee/start': typeof ApiAdminShopeeStartRoute
   '/api/admin/tiktok/callback': typeof ApiAdminTiktokCallbackRoute
@@ -593,6 +607,8 @@ export interface FileRoutesByTo {
   '/admin/khach': typeof AdminKhachIndexRoute
   '/api/admin/drive/callback': typeof ApiAdminDriveCallbackRoute
   '/api/admin/drive/start': typeof ApiAdminDriveStartRoute
+  '/api/admin/meta/callback': typeof ApiAdminMetaCallbackRoute
+  '/api/admin/meta/start': typeof ApiAdminMetaStartRoute
   '/api/admin/shopee/callback': typeof ApiAdminShopeeCallbackRoute
   '/api/admin/shopee/start': typeof ApiAdminShopeeStartRoute
   '/api/admin/tiktok/callback': typeof ApiAdminTiktokCallbackRoute
@@ -669,6 +685,8 @@ export interface FileRoutesById {
   '/admin/khach/': typeof AdminKhachIndexRoute
   '/api/admin/drive/callback': typeof ApiAdminDriveCallbackRoute
   '/api/admin/drive/start': typeof ApiAdminDriveStartRoute
+  '/api/admin/meta/callback': typeof ApiAdminMetaCallbackRoute
+  '/api/admin/meta/start': typeof ApiAdminMetaStartRoute
   '/api/admin/shopee/callback': typeof ApiAdminShopeeCallbackRoute
   '/api/admin/shopee/start': typeof ApiAdminShopeeStartRoute
   '/api/admin/tiktok/callback': typeof ApiAdminTiktokCallbackRoute
@@ -746,6 +764,8 @@ export interface FileRouteTypes {
     | '/admin/khach/'
     | '/api/admin/drive/callback'
     | '/api/admin/drive/start'
+    | '/api/admin/meta/callback'
+    | '/api/admin/meta/start'
     | '/api/admin/shopee/callback'
     | '/api/admin/shopee/start'
     | '/api/admin/tiktok/callback'
@@ -820,6 +840,8 @@ export interface FileRouteTypes {
     | '/admin/khach'
     | '/api/admin/drive/callback'
     | '/api/admin/drive/start'
+    | '/api/admin/meta/callback'
+    | '/api/admin/meta/start'
     | '/api/admin/shopee/callback'
     | '/api/admin/shopee/start'
     | '/api/admin/tiktok/callback'
@@ -895,6 +917,8 @@ export interface FileRouteTypes {
     | '/admin/khach/'
     | '/api/admin/drive/callback'
     | '/api/admin/drive/start'
+    | '/api/admin/meta/callback'
+    | '/api/admin/meta/start'
     | '/api/admin/shopee/callback'
     | '/api/admin/shopee/start'
     | '/api/admin/tiktok/callback'
@@ -927,6 +951,8 @@ export interface RootRouteChildren {
   ApiStaffPackingPhotoRoute: typeof ApiStaffPackingPhotoRoute
   ApiAdminDriveCallbackRoute: typeof ApiAdminDriveCallbackRoute
   ApiAdminDriveStartRoute: typeof ApiAdminDriveStartRoute
+  ApiAdminMetaCallbackRoute: typeof ApiAdminMetaCallbackRoute
+  ApiAdminMetaStartRoute: typeof ApiAdminMetaStartRoute
   ApiAdminShopeeCallbackRoute: typeof ApiAdminShopeeCallbackRoute
   ApiAdminShopeeStartRoute: typeof ApiAdminShopeeStartRoute
   ApiAdminTiktokCallbackRoute: typeof ApiAdminTiktokCallbackRoute
@@ -1400,6 +1426,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminDriveStartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/meta/callback': {
+      id: '/api/admin/meta/callback'
+      path: '/api/admin/meta/callback'
+      fullPath: '/api/admin/meta/callback'
+      preLoaderRoute: typeof ApiAdminMetaCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/meta/start': {
+      id: '/api/admin/meta/start'
+      path: '/api/admin/meta/start'
+      fullPath: '/api/admin/meta/start'
+      preLoaderRoute: typeof ApiAdminMetaStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/shopee/callback': {
       id: '/api/admin/shopee/callback'
       path: '/api/admin/shopee/callback'
@@ -1580,6 +1620,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStaffPackingPhotoRoute: ApiStaffPackingPhotoRoute,
   ApiAdminDriveCallbackRoute: ApiAdminDriveCallbackRoute,
   ApiAdminDriveStartRoute: ApiAdminDriveStartRoute,
+  ApiAdminMetaCallbackRoute: ApiAdminMetaCallbackRoute,
+  ApiAdminMetaStartRoute: ApiAdminMetaStartRoute,
   ApiAdminShopeeCallbackRoute: ApiAdminShopeeCallbackRoute,
   ApiAdminShopeeStartRoute: ApiAdminShopeeStartRoute,
   ApiAdminTiktokCallbackRoute: ApiAdminTiktokCallbackRoute,

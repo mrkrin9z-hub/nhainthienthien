@@ -24,9 +24,16 @@ function ConnectPage() {
   useEffect(() => {
     const drive = new URLSearchParams(window.location.search).get("drive");
     if (drive === "ok") toast.success("Đã kết nối Google Drive");
-    if (drive === "thieu") toast.error("Nhập Client ID và Client secret trước");
+    if (drive === "thieu") toast.error("Chưa có Client ID / secret Google — mở phần cấu hình nâng cao để lưu một lần");
     if (drive === "tu-choi") toast.error("Google chưa cấp quyền Drive");
     if (drive === "loi") toast.error("Không kết nối được Google Drive");
+    const meta = new URLSearchParams(window.location.search).get("meta");
+    if (meta === "ok") toast.success("Đã kết nối Fanpage Thiên Thiên");
+    if (meta === "chon") toast.message("Chọn Fanpage vừa cấp quyền");
+    if (meta === "thieu") toast.error("Chưa có App Meta — mở cấu hình nâng cao hoặc đặt META_APP_ID / META_APP_SECRET trên Worker");
+    if (meta === "tu-choi") toast.error("Facebook chưa cấp quyền page");
+    if (meta === "khong-page") toast.error("Tài khoản Facebook không có Fanpage nào");
+    if (meta === "loi") toast.error("Không kết nối được Fanpage");
     const tiktok = new URLSearchParams(window.location.search).get("tiktok");
     if (tiktok === "ok") toast.success("Đã kết nối TikTok Shop. Đơn 7 ngày sẽ đổ vào sổ, đơn đã có thì bỏ qua.");
     if (tiktok === "thieu") toast.error("Nhập App key, App secret và Service ID trước");
@@ -44,13 +51,14 @@ function ConnectPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-extrabold text-primary">Kết nối</h1>
       <p className="text-sm text-muted-foreground">
-        Ô để trống thì app vẫn chạy. Khóa chỉ được lưu, không hiện lại. Chưa có khóa thì không gọi API ngoài.
+        Drive và Fanpage: bấm nút Kết nối để Google/Facebook cấp quyền. Cấu hình App (Client ID, Meta App) chỉ mở khi thiếu.
       </p>
       <DriveCard
         clientSaved={Boolean(status.data?.google_client_id)}
         secretSaved={Boolean(status.data?.google_client_secret)}
         connected={Boolean(status.data?.google_drive)}
       />
+      <FanpageCard pageSaved={Boolean(status.data?.meta_page || status.data?.meta)} />
       <ShopCard
         title="TikTok Shop"
         channel="tiktok"
@@ -78,96 +86,81 @@ function ConnectPage() {
         <SecretField field={{ id: "shopee_partner_id", label: "Partner ID", hint: "Số partner_id của app." }} saved={Boolean(status.data?.shopee_partner_id)} inputType="text" />
         <SecretField field={{ id: "shopee_partner_key", label: "Partner key", hint: "Khóa ký. Không hiện lại sau khi lưu." }} saved={Boolean(status.data?.shopee_partner_key)} />
       </ShopCard>
-      <FanpageCard
-        appIdSaved={Boolean(status.data?.meta_app_id)}
-        pageSaved={Boolean(status.data?.meta_page || status.data?.meta)}
-      />
       <CarrierCards status={status.data} />
     </div>
   );
 }
 
-function FanpageCard({ appIdSaved, pageSaved }: { appIdSaved: boolean; pageSaved: boolean }) {
+function FanpageCard({ pageSaved }: { pageSaved: boolean }) {
   const queryClient = useQueryClient();
+  const meta = useQuery({
+    queryKey: ["meta-connect"],
+    queryFn: async () => {
+      const { metaConnectStatus } = await import("@/lib/chat.functions");
+      return metaConnectStatus();
+    },
+  });
   const [origin, setOrigin] = useState("");
-  const [pageToken, setPageToken] = useState("");
-  const [verifyToken, setVerifyToken] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [pageInfo, setPageInfo] = useState<{ pageName?: string | null; pageId?: string | null; verifyToken?: string } | null>(null);
+  const [advanced, setAdvanced] = useState(false);
+  const [picking, setPicking] = useState<string | null>(null);
   useEffect(() => setOrigin(window.location.origin), []);
   const webhook = `${origin}/api/public/meta-webhook`;
+  const oauthReady = Boolean(meta.data?.oauthReady);
+  const pending = meta.data?.pendingPages ?? [];
+  const connected = Boolean(meta.data?.connected || pageSaved);
 
   return (
     <section className="glass-card space-y-3 rounded-3xl p-4">
       <h2 className="font-bold text-primary">Fanpage Nhà In (Messenger)</h2>
       <p className="text-xs text-muted-foreground">
-        Chat tự nối <strong>page của Nhà In Thiên Thiên</strong>. App Meta chỉ mượn quyền đã được StudioBase cấp sẵn (không cần đăng ký Facebook Developer App mới) —{" "}
-        <strong>không lấy tin nhắn / hội thoại từ studiobase.vn</strong>. Inbox lưu local trong app này.
+        Bấm nút bên dưới để đăng nhập Facebook và chọn page của Nhà In. App Meta mượn quyền đã cấp sẵn (không đăng ký Dev App mới) — inbox lưu local, không lấy tin từ studiobase.vn.
       </p>
-      <SecretField
-        field={{
-          id: "meta_app_id",
-          label: "Meta App ID (app đã được cấp quyền)",
-          hint: "App ID Meta dùng chung quyền với StudioBase — chỉ để OAuth/nối page, không phải API inbox StudioBase.",
-        }}
-        saved={appIdSaved}
-        inputType="text"
-      />
-      <div className="space-y-1">
-        <Label>Page access token của Fanpage Thiên Thiên</Label>
-        <Input
-          className="min-h-11"
-          type="password"
-          autoComplete="off"
-          placeholder={pageSaved ? "Đã lưu — dán token mới để thay" : "EAAx… token page Nhà In"}
-          value={pageToken}
-          onChange={(e) => setPageToken(e.target.value)}
-        />
-      </div>
-      <div className="space-y-1">
-        <Label>Webhook verify token (tuỳ chọn)</Label>
-        <Input
-          className="min-h-11"
-          value={verifyToken}
-          onChange={(e) => setVerifyToken(e.target.value)}
-          placeholder="Để trống thì app tự tạo khi nối"
-        />
-      </div>
-      <p className="break-all text-xs text-muted-foreground">
-        Webhook Meta (Callback URL): {origin ? webhook : "/api/public/meta-webhook"}
-        <br />
-        Đăng ký webhook trên Meta cho <strong>page Nhà In</strong> → tin nhắn ghi vào Chat Thiên Thiên.
+      <p className="text-sm font-semibold">
+        {connected
+          ? `Đã nối: ${meta.data?.pageName || "Fanpage"} ${meta.data?.pageId ? `(${meta.data.pageId})` : ""}`
+          : "Chưa nối Fanpage — Chat vẫn dùng hội thoại nội bộ."}
       </p>
+      {pending.length > 0 ? (
+        <div className="space-y-2 rounded-2xl border border-primary/30 bg-primary/5 p-3">
+          <p className="text-sm font-semibold text-primary">Chọn Fanpage vừa cấp quyền</p>
+          {pending.map((page) => (
+            <Button
+              key={page.id}
+              type="button"
+              className="min-h-11 w-full justify-start"
+              disabled={picking === page.id}
+              onClick={async () => {
+                setPicking(page.id);
+                try {
+                  const { chooseShopMetaPage } = await import("@/lib/chat.functions");
+                  const result = await chooseShopMetaPage({ data: { pageId: page.id } });
+                  toast.success(`Đã nối ${result.pageName}`);
+                  await queryClient.invalidateQueries({ queryKey: ["integrations"] });
+                  await queryClient.invalidateQueries({ queryKey: ["meta-connect"] });
+                  await queryClient.invalidateQueries({ queryKey: ["chat-status"] });
+                } catch (error) {
+                  toast.error((error as Error).message);
+                } finally {
+                  setPicking(null);
+                }
+              }}
+            >
+              {picking === page.id ? "Đang nối…" : page.name}
+            </Button>
+          ))}
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          className="min-h-11"
-          disabled={saving || pageToken.trim().length < 20}
-          onClick={async () => {
-            setSaving(true);
-            try {
-              const { connectShopMetaPage } = await import("@/lib/chat.functions");
-              const result = await connectShopMetaPage({
-                data: {
-                  pageToken: pageToken.trim(),
-                  ...(verifyToken.trim() ? { verifyToken: verifyToken.trim() } : {}),
-                },
-              });
-              setPageInfo(result);
-              setPageToken("");
-              toast.success(`Đã nối Fanpage ${result.pageName}`);
-              await queryClient.invalidateQueries({ queryKey: ["integrations"] });
-              await queryClient.invalidateQueries({ queryKey: ["chat-status"] });
-            } catch (error) {
-              toast.error((error as Error).message);
-            } finally {
-              setSaving(false);
-            }
-          }}
-        >
-          {saving ? "Đang nối…" : "Nối Fanpage Thiên Thiên"}
-        </Button>
-        {pageSaved ? (
+        {oauthReady ? (
+          <Button asChild className="min-h-12">
+            <a href="/api/admin/meta/start">{connected ? "Đổi Fanpage (Facebook)" : "Kết nối Fanpage bằng Facebook"}</a>
+          </Button>
+        ) : (
+          <p className="text-sm text-amber-800">
+            Chưa có App Meta để mở Facebook. Mở cấu hình nâng cao bên dưới (một lần) — dùng App ID/Secret đã được StudioBase cấp quyền.
+          </p>
+        )}
+        {connected ? (
           <Button
             type="button"
             variant="outline"
@@ -177,9 +170,9 @@ function FanpageCard({ appIdSaved, pageSaved }: { appIdSaved: boolean; pageSaved
               try {
                 const { disconnectShopMetaPage } = await import("@/lib/chat.functions");
                 await disconnectShopMetaPage();
-                setPageInfo(null);
                 toast.success("Đã ngắt Fanpage");
                 await queryClient.invalidateQueries({ queryKey: ["integrations"] });
+                await queryClient.invalidateQueries({ queryKey: ["meta-connect"] });
                 await queryClient.invalidateQueries({ queryKey: ["chat-status"] });
               } catch (error) {
                 toast.error((error as Error).message);
@@ -193,13 +186,28 @@ function FanpageCard({ appIdSaved, pageSaved }: { appIdSaved: boolean; pageSaved
           <a href="/admin/chat">Mở Chat</a>
         </Button>
       </div>
-      <p className="text-sm font-semibold">
-        {pageInfo?.pageName
-          ? `Đang nối: ${pageInfo.pageName} (${pageInfo.pageId}) · verify: ${pageInfo.verifyToken}`
-          : pageSaved
-            ? "Đã có Page token — Chat chỉ hiện hội thoại của page Nhà In."
-            : "Chưa nối Fanpage — Chat vẫn dùng hội thoại nội bộ."}
+      <p className="break-all text-xs text-muted-foreground">
+        Webhook Callback URL (dán trên Meta cho page Nhà In): {origin ? webhook : "/api/public/meta-webhook"}
       </p>
+      <button type="button" className="text-sm font-semibold text-primary underline" onClick={() => setAdvanced((v) => !v)}>
+        {advanced ? "Ẩn cấu hình nâng cao" : "Cấu hình nâng cao (App Meta — chỉ khi thiếu)"}
+      </button>
+      {advanced ? (
+        <div className="space-y-3 rounded-2xl border border-dashed p-3">
+          <p className="text-xs text-muted-foreground">
+            Chỉ cần khi Worker chưa có META_APP_ID / META_APP_SECRET. Lưu một lần rồi dùng nút Facebook ở trên.
+          </p>
+          <SecretField
+            field={{ id: "meta_app_id", label: "Meta App ID", hint: "App đã được StudioBase cấp quyền." }}
+            saved={Boolean(meta.data?.metaAppIdSaved)}
+            inputType="text"
+          />
+          <SecretField
+            field={{ id: "meta_app_secret", label: "Meta App Secret", hint: "Không hiện lại sau khi lưu." }}
+            saved={Boolean(meta.data?.metaAppSecretSaved)}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -214,6 +222,7 @@ function DriveCard({
   connected: boolean;
 }) {
   const [origin, setOrigin] = useState("");
+  const [advanced, setAdvanced] = useState(false);
   useEffect(() => setOrigin(window.location.origin), []);
   const redirect = `${origin}/api/admin/drive/callback`;
   const ready = clientSaved && secretSaved;
@@ -221,30 +230,46 @@ function DriveCard({
     <section className="glass-card space-y-3 rounded-3xl p-4">
       <h2 className="font-bold text-primary">Google Drive</h2>
       <p className="text-xs text-muted-foreground">
-        Ảnh khách lên thẳng Drive của chủ, không giới hạn dung lượng. Album theo số điện thoại nằm trong thư mục Album khách. Chưa kết nối thì ảnh lưu tạm, mỗi ảnh tối đa 10MB.
+        Ảnh khách lên Drive của chủ. Bấm nút để Google cấp quyền — không cần nhập lại Client ID mỗi lần nếu đã lưu.
       </p>
-      <p className="break-all text-xs text-muted-foreground">
-        Redirect URI trên Google Cloud: {origin ? redirect : "/api/admin/drive/callback"}
+      <p className="text-sm font-semibold">
+        {connected ? "Đã kết nối Google Drive." : ready ? "Đã có ứng dụng Google — bấm Kết nối để cấp quyền Drive." : "Chưa cấu hình ứng dụng Google."}
       </p>
-      <SecretField
-        field={{ id: "google_client_id", label: "Google Client ID", hint: "Tạo ở Google Cloud, loại Web." }}
-        saved={clientSaved}
-        inputType="text"
-      />
-      <SecretField
-        field={{ id: "google_client_secret", label: "Google Client secret", hint: "Cùng ứng dụng với Client ID." }}
-        saved={secretSaved}
-      />
-      <p className="text-sm font-semibold">{connected ? "Đã kết nối Google Drive." : "Chưa kết nối Google Drive."}</p>
-      {connected ? (
-        <DisconnectDrive />
-      ) : ready ? (
-        <Button asChild className="min-h-12">
-          <a href="/api/admin/drive/start">Kết nối Google Drive</a>
-        </Button>
-      ) : (
-        <p className="text-sm text-muted-foreground">Nhập Client ID và Client secret, bấm Lưu, rồi mới bấm Kết nối Google Drive.</p>
-      )}
+      <div className="flex flex-wrap gap-2">
+        {connected ? (
+          <>
+            <Button asChild className="min-h-12" variant="outline">
+              <a href="/api/admin/drive/start">Kết nối lại Google Drive</a>
+            </Button>
+            <DisconnectDrive />
+          </>
+        ) : ready ? (
+          <Button asChild className="min-h-12">
+            <a href="/api/admin/drive/start">Kết nối Google Drive</a>
+          </Button>
+        ) : (
+          <p className="text-sm text-amber-800">Mở cấu hình nâng cao để lưu Client ID / secret một lần, rồi bấm Kết nối.</p>
+        )}
+      </div>
+      <button type="button" className="text-sm font-semibold text-primary underline" onClick={() => setAdvanced((v) => !v)}>
+        {advanced ? "Ẩn cấu hình nâng cao" : ready ? "Đổi Client ID / secret (nâng cao)" : "Cấu hình nâng cao (Client ID / secret)"}
+      </button>
+      {advanced ? (
+        <div className="space-y-3 rounded-2xl border border-dashed p-3">
+          <p className="break-all text-xs text-muted-foreground">
+            Redirect URI trên Google Cloud: {origin ? redirect : "/api/admin/drive/callback"}
+          </p>
+          <SecretField
+            field={{ id: "google_client_id", label: "Google Client ID", hint: "Tạo ở Google Cloud, loại Web." }}
+            saved={clientSaved}
+            inputType="text"
+          />
+          <SecretField
+            field={{ id: "google_client_secret", label: "Google Client secret", hint: "Cùng ứng dụng với Client ID." }}
+            saved={secretSaved}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -482,6 +507,7 @@ function SecretField({
         setValue("");
         toast.success(value.trim() ? "Đã lưu khóa" : "Đã xóa khóa");
         await queryClient.invalidateQueries({ queryKey: ["integrations"] });
+        await queryClient.invalidateQueries({ queryKey: ["meta-connect"] });
       }}
     >
       <Label htmlFor={field.id}>{field.label}</Label>

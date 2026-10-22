@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { metaAuthUrl, parseMetaAccountsPayload } from "./meta-oauth.ts";
 import { metaPageConnected, parseMetaPageLink, parseMetaWebhook } from "./meta-page.ts";
 
 test("parseMetaPageLink đọc JSON và token legacy", () => {
@@ -39,4 +40,20 @@ test("parseMetaWebhook lấy tin inbound Messenger", () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0]?.psid, "psid9");
   assert.match(rows[0]?.content ?? "", /20x30/);
+});
+
+test("meta OAuth URL và parse danh sách page", () => {
+  const url = metaAuthUrl({ appId: "123", redirectUri: "https://nhainthienthien.com/api/admin/meta/callback", state: "abc" });
+  assert.match(url, /facebook\.com/);
+  assert.match(url, /pages_messaging/);
+  assert.match(url, /client_id=123/);
+  const pages = parseMetaAccountsPayload({
+    data: [
+      { id: "p1", name: "Nhà In", access_token: "EAA_token_xxxxxxxxxxxxxxxxxxxx" },
+      { id: "bad", name: "x", access_token: "short" },
+    ],
+  });
+  assert.equal(pages.length, 1);
+  assert.equal(pages[0]?.id, "p1");
+  assert.equal(pages[0]?.name, "Nhà In");
 });

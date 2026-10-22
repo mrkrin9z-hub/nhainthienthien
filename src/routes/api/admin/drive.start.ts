@@ -13,8 +13,8 @@ export const Route = createFileRoute("/api/admin/drive/start")({
         const { googleAuthUrl, signDriveState } = await import("@/domain/drive-oauth");
         const actor = await currentActor(await readStaffId());
         if (!actor || actor.role !== "owner" || actor.mustChangePassword) return back("loi");
-        const clientId = (await readIntegrationSecret("google_client_id")).trim();
-        const clientSecret = (await readIntegrationSecret("google_client_secret")).trim();
+        const clientId = (process.env.GOOGLE_CLIENT_ID || "").trim() || (await readIntegrationSecret("google_client_id")).trim();
+        const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || "").trim() || (await readIntegrationSecret("google_client_secret")).trim();
         if (!clientId || !clientSecret) return back("thieu");
         const state = await signDriveState(actor.id, sessionConfig().password);
         return go(googleAuthUrl({ clientId, redirectUri: `${origin}/api/admin/drive/callback`, state }));
