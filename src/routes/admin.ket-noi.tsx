@@ -78,57 +78,128 @@ function ConnectPage() {
         <SecretField field={{ id: "shopee_partner_id", label: "Partner ID", hint: "Số partner_id của app." }} saved={Boolean(status.data?.shopee_partner_id)} inputType="text" />
         <SecretField field={{ id: "shopee_partner_key", label: "Partner key", hint: "Khóa ký. Không hiện lại sau khi lưu." }} saved={Boolean(status.data?.shopee_partner_key)} />
       </ShopCard>
-      <StudioBaseFacebookCard
-        apiSaved={Boolean(status.data?.studiobase_chat_api_key)}
-        hookSaved={Boolean(status.data?.studiobase_webhook_secret)}
-        metaSaved={Boolean(status.data?.meta)}
+      <FanpageCard
+        appIdSaved={Boolean(status.data?.meta_app_id)}
+        pageSaved={Boolean(status.data?.meta_page || status.data?.meta)}
       />
       <CarrierCards status={status.data} />
     </div>
   );
 }
 
-function StudioBaseFacebookCard({
-  apiSaved,
-  hookSaved,
-  metaSaved,
-}: {
-  apiSaved: boolean;
-  hookSaved: boolean;
-  metaSaved: boolean;
-}) {
+function FanpageCard({ appIdSaved, pageSaved }: { appIdSaved: boolean; pageSaved: boolean }) {
+  const queryClient = useQueryClient();
   const [origin, setOrigin] = useState("");
+  const [pageToken, setPageToken] = useState("");
+  const [verifyToken, setVerifyToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [pageInfo, setPageInfo] = useState<{ pageName?: string | null; pageId?: string | null; verifyToken?: string } | null>(null);
   useEffect(() => setOrigin(window.location.origin), []);
-  const webhook = `${origin}/api/public/studiobase-webhook`;
+  const webhook = `${origin}/api/public/meta-webhook`;
+
   return (
     <section className="glass-card space-y-3 rounded-3xl p-4">
-      <h2 className="font-bold text-primary">Facebook login (qua StudioBase)</h2>
+      <h2 className="font-bold text-primary">Fanpage Nhà In (Messenger)</h2>
       <p className="text-xs text-muted-foreground">
-        Hai hệ thống độc lập. StudioBase chỉ cho Thiên Thiên <strong>ủy quyền Facebook</strong> bằng app Meta sẵn có — không cần đăng ký Facebook Developer App mới. Chat, đơn, khách, ví… đều lưu local trong app Thiên Thiên; không kéo tin nhắn hay data StudioBase sang đây.
+        Chat tự nối <strong>page của Nhà In Thiên Thiên</strong>. App Meta chỉ mượn quyền đã được StudioBase cấp sẵn (không cần đăng ký Facebook Developer App mới) —{" "}
+        <strong>không lấy tin nhắn / hội thoại từ studiobase.vn</strong>. Inbox lưu local trong app này.
       </p>
       <SecretField
         field={{
-          id: "studiobase_chat_api_key",
-          label: "Khóa ủy quyền StudioBase",
-          hint: "Dùng để login / nối Fanpage qua app Meta của StudioBase. Không phải inbox StudioBase.",
+          id: "meta_app_id",
+          label: "Meta App ID (app đã được cấp quyền)",
+          hint: "App ID Meta dùng chung quyền với StudioBase — chỉ để OAuth/nối page, không phải API inbox StudioBase.",
         }}
-        saved={apiSaved}
+        saved={appIdSaved}
+        inputType="text"
       />
-      <SecretField
-        field={{ id: "studiobase_webhook_secret", label: "Webhook secret (tuỳ chọn)", hint: "Nếu StudioBase chuyển sự kiện Meta về app — ký X-StudioBase-Signature." }}
-        saved={hookSaved}
-      />
-      <SecretField
-        field={{ id: "meta", label: "Token trang Facebook (local)", hint: "Page token lưu tại Thiên Thiên để gửi/nhận Messenger trên chat riêng." }}
-        saved={metaSaved}
-      />
-      <p className="break-all text-xs text-muted-foreground">Webhook URL (ghi vào chat local): {origin ? webhook : "/api/public/studiobase-webhook"}</p>
-      <p className="text-sm font-semibold">
-        {apiSaved || metaSaved ? "Đã có khóa Facebook — Chat Thiên Thiên vẫn mở bình thường (data local)." : "Chưa có khóa Facebook (chat nội bộ vẫn dùng được)."}
+      <div className="space-y-1">
+        <Label>Page access token của Fanpage Thiên Thiên</Label>
+        <Input
+          className="min-h-11"
+          type="password"
+          autoComplete="off"
+          placeholder={pageSaved ? "Đã lưu — dán token mới để thay" : "EAAx… token page Nhà In"}
+          value={pageToken}
+          onChange={(e) => setPageToken(e.target.value)}
+        />
+      </div>
+      <div className="space-y-1">
+        <Label>Webhook verify token (tuỳ chọn)</Label>
+        <Input
+          className="min-h-11"
+          value={verifyToken}
+          onChange={(e) => setVerifyToken(e.target.value)}
+          placeholder="Để trống thì app tự tạo khi nối"
+        />
+      </div>
+      <p className="break-all text-xs text-muted-foreground">
+        Webhook Meta (Callback URL): {origin ? webhook : "/api/public/meta-webhook"}
+        <br />
+        Đăng ký webhook trên Meta cho <strong>page Nhà In</strong> → tin nhắn ghi vào Chat Thiên Thiên.
       </p>
-      <Button asChild variant="outline" className="min-h-11">
-        <a href="/admin/chat">Mở Chat Thiên Thiên</a>
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          className="min-h-11"
+          disabled={saving || pageToken.trim().length < 20}
+          onClick={async () => {
+            setSaving(true);
+            try {
+              const { connectShopMetaPage } = await import("@/lib/chat.functions");
+              const result = await connectShopMetaPage({
+                data: {
+                  pageToken: pageToken.trim(),
+                  ...(verifyToken.trim() ? { verifyToken: verifyToken.trim() } : {}),
+                },
+              });
+              setPageInfo(result);
+              setPageToken("");
+              toast.success(`Đã nối Fanpage ${result.pageName}`);
+              await queryClient.invalidateQueries({ queryKey: ["integrations"] });
+              await queryClient.invalidateQueries({ queryKey: ["chat-status"] });
+            } catch (error) {
+              toast.error((error as Error).message);
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          {saving ? "Đang nối…" : "Nối Fanpage Thiên Thiên"}
+        </Button>
+        {pageSaved ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11"
+            onClick={async () => {
+              if (!confirm("Ngắt kết nối Fanpage?")) return;
+              try {
+                const { disconnectShopMetaPage } = await import("@/lib/chat.functions");
+                await disconnectShopMetaPage();
+                setPageInfo(null);
+                toast.success("Đã ngắt Fanpage");
+                await queryClient.invalidateQueries({ queryKey: ["integrations"] });
+                await queryClient.invalidateQueries({ queryKey: ["chat-status"] });
+              } catch (error) {
+                toast.error((error as Error).message);
+              }
+            }}
+          >
+            Ngắt Fanpage
+          </Button>
+        ) : null}
+        <Button asChild variant="outline" className="min-h-11">
+          <a href="/admin/chat">Mở Chat</a>
+        </Button>
+      </div>
+      <p className="text-sm font-semibold">
+        {pageInfo?.pageName
+          ? `Đang nối: ${pageInfo.pageName} (${pageInfo.pageId}) · verify: ${pageInfo.verifyToken}`
+          : pageSaved
+            ? "Đã có Page token — Chat chỉ hiện hội thoại của page Nhà In."
+            : "Chưa nối Fanpage — Chat vẫn dùng hội thoại nội bộ."}
+      </p>
     </section>
   );
 }

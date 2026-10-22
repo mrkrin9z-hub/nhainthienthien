@@ -66,6 +66,7 @@ import { Route as AdminTemCodeRouteImport } from './routes/admin.tem.$code'
 import { Route as ApiAdminProductPhotoRouteImport } from './routes/api/admin/product-photo'
 import { Route as ApiPublicAlbumRouteImport } from './routes/api/public/album'
 import { Route as ApiPublicCleanupFilesRouteImport } from './routes/api/public/cleanup-files'
+import { Route as ApiPublicMetaWebhookRouteImport } from './routes/api/public/meta-webhook'
 import { Route as ApiPublicSepayRouteImport } from './routes/api/public/sepay'
 import { Route as ApiPublicStudiobaseWebhookRouteImport } from './routes/api/public/studiobase-webhook'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
@@ -365,6 +366,11 @@ const ApiPublicCleanupFilesRoute = ApiPublicCleanupFilesRouteImport.update({
   path: '/api/public/cleanup-files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicMetaWebhookRoute = ApiPublicMetaWebhookRouteImport.update({
+  id: '/api/public/meta-webhook',
+  path: '/api/public/meta-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicSepayRoute = ApiPublicSepayRouteImport.update({
   id: '/api/public/sepay',
   path: '/api/public/sepay',
@@ -489,6 +495,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/album': typeof ApiPublicAlbumRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
+  '/api/public/meta-webhook': typeof ApiPublicMetaWebhookRoute
   '/api/public/sepay': typeof ApiPublicSepayRoute
   '/api/public/studiobase-webhook': typeof ApiPublicStudiobaseWebhookRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
@@ -560,6 +567,7 @@ export interface FileRoutesByTo {
   '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/album': typeof ApiPublicAlbumRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
+  '/api/public/meta-webhook': typeof ApiPublicMetaWebhookRoute
   '/api/public/sepay': typeof ApiPublicSepayRoute
   '/api/public/studiobase-webhook': typeof ApiPublicStudiobaseWebhookRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
@@ -633,6 +641,7 @@ export interface FileRoutesById {
   '/api/admin/product-photo': typeof ApiAdminProductPhotoRoute
   '/api/public/album': typeof ApiPublicAlbumRoute
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
+  '/api/public/meta-webhook': typeof ApiPublicMetaWebhookRoute
   '/api/public/sepay': typeof ApiPublicSepayRoute
   '/api/public/studiobase-webhook': typeof ApiPublicStudiobaseWebhookRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
@@ -707,6 +716,7 @@ export interface FileRouteTypes {
     | '/api/admin/product-photo'
     | '/api/public/album'
     | '/api/public/cleanup-files'
+    | '/api/public/meta-webhook'
     | '/api/public/sepay'
     | '/api/public/studiobase-webhook'
     | '/api/public/upload'
@@ -778,6 +788,7 @@ export interface FileRouteTypes {
     | '/api/admin/product-photo'
     | '/api/public/album'
     | '/api/public/cleanup-files'
+    | '/api/public/meta-webhook'
     | '/api/public/sepay'
     | '/api/public/studiobase-webhook'
     | '/api/public/upload'
@@ -850,6 +861,7 @@ export interface FileRouteTypes {
     | '/api/admin/product-photo'
     | '/api/public/album'
     | '/api/public/cleanup-files'
+    | '/api/public/meta-webhook'
     | '/api/public/sepay'
     | '/api/public/studiobase-webhook'
     | '/api/public/upload'
@@ -883,6 +895,7 @@ export interface RootRouteChildren {
   ApiAdminProductPhotoRoute: typeof ApiAdminProductPhotoRoute
   ApiPublicAlbumRoute: typeof ApiPublicAlbumRoute
   ApiPublicCleanupFilesRoute: typeof ApiPublicCleanupFilesRoute
+  ApiPublicMetaWebhookRoute: typeof ApiPublicMetaWebhookRoute
   ApiPublicSepayRoute: typeof ApiPublicSepayRoute
   ApiPublicStudiobaseWebhookRoute: typeof ApiPublicStudiobaseWebhookRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
@@ -1299,6 +1312,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCleanupFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/meta-webhook': {
+      id: '/api/public/meta-webhook'
+      path: '/api/public/meta-webhook'
+      fullPath: '/api/public/meta-webhook'
+      preLoaderRoute: typeof ApiPublicMetaWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/sepay': {
       id: '/api/public/sepay'
       path: '/api/public/sepay'
@@ -1502,6 +1522,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminProductPhotoRoute: ApiAdminProductPhotoRoute,
   ApiPublicAlbumRoute: ApiPublicAlbumRoute,
   ApiPublicCleanupFilesRoute: ApiPublicCleanupFilesRoute,
+  ApiPublicMetaWebhookRoute: ApiPublicMetaWebhookRoute,
   ApiPublicSepayRoute: ApiPublicSepayRoute,
   ApiPublicStudiobaseWebhookRoute: ApiPublicStudiobaseWebhookRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,

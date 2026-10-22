@@ -3990,14 +3990,27 @@ export async function sendShopChatMessage(
   assertRole(actor, ["owner", "sale"]);
   const content = input.content.trim();
   if (!content) throw new Error("Tin nhắn trống.");
-  await mutate(async (state) => {
-    ensureChatCollections(state);
-    const conversation = state.chatConversations!.find((item) => item.id === input.conversationId);
-    if (!conversation) throw new Error("Không thấy hội thoại.");
+  const state = await readState();
+  ensureChatCollections(state);
+  const conversation = state.chatConversations!.find((item) => item.id === input.conversationId);
+  if (!conversation) throw new Error("Không thấy hội thoại.");
+
+  // Messenger: gửi thẳng Graph API tới PSID của page Thiên Thiên (không qua StudioBase inbox).
+  if (conversation.channel === "messenger" && conversation.externalUserId) {
+    const { readMetaPageLink, sendMetaMessengerText } = await import("@/server/meta-messenger");
+    const link = await readMetaPageLink();
+    if (!link?.pageToken) throw new Error("Chưa nối Fanpage — vào Kết nối lưu Page token của page Nhà In.");
+    await sendMetaMessengerText(link.pageToken, conversation.externalUserId, content);
+  }
+
+  await mutate(async (draft) => {
+    ensureChatCollections(draft);
+    const row = draft.chatConversations!.find((item) => item.id === input.conversationId);
+    if (!row) throw new Error("Không thấy hội thoại.");
     const at = nowIso();
     const message: ShopChatMessage = {
       id: nid(),
-      conversationId: conversation.id,
+      conversationId: row.id,
       direction: "outbound",
       content,
       contentType: "text",
@@ -4006,15 +4019,63 @@ export async function sendShopChatMessage(
       createdAt: at,
       byStaffId: actor.id,
     };
-    state.chatMessages!.push(message);
-    conversation.lastMessageAt = at;
-    conversation.lastMessagePreview = content.slice(0, 160);
-    conversation.updatedAt = at;
+    draft.chatMessages!.push(message);
+    row.lastMessageAt = at;
+    row.lastMessagePreview = content.slice(0, 160);
+    row.updatedAt = at;
     const phone = extractVietnamPhone(content);
-    if (phone && !conversation.customerPhone) conversation.customerPhone = phone;
-    audit(state, actor.id, "chat.send", conversation.id, null, { preview: content.slice(0, 80) });
+    if (phone && !row.customerPhone) row.customerPhone = phone;
+    audit(draft, actor.id, "chat.send", row.id, null, { preview: content.slice(0, 80) });
   });
   return { ok: true as const };
+}
+
+export async function connectMetaPage(
+  actor: Actor,
+  input: { pageToken: string; verifyToken?: string; pageName?: string },
+) {
+  assertRole(actor, ["owner"]);
+  const token = input.pageToken.trim();
+  if (token.length < 20) throw new Error("Page access token quá ngắn.");
+  const { fetchMetaPageProfile } = await import("@/server/meta-messenger");
+  const profile = await fetchMetaPageProfile(token);
+  const link = {
+    pageId: profile.id,
+    pageName: input.pageName?.trim() || profile.name,
+    pageToken: token,
+    verifyToken: (input.verifyToken || "").trim() || `tt-${nid().slice(0, 12)}`,
+    connectedAt: nowIso(),
+  };
+  const { saveIntegrationSecret } = await import("@/server/secrets");
+  await saveIntegrationSecret("meta_page", JSON.stringify(link));
+  await saveIntegrationSecret("meta", token);
+  await mutate(async (state) => {
+    audit(state, actor.id, "meta_page.connect", link.pageId, null, { name: link.pageName });
+  });
+  return { pageId: link.pageId, pageName: link.pageName, verifyToken: link.verifyToken };
+}
+
+export async function disconnectMetaPage(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  const { saveIntegrationSecret } = await import("@/server/secrets");
+  await saveIntegrationSecret("meta_page", "");
+  await saveIntegrationSecret("meta", "");
+  return { ok: true as const };
+}
+
+export async function metaPageStatus(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const { readMetaPageLink } = await import("@/server/meta-messenger");
+  const link = await readMetaPageLink();
+  const appId = (await readIntegrationSecret("meta_app_id")).trim();
+  return {
+    connected: Boolean(link?.pageToken),
+    pageId: link?.pageId || null,
+    pageName: link?.pageName || null,
+    hasVerifyToken: Boolean(link?.verifyToken),
+    /** App ID Meta (thường là app đã được StudioBase cấp quyền — không phải inbox StudioBase). */
+    metaAppIdSaved: Boolean(appId),
+  };
 }
 
 export async function createManualConversation(

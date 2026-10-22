@@ -16,17 +16,41 @@ async function assertChatRole() {
 }
 
 export const chatStatus = createServerFn({ method: "GET" }).handler(async () => {
-  await assertChatRole();
-  const { studiobaseFacebookLoginConfigured } = await import("@/server/studiobase");
-  const { readIntegrationSecret } = await import("@/server/secrets");
-  const facebookLogin = await studiobaseFacebookLoginConfigured();
-  const metaToken = Boolean(await readIntegrationSecret("meta"));
+  const actor = await assertChatRole();
+  const { metaPageStatus } = await import("@/server/service");
+  const page = await metaPageStatus(actor);
   return {
-    /** Chat luôn dùng data local; không cần StudioBase để mở inbox. */
     ready: true as const,
-    facebookLoginViaStudioBase: facebookLogin,
-    metaPageTokenSaved: metaToken,
+    /** Fanpage Nhà In đã nối (token local) — inbox chỉ của page này. */
+    pageConnected: page.connected,
+    pageName: page.pageName,
+    pageId: page.pageId,
+    metaAppIdSaved: page.metaAppIdSaved,
   };
+});
+
+export const connectShopMetaPage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        pageToken: z.string().trim().min(20).max(6000),
+        verifyToken: z.string().trim().max(200).optional(),
+        pageName: z.string().trim().max(120).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const actor = await assertChatRole();
+    if (actor.role !== "owner") throw new Error("Chỉ chủ nối Fanpage.");
+    const { connectMetaPage } = await import("@/server/service");
+    return connectMetaPage(actor, data);
+  });
+
+export const disconnectShopMetaPage = createServerFn({ method: "POST" }).handler(async () => {
+  const actor = await assertChatRole();
+  if (actor.role !== "owner") throw new Error("Chỉ chủ ngắt Fanpage.");
+  const { disconnectMetaPage } = await import("@/server/service");
+  return disconnectMetaPage(actor);
 });
 
 export const listChatConversations = createServerFn({ method: "GET" }).handler(async () => {
