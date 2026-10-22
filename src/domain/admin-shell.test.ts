@@ -115,7 +115,7 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.doesNotMatch(chat, /Zalo OA|StudioBase|studiobase/i);
   const slip = readFileSync(new URL("../routes/admin.phieu.$code.tsx", import.meta.url), "utf8");
   assert.match(slip, /Phiếu giao nhận/);
-  assert.match(slip, /80mm auto/);
+  assert.match(slip, /size: 80mm /);
   assert.match(slip, /K80/);
   const ketNoi = readFileSync(new URL("../routes/admin.ket-noi.tsx", import.meta.url), "utf8");
   assert.match(ketNoi, /Fanpage Nhà In/);

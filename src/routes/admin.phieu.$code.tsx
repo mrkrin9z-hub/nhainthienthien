@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ function SlipBody() {
   const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
   const [paper, setPaper] = useState<Paper>("k80");
   const [qr, setQr] = useState<string | null>(null);
+  const [k80Height, setK80Height] = useState(160);
+  const sheetRef = useRef<HTMLElement>(null);
   const data = order.data;
 
   useEffect(() => {
@@ -59,9 +61,16 @@ function SlipBody() {
     minute: "2-digit",
   });
   const where = data.fulfillment === "delivery" ? data.address || "Chưa ghi nơi nhận" : "Nhận tại tiệm";
+  useEffect(() => {
+    if (paper !== "k80" || !sheetRef.current) return;
+    const px = sheetRef.current.scrollHeight;
+    const mm = Math.ceil((px * 25.4) / 96) + 8;
+    setK80Height(Math.max(90, mm));
+  }, [data, paper, qr]);
+
   const pageRule =
     paper === "k80"
-      ? "size: 80mm auto; margin: 2mm;"
+      ? `size: 80mm ${k80Height}mm; margin: 2mm;`
       : `size: ${paper === "a5" ? "A5" : "A4"}; margin: 12mm;`;
 
   return (
@@ -89,7 +98,7 @@ function SlipBody() {
         ))}
       </div>
       {paper === "k80" ? (
-        <K80Slip data={data} when={when} where={where} qr={qr} />
+        <K80Slip sheetRef={sheetRef} pageHeight={k80Height} data={data} when={when} where={where} qr={qr} />
       ) : (
         <OfficeSlip data={data} when={when} where={where} qr={qr} paper={paper} />
       )}
@@ -99,9 +108,25 @@ function SlipBody() {
 
 type SlipData = NonNullable<Awaited<ReturnType<typeof getOrderDetail>>>;
 
-function K80Slip({ data, when, where, qr }: { data: SlipData; when: string; where: string; qr: string | null }) {
+function K80Slip({
+  data,
+  when,
+  where,
+  qr,
+  sheetRef,
+  pageHeight,
+}: {
+  data: SlipData;
+  when: string;
+  where: string;
+  qr: string | null;
+  sheetRef: RefObject<HTMLElement | null>;
+  pageHeight: number;
+}) {
   return (
     <article
+      ref={sheetRef}
+      data-k80-height={pageHeight}
       className="slip-sheet mx-auto box-border w-[72mm] bg-white p-1 text-[12px] leading-snug text-black shadow print:shadow-none"
       style={{ fontFamily: '"Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif' }}
     >
