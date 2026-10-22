@@ -121,7 +121,7 @@ export function ToolbarLink({
   label: string;
   icon: LucideIcon;
   primary?: boolean;
-  to: "/admin/don-moi" | "/admin/nhap-don" | "/admin/cod";
+  to: "/orders/create" | "/admin/don-moi" | "/admin/nhap-don" | "/admin/cod";
 }) {
   return (
     <Link to={to} className={actionClass(primary)} aria-label={label} title={label}>

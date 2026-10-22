@@ -270,7 +270,7 @@ function ChatWorkspace({ pageConnected, pageName }: { pageConnected: boolean; pa
             <h2 className="font-bold text-primary">Thông tin & đơn</h2>
             {activeId ? (
               <Button asChild size="sm">
-                <a href={`/admin/don-moi?chat=${encodeURIComponent(activeId)}&phone=${encodeURIComponent(customerPhone)}&name=${encodeURIComponent(customerName === "Khách" ? "" : customerName)}`}>
+                <a href={`/orders/create?chat=${encodeURIComponent(activeId)}&phone=${encodeURIComponent(customerPhone)}&name=${encodeURIComponent(customerName === "Khách" ? "" : customerName)}`}>
                   <Plus className="size-4" />
                   Tạo đơn in
                 </a>
