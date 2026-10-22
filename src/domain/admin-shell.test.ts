@@ -11,15 +11,21 @@ test("đơn đã trừ kho hoặc đã xong thì không sửa sản phẩm", () 
   assert.match(orderRevisionBlock({ status: "xong", printDeducted: false, packDeducted: false }, false) ?? "", /Mở lại đơn/);
 });
 
-test("cài đặt chia nhóm nhưng không bỏ sót ô số", () => {
+test("cài đặt là hub nút truy cập; giá vốn trong chi phí; có kênh cửa hàng", () => {
   const src = readFileSync(new URL("../routes/admin.cai-dat.tsx", import.meta.url), "utf8");
-  const groupBlock = src.slice(src.indexOf("const FIELD_GROUPS"), src.indexOf("const NUMBER_FIELDS"));
-  const fieldBlock = src.slice(src.indexOf("const NUMBER_FIELDS"), src.indexOf("function SettingsPage"));
-  const groupKeys = [...groupBlock.matchAll(/"([A-Za-z][A-Za-z0-9]*)"/g)].map((match) => match[1]).sort();
-  const fieldKeys = [...fieldBlock.matchAll(/key: "([^"]+)"/g)].map((match) => match[1]).sort();
-  assert.deepEqual(groupKeys, fieldKeys);
-  assert.match(src, /Phí sàn/);
-  assert.match(src, /Lưu cài đặt/);
+  const hub = readFileSync(new URL("../admin-os/settings-hub.ts", import.meta.url), "utf8");
+  assert.match(src, /Cài đặt hệ thống/);
+  assert.match(src, /SETTINGS_HUB_GROUPS/);
+  assert.match(src, /Cài đặt chi phí/);
+  assert.match(src, /Giá vốn/);
+  assert.match(src, /Kênh cửa hàng/);
+  assert.match(hub, /title: "Cài đặt chi phí"/);
+  assert.match(hub, /title: "Kênh cửa hàng"/);
+  assert.match(hub, /title: "Kết nối SePay"/);
+  assert.match(src, /COST_KEYS/);
+  assert.match(src, /inkPercent/);
+  assert.match(src, /FEE_KEYS/);
+  assert.match(src, /tiktokFeePercent/);
 });
 
 test("đơn TikTok và Shopee không sửa khách, sản phẩm hay thu tiền", () => {

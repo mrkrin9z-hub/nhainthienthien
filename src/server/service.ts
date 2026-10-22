@@ -91,6 +91,7 @@ import type {
   CashHandover,
   SePayConfig,
   ServicePackage,
+  Settings,
   ShopDocument,
   ShopState,
   Sku,
@@ -2508,6 +2509,10 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
         cashHandover: typeof raw.cashHandover === "boolean" ? raw.cashHandover : prev.cashHandover,
         browserPrompted: typeof raw.browserPrompted === "boolean" ? raw.browserPrompted : prev.browserPrompted,
       };
+    }
+    if (Array.isArray(patch.shopChannels)) {
+      const { normalizeShopChannels } = await import("@/domain/org-desk");
+      state.settings.shopChannels = normalizeShopChannels(patch.shopChannels as Settings["shopChannels"]);
     }
     recalcBoms(state);
     audit(state, actor.id, "settings.update", "settings", before, state.settings);

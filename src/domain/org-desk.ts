@@ -1,4 +1,29 @@
-import type { NotifyPrefs, Role, RoleModules, SePayConfig, ServicePackage } from "./types.ts";
+import type { Channel, NotifyPrefs, Role, RoleModules, SePayConfig, ServicePackage, Settings } from "./types.ts";
+import { CHANNEL_LABEL, CHANNELS } from "./types.ts";
+
+export function defaultShopChannels(): NonNullable<Settings["shopChannels"]> {
+  return CHANNELS.map((id) => ({ id, enabled: true, label: CHANNEL_LABEL[id] }));
+}
+
+export function normalizeShopChannels(rows: Settings["shopChannels"] | undefined): NonNullable<Settings["shopChannels"]> {
+  const base = defaultShopChannels();
+  if (!Array.isArray(rows) || rows.length === 0) return base;
+  return base.map((item) => {
+    const hit = rows.find((row) => row.id === item.id);
+    if (!hit) return item;
+    return {
+      id: item.id,
+      enabled: hit.enabled !== false,
+      label: String(hit.label || item.label).trim() || item.label,
+    };
+  });
+}
+
+export function enabledShopChannels(settings: Pick<Settings, "shopChannels">): Channel[] {
+  return normalizeShopChannels(settings.shopChannels)
+    .filter((row) => row.enabled)
+    .map((row) => row.id);
+}
 
 /** Module path mặc định theo vai — khớp menu Manage OS hiện tại. */
 export const DEFAULT_ROLE_MODULES: RoleModules[] = [
@@ -177,6 +202,10 @@ export function ensureOrgCollections(state: {
   }
   if (!state.settings.notifyPrefs) {
     state.settings.notifyPrefs = defaultNotifyPrefs();
+    changed = true;
+  }
+  if (!Array.isArray(state.settings.shopChannels) || state.settings.shopChannels.length === 0) {
+    state.settings.shopChannels = defaultShopChannels();
     changed = true;
   }
   return changed;

@@ -2,7 +2,7 @@ import { APPROVED_PRICES } from "./approved-prices.ts";
 import { DEFAULT_REMIND_MESSAGE } from "./crm.ts";
 import { formulaQty } from "./calc.ts";
 import { CAR_MAGNET_SIZES, FRIDGE_MAGNET_SIZES, PHOTO_PRINT_SIZES } from "./sizes.ts";
-import { DEFAULT_ROLE_MODULES, defaultNotifyPrefs, defaultSePay } from "./org-desk.ts";
+import { DEFAULT_ROLE_MODULES, defaultNotifyPrefs, defaultSePay, defaultShopChannels } from "./org-desk.ts";
 import type {
   BomLine,
   Channel,
@@ -111,6 +111,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
   sepay: defaultSePay(),
   notifyPrefs: defaultNotifyPrefs(),
+  shopChannels: defaultShopChannels(),
 };
 
 function sizeCm(code: string): { code: string; w: number; h: number } {

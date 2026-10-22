@@ -159,6 +159,11 @@ export type Settings = {
   sepay?: SePayConfig;
   /** Cảnh báo trong app (không phải Web Push). */
   notifyPrefs?: NotifyPrefs;
+  /**
+   * Kênh cửa hàng Thiên Thiên — bật/tắt + tên hiển thị.
+   * Thiếu = cả 4 kênh mặc định bật với CHANNEL_LABEL.
+   */
+  shopChannels?: { id: Channel; enabled: boolean; label: string }[];
 };
 
 export type Staff = {
