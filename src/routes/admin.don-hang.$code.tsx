@@ -8,6 +8,8 @@ import { OrderQrDialog } from "@/components/admin/order-qr-dialog";
 import { WaybillBox } from "@/components/admin/waybill-box";
 import { canPreviewPhoto, PhotoViewer, saveStaffFile, saveStaffFiles, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
@@ -68,17 +70,25 @@ function OrderDetailPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
-        <div className="flex flex-wrap gap-2">
-          {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
-            <Button asChild variant="outline" className="min-h-11">
-              <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem</Link>
-            </Button>
-          ) : null}
-          {role !== "production" ? (
-            <Button asChild variant="outline" className="min-h-11">
-              <Link to="/admin/phieu/$code" params={{ code: data.code }}>Phiếu giao nhận</Link>
-            </Button>
-          ) : null}
+        <div className="flex items-center gap-2">
+          <Button asChild className="min-h-11">
+            <Link to="/admin/phieu/$code" params={{ code: data.code }}>In K80</Link>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="inline-flex size-9 items-center justify-center rounded-md border" aria-label={`Thao tác ${data.code}`}>
+                <MoreHorizontal className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setTab("trang-thai")}>Chuyển bước</DropdownMenuItem>
+              {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
+                <DropdownMenuItem asChild>
+                  <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       <p className="break-words text-sm">

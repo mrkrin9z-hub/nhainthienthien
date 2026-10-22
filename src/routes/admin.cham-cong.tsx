@@ -74,11 +74,15 @@ function ClockPage() {
             <Button
               className="min-h-11"
               onClick={async () => {
-                await punchClock({ data: { action: "in" } });
-                toast.success("Đã vào ca");
-                setPunchOpen(false);
-                await queryClient.invalidateQueries({ queryKey: ["attendance"] });
-                await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+                try {
+                  await punchClock({ data: { action: "in" } });
+                  toast.success("Đã vào ca");
+                  setPunchOpen(false);
+                  await queryClient.invalidateQueries({ queryKey: ["attendance"] });
+                  await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+                } catch (error) {
+                  toast.error((error as Error).message);
+                }
               }}
             >
               Vào ca
@@ -87,11 +91,15 @@ function ClockPage() {
               className="min-h-11"
               variant="outline"
               onClick={async () => {
-                await punchClock({ data: { action: "out" } });
-                toast.success("Đã ra ca");
-                setPunchOpen(false);
-                await queryClient.invalidateQueries({ queryKey: ["attendance"] });
-                await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+                try {
+                  await punchClock({ data: { action: "out" } });
+                  toast.success("Đã ra ca");
+                  setPunchOpen(false);
+                  await queryClient.invalidateQueries({ queryKey: ["attendance"] });
+                  await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+                } catch (error) {
+                  toast.error((error as Error).message);
+                }
               }}
             >
               Ra ca
