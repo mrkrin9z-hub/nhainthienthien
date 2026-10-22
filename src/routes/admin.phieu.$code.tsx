@@ -49,6 +49,13 @@ function SlipBody() {
     };
   }, [data, paper]);
 
+  useEffect(() => {
+    if (paper !== "k80" || !sheetRef.current) return;
+    const px = sheetRef.current.scrollHeight;
+    const mm = Math.ceil((px * 25.4) / 96) + 8;
+    setK80Height(Math.max(90, mm));
+  }, [data, paper, qr]);
+
   if (order.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
   if (order.isError || !data) return <p className="font-semibold text-destructive">{(order.error as Error)?.message ?? "Không thấy đơn."}</p>;
 
@@ -61,12 +68,6 @@ function SlipBody() {
     minute: "2-digit",
   });
   const where = data.fulfillment === "delivery" ? data.address || "Chưa ghi nơi nhận" : "Nhận tại tiệm";
-  useEffect(() => {
-    if (paper !== "k80" || !sheetRef.current) return;
-    const px = sheetRef.current.scrollHeight;
-    const mm = Math.ceil((px * 25.4) / 96) + 8;
-    setK80Height(Math.max(90, mm));
-  }, [data, paper, qr]);
 
   const pageRule =
     paper === "k80"
