@@ -3,7 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { MoneyLinks } from "@/components/admin/sections";
+import { FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { vnMonth } from "@/domain/calc";
@@ -27,32 +29,49 @@ function ProfitPage() {
 
 function ProfitBody() {
   const [month, setMonth] = useState(monthNow());
+  const [filters, setFilters] = useState(false);
   const queryClient = useQueryClient();
   const report = useQuery({ queryKey: ["profit", month], queryFn: () => getProfit({ data: { month } }) });
   const data = report.data;
 
   return (
     <div className="space-y-4">
-      <MoneyLinks />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-primary">Lợi nhuận</h1>
-        <Button
-          variant="outline"
-          className="min-h-11"
-          onClick={async () => {
-            const file = await downloadExcel({ data: { kind: "profit", month } });
-            const blob = new Blob([file.xml], { type: "application/vnd.ms-excel" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = file.filename;
-            a.click();
-          }}
-        >
-          Xuất Excel
-        </Button>
-      </div>
-      <Input className="min-h-12 max-w-xs" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+      <PageToolbar
+        title="Lợi nhuận"
+        hint="Lãi sau giá vốn và chi phí cố định. Đơn thử không tính."
+        filterCount={1}
+        onFilter={() => setFilters(true)}
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="inline-flex size-9 items-center justify-center rounded-md border" aria-label="Thêm thao tác">
+                <MoreHorizontal className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={async () => {
+                  const file = await downloadExcel({ data: { kind: "profit", month } });
+                  const blob = new Blob([file.xml], { type: "application/vnd.ms-excel" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = file.filename;
+                  a.click();
+                }}
+              >
+                Xuất Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      />
+      <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc lợi nhuận">
+        <label className="text-sm font-semibold">
+          Tháng
+          <Input className="mt-1 min-h-11" type="month" aria-label="Tháng lợi nhuận" value={month} onChange={(e) => setMonth(e.target.value)} />
+        </label>
+      </FilterSheet>
       {report.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {report.isError ? <p className="font-semibold text-destructive">{(report.error as Error).message}</p> : null}
       {data ? (

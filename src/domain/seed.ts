@@ -69,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
   catalogImport20261022: true,
   hrApproved20261022: true,
   menuLinks20261022: true,
+  taskMenu20261023: true,
   platformFeeNote:
     "Hoạch toán sàn: 27% + 11.000đ/đơn. Bảng phí từng hạng mục trong file Phi-san ghi chưa xác minh, chỉ để đối chiếu.",
   showAnhThe: false,

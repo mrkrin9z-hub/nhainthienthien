@@ -5,8 +5,8 @@ import { toast } from "sonner";
 
 import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
 import { ListPager, useListPage } from "@/components/admin/list-page";
-import { PageToolbar } from "@/components/admin/page-toolbar";
-import { StaffLinks } from "@/components/admin/sections";
+import { FilterSheet, PageToolbar, ToolbarButton } from "@/components/admin/page-toolbar";
+import { Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,8 @@ function ClockPage() {
   const [month, setMonth] = useState(monthNow());
   const [q, setQ] = useState("");
   const [who, setWho] = useState("all");
+  const [filters, setFilters] = useState(false);
+  const [punchOpen, setPunchOpen] = useState(false);
   const queryClient = useQueryClient();
   const sheet = useQuery({ queryKey: ["attendance", month], queryFn: () => getAttendance({ data: { month } }) });
   const owner = me.data?.role === "owner";
@@ -52,46 +54,58 @@ function ClockPage() {
 
   return (
     <div className="space-y-4">
-      <StaffLinks />
-      <PageToolbar title="Chấm công" search={q} onSearch={setQ} searchPlaceholder="Tìm tên nhân viên…" />
-      <FilterChips label="Ca làm" value={who} chips={whoChips} onChange={setWho} />
-      <div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Ca {sheet.data?.workStart ?? "08:00"}–{sheet.data?.workEnd ?? "18:00"}. Ngày nghỉ tuần:{" "}
-          {(sheet.data?.weeklyOff ?? []).length === 0 ? "chưa đặt (hợp đồng ghi làm hằng ngày, chủ sửa trong Cài đặt)." : sheet.data?.weeklyOff.join(", ")}
-        </p>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <Summary label="Lượt bấm" value={String(punches.length)} />
-        <Summary label="Đang trong ca" value={String(openCount)} />
-        <Summary label="Lượt đi trễ" value={String(lateCount)} />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          className="min-h-14 flex-1 bg-accent text-accent-foreground text-base"
-          onClick={async () => {
-            await punchClock({ data: { action: "in" } });
-            toast.success("Đã vào ca");
-            await queryClient.invalidateQueries({ queryKey: ["attendance"] });
-            await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-          }}
-        >
-          Vào ca
-        </Button>
-        <Button
-          className="min-h-14 flex-1 text-base"
-          variant="outline"
-          onClick={async () => {
-            await punchClock({ data: { action: "out" } });
-            toast.success("Đã ra ca");
-            await queryClient.invalidateQueries({ queryKey: ["attendance"] });
-            await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-          }}
-        >
-          Ra ca
-        </Button>
-      </div>
-      <Input className="min-h-12 max-w-xs" type="month" aria-label="Tháng chấm công" value={month} onChange={(e) => setMonth(e.target.value)} />
+      <PageToolbar
+        title="Chấm công"
+        hint={`Ca ${sheet.data?.workStart ?? "08:00"}–${sheet.data?.workEnd ?? "18:00"}. ${punches.length} lượt · ${openCount} đang trong ca · ${lateCount} lần trễ.`}
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Tìm tên nhân viên…"
+        filterCount={(who !== "all" ? 1 : 0) + 1}
+        onFilter={() => setFilters(true)}
+        actions={<ToolbarButton label="Chấm công" icon={Clock} primary onClick={() => setPunchOpen(true)} />}
+      />
+      <Dialog open={punchOpen} onOpenChange={setPunchOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Chấm công</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Bấm vào ca khi bắt đầu, ra ca khi hết giờ.</p>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              className="min-h-11"
+              onClick={async () => {
+                await punchClock({ data: { action: "in" } });
+                toast.success("Đã vào ca");
+                setPunchOpen(false);
+                await queryClient.invalidateQueries({ queryKey: ["attendance"] });
+                await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+              }}
+            >
+              Vào ca
+            </Button>
+            <Button
+              className="min-h-11"
+              variant="outline"
+              onClick={async () => {
+                await punchClock({ data: { action: "out" } });
+                toast.success("Đã ra ca");
+                setPunchOpen(false);
+                await queryClient.invalidateQueries({ queryKey: ["attendance"] });
+                await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+              }}
+            >
+              Ra ca
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc chấm công">
+        <label className="text-sm font-semibold">
+          Tháng
+          <Input className="mt-1 min-h-11" type="month" aria-label="Tháng chấm công" value={month} onChange={(e) => setMonth(e.target.value)} />
+        </label>
+        <FilterChips label="Ca làm" value={who} chips={whoChips} onChange={setWho} wrap />
+      </FilterSheet>
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="người" onPage={list.setPage} />
       {list.slice.map((person) => {
         const mine = leaves.filter((leave) => leave.staffId === person.id);
@@ -165,6 +179,7 @@ function PunchRow({
   owner: boolean;
 }) {
   const queryClient = useQueryClient();
+  const [fix, setFix] = useState(false);
   const [inAt, setInAt] = useState(punch.inAt.slice(0, 16));
   const [outAt, setOutAt] = useState(punch.outAt ? punch.outAt.slice(0, 16) : "");
   return (
@@ -177,30 +192,45 @@ function PunchRow({
         Trễ {punch.lateMinutes} phút · Về sớm {punch.earlyMinutes} phút
       </p>
       {owner ? (
-        <div className="mt-2 grid grid-cols-1 gap-2">
-          <Input className="h-12 w-full min-w-0" type="datetime-local" value={inAt} onChange={(e) => setInAt(e.target.value)} />
-          <Input className="h-12 w-full min-w-0" type="datetime-local" value={outAt} onChange={(e) => setOutAt(e.target.value)} />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={async () => {
-              const { correctPunch } = await import("@/lib/admin.functions");
-              await correctPunch({
-                data: {
-                  punchId: punch.id,
-                  inAt: new Date(inAt).toISOString(),
-                  outAt: outAt ? new Date(outAt).toISOString() : null,
-                  note: "Chủ sửa",
-                },
-              });
-              toast.success("Đã sửa giờ");
-              await queryClient.invalidateQueries({ queryKey: ["attendance"] });
-            }}
-          >
-            Sửa
-          </Button>
-        </div>
+        <Button size="sm" variant="outline" className="mt-2" onClick={() => setFix(true)}>
+          Sửa
+        </Button>
       ) : null}
+      <Dialog open={fix} onOpenChange={setFix}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sửa giờ chấm</DialogTitle>
+          </DialogHeader>
+          <label className="text-sm font-semibold">
+            Vào ca
+            <Input className="mt-1 h-12 w-full" type="datetime-local" value={inAt} onChange={(e) => setInAt(e.target.value)} />
+          </label>
+          <label className="text-sm font-semibold">
+            Ra ca
+            <Input className="mt-1 h-12 w-full" type="datetime-local" value={outAt} onChange={(e) => setOutAt(e.target.value)} />
+          </label>
+          <DialogFooter>
+            <Button
+              onClick={async () => {
+                const { correctPunch } = await import("@/lib/admin.functions");
+                await correctPunch({
+                  data: {
+                    punchId: punch.id,
+                    inAt: new Date(inAt).toISOString(),
+                    outAt: outAt ? new Date(outAt).toISOString() : null,
+                    note: "Chủ sửa",
+                  },
+                });
+                toast.success("Đã sửa giờ");
+                setFix(false);
+                await queryClient.invalidateQueries({ queryKey: ["attendance"] });
+              }}
+            >
+              Lưu giờ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </li>
   );
 }

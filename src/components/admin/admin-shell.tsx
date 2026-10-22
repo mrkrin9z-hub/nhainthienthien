@@ -12,13 +12,12 @@ import {
   Image,
   Images,
   Landmark,
-  CalendarDays,
   ChevronDown,
-  ChevronLeft,
   LayoutDashboard,
   LogOut,
   Menu,
   MessageCircle,
+  Search,
   Package,
   Plug,
   Plus,
@@ -37,6 +36,14 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ADMIN_MODULE_GROUPS, modulesForRole, type AdminModule, type AdminModuleGroup } from "@/admin-os/modules";
@@ -85,6 +92,12 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin/sao-luu": Archive,
   "/admin/ket-noi": Plug,
   "/admin/cai-dat": Settings,
+  "/admin/in-don": Receipt,
+  "/admin/check-cong": Clock,
+  "/admin/thuong": Target,
+  "/admin/chuyen-nop": Landmark,
+  "/admin/duyet-chi": Receipt,
+  "/admin/cong-no": HandCoins,
 };
 
 function pathActive(pathname: string, to: string) {
@@ -139,6 +152,7 @@ export function AdminShell() {
   const counts = useQuery({ queryKey: ["nav-counts"], queryFn: () => getNavCounts(), enabled: Boolean(me.data) && !me.data.mustChangePassword });
   const [menuOpen, setMenuOpen] = useState(false);
   const [narrow, setNarrow] = useState(false);
+  const [find, setFind] = useState("");
   useEffect(() => {
     document.documentElement.classList.add("admin-desk");
     return () => document.documentElement.classList.remove("admin-desk");
@@ -157,17 +171,18 @@ export function AdminShell() {
     router.navigate({ to: "/admin" });
   }
 
-  const title = pageTitle(pathname, role, search);
   const groups = modulesForRole(role, me.data.modules);
-
-  const bottom = [
-    { to: "/admin" as const, label: "Trang chủ", icon: LayoutDashboard },
-    { to: "/admin/don-hang" as const, label: "Đơn", icon: ClipboardList },
-    { to: "/admin/lich" as const, label: "Lịch", icon: CalendarDays },
-    role === "production"
-      ? { to: "/admin/san-xuat" as const, label: "Xưởng", icon: ClipboardList }
-      : { to: "/admin/chat" as const, label: "Chat", icon: MessageCircle },
-  ];
+  function goFind(event: { preventDefault: () => void }) {
+    event.preventDefault();
+    const value = find.trim();
+    if (!value) return;
+    if (/^TT/i.test(value)) {
+      void router.navigate({ to: "/admin/don-hang/$code", params: { code: value.toUpperCase() } });
+    } else {
+      void router.navigate({ to: "/admin/don-hang", search: { status: "all", q: value } as never });
+    }
+    setMenuOpen(false);
+  }
 
   return (
     <div className="admin-desk flex min-h-screen bg-[#f3f4f7]">
@@ -218,25 +233,44 @@ export function AdminShell() {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-[#e5e7eb] bg-white px-3 print:hidden md:px-5">
-          {pathname !== "/admin" && pathname !== "/admin/" ? (
-            <button type="button" className="hidden items-center gap-1 text-[13px] font-medium text-muted-foreground md:inline-flex" onClick={() => router.history.back()}>
-              <ChevronLeft className="size-4" />
-              Trở lại
-            </button>
-          ) : null}
           <button type="button" className="flex size-8 items-center justify-center rounded md:hidden" aria-label="Mở menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>
             <Menu className="size-4" />
           </button>
-          <span className="truncate text-[15px] font-semibold">{title}</span>
-          <span className="ml-auto flex items-center gap-2">
-            <span className="hidden text-right sm:block">
-              <span className="block text-sm font-semibold">{me.data.name}</span>
-              <span className="block text-xs text-muted-foreground">{ROLE_LABEL[role]}</span>
-            </span>
-            <span className="flex size-8 items-center justify-center rounded-full bg-[#2563eb] text-[11px] font-bold text-white">{initials(me.data.name)}</span>
-          </span>
+          <Link to="/admin/don-hang" search={{ status: "all", q: "" } as never} className="hidden shrink-0 items-center sm:flex" aria-label="Nhận đơn">
+            <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="h-8 w-auto" />
+          </Link>
+          <form className="relative min-w-0 flex-1" onSubmit={goFind}>
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={find}
+              onChange={(event) => setFind(event.target.value)}
+              placeholder="Tìm đơn, tên khách, SĐT…"
+              aria-label="Tìm đơn"
+              className="h-9 pl-9"
+            />
+          </form>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="flex items-center gap-2 rounded-full" aria-label="Tài khoản">
+                <span className="hidden text-right sm:block">
+                  <span className="block text-sm font-semibold">{me.data.name}</span>
+                  <span className="block text-xs text-muted-foreground">{ROLE_LABEL[role]}</span>
+                </span>
+                <span className="flex size-8 items-center justify-center rounded-full bg-[#2563eb] text-[11px] font-bold text-white">{initials(me.data.name)}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{me.data.name}</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{ROLE_LABEL[role]}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/admin/tai-khoan">Tài khoản</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void logout()}>Đăng xuất</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-4 pb-[calc(var(--manage-mobile-nav-height)+1rem)] md:px-6 md:pb-6">
+        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-4 md:px-6 md:pb-6">
           {me.data.mustChangePassword ? (
             <ForcePasswordChange
               onDone={() => {
@@ -247,43 +281,26 @@ export function AdminShell() {
             <Outlet />
           )}
         </main>
-        <nav aria-label="Điều hướng dưới" className="print:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[#e5e7eb] bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
-          {bottom.map((item) => {
-            const Icon = item.icon;
-            const active = pathActive(pathname, item.to);
-            return (
-              <Link key={item.to} to={item.to} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold ${active ? "text-[#2563eb]" : "text-muted-foreground"}`}>
-                <Icon className="size-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-          <button type="button" className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-muted-foreground" onClick={() => setMenuOpen(true)}>
-            <Menu className="size-4" />
-            Menu
-          </button>
-        </nav>
       </div>
     </div>
   );
 }
 
 const GROUP_ICONS: Record<string, typeof LayoutDashboard> = {
-  "Tổng quan": LayoutDashboard,
-  "Bán hàng": ClipboardList,
-  "Sản xuất": Package,
-  "Sản phẩm & Giá": Tags,
-  "Tài chính": Landmark,
+  "Đơn hàng": ClipboardList,
   "Nhân sự": Users,
-  "Hệ thống": Settings,
+  "Thu chi": Landmark,
+  "Báo cáo": BarChart3,
+  Kho: Package,
+  "Cài đặt": Settings,
 };
 
 function groupTile(title: string | undefined): string {
-  if (title === "Sản xuất") return "bg-[#f3e8ff] text-[#9333ea]";
-  if (title === "Sản phẩm & Giá") return "bg-[#ccfbf1] text-[#0f766e]";
   if (title === "Nhân sự") return "bg-[#ffedd5] text-[#ea580c]";
-  if (title === "Tài chính") return "bg-[#dcfce7] text-[#16a34a]";
-  if (title === "Hệ thống") return "bg-[#f1f5f9] text-[#475569]";
+  if (title === "Thu chi") return "bg-[#dcfce7] text-[#16a34a]";
+  if (title === "Báo cáo") return "bg-[#f3e8ff] text-[#9333ea]";
+  if (title === "Kho") return "bg-[#ccfbf1] text-[#0f766e]";
+  if (title === "Cài đặt") return "bg-[#f1f5f9] text-[#475569]";
   return "bg-[#e0eefe] text-[#2563eb]";
 }
 
@@ -319,38 +336,18 @@ function DeskNav({
   const activeTitle = groups.find((group) => group.items.some((item) => itemActive(pathname, search, item, flat)))?.title ?? "";
   const [open, setOpen] = useState<Record<string, boolean>>({});
   useEffect(() => {
-    if (!activeTitle || activeTitle === "Tổng quan") return;
+    if (!activeTitle) return;
     setOpen((prev) => (prev[activeTitle] ? prev : { ...prev, [activeTitle]: true }));
   }, [activeTitle]);
 
   return (
     <>
       {groups.map((group) => {
-        const title = group.title || "Tổng quan";
+        const title = group.title || "Menu";
         const tone = groupTile(title);
         const GroupIcon = GROUP_ICONS[title] ?? LayoutDashboard;
-        const groupCount = group.items.reduce((sum, item) => sum + (counts[item.to] ?? 0), 0);
+        const groupCount = group.items.reduce((sum, item) => sum + (item.search ? 0 : (counts[item.to] ?? 0)), 0);
         const childActive = group.items.some((item) => itemActive(pathname, search, item, flat));
-        if (title === "Tổng quan") {
-          const item = group.items[0];
-          if (!item) return null;
-          const active = itemActive(pathname, search, item, flat);
-          return (
-            <Link
-              key={title}
-              to={item.to}
-              title={title}
-              aria-current={active ? "page" : undefined}
-              className={`mb-1 flex min-h-9 items-center gap-2 rounded-xl px-1.5 text-[13px] ${active ? "bg-[#e0eefe] font-semibold text-[#1d4ed8]" : "text-sidebar-foreground hover:bg-[#f8fafc]"}`}
-              onClick={onNavigate}
-            >
-              <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${active ? "bg-[#2563eb] text-white" : tone}`}>
-                <GroupIcon className="size-3.5" />
-              </span>
-              {narrow ? null : <span className="truncate">{title}</span>}
-            </Link>
-          );
-        }
         const expanded = !narrow && open[title] === true;
         return (
           <div key={title} className="mb-1">
@@ -403,7 +400,7 @@ function DeskNav({
                       </span>
                       <span className="truncate">{label}</span>
                       <span className="ml-auto">
-                        <CountBadge n={counts[item.to] ?? 0} />
+                        <CountBadge n={item.search ? 0 : (counts[item.to] ?? 0)} />
                       </span>
                     </Link>
                   );

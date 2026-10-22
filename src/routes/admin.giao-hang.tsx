@@ -5,8 +5,8 @@ import { useMemo, useState } from "react";
 import { ALL_TONE, CHANNEL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
 import { ListPager, useListPage } from "@/components/admin/list-page";
 import { ClearFilters, FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
-import { OrderLinks } from "@/components/admin/sections";
-import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL, type OrderStatus } from "@/domain/types";
 import { formatMaybe } from "@/lib/brand";
 import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
@@ -69,30 +69,15 @@ function DeliveryPage() {
   if (rows.isError) return <p className="font-semibold text-destructive">{(rows.error as Error).message}</p>;
   return (
     <div className="space-y-3">
-      <OrderLinks />
       <PageToolbar
-        title="Giao hàng"
+        title="Giao đơn"
         hint="Đơn giao tận nơi và đơn Facebook, TikTok, Shopee. Tem 100×150 chỉ in cho đơn tại tiệm và Facebook."
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm mã, tên, SĐT, vận đơn…"
         filterCount={filterCount}
         onFilter={() => setSheet(true)}
-        below={
-          <div className="hidden flex-wrap items-center gap-2 sm:flex">
-            <FilterChips label="Kênh giao" value={channel} chips={channelChips} onChange={setChannel} />
-            {filterCount > 0 ? (
-              <ClearFilters
-                onClick={() => {
-                  setStatus("all");
-                  setChannel("all");
-                }}
-              />
-            ) : null}
-          </div>
-        }
       />
-      <FilterChips label="Trạng thái giao" value={status} chips={statusChips} onChange={setStatus} />
       <ListPager page={page.page} pages={page.pages} total={page.total} start={page.start} count={page.slice.length} noun="đơn giao" onPage={page.setPage} />
       <div className="grid gap-3">
         {page.slice.map((order) => (
@@ -111,11 +96,26 @@ function DeliveryPage() {
             {money ? (
               <p>Phí ship: {order.shipFee === null ? "chưa có" : formatMaybe(order.shipFee)} · COD: {order.codAmount === null ? "không" : formatMaybe(order.codAmount)}</p>
             ) : null}
-            {order.canLabel && money ? (
-              <Button asChild variant="outline" className="mt-2 min-h-11">
-                <Link to="/admin/tem/$code" params={{ code: order.code }}>In tem 100×150</Link>
-              </Button>
-            ) : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="inline-flex size-8 items-center justify-center rounded-md border" aria-label={`Thao tác ${order.code}`}>
+                  <MoreHorizontal className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/admin/don-hang/$code" params={{ code: order.code }}>Mở đơn</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/admin/phieu/$code" params={{ code: order.code }}>In K80</Link>
+                </DropdownMenuItem>
+                {order.canLabel && money ? (
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin/tem/$code" params={{ code: order.code }}>In tem 100×150</Link>
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </article>
         ))}
         {rows.data && shown.length === 0 ? (
@@ -123,6 +123,7 @@ function DeliveryPage() {
         ) : null}
       </div>
       <FilterSheet open={sheet} onClose={() => setSheet(false)} title="Bộ lọc giao hàng">
+        <FilterChips label="Trạng thái giao" value={status} chips={statusChips} onChange={setStatus} wrap />
         <FilterChips label="Kênh giao" value={channel} chips={channelChips} onChange={setChannel} wrap />
         {filterCount > 0 ? (
           <ClearFilters

@@ -71,13 +71,14 @@ export function PageToolbar({
           {onFilter ? (
             <button
               type="button"
-              className="relative flex size-11 shrink-0 items-center justify-center rounded-full border bg-background active:scale-[0.97] sm:hidden"
+              className="relative inline-flex h-10 shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium sm:h-9"
               aria-label="Bộ lọc"
               onClick={onFilter}
             >
               <SlidersHorizontal className="size-4" />
+              Bộ lọc
               {filterCount > 0 ? (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
                   {filterCount > 9 ? "9+" : filterCount}
                 </span>
               ) : null}

@@ -4,7 +4,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ListPager, useListPage } from "@/components/admin/list-page";
-import { MoneyLinks } from "@/components/admin/sections";
+import { FilterSheet, PageToolbar, ToolbarButton } from "@/components/admin/page-toolbar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, Plus } from "lucide-react";
 import { WalletToggle } from "@/components/admin/wallet-toggle";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
@@ -23,7 +25,7 @@ const control = "min-h-11 w-full rounded-xl border border-input bg-background px
 
 function ExpensePage() {
   return (
-    <RoleGate allow={["owner"]} deny="Chỉ chủ xem.">
+    <RoleGate allow={["owner", "sale"]} deny="Chỉ chủ và sale nhập chi.">
       <ExpenseBody />
     </RoleGate>
   );
@@ -34,6 +36,7 @@ function ExpenseBody() {
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [filters, setFilters] = useState(false);
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const desk = useQuery({ queryKey: ["money", month], queryFn: () => getMoneyDesk({ data: { month } }) });
@@ -51,16 +54,34 @@ function ExpenseBody() {
 
   return (
     <div className="space-y-4">
-      <MoneyLinks />
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-primary">Chi phí</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Danh sách khoản chi trong tháng. Bấm nút để ghi một khoản mới.</p>
-        </div>
-        <Button className="min-h-11" onClick={() => setOpen(true)}>
-          Tạo khoản chi
-        </Button>
-      </div>
+      <PageToolbar
+        title="Nhập chi"
+        hint="Danh sách chi phí trong tháng. Khoản mới chờ chủ duyệt, tiền vẫn đã chi."
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Tìm diễn giải"
+        filterCount={(filter !== "all" ? 1 : 0) + 1}
+        onFilter={() => setFilters(true)}
+        actions={<ToolbarButton label="Tạo khoản chi" icon={Plus} primary onClick={() => setOpen(true)} />}
+      />
+      <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc chi phí">
+        <label className="text-sm font-semibold">
+          Tháng chi phí
+          <Input className="mt-1 min-h-11" type="month" aria-label="Tháng chi phí" value={month} onChange={(e) => setMonth(e.target.value)} />
+        </label>
+        <label className="text-sm font-semibold">
+          Nhóm
+          <select className={control + " mt-1"} aria-label="Lọc nhóm" value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">Tất cả nhóm</option>
+            {EXPENSE_CATEGORIES.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+            <option value="">Chưa phân nhóm</option>
+          </select>
+        </label>
+      </FilterSheet>
       <ExpenseDialog
         open={open}
         payerName={me.data?.name ?? ""}
@@ -70,20 +91,7 @@ function ExpenseBody() {
           await refresh(nextMonth);
         }}
       />
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-bold text-primary">Danh sách chi phí</h2>
-        <Input className="min-h-11 max-w-xs" type="month" aria-label="Tháng chi phí" value={month} onChange={(e) => setMonth(e.target.value)} />
-        <Input className="min-h-11 max-w-xs" placeholder="Tìm diễn giải" aria-label="Tìm khoản chi" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select className={control + " max-w-xs"} aria-label="Lọc nhóm" value={filter} onChange={(e) => setFilter(e.target.value)}>
-          <option value="all">Tất cả nhóm</option>
-          {EXPENSE_CATEGORIES.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-          <option value="">Chưa phân nhóm</option>
-        </select>
-      </div>
+      <h2 className="sr-only">Danh sách chi phí</h2>
       {desk.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {desk.isError ? <p className="font-semibold text-destructive">{(desk.error as Error).message}</p> : null}
       {desk.data && (desk.data.expenses ?? []).length === 0 ? <p className="rounded-md border bg-card p-4 text-sm">Chưa có chi phí nào trong tháng này.</p> : null}
@@ -96,26 +104,35 @@ function ExpenseBody() {
               <p className="font-semibold">{row.name}</p>
               <p className="text-sm text-muted-foreground">
                 {vnYmd(row.at) || row.month} · {row.categoryLabel} · {row.walletLabel}
+                {row.pending ? " · chờ duyệt" : ""}
                 {row.note ? ` · ${row.note}` : ""}
               </p>
             </div>
             <p className="font-extrabold text-primary">{formatVnd(row.amount)}</p>
-            <Button
-              variant="outline"
-              className="min-h-11"
-              aria-label={`Xóa ${row.name}`}
-              onClick={async () => {
-                try {
-                  await removeExpense({ data: { id: row.id } });
-                  toast.success("Đã xóa chi phí");
-                  await refresh();
-                } catch (error) {
-                  toast.error((error as Error).message);
-                }
-              }}
-            >
-              Xóa
-            </Button>
+            {me.data?.role === "owner" ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="inline-flex size-8 items-center justify-center rounded-md border" aria-label={`Thao tác ${row.name}`}>
+                    <MoreHorizontal className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      try {
+                        await removeExpense({ data: { id: row.id } });
+                        toast.success("Đã xóa chi phí");
+                        await refresh();
+                      } catch (error) {
+                        toast.error((error as Error).message);
+                      }
+                    }}
+                  >
+                    Xóa
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
           </li>
         ))}
       </ul>

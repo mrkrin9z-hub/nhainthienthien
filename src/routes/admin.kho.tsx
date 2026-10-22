@@ -5,18 +5,21 @@ import { toast } from "sonner";
 
 import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
 import { ListPager, useListPage } from "@/components/admin/list-page";
-import { PageToolbar } from "@/components/admin/page-toolbar";
-import { GoodsLinks } from "@/components/admin/sections";
+import { FilterSheet, PageToolbar, ToolbarButton } from "@/components/admin/page-toolbar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PackageSearch } from "lucide-react";
-import { CircleCheck } from "lucide-react";
+import { CircleCheck, MoreHorizontal, PackagePlus, PackageSearch } from "lucide-react";
+import { useEffect } from "react";
 import { formatMaybe } from "@/lib/brand";
 import { approvePrice, countStock, downloadExcel, getInventory, getMe, markInkOpened, receiveStock, saveMaterial } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/kho")({
+  validateSearch: (search: Record<string, unknown>): { m: string } => ({
+    m: search.m === "nhap" ? "nhap" : "",
+  }),
   component: StockPage,
 });
 
@@ -26,10 +29,17 @@ function StockPage() {
   const owner = me.data?.role === "owner";
   const canIn = me.data?.role === "owner" || me.data?.role === "sale";
   const queryClient = useQueryClient();
+  const { m } = Route.useSearch();
   const [q, setQ] = useState("");
   const [stockFilter, setStockFilter] = useState("all");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [moveQ, setMoveQ] = useState("");
+  const [filters, setFilters] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(m === "nhap");
+  const [receiveId, setReceiveId] = useState("");
+  const [packs, setPacks] = useState("1");
+  useEffect(() => {
+    if (m === "nhap") setReceiveOpen(true);
+  }, [m]);
   const allMaterials = stock.data?.materials ?? [];
   const materials = allMaterials.filter((material) => {
     const short = material.low || material.reorder;
@@ -45,10 +55,10 @@ function StockPage() {
   ];
   const list = useListPage(materials, `${q}|${stockFilter}`);
   const movements = (stock.data?.movements ?? []).filter((move) => {
-    const needle = moveQ.trim().toLowerCase();
+    const needle = q.trim().toLowerCase();
     return !needle || `${move.materialName} ${move.reason} ${move.note}`.toLowerCase().includes(needle);
   });
-  const moveList = useListPage(movements, moveQ);
+  const moveList = useListPage(movements, q);
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["stock"] });
@@ -58,35 +68,81 @@ function StockPage() {
 
   return (
     <div className="space-y-4">
-      <GoodsLinks />
       <PageToolbar
-        title="Kho"
-        hint="Tồn đầu kỳ đang là 0. Đếm thực tế rồi nhập. Giá túi, carton, tem để trống."
+        title={m === "nhap" ? "Nhập vật tư" : "Tồn kho vật tư"}
+        hint="Tồn đầu kỳ đang là 0 cho đến khi đếm. Hàng bán làm theo đơn, không trừ vào đây."
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm vật tư…"
+        filterCount={stockFilter === "all" ? 0 : 1}
+        onFilter={() => setFilters(true)}
+        actions={
+          canIn ? (
+            <>
+              <ToolbarButton label="Nhập vật tư" icon={PackagePlus} primary onClick={() => setReceiveOpen(true)} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="inline-flex size-9 items-center justify-center rounded-md border" aria-label="Thêm thao tác">
+                    <MoreHorizontal className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => markInkOpened().then(() => refresh()).then(() => toast.success("Đã trừ 1 lọ mực"))}>
+                    Mở lọ mực mới
+                  </DropdownMenuItem>
+                  {me.data && me.data.role !== "production" ? (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        const file = await downloadExcel({ data: { kind: "stock", month: "all" } });
+                        download(file.filename, file.xml);
+                      }}
+                    >
+                      Xuất tồn
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : null
+        }
       />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <FilterChips label="Tồn kho" value={stockFilter} chips={stockChips} onChange={setStockFilter} />
-        <div className="flex gap-2">
-          <Button className="min-h-12" variant="outline" onClick={() => markInkOpened().then(() => refresh()).then(() => toast.success("Đã trừ 1 lọ mực"))}>
-            Mở lọ mực mới
-          </Button>
-          {me.data && me.data.role !== "production" ? (
+      <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc vật tư">
+        <FilterChips label="Tồn kho" value={stockFilter} chips={stockChips} onChange={setStockFilter} wrap />
+      </FilterSheet>
+      <Dialog open={receiveOpen} onOpenChange={setReceiveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nhập vật tư</DialogTitle>
+          </DialogHeader>
+          <label className="text-sm font-semibold">
+            Vật tư
+            <select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm" aria-label="Chọn vật tư" value={receiveId} onChange={(event) => setReceiveId(event.target.value)}>
+              <option value="">Chọn vật tư</option>
+              {allMaterials.map((material) => (
+                <option key={material.id} value={material.id}>
+                  {material.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-semibold">
+            Số lần mua
+            <Input className="mt-1 min-h-11" inputMode="numeric" aria-label="Số lần mua" value={packs} onChange={(event) => setPacks(event.target.value.replace(/[^\d]/g, ""))} />
+          </label>
           <Button
-            variant="outline"
-            className="min-h-12"
+            className="min-h-11"
+            disabled={!receiveId || !Number(packs)}
             onClick={async () => {
-              const file = await downloadExcel({ data: { kind: "stock", month: "all" } });
-              download(file.filename, file.xml);
+              await receiveStock({ data: { materialId: receiveId, packs: Number(packs), packPrice: null, supplier: "", note: "" } });
+              toast.success(owner ? "Đã nhập kho" : "Đã nhập kho. Giá mới chờ chủ duyệt.");
+              setReceiveOpen(false);
+              await refresh();
             }}
           >
-            Xuất tồn
+            Nhập
           </Button>
-          ) : null}
-        </div>
-      </div>
-      <p className="text-sm text-muted-foreground">Chọn một dòng để nhập kho, kiểm tồn hoặc sửa mức tối thiểu.</p>
+        </DialogContent>
+      </Dialog>
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="vật tư" onPage={list.setPage} />
       <div className="overflow-hidden rounded-md border bg-card">
         <Table>
@@ -162,7 +218,6 @@ function StockPage() {
       </Dialog>
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Nhập xuất</h2>
-        <Input value={moveQ} onChange={(event) => setMoveQ(event.target.value)} placeholder="Tìm vật tư hoặc lý do…" aria-label="Tìm phiếu kho" className="mt-2 h-11" />
         <div className="mt-2">
           <ListPager page={moveList.page} pages={moveList.pages} total={moveList.total} start={moveList.start} count={moveList.slice.length} noun="phiếu" onPage={moveList.setPage} />
         </div>
@@ -206,7 +261,7 @@ function MaterialForms({
   const [leadTime, setLeadTime] = useState(String(material.leadTimeDays));
 
   return (
-    <div className="mt-3 grid gap-2 md:grid-cols-2">
+    <div className="mt-3 space-y-3">
       {canIn ? (
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <Input className="h-12 w-full sm:w-20" value={packs} onChange={(e) => setPacks(e.target.value)} />

@@ -170,6 +170,7 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (confirmDeskCombos(state)) changed = true;
   if (renameDeskStaff(state)) changed = true;
   if (grantDeskLinks(state)) changed = true;
+  if (grantTaskMenu(state)) changed = true;
   if (ensureOrgCollections(state)) changed = true;
   return changed;
 }
@@ -361,5 +362,24 @@ function grantDeskLinks(state: Migratable): boolean {
     }
   }
   settings.menuLinks20261022 = true;
+  return true;
+}
+
+const TASK_MENU_LINKS: Record<string, string[]> = {
+  owner: ["/admin/in-don", "/admin/check-cong", "/admin/thuong", "/admin/chuyen-nop", "/admin/duyet-chi", "/admin/cong-no"],
+  sale: ["/admin/in-don", "/admin/check-cong", "/admin/thuong", "/admin/chuyen-nop", "/admin/cong-no", "/admin/chi-phi", "/admin/san-pham"],
+  production: ["/admin/in-don", "/admin/check-cong"],
+};
+
+function grantTaskMenu(state: Migratable): boolean {
+  const settings = state.settings as Settings;
+  if (settings.taskMenu20261023) return false;
+  if (!settings.fixedCosts || !state.roleModules?.length) return false;
+  for (const row of state.roleModules) {
+    for (const path of TASK_MENU_LINKS[row.role] ?? []) {
+      if (!row.modules.includes(path)) row.modules.push(path);
+    }
+  }
+  settings.taskMenu20261023 = true;
   return true;
 }

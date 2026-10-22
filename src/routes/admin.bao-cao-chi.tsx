@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { ListPager, useListPage } from "@/components/admin/list-page";
-import { MoneyLinks } from "@/components/admin/sections";
+import { FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
 import { RoleGate } from "@/components/role-gate";
 import { Input } from "@/components/ui/input";
 import { vnMonth, vnYmd } from "@/domain/calc";
@@ -25,6 +25,7 @@ function ExpenseReportPage() {
 function ReportBody() {
   const [month, setMonth] = useState(vnMonth());
   const [q, setQ] = useState("");
+  const [filters, setFilters] = useState(false);
   const desk = useQuery({ queryKey: ["money", month], queryFn: () => getMoneyDesk({ data: { month } }) });
   const expenses = (desk.data?.expenses ?? []).filter((row) => {
     const needle = q.trim().toLowerCase();
@@ -37,14 +38,21 @@ function ReportBody() {
 
   return (
     <div className="space-y-4">
-      <MoneyLinks />
-      <div>
-        <h1 className="text-2xl font-extrabold text-primary">Báo cáo chi phí</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Chi trong tháng, tách theo nhóm và theo ví. Tiền thu đơn trừ chi phí phát sinh chưa phải lợi nhuận — lợi nhuận nằm ở trang Lợi nhuận, sau giá vốn và chi phí cố định.
-        </p>
-      </div>
-      <Input className="min-h-12 max-w-xs" type="month" aria-label="Tháng báo cáo chi" value={month} onChange={(e) => setMonth(e.target.value)} />
+      <PageToolbar
+        title="Báo cáo chi phí"
+        hint="Chi trong tháng, tách theo nhóm và theo ví. Lợi nhuận nằm ở trang Lợi nhuận."
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Tìm khoản chi"
+        filterCount={1}
+        onFilter={() => setFilters(true)}
+      />
+      <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc chi phí">
+        <label className="text-sm font-semibold">
+          Tháng báo cáo chi
+          <Input className="mt-1 min-h-11" type="month" aria-label="Tháng báo cáo chi" value={month} onChange={(e) => setMonth(e.target.value)} />
+        </label>
+      </FilterSheet>
       {desk.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {desk.isError ? <p className="font-semibold text-destructive">{(desk.error as Error).message}</p> : null}
       {data && report ? (
@@ -75,7 +83,6 @@ function ReportBody() {
           </section>
           <section className="glass-card rounded-3xl p-4">
             <h2 className="font-bold text-primary">Khoản trong tháng</h2>
-            <Input className="mt-2 min-h-11" placeholder="Tìm khoản chi" aria-label="Tìm khoản chi trong báo cáo" value={q} onChange={(e) => setQ(e.target.value)} />
             <div className="mt-2">
               <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="khoản" onPage={list.setPage} />
             </div>

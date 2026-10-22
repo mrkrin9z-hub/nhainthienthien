@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -11,6 +11,9 @@ import { statusLabelOf } from "@/lib/display-labels";
 import { getDashboard, punchClock } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/")({
+  beforeLoad: () => {
+    throw redirect({ to: "/admin/don-hang", search: { status: "all", q: "" } });
+  },
   component: DashboardPage,
 });
 

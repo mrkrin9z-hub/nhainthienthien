@@ -10,6 +10,9 @@ function pathActive(pathname: string, to: string) {
 }
 
 export function SectionLinks({ label, items }: { label: string; items: { to: string; label: string }[] }) {
+  void label;
+  void items;
+  return null;
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   if (items.length < 2) return null;
   return (

@@ -141,6 +141,8 @@ export type Settings = {
   hrApproved20261022?: boolean;
   /** Đã thêm Lên đơn, COD, Nhập đơn vào menu một lần. */
   menuLinks20261022?: boolean;
+  /** Đã thêm việc hằng ngày (in đơn, chuyển nộp, duyệt chi, thưởng) vào menu một lần. */
+  taskMenu20261023?: boolean;
   /** Phí sàn để đối chiếu. Không thay mức 27% + 11.000đ. */
   platformFeeNote?: string;
   showAnhThe: boolean;
@@ -579,6 +581,8 @@ export type Expense = {
   by: string | null;
   category?: string;
   wallet?: string;
+  /** Thiếu = khoản cũ, coi như đã duyệt. null = chờ duyệt. Chuỗi = thời điểm chủ duyệt. */
+  approvedAt?: string | null;
 };
 
 export type WalletAdjust = {

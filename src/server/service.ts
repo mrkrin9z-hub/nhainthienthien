@@ -2209,7 +2209,7 @@ export async function addExpense(
   actor: Actor,
   input: { month: string; name: string; amount: number; note: string; category?: string; wallet?: string; date?: string },
 ) {
-  assertRole(actor, ["owner"]);
+  assertRole(actor, ["owner", "sale"]);
   const name = input.name.trim();
   const amount = Math.round(input.amount);
   if (!name || !Number.isFinite(amount) || amount <= 0) throw new Error("Chi phí chưa đủ.");
@@ -2234,6 +2234,7 @@ export async function addExpense(
       by: actor.id,
       category,
       wallet,
+      approvedAt: null,
     };
     state.expenses.unshift(row);
     audit(state, actor.id, "cost.expense", row.id, null, { name, amount, wallet, category });
@@ -2248,6 +2249,17 @@ export async function deleteExpense(actor: Actor, id: string) {
     const [row] = state.expenses.splice(index, 1);
     if (!row) throw new Error("Không thấy khoản chi.");
     audit(state, actor.id, "cost.expense", row.id, { name: row.name, amount: row.amount }, null);
+  });
+}
+
+export async function approveExpense(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const row = state.expenses.find((item) => item.id === id);
+    if (!row) throw new Error("Không thấy khoản chi.");
+    if (row.approvedAt) return;
+    row.approvedAt = nowIso();
+    audit(state, actor.id, "cost.expense.approve", row.id, { approvedAt: null }, { approvedAt: row.approvedAt });
   });
 }
 
@@ -2340,6 +2352,7 @@ export async function moneyDesk(actor: Actor, month: string) {
     }));
   const expenses = state.expenses
     .filter((row) => row.month === month)
+    .filter((row) => actor.role !== "sale" || row.by === actor.id)
     .map((row) => ({
       id: row.id,
       name: row.name,
@@ -2351,6 +2364,9 @@ export async function moneyDesk(actor: Actor, month: string) {
       wallet: row.wallet ?? "",
       categoryLabel: row.category ? categoryLabel(row.category) : "Chưa phân nhóm",
       walletLabel: walletLabel(row.wallet ?? ""),
+      pending: row.approvedAt === null,
+      approvedAt: row.approvedAt ?? null,
+      by: row.by,
     }))
     .sort((a, b) => b.at.localeCompare(a.at));
   const holders = holderBalances({
@@ -2374,8 +2390,8 @@ export async function moneyDesk(actor: Actor, month: string) {
       holders: mine ? [mine] : [],
       handovers: [],
       lines: myLines,
-      expenses: [],
-      report: expenseReport([], month),
+      expenses,
+      report: expenseReport(expenses, month),
       collected: myLines.filter((line) => line.kind === "thu").reduce((sum, line) => sum + line.amount, 0),
     };
   }

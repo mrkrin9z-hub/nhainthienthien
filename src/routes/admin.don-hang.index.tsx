@@ -1,21 +1,22 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { AlarmClock, Columns3, Download, FileSpreadsheet, HandCoins, List, Plus, Wallet } from "lucide-react";
+import { AlarmClock, HandCoins, MoreHorizontal, Plus } from "lucide-react";
 
 import { DateRangeField, vnDayOf } from "@/components/admin/date-range";
 import { ListPager, useListPage } from "@/components/admin/list-page";
-import { ClearFilters, FilterSheet, PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
-import { OrderLinks } from "@/components/admin/sections";
+import { ClearFilters, FilterSheet, PageToolbar, ToolbarLink } from "@/components/admin/page-toolbar";
 import { ALL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatMaybe } from "@/lib/brand";
 import { downloadExcel, getMe, getOrders } from "@/lib/admin.functions";
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL, type OrderStatus } from "@/domain/types";
 import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
 
 export const Route = createFileRoute("/admin/don-hang/")({
-  validateSearch: (search: Record<string, unknown>): { status: string } => ({
+  validateSearch: (search: Record<string, unknown>): { status: string; q: string } => ({
     status: typeof search.status === "string" && search.status ? search.status : "all",
+    q: typeof search.q === "string" ? search.q : "",
   }),
   component: OrdersPage,
 });
@@ -27,8 +28,11 @@ function OrdersPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const orders = useQuery({ queryKey: ["orders"], queryFn: () => getOrders() });
   const navigate = useNavigate();
-  const { status } = Route.useSearch();
-  const [q, setQ] = useState("");
+  const { status, q: routeQ } = Route.useSearch();
+  const [q, setQ] = useState(routeQ);
+  useEffect(() => {
+    setQ(routeQ);
+  }, [routeQ]);
   const [channel, setChannel] = useState("all");
   const [lateOnly, setLateOnly] = useState(false);
   const [unpaidOnly, setUnpaidOnly] = useState(false);
@@ -40,7 +44,7 @@ function OrdersPage() {
     if (window.localStorage.getItem("admin-orders-view") === "board") setView("board");
   }, []);
   function setStatus(next: string) {
-    void navigate({ to: "/admin/don-hang", search: { status: next } });
+    void navigate({ to: "/admin/don-hang", search: { status: next, q } });
   }
   function chooseView(next: "list" | "board") {
     setView(next);
@@ -144,10 +148,9 @@ function OrdersPage() {
 
   return (
     <div className="space-y-3">
-      <OrderLinks />
       <PageToolbar
-        title="Đơn hàng"
-        hint={production ? "Chỉ hiện đơn đang In, Đóng gói hoặc Giao." : undefined}
+        title="Nhận đơn"
+        hint={production ? "Chỉ hiện đơn đang In, Đóng gói hoặc Giao." : "Đơn đang xử lý. Tạo đơn mới bằng nút bên phải."}
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm tên, SĐT, mã đơn…"
@@ -155,35 +158,48 @@ function OrdersPage() {
         onFilter={() => setSheet(true)}
         actions={
           <>
-            <ToolbarButton label={view === "board" ? "Danh sách" : "Dạng cột"} icon={view === "board" ? List : Columns3} onClick={() => chooseView(view === "board" ? "list" : "board")} />
-            {production ? null : (
-              <ToolbarButton
-                label="Xuất Excel"
-                icon={Download}
-                onClick={async () => {
-                  const file = await downloadExcel({ data: { kind: "orders", month: "all" } });
-                  const blob = new Blob([file.xml], { type: "application/vnd.ms-excel" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = file.filename;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-              />
-            )}
             {production ? null : <ToolbarLink label="Tạo đơn" icon={Plus} primary to="/orders/create" />}
-            {production ? null : <ToolbarLink label="Nhập Excel" icon={FileSpreadsheet} to="/admin/nhap-don" />}
-            {production ? null : <ToolbarLink label="Đối soát COD" icon={Wallet} to="/admin/cod" />}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="inline-flex size-9 items-center justify-center rounded-md border bg-background" aria-label="Thêm thao tác">
+                  <MoreHorizontal className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => chooseView(view === "board" ? "list" : "board")}>
+                  {view === "board" ? "Danh sách" : "Dạng cột"}
+                </DropdownMenuItem>
+                {production ? null : (
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      const file = await downloadExcel({ data: { kind: "orders", month: "all" } });
+                      const blob = new Blob([file.xml], { type: "application/vnd.ms-excel" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = file.filename;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    Xuất Excel
+                  </DropdownMenuItem>
+                )}
+                {production ? null : (
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin/nhap-don">Nhập Excel</Link>
+                  </DropdownMenuItem>
+                )}
+                {production ? null : (
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin/cod">Đối soát COD</Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
-        below={
-          <div className="hidden flex-wrap items-center gap-2 sm:flex">
-            {extraFilters()}
-          </div>
-        }
       />
-      <FilterChips label="Trạng thái đơn" value={status} chips={statusChips} onChange={setStatus} wrap />
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={pageRows.length} noun="đơn" onPage={list.setPage} />
       {view === "board" ? (
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -240,6 +256,21 @@ function OrdersPage() {
                   <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="text-primary">
                     {order.code}
                   </Link>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" className="ml-1 inline-flex size-7 items-center justify-center rounded-md hover:bg-muted" aria-label={`Thao tác ${order.code}`} onClick={(event) => event.stopPropagation()}>
+                        <MoreHorizontal className="size-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin/phieu/$code" params={{ code: order.code }}>In K80</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin/giao-hang">Giao đơn</Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   {order.late ? <span className="ml-2 text-[11px] font-bold text-destructive">Trễ</span> : null}
                 </td>
                 <td className="px-3 py-2.5">
@@ -272,6 +303,7 @@ function OrdersPage() {
       </>
       ) : null}
       <FilterSheet open={sheet} onClose={() => setSheet(false)} title="Bộ lọc đơn hàng">
+        <FilterChips label="Trạng thái đơn" value={status} chips={statusChips} onChange={setStatus} wrap />
         {extraFilters()}
       </FilterSheet>
     </div>

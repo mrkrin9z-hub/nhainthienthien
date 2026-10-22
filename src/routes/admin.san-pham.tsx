@@ -1,20 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
 import { ListPager, useListPage } from "@/components/admin/list-page";
-import { PageToolbar } from "@/components/admin/page-toolbar";
-import { GoodsLinks } from "@/components/admin/sections";
+import { FilterSheet, PageToolbar, ToolbarButton } from "@/components/admin/page-toolbar";
+import { Plus } from "lucide-react";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { createWebProduct, getWebProducts, setWebProductListed } from "@/lib/admin.functions";
+import { createWebProduct, getMe, getWebProducts, setWebProductListed } from "@/lib/admin.functions";
 import { formatVnd } from "@/lib/brand";
 
 export const Route = createFileRoute("/admin/san-pham")({
+  validateSearch: (search: Record<string, unknown>): { m: string } => ({
+    m: search.m === "nhap" ? "nhap" : "",
+  }),
   component: WebProductsPage,
 });
 
@@ -29,7 +32,7 @@ function whole(value: string): number {
 
 function WebProductsPage() {
   return (
-    <RoleGate allow={["owner"]} deny="Chỉ chủ thêm sản phẩm lên trang chủ.">
+    <RoleGate allow={["owner", "sale"]} deny="Chỉ chủ và sale xem sản phẩm.">
       <WebProductsBody />
     </RoleGate>
   );
@@ -37,6 +40,9 @@ function WebProductsPage() {
 
 function WebProductsBody() {
   const queryClient = useQueryClient();
+  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
+  const owner = me.data?.role === "owner";
+  const { m } = Route.useSearch();
   const products = useQuery({ queryKey: ["web-products"], queryFn: () => getWebProducts() });
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Ảnh gỗ");
@@ -45,7 +51,11 @@ function WebProductsBody() {
   const [rows, setRows] = useState<SizeRow[]>([blankRow()]);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(m === "nhap" && owner);
+  const [filters, setFilters] = useState(false);
+  useEffect(() => {
+    if (m === "nhap" && owner) setOpen(true);
+  }, [m, owner]);
   const [q, setQ] = useState("");
   const [listed, setListed] = useState("all");
   const catalog = products.data ?? [];
@@ -114,20 +124,19 @@ function WebProductsBody() {
 
   return (
     <div className="space-y-6">
-      <GoodsLinks />
       <PageToolbar
-        title="Sản phẩm"
-        hint="Sản phẩm đang bật hiện ở gian hàng trang chủ, trang sản phẩm và đặt in. Giá nhập ở đây là giá tại tiệm."
+        title={m === "nhap" ? "Nhập sản phẩm" : "Tồn kho sản phẩm"}
+        hint="Hàng làm theo đơn, không có số tồn thành phẩm. Danh sách là sản phẩm đang bán. Giá ở đây là giá tại tiệm."
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm tên, mã sản phẩm…"
-        actions={
-          <Button className="min-h-9" onClick={() => setOpen(true)}>
-            Tạo
-          </Button>
-        }
+        filterCount={listed === "all" ? 0 : 1}
+        onFilter={() => setFilters(true)}
+        actions={owner ? <ToolbarButton label="Tạo sản phẩm" icon={Plus} primary onClick={() => setOpen(true)} /> : null}
       />
-      <FilterChips label="Trang chủ" value={listed} chips={chips} onChange={setListed} wrap />
+      <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc sản phẩm">
+        <FilterChips label="Trang chủ" value={listed} chips={chips} onChange={setListed} wrap />
+      </FilterSheet>
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="sản phẩm" onPage={list.setPage} />
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -229,7 +238,7 @@ function WebProductsBody() {
                         type="checkbox"
                         className="size-4"
                         checked={product.listed}
-                        disabled={busyId === product.id}
+                        disabled={!owner || busyId === product.id}
                         onChange={(event) => void onListed(product.id, event.target.checked)}
                       />
                       <span className={product.listed ? "font-semibold text-emerald-700" : "text-muted-foreground"}>

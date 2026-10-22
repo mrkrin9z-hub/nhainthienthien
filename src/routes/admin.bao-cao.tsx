@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { MoneyLinks } from "@/components/admin/sections";
+import { FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,6 +31,7 @@ function ReportPage() {
 function ReportBody() {
   const [month, setMonth] = useState(monthNow());
   const [grain, setGrain] = useState<"day" | "week" | "month">("day");
+  const [filters, setFilters] = useState(false);
   const queryClient = useQueryClient();
   const report = useQuery({ queryKey: ["report", month, grain], queryFn: () => getReport({ data: { month, grain } }) });
   const data = report.data;
@@ -38,21 +39,25 @@ function ReportBody() {
 
   return (
     <div className="space-y-4">
-      <MoneyLinks />
-      <div>
-        <h1 className="text-2xl font-extrabold text-primary">Báo cáo</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Doanh thu và lãi gộp lấy đơn đã xong, trừ đơn thử. Lãi ròng trừ định phí chỉ từ tháng khai trương. Định phí kế hoạch 23.900.000đ/tháng. Doanh thu hòa vốn mix khoảng 45,1 triệu — khác mục tiêu KPI.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Input className="min-h-12 max-w-xs" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-        {(["day", "week", "month"] as const).map((item) => (
-          <Button key={item} variant={grain === item ? "default" : "outline"} className="min-h-12" onClick={() => setGrain(item)}>
-            {item === "day" ? "Ngày" : item === "week" ? "Tuần" : "Tháng"}
-          </Button>
-        ))}
-      </div>
+      <PageToolbar
+        title="Báo cáo tổng"
+        hint="Doanh thu và lãi gộp lấy đơn đã xong, trừ đơn thử. Lãi ròng trừ định phí chỉ từ tháng khai trương."
+        filterCount={1}
+        onFilter={() => setFilters(true)}
+      />
+      <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc báo cáo">
+        <label className="text-sm font-semibold">
+          Tháng
+          <Input className="mt-1 min-h-11" type="month" aria-label="Tháng báo cáo" value={month} onChange={(e) => setMonth(e.target.value)} />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {(["day", "week", "month"] as const).map((item) => (
+            <Button key={item} variant={grain === item ? "default" : "outline"} className="min-h-11" onClick={() => setGrain(item)}>
+              {item === "day" ? "Ngày" : item === "week" ? "Tuần" : "Tháng"}
+            </Button>
+          ))}
+        </div>
+      </FilterSheet>
       {report.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {report.isError ? <p className="font-semibold text-destructive">{(report.error as Error).message}</p> : null}
       {data ? (

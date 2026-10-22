@@ -25,14 +25,19 @@ import { Route as AdminBaoCaoChiRouteImport } from './routes/admin.bao-cao-chi'
 import { Route as AdminCaiDatRouteImport } from './routes/admin.cai-dat'
 import { Route as AdminChamCongRouteImport } from './routes/admin.cham-cong'
 import { Route as AdminChatRouteImport } from './routes/admin.chat'
+import { Route as AdminCheckCongRouteImport } from './routes/admin.check-cong'
 import { Route as AdminChiPhiRouteImport } from './routes/admin.chi-phi'
+import { Route as AdminChuyenNopRouteImport } from './routes/admin.chuyen-nop'
 import { Route as AdminCodRouteImport } from './routes/admin.cod'
+import { Route as AdminCongNoRouteImport } from './routes/admin.cong-no'
 import { Route as AdminCongViecRouteImport } from './routes/admin.cong-viec'
 import { Route as AdminDanhGiaRouteImport } from './routes/admin.danh-gia'
 import { Route as AdminDonMoiRouteImport } from './routes/admin.don-moi'
+import { Route as AdminDuyetChiRouteImport } from './routes/admin.duyet-chi'
 import { Route as AdminGiaRouteImport } from './routes/admin.gia'
 import { Route as AdminGiaoHangRouteImport } from './routes/admin.giao-hang'
 import { Route as AdminGoiRouteImport } from './routes/admin.goi'
+import { Route as AdminInDonRouteImport } from './routes/admin.in-don'
 import { Route as AdminKetNoiRouteImport } from './routes/admin.ket-noi'
 import { Route as AdminKhoRouteImport } from './routes/admin.kho'
 import { Route as AdminKpiRouteImport } from './routes/admin.kpi'
@@ -52,6 +57,7 @@ import { Route as AdminSepayRouteImport } from './routes/admin.sepay'
 import { Route as AdminTaiKhoanRouteImport } from './routes/admin.tai-khoan'
 import { Route as AdminThongBaoRouteImport } from './routes/admin.thong-bao'
 import { Route as AdminThuRouteImport } from './routes/admin.thu'
+import { Route as AdminThuongRouteImport } from './routes/admin.thuong'
 import { Route as AdminTinMauRouteImport } from './routes/admin.tin-mau'
 import { Route as AdminViRouteImport } from './routes/admin.vi'
 import { Route as DanhGiaTokenRouteImport } from './routes/danh-gia.$token'
@@ -166,14 +172,29 @@ const AdminChatRoute = AdminChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCheckCongRoute = AdminCheckCongRouteImport.update({
+  id: '/check-cong',
+  path: '/check-cong',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminChiPhiRoute = AdminChiPhiRouteImport.update({
   id: '/chi-phi',
   path: '/chi-phi',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminChuyenNopRoute = AdminChuyenNopRouteImport.update({
+  id: '/chuyen-nop',
+  path: '/chuyen-nop',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCodRoute = AdminCodRouteImport.update({
   id: '/cod',
   path: '/cod',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCongNoRoute = AdminCongNoRouteImport.update({
+  id: '/cong-no',
+  path: '/cong-no',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminCongViecRoute = AdminCongViecRouteImport.update({
@@ -191,6 +212,11 @@ const AdminDonMoiRoute = AdminDonMoiRouteImport.update({
   path: '/don-moi',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminDuyetChiRoute = AdminDuyetChiRouteImport.update({
+  id: '/duyet-chi',
+  path: '/duyet-chi',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminGiaRoute = AdminGiaRouteImport.update({
   id: '/gia',
   path: '/gia',
@@ -204,6 +230,11 @@ const AdminGiaoHangRoute = AdminGiaoHangRouteImport.update({
 const AdminGoiRoute = AdminGoiRouteImport.update({
   id: '/goi',
   path: '/goi',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminInDonRoute = AdminInDonRouteImport.update({
+  id: '/in-don',
+  path: '/in-don',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminKetNoiRoute = AdminKetNoiRouteImport.update({
@@ -299,6 +330,11 @@ const AdminThongBaoRoute = AdminThongBaoRouteImport.update({
 const AdminThuRoute = AdminThuRouteImport.update({
   id: '/thu',
   path: '/thu',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminThuongRoute = AdminThuongRouteImport.update({
+  id: '/thuong',
+  path: '/thuong',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminTinMauRoute = AdminTinMauRouteImport.update({
@@ -486,14 +522,19 @@ export interface FileRoutesByFullPath {
   '/admin/cai-dat': typeof AdminCaiDatRoute
   '/admin/cham-cong': typeof AdminChamCongRoute
   '/admin/chat': typeof AdminChatRoute
+  '/admin/check-cong': typeof AdminCheckCongRoute
   '/admin/chi-phi': typeof AdminChiPhiRoute
+  '/admin/chuyen-nop': typeof AdminChuyenNopRoute
   '/admin/cod': typeof AdminCodRoute
+  '/admin/cong-no': typeof AdminCongNoRoute
   '/admin/cong-viec': typeof AdminCongViecRoute
   '/admin/danh-gia': typeof AdminDanhGiaRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
+  '/admin/duyet-chi': typeof AdminDuyetChiRoute
   '/admin/gia': typeof AdminGiaRoute
   '/admin/giao-hang': typeof AdminGiaoHangRoute
   '/admin/goi': typeof AdminGoiRoute
+  '/admin/in-don': typeof AdminInDonRoute
   '/admin/ket-noi': typeof AdminKetNoiRoute
   '/admin/kho': typeof AdminKhoRoute
   '/admin/kpi': typeof AdminKpiRoute
@@ -513,6 +554,7 @@ export interface FileRoutesByFullPath {
   '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/thong-bao': typeof AdminThongBaoRoute
   '/admin/thu': typeof AdminThuRoute
+  '/admin/thuong': typeof AdminThuongRoute
   '/admin/tin-mau': typeof AdminTinMauRoute
   '/admin/vi': typeof AdminViRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
@@ -563,14 +605,19 @@ export interface FileRoutesByTo {
   '/admin/cai-dat': typeof AdminCaiDatRoute
   '/admin/cham-cong': typeof AdminChamCongRoute
   '/admin/chat': typeof AdminChatRoute
+  '/admin/check-cong': typeof AdminCheckCongRoute
   '/admin/chi-phi': typeof AdminChiPhiRoute
+  '/admin/chuyen-nop': typeof AdminChuyenNopRoute
   '/admin/cod': typeof AdminCodRoute
+  '/admin/cong-no': typeof AdminCongNoRoute
   '/admin/cong-viec': typeof AdminCongViecRoute
   '/admin/danh-gia': typeof AdminDanhGiaRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
+  '/admin/duyet-chi': typeof AdminDuyetChiRoute
   '/admin/gia': typeof AdminGiaRoute
   '/admin/giao-hang': typeof AdminGiaoHangRoute
   '/admin/goi': typeof AdminGoiRoute
+  '/admin/in-don': typeof AdminInDonRoute
   '/admin/ket-noi': typeof AdminKetNoiRoute
   '/admin/kho': typeof AdminKhoRoute
   '/admin/kpi': typeof AdminKpiRoute
@@ -590,6 +637,7 @@ export interface FileRoutesByTo {
   '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/thong-bao': typeof AdminThongBaoRoute
   '/admin/thu': typeof AdminThuRoute
+  '/admin/thuong': typeof AdminThuongRoute
   '/admin/tin-mau': typeof AdminTinMauRoute
   '/admin/vi': typeof AdminViRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
@@ -642,14 +690,19 @@ export interface FileRoutesById {
   '/admin/cai-dat': typeof AdminCaiDatRoute
   '/admin/cham-cong': typeof AdminChamCongRoute
   '/admin/chat': typeof AdminChatRoute
+  '/admin/check-cong': typeof AdminCheckCongRoute
   '/admin/chi-phi': typeof AdminChiPhiRoute
+  '/admin/chuyen-nop': typeof AdminChuyenNopRoute
   '/admin/cod': typeof AdminCodRoute
+  '/admin/cong-no': typeof AdminCongNoRoute
   '/admin/cong-viec': typeof AdminCongViecRoute
   '/admin/danh-gia': typeof AdminDanhGiaRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
+  '/admin/duyet-chi': typeof AdminDuyetChiRoute
   '/admin/gia': typeof AdminGiaRoute
   '/admin/giao-hang': typeof AdminGiaoHangRoute
   '/admin/goi': typeof AdminGoiRoute
+  '/admin/in-don': typeof AdminInDonRoute
   '/admin/ket-noi': typeof AdminKetNoiRoute
   '/admin/kho': typeof AdminKhoRoute
   '/admin/kpi': typeof AdminKpiRoute
@@ -669,6 +722,7 @@ export interface FileRoutesById {
   '/admin/tai-khoan': typeof AdminTaiKhoanRoute
   '/admin/thong-bao': typeof AdminThongBaoRoute
   '/admin/thu': typeof AdminThuRoute
+  '/admin/thuong': typeof AdminThuongRoute
   '/admin/tin-mau': typeof AdminTinMauRoute
   '/admin/vi': typeof AdminViRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
@@ -722,14 +776,19 @@ export interface FileRouteTypes {
     | '/admin/cai-dat'
     | '/admin/cham-cong'
     | '/admin/chat'
+    | '/admin/check-cong'
     | '/admin/chi-phi'
+    | '/admin/chuyen-nop'
     | '/admin/cod'
+    | '/admin/cong-no'
     | '/admin/cong-viec'
     | '/admin/danh-gia'
     | '/admin/don-moi'
+    | '/admin/duyet-chi'
     | '/admin/gia'
     | '/admin/giao-hang'
     | '/admin/goi'
+    | '/admin/in-don'
     | '/admin/ket-noi'
     | '/admin/kho'
     | '/admin/kpi'
@@ -749,6 +808,7 @@ export interface FileRouteTypes {
     | '/admin/tai-khoan'
     | '/admin/thong-bao'
     | '/admin/thu'
+    | '/admin/thuong'
     | '/admin/tin-mau'
     | '/admin/vi'
     | '/danh-gia/$token'
@@ -799,14 +859,19 @@ export interface FileRouteTypes {
     | '/admin/cai-dat'
     | '/admin/cham-cong'
     | '/admin/chat'
+    | '/admin/check-cong'
     | '/admin/chi-phi'
+    | '/admin/chuyen-nop'
     | '/admin/cod'
+    | '/admin/cong-no'
     | '/admin/cong-viec'
     | '/admin/danh-gia'
     | '/admin/don-moi'
+    | '/admin/duyet-chi'
     | '/admin/gia'
     | '/admin/giao-hang'
     | '/admin/goi'
+    | '/admin/in-don'
     | '/admin/ket-noi'
     | '/admin/kho'
     | '/admin/kpi'
@@ -826,6 +891,7 @@ export interface FileRouteTypes {
     | '/admin/tai-khoan'
     | '/admin/thong-bao'
     | '/admin/thu'
+    | '/admin/thuong'
     | '/admin/tin-mau'
     | '/admin/vi'
     | '/danh-gia/$token'
@@ -877,14 +943,19 @@ export interface FileRouteTypes {
     | '/admin/cai-dat'
     | '/admin/cham-cong'
     | '/admin/chat'
+    | '/admin/check-cong'
     | '/admin/chi-phi'
+    | '/admin/chuyen-nop'
     | '/admin/cod'
+    | '/admin/cong-no'
     | '/admin/cong-viec'
     | '/admin/danh-gia'
     | '/admin/don-moi'
+    | '/admin/duyet-chi'
     | '/admin/gia'
     | '/admin/giao-hang'
     | '/admin/goi'
+    | '/admin/in-don'
     | '/admin/ket-noi'
     | '/admin/kho'
     | '/admin/kpi'
@@ -904,6 +975,7 @@ export interface FileRouteTypes {
     | '/admin/tai-khoan'
     | '/admin/thong-bao'
     | '/admin/thu'
+    | '/admin/thuong'
     | '/admin/tin-mau'
     | '/admin/vi'
     | '/danh-gia/$token'
@@ -1088,6 +1160,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminChatRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/check-cong': {
+      id: '/admin/check-cong'
+      path: '/check-cong'
+      fullPath: '/admin/check-cong'
+      preLoaderRoute: typeof AdminCheckCongRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/chi-phi': {
       id: '/admin/chi-phi'
       path: '/chi-phi'
@@ -1095,11 +1174,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminChiPhiRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/chuyen-nop': {
+      id: '/admin/chuyen-nop'
+      path: '/chuyen-nop'
+      fullPath: '/admin/chuyen-nop'
+      preLoaderRoute: typeof AdminChuyenNopRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/cod': {
       id: '/admin/cod'
       path: '/cod'
       fullPath: '/admin/cod'
       preLoaderRoute: typeof AdminCodRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/cong-no': {
+      id: '/admin/cong-no'
+      path: '/cong-no'
+      fullPath: '/admin/cong-no'
+      preLoaderRoute: typeof AdminCongNoRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/cong-viec': {
@@ -1123,6 +1216,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDonMoiRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/duyet-chi': {
+      id: '/admin/duyet-chi'
+      path: '/duyet-chi'
+      fullPath: '/admin/duyet-chi'
+      preLoaderRoute: typeof AdminDuyetChiRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/gia': {
       id: '/admin/gia'
       path: '/gia'
@@ -1142,6 +1242,13 @@ declare module '@tanstack/react-router' {
       path: '/goi'
       fullPath: '/admin/goi'
       preLoaderRoute: typeof AdminGoiRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/in-don': {
+      id: '/admin/in-don'
+      path: '/in-don'
+      fullPath: '/admin/in-don'
+      preLoaderRoute: typeof AdminInDonRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/ket-noi': {
@@ -1275,6 +1382,13 @@ declare module '@tanstack/react-router' {
       path: '/thu'
       fullPath: '/admin/thu'
       preLoaderRoute: typeof AdminThuRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/thuong': {
+      id: '/admin/thuong'
+      path: '/thuong'
+      fullPath: '/admin/thuong'
+      preLoaderRoute: typeof AdminThuongRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/tin-mau': {
@@ -1518,14 +1632,19 @@ interface AdminRouteChildren {
   AdminCaiDatRoute: typeof AdminCaiDatRoute
   AdminChamCongRoute: typeof AdminChamCongRoute
   AdminChatRoute: typeof AdminChatRoute
+  AdminCheckCongRoute: typeof AdminCheckCongRoute
   AdminChiPhiRoute: typeof AdminChiPhiRoute
+  AdminChuyenNopRoute: typeof AdminChuyenNopRoute
   AdminCodRoute: typeof AdminCodRoute
+  AdminCongNoRoute: typeof AdminCongNoRoute
   AdminCongViecRoute: typeof AdminCongViecRoute
   AdminDanhGiaRoute: typeof AdminDanhGiaRoute
   AdminDonMoiRoute: typeof AdminDonMoiRoute
+  AdminDuyetChiRoute: typeof AdminDuyetChiRoute
   AdminGiaRoute: typeof AdminGiaRoute
   AdminGiaoHangRoute: typeof AdminGiaoHangRoute
   AdminGoiRoute: typeof AdminGoiRoute
+  AdminInDonRoute: typeof AdminInDonRoute
   AdminKetNoiRoute: typeof AdminKetNoiRoute
   AdminKhoRoute: typeof AdminKhoRoute
   AdminKpiRoute: typeof AdminKpiRoute
@@ -1545,6 +1664,7 @@ interface AdminRouteChildren {
   AdminTaiKhoanRoute: typeof AdminTaiKhoanRoute
   AdminThongBaoRoute: typeof AdminThongBaoRoute
   AdminThuRoute: typeof AdminThuRoute
+  AdminThuongRoute: typeof AdminThuongRoute
   AdminTinMauRoute: typeof AdminTinMauRoute
   AdminViRoute: typeof AdminViRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -1565,14 +1685,19 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCaiDatRoute: AdminCaiDatRoute,
   AdminChamCongRoute: AdminChamCongRoute,
   AdminChatRoute: AdminChatRoute,
+  AdminCheckCongRoute: AdminCheckCongRoute,
   AdminChiPhiRoute: AdminChiPhiRoute,
+  AdminChuyenNopRoute: AdminChuyenNopRoute,
   AdminCodRoute: AdminCodRoute,
+  AdminCongNoRoute: AdminCongNoRoute,
   AdminCongViecRoute: AdminCongViecRoute,
   AdminDanhGiaRoute: AdminDanhGiaRoute,
   AdminDonMoiRoute: AdminDonMoiRoute,
+  AdminDuyetChiRoute: AdminDuyetChiRoute,
   AdminGiaRoute: AdminGiaRoute,
   AdminGiaoHangRoute: AdminGiaoHangRoute,
   AdminGoiRoute: AdminGoiRoute,
+  AdminInDonRoute: AdminInDonRoute,
   AdminKetNoiRoute: AdminKetNoiRoute,
   AdminKhoRoute: AdminKhoRoute,
   AdminKpiRoute: AdminKpiRoute,
@@ -1592,6 +1717,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminTaiKhoanRoute: AdminTaiKhoanRoute,
   AdminThongBaoRoute: AdminThongBaoRoute,
   AdminThuRoute: AdminThuRoute,
+  AdminThuongRoute: AdminThuongRoute,
   AdminTinMauRoute: AdminTinMauRoute,
   AdminViRoute: AdminViRoute,
   AdminIndexRoute: AdminIndexRoute,

@@ -556,6 +556,14 @@ export const removeExpense = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const approveExpense = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data }) => {
+    const { approveExpense: approve } = await import("@/server/service");
+    await approve(await actor(), data.id);
+    return { ok: true };
+  });
+
 export const saveWalletAdjust = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z

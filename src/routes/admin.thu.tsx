@@ -5,7 +5,9 @@ import { toast } from "sonner";
 
 import { ALL_TONE, CHANNEL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
 import { ListPager, useListPage } from "@/components/admin/list-page";
-import { MoneyLinks } from "@/components/admin/sections";
+import { FilterSheet, PageToolbar, ToolbarButton } from "@/components/admin/page-toolbar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { HandCoins, MoreHorizontal } from "lucide-react";
 import { WalletToggle } from "@/components/admin/wallet-toggle";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
@@ -48,6 +50,8 @@ function CollectBody() {
   const [channel, setChannel] = useState("all");
   const [open, setOpen] = useState<CollectRow | null>(null);
   const [handOpen, setHandOpen] = useState(false);
+  const [picker, setPicker] = useState(false);
+  const [filters, setFilters] = useState(false);
   const list = useQuery({ queryKey: ["collect"], queryFn: () => getCollectList() });
   const needle = query.trim().toLowerCase();
   const source = list.data?.rows ?? [];
@@ -71,32 +75,47 @@ function CollectBody() {
 
   return (
     <div className="space-y-4">
-      <MoneyLinks />
-      <div>
-        <h1 className="text-2xl font-extrabold text-primary">Thu tiền</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Bấm Thu tiền trên đơn. Số tiền tự vào ví của bạn. Xem chi tiết ở Ví tiền. Cuối ca nộp tiền mặt đang giữ vào két tiệm.</p>
-      </div>
-      {me ? (
-        <section className="grid gap-3 sm:grid-cols-2">
-          <article className="rounded-md border bg-card p-4">
-            <p className="text-sm text-muted-foreground">Ví tiền mặt của {me.name}</p>
-            <p className="text-xl font-extrabold">{formatVnd(me.tien_mat)}</p>
-            {me.tien_mat > 0 ? (
-              <Button className="mt-3 min-h-11" variant="outline" onClick={() => setHandOpen(true)}>
-                Nộp vào ví cửa hàng
-              </Button>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">Không còn tiền mặt đang giữ.</p>
-            )}
-          </article>
-          <article className="rounded-md border bg-card p-4">
-            <p className="text-sm text-muted-foreground">Ví chuyển khoản của {me.name}</p>
-            <p className="text-xl font-extrabold">{formatVnd(me.chuyen_khoan)}</p>
-          </article>
-        </section>
-      ) : null}
-      <Input className="min-h-12 max-w-md" placeholder="Tìm mã đơn hoặc tên khách" value={query} onChange={(e) => setQuery(e.target.value)} />
-      <FilterChips label="Kênh đơn" value={channel} chips={channelChips} onChange={setChannel} />
+      <PageToolbar
+        title="Nhập thu"
+        hint="Ghi tiền khách trả. Số cộng vào ví của bạn. Nộp tiền mặt làm ở mục Chuyển nộp."
+        search={query}
+        onSearch={setQuery}
+        searchPlaceholder="Tìm mã đơn hoặc tên khách"
+        filterCount={channel === "all" ? 0 : 1}
+        onFilter={() => setFilters(true)}
+        actions={<ToolbarButton label="Nhập thu" icon={HandCoins} primary onClick={() => setPicker(true)} />}
+      />
+      <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc thu">
+        <FilterChips label="Kênh đơn" value={channel} chips={channelChips} onChange={setChannel} wrap />
+      </FilterSheet>
+      <Dialog open={picker} onOpenChange={setPicker}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Chọn đơn để thu</DialogTitle>
+          </DialogHeader>
+          <ul className="max-h-80 space-y-1 overflow-y-auto">
+            {rows.map((row) => (
+              <li key={row.id}>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left hover:bg-muted"
+                  onClick={() => {
+                    setOpen(row);
+                    setPicker(false);
+                  }}
+                >
+                  <span>
+                    <span className="font-semibold">{row.code}</span>
+                    <span className="block text-xs text-muted-foreground">{row.customerName || "Khách lẻ"}</span>
+                  </span>
+                  <span className="text-sm font-semibold">{row.remain === null ? "Chưa đủ giá" : formatMaybe(row.remain)}</span>
+                </button>
+              </li>
+            ))}
+            {rows.length === 0 ? <li className="text-sm text-muted-foreground">Không còn đơn cần thu.</li> : null}
+          </ul>
+        </DialogContent>
+      </Dialog>
       <ListPager page={page.page} pages={page.pages} total={page.total} start={page.start} count={page.slice.length} noun="đơn cần thu" onPage={page.setPage} />
       {list.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {list.isError ? <p className="font-semibold text-destructive">{(list.error as Error).message}</p> : null}
@@ -117,9 +136,16 @@ function CollectBody() {
               <p>Đã thu {formatMaybe(row.depositPaid)}</p>
               <p className="font-extrabold text-primary">{row.remain === null ? "Chưa đủ giá" : `Còn ${formatMaybe(row.remain)}`}</p>
             </div>
-            <Button className="min-h-11" onClick={() => setOpen(row)}>
-              Thu tiền
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="inline-flex size-8 items-center justify-center rounded-md border" aria-label={`Thao tác ${row.code}`}>
+                  <MoreHorizontal className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setOpen(row)}>Thu tiền</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </li>
         ))}
       </ul>
