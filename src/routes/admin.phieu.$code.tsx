@@ -67,8 +67,8 @@ function SlipBody() {
   return (
     <div className="space-y-4">
       <style>{`
+        @page { ${pageRule} }
         @media print {
-          @page { ${pageRule} }
           header, nav, aside, .no-print { display: none !important; }
           html, body, .admin-desk, main { background: #fff !important; color: #000 !important; }
           main { padding: 0 !important; max-width: none !important; }
