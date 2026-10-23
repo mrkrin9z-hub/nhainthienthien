@@ -1800,18 +1800,22 @@ export async function updateMaterial(
     minStock: number | null;
     supplier: string;
     leadTimeDays?: number | null;
+    name?: string;
+    code?: string;
   },
 ) {
   assertRole(actor, ["owner"]);
   await mutate(async (state) => {
     const material = state.materials.find((item) => item.id === input.materialId);
     if (!material) throw new Error("Không thấy vật tư.");
-    const before = { packPrice: material.packPrice, packSize: material.packSize, minStock: material.minStock, leadTimeDays: material.leadTimeDays ?? null };
+    const before = { packPrice: material.packPrice, packSize: material.packSize, minStock: material.minStock, leadTimeDays: material.leadTimeDays ?? null, name: material.name, code: material.code ?? "" };
     material.packPrice = input.packPrice;
     material.packSize = input.packSize;
     material.minStock = input.minStock;
     material.supplier = input.supplier;
     if (input.leadTimeDays !== undefined) material.leadTimeDays = input.leadTimeDays;
+    if (input.name !== undefined && input.name.trim()) material.name = input.name.trim();
+    if (input.code !== undefined) material.code = input.code.trim();
     audit(state, actor.id, "material.update", material.id, before, input);
   });
 }
@@ -1835,6 +1839,7 @@ export async function recount(actor: Actor, input: { materialId: string; actual:
     const systemQty = material.stock;
     const delta = input.actual - systemQty;
     material.stock = input.actual;
+    material.openingCounted = true;
     state.counts.unshift({ id: nid(), at: nowIso(), materialId: material.id, systemQty, actualQty: input.actual, by: actor.id, note: input.note.trim() });
     state.movements.unshift({
       id: nid(),
@@ -1850,9 +1855,10 @@ export async function recount(actor: Actor, input: { materialId: string; actual:
   });
 }
 
-export async function openInk(actor: Actor) {
+export async function openInk(actor: Actor, materialId: string) {
+  if (!/^muc-[1-9]$/.test(materialId)) throw new Error("Chọn một lọ mực.");
   await mutate(async (state) => {
-    const ink = state.materials.find((item) => item.id === "muc");
+    const ink = state.materials.find((item) => item.id === materialId);
     if (!ink) throw new Error("Không thấy mực.");
     ink.stock -= 1;
     state.movements.unshift({

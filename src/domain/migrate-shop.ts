@@ -1,3 +1,4 @@
+import { applyDeskSheetCosts, applyDeskSupplies } from "./desk-supply.ts";
 import { ensureOrgCollections } from "./org-desk.ts";
 import {
   applyApprovedHr,
@@ -10,7 +11,7 @@ import {
   MIN_STOCK_20261022,
 } from "./price-import.ts";
 import { repairMojibake } from "./text-repair.ts";
-import type { ChannelPrice, Material, NotifyPrefs, Order, Role, RoleModules, SePayConfig, ServicePackage, Settings, Sku } from "./types.ts";
+import type { BomLine, ChannelPrice, Material, NotifyPrefs, Order, Role, RoleModules, SePayConfig, ServicePackage, Settings, Sku } from "./types.ts";
 
 const LEGACY_ANH_THO = "Miễn phí khôi phục, thay áo, đổi nền. Không giới hạn số lần sửa.";
 const NEXT_ANH_THO = "Hỗ trợ chỉnh sửa ảnh cơ bản.";
@@ -46,6 +47,7 @@ type Migratable = {
     sepay?: SePayConfig;
     notifyPrefs?: NotifyPrefs;
     catalogImport20261022?: boolean;
+    deskBom20261023?: boolean;
     fixedCosts?: Settings["fixedCosts"];
     publicHours?: string;
   };
@@ -53,6 +55,7 @@ type Migratable = {
   skus?: (Sku | { id: string; code: string; groupId: string; sheetCost?: number | null })[];
   prices?: ChannelPrice[];
   materials?: Material[];
+  boms?: BomLine[];
   orders?: (Order | { code?: string; isTest?: boolean; customerId?: string; items: { name: string }[]; history?: { note: string }[]; customerNote?: string; internalNote?: string; stockWarning?: string })[];
   customers?: { id: string; name: string; phone: string }[];
   staff?: { id: string; email: string; name: string; role: Role | string }[];
@@ -171,6 +174,7 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (renameDeskStaff(state)) changed = true;
   if (grantDeskLinks(state)) changed = true;
   if (grantTaskMenu(state)) changed = true;
+  if (applyDeskSupplies(state as unknown as Parameters<typeof applyDeskSupplies>[0])) changed = true;
   if (ensureOrgCollections(state)) changed = true;
   return changed;
 }
@@ -306,6 +310,9 @@ function importCatalogOnce(state: Migratable): boolean {
   if (state.settings.groupListed) {
     state.settings.groupListed.tkb = true;
     state.settings.groupListed.lua = true;
+  }
+  if ((state.settings as Settings).deskBom20261023 && state.skus && state.materials) {
+    applyDeskSheetCosts(state.skus as Sku[], state.materials, state.settings as Settings);
   }
   return true;
 }

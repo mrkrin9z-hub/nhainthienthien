@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CircleCheck, MoreHorizontal, PackagePlus, PackageSearch } from "lucide-react";
+import { CircleCheck, CircleDashed, MoreHorizontal, PackagePlus, PackageSearch, TriangleAlert } from "lucide-react";
 import { useEffect } from "react";
 import { formatMaybe } from "@/lib/brand";
 import { approvePrice, countStock, downloadExcel, getInventory, getMe, markInkOpened, receiveStock, saveMaterial } from "@/lib/admin.functions";
@@ -35,23 +35,26 @@ function StockPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [filters, setFilters] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(m === "nhap");
+  const [inkOpen, setInkOpen] = useState(false);
   const [receiveId, setReceiveId] = useState("");
   const [packs, setPacks] = useState("1");
   useEffect(() => {
     if (m === "nhap") setReceiveOpen(true);
   }, [m]);
   const allMaterials = stock.data?.materials ?? [];
+  const inks = allMaterials.filter((material) => /^muc-[1-9]$/.test(material.id));
   const materials = allMaterials.filter((material) => {
-    const short = material.low || material.reorder;
-    if (stockFilter === "low" && !short) return false;
-    if (stockFilter === "ok" && short) return false;
+    if (stockFilter !== "all" && material.stockLabel !== stockFilter) return false;
     const needle = q.trim().toLowerCase();
-    return !needle || material.name.toLowerCase().includes(needle);
+    return !needle || `${material.name} ${material.code ?? ""}`.toLowerCase().includes(needle);
   });
+  const countLabel = (label: string) => allMaterials.filter((material) => material.stockLabel === label).length;
   const stockChips: FilterChip[] = [
     { id: "all", label: "Tất cả", count: allMaterials.length, ...ALL_TONE },
-    { id: "low", label: "Sắp hết", count: allMaterials.filter((material) => material.low || material.reorder).length, color: "#DC2626", icon: PackageSearch },
-    { id: "ok", label: "Đủ", count: allMaterials.filter((material) => !material.low && !material.reorder).length, color: "#059669", icon: CircleCheck },
+    { id: "Chưa đếm", label: "Chưa đếm", count: countLabel("Chưa đếm"), color: "#B45309", icon: CircleDashed },
+    { id: "Tồn âm", label: "Tồn âm", count: countLabel("Tồn âm"), color: "#DC2626", icon: TriangleAlert },
+    { id: "Sắp hết", label: "Sắp hết", count: countLabel("Sắp hết"), color: "#DC2626", icon: PackageSearch },
+    { id: "Đủ", label: "Đủ", count: countLabel("Đủ"), color: "#059669", icon: CircleCheck },
   ];
   const list = useListPage(materials, `${q}|${stockFilter}`);
   const movements = (stock.data?.movements ?? []).filter((move) => {
@@ -70,7 +73,7 @@ function StockPage() {
     <div className="space-y-4">
       <PageToolbar
         title={m === "nhap" ? "Nhập vật tư" : "Tồn kho vật tư"}
-        hint="Tồn đầu kỳ đang là 0 cho đến khi đếm. Hàng bán làm theo đơn, không trừ vào đây."
+        hint="Chưa đếm là chưa ghi tồn đầu. Tồn âm là đã trừ nhưng chưa nhập. Hàng bán làm theo đơn."
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm vật tư…"
@@ -87,9 +90,7 @@ function StockPage() {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => markInkOpened().then(() => refresh()).then(() => toast.success("Đã trừ 1 lọ mực"))}>
-                    Mở lọ mực mới
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setInkOpen(true)}>Mở lọ mực mới</DropdownMenuItem>
                   {me.data && me.data.role !== "production" ? (
                     <DropdownMenuItem
                       onClick={async () => {
@@ -109,6 +110,35 @@ function StockPage() {
       <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc vật tư">
         <FilterChips label="Tồn kho" value={stockFilter} chips={stockChips} onChange={setStockFilter} wrap />
       </FilterSheet>
+      <Dialog open={inkOpen} onOpenChange={setInkOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mở lọ mực mới</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Mỗi màu một lọ. Mã màu để trống cho đến khi có mã Canon. Mực tính lãi vẫn là 4,4% giá bán.</p>
+          <ul className="space-y-2">
+            {inks.map((ink) => (
+              <li key={ink.id} className="flex items-center justify-between gap-3 text-sm">
+                <span>
+                  <span className="font-semibold">{ink.name}</span>
+                  <span className="text-muted-foreground"> · {ink.stock} {ink.unit} · {ink.stockLabel}</span>
+                </span>
+                <Button
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={async () => {
+                    await markInkOpened({ data: { materialId: ink.id } });
+                    toast.success(`Đã trừ 1 lọ ${ink.name}`);
+                    await refresh();
+                  }}
+                >
+                  Mở lọ mới
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </DialogContent>
+      </Dialog>
       <Dialog open={receiveOpen} onOpenChange={setReceiveOpen}>
         <DialogContent>
           <DialogHeader>
@@ -167,8 +197,8 @@ function StockPage() {
                 <TableCell className="hidden text-right sm:table-cell">
                   {material.avgDaily} {material.unit}/ngày
                 </TableCell>
-                <TableCell className={`text-right ${material.low || material.reorder ? "font-semibold text-destructive" : "text-muted-foreground"}`}>
-                  {material.low || material.reorder ? "Sắp hết" : "Đủ"}
+                <TableCell className={`text-right ${material.stockLabel === "Tồn âm" || material.stockLabel === "Sắp hết" ? "font-semibold text-destructive" : material.stockLabel === "Chưa đếm" ? "font-semibold text-amber-700" : "text-muted-foreground"}`}>
+                  {material.stockLabel}
                 </TableCell>
               </TableRow>
             ))}
@@ -193,6 +223,7 @@ function StockPage() {
               <p className="text-xl font-extrabold">
                 {opened.stock} {opened.unit}
               </p>
+              <p className="text-sm font-semibold">{opened.stockLabel}</p>
               <p className="text-sm">
                 30 ngày qua dùng {opened.avgDaily} {opened.unit}/ngày
                 {opened.daysLeft === null ? " · chưa đủ nhịp để tính số ngày còn." : ` · còn khoảng ${opened.daysLeft} ngày.`}
@@ -242,6 +273,8 @@ function MaterialForms({
 }: {
   material: {
     id: string;
+    name: string;
+    code?: string;
     packPrice?: number | null;
     packSize?: number | null;
     minStock: number | null;
@@ -259,6 +292,9 @@ function MaterialForms({
   const [minStock, setMinStock] = useState(material.minStock === null ? "" : String(material.minStock));
   const [packPrice, setPackPrice] = useState(material.packPrice == null ? "" : String(material.packPrice));
   const [leadTime, setLeadTime] = useState(String(material.leadTimeDays));
+  const [name, setName] = useState(material.name);
+  const [code, setCode] = useState(material.code ?? "");
+  const ink = /^muc-[1-9]$/.test(material.id);
 
   return (
     <div className="mt-3 space-y-3">
@@ -301,8 +337,27 @@ function MaterialForms({
           Ghi số đếm
         </Button>
       </div>
+      {ink && canIn ? (
+        <Button
+          variant="outline"
+          className="min-h-12"
+          onClick={async () => {
+            await markInkOpened({ data: { materialId: material.id } });
+            toast.success(`Đã trừ 1 lọ ${name}`);
+            await onDone();
+          }}
+        >
+          Mở lọ mới
+        </Button>
+      ) : null}
       {owner ? (
         <div className="flex flex-wrap gap-2 md:col-span-2">
+          {ink ? (
+            <>
+              <Input className="h-11 w-40" aria-label="Tên màu mực" placeholder="Tên màu" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input className="h-11 w-36" aria-label="Mã mực" placeholder="Mã màu" value={code} onChange={(e) => setCode(e.target.value)} />
+            </>
+          ) : null}
           <Input className="h-11 w-32" placeholder="Giá / lần mua" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
           <Input className="h-11 w-28" placeholder="Tồn tối thiểu" value={minStock} onChange={(e) => setMinStock(e.target.value)} />
           <Input className="h-11 w-28" placeholder="Ngày chờ hàng" value={leadTime} onChange={(e) => setLeadTime(e.target.value)} />
@@ -318,6 +373,7 @@ function MaterialForms({
                   minStock: minStock.trim() === "" ? null : Number(minStock),
                   supplier,
                   leadTimeDays: leadTime.trim() === "" ? null : Number(leadTime),
+                  ...(ink ? { name, code } : {}),
                 },
               });
               toast.success("Đã lưu vật tư");

@@ -143,6 +143,8 @@ export type Settings = {
   menuLinks20261022?: boolean;
   /** Đã thêm việc hằng ngày (in đơn, chuyển nộp, duyệt chi, thưởng) vào menu một lần. */
   taskMenu20261023?: boolean;
+  /** Đã gắn gỗ cho ảnh TG, định mức nam châm theo khổ, và 9 lọ mực. Không chạy lại. */
+  deskBom20261023?: boolean;
   /** Phí sàn để đối chiếu. Không thay mức 27% + 11.000đ. */
   platformFeeNote?: string;
   showAnhThe: boolean;
@@ -369,6 +371,8 @@ export type Material = {
   pendingPrice: number | null;
   /** Đã có lần đếm tồn đầu. Thiếu hoặc false và tồn 0 thì hiện "Chưa đếm". */
   openingCounted?: boolean;
+  /** Mã mực / mã vật tư chủ sửa. Thiếu thì để trống. */
+  code?: string;
 };
 
 export type BomPhase = "print" | "pack";

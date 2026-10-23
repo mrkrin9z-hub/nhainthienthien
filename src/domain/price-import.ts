@@ -1,3 +1,4 @@
+import { magnetPiecesOnSheet, money } from "./calc.ts";
 import { PRICE_SHEET_20261022 } from "./price-sheet-20261022.ts";
 import type { Channel, ChannelPrice, HrDraft, Settings, Sku } from "./types.ts";
 import { CHANNELS } from "./types.ts";
@@ -125,6 +126,17 @@ function marketPrice(row: MasterRow): number | null {
   return PRICE_OVERRIDES[row.code] ?? row.sale ?? row.common;
 }
 
+function vnd(amount: number): string {
+  return Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+/** Ghi chú giá NX-12×25: vốn nam châm theo tấm 62×100, không giữ ước tính 7.500. */
+export function nx12MagnetNote(packPrice = 176000, piecesFor6x9 = 96): string {
+  const pieces = magnetPiecesOnSheet(12, 25, piecesFor6x9) ?? 20;
+  const piece = money(packPrice / pieces);
+  return `Đổi từ 9×19 ngày 22/10. Nam châm dẻo ${vnd(piece)}đ/tấm (${vnd(packPrice)} ÷ ${pieces}), thay ước tính ~7.500.`;
+}
+
 function priceNote(row: MasterRow, channel: Channel): string {
   const confirmed = CONFIRMED_COMBO_NOTE[row.code];
   if (confirmed) return confirmed;
@@ -136,7 +148,7 @@ function priceNote(row: MasterRow, channel: Channel): string {
   if ((channel === "tiktok" || channel === "shopee") && row.list === null && row.sale === null) {
     return row.note || "Chỉ bán tại tiệm và Facebook.";
   }
-  if (row.code === "NX-12x25-C1") return "Đổi từ 9×19 ngày 22/10. Vốn vật tư là ước tính.";
+  if (row.code === "NX-12x25-C1") return nx12MagnetNote();
   if (row.note) return row.note;
   if (channel === "tiktok" || channel === "shopee") return "Giá sau giảm 22/10. Niêm yết = giá chung × 1,35.";
   return "Giá chung 22/10 cho tại tiệm, web và Facebook.";

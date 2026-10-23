@@ -210,7 +210,7 @@ export function navCounts(state: ShopState): Record<string, number> {
     const amount = order.shipping?.codAmount ?? 0;
     return order.status !== "huy" && amount > 0 && !order.shipping?.codReceivedAt;
   }).length;
-  const low = state.materials.filter((material) => material.minStock !== null && material.stock > 0 && material.stock <= material.minStock).length;
+  const low = state.materials.filter((material) => stockLabel(material) !== "Đủ").length;
   const chat = (state.chatConversations ?? []).reduce((sum, row) => sum + (row.unreadCount > 0 ? row.unreadCount : 0), 0);
   return {
     "/admin/don-hang": open,
@@ -224,7 +224,7 @@ export function navCounts(state: ShopState): Record<string, number> {
 }
 
 export function stockLabel(material: { stock: number; minStock: number | null; openingCounted?: boolean }): string {
-  if (material.stock < 0) return "Tồn âm — chưa nhập tồn đầu";
+  if (material.stock < 0) return "Tồn âm";
   if (material.stock === 0 && material.openingCounted !== true) return "Chưa đếm";
   if (material.minStock !== null && material.stock <= material.minStock) return "Sắp hết";
   return "Đủ";
@@ -237,6 +237,7 @@ export function inventoryView(state: ShopState, role: Role) {
     materials: state.materials.map((material) => ({
       id: material.id,
       name: material.name,
+      code: material.code ?? "",
       buyLabel: material.buyLabel,
       unit: material.unit,
       stock: material.stock,

@@ -65,6 +65,26 @@ export function isWallSize(size: string | null): boolean {
   return size === "30x45" || size === "40x60" || size === "50x75" || size === "60x90";
 }
 
+/** Tấm nam châm dẻo bán theo khổ 62cm × 1m. */
+export const MAGNET_SHEET_WIDTH_CM = 62;
+export const MAGNET_SHEET_LENGTH_CM = 100;
+
+/**
+ * Số miếng cắt được từ một tấm 62×100.
+ * Xếp hai chiều, lấy chiều được nhiều miếng hơn: floor(62/cạnh)×floor(100/cạnh kia).
+ * 6×9 giữ đúng 96 miếng chủ đã chốt, không lấy 110 miếng của chiều xoay kia.
+ */
+export function magnetPiecesOnSheet(widthCm: number, heightCm: number, piecesFor6x9: number): number | null {
+  if (!(widthCm > 0) || !(heightCm > 0)) return null;
+  const short = Math.min(widthCm, heightCm);
+  const long = Math.max(widthCm, heightCm);
+  if (short === 6 && long === 9) return piecesFor6x9 > 0 ? piecesFor6x9 : null;
+  const fit = (acrossCm: number, alongCm: number) =>
+    Math.floor(MAGNET_SHEET_WIDTH_CM / acrossCm) * Math.floor(MAGNET_SHEET_LENGTH_CM / alongCm);
+  const pieces = Math.max(fit(widthCm, heightCm), fit(heightCm, widthCm));
+  return pieces >= 1 ? pieces : null;
+}
+
 export function needsLargeDeposit(size: string | null): boolean {
   return size === "40x60" || size === "50x75" || size === "60x90";
 }
@@ -584,9 +604,11 @@ export function formulaQty(formula: string, sku: Sku, settings: Settings): numbe
     const width = formula === "film-pack" ? settings.filmRollWidthCm : settings.ppRollWidthCm;
     return rollMeters(w, h, width, settings.wasteRate);
   }
-  if (formula === "magnet-6x9") {
-    if (!settings.magnetPiecesPerSheet) return null;
-    return round4(1 / settings.magnetPiecesPerSheet);
+  if (formula === "magnet" || formula === "magnet-6x9") {
+    if (!w || !h) return null;
+    const pieces = magnetPiecesOnSheet(w, h, settings.magnetPiecesPerSheet);
+    if (!pieces) return null;
+    return round4(1 / pieces);
   }
   return null;
 }

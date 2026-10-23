@@ -369,6 +369,8 @@ export const saveMaterial = createServerFn({ method: "POST" })
         minStock: z.number().min(0).nullable(),
         supplier: z.string(),
         leadTimeDays: z.number().int().min(0).nullable().optional(),
+        name: z.string().optional(),
+        code: z.string().optional(),
       })
       .parse(data),
   )
@@ -394,11 +396,13 @@ export const countStock = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const markInkOpened = createServerFn({ method: "POST" }).handler(async () => {
-  const { openInk } = await import("@/server/service");
-  await openInk(await actor());
-  return { ok: true };
-});
+export const markInkOpened = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ materialId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { openInk } = await import("@/server/service");
+    await openInk(await actor(), data.materialId);
+    return { ok: true };
+  });
 
 export const getBom = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => z.object({ skuId: z.string() }).parse(data))

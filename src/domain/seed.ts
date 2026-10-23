@@ -1,4 +1,5 @@
 import { DEFAULT_REMIND_MESSAGE } from "./crm.ts";
+import { applyDeskSheetCosts, inkBottles } from "./desk-supply.ts";
 import { catalogPrices, DESK_PRODUCT_DESCRIPTION, DESK_PRODUCT_NAME, MIN_STOCK_20261022, stampSheetCosts } from "./price-import.ts";
 import { formulaQty } from "./calc.ts";
 import { CAR_MAGNET_SIZES, FRIDGE_MAGNET_SIZES, PHOTO_PRINT_SIZES } from "./sizes.ts";
@@ -70,6 +71,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hrApproved20261022: true,
   menuLinks20261022: true,
   taskMenu20261023: true,
+  deskBom20261023: true,
   platformFeeNote:
     "Hoạch toán sàn: 27% + 11.000đ/đơn. Bảng phí từng hạng mục trong file Phi-san ghi chưa xác minh, chỉ để đối chiếu.",
   showAnhThe: false,
@@ -374,18 +376,18 @@ function buildCatalog(settings: Settings): { skus: Sku[]; boms: BomLine[] } {
           addBom(sku, "giay-pp", "print", "sheet", "pp");
           addBom(sku, "mang", "print", "sheet", "film");
           addBom(sku, "vien", "print", "sheet", "edge");
-          if (spec.kind === "wood") addBom(sku, `go-${size.code}`, "print", "sheet", "wood");
+          addBom(sku, `go-${size.code}`, "print", "sheet", "wood");
           if (["13x18", "15x21", "20x30"].includes(size.code)) addBom(sku, "chan", "print", "sheet", "stand");
           if (["30x45", "40x60", "50x75", "60x90"].includes(size.code)) {
             addBom(sku, "moc", "print", "sheet", "hook");
             addBom(sku, "oc", "print", "sheet", "screw");
           }
         }
-        if (spec.kind === "car") addBom(sku, "nam-cham", "print", "sheet", "unknown");
+        if (spec.kind === "car") addBom(sku, "nam-cham", "print", "sheet", "magnet");
         if (spec.kind === "fridge") {
           addBom(sku, "giay-pp", "print", "sheet", "pp-pack");
           addBom(sku, "mang", "print", "sheet", "film-pack");
-          addBom(sku, "nam-cham", "print", "sheet", "magnet-6x9");
+          addBom(sku, "nam-cham", "print", "sheet", "magnet");
         }
         if (spec.kind === "silk") addBom(sku, "giay-lua", "print", "sheet", "silk-pack");
         addBom(sku, "tui", "pack", "sheet", "bag");
@@ -404,7 +406,7 @@ function materials(): Material[] {
     material("giay-pp", "Giấy PP (in tráng gương)", "cuộn 61cm × 50m", "m", 50, 702000),
     material("giay-lua", "Giấy lụa", "cuộn 61cm × 40m", "m", 40, 732000),
     material("mang", "Màng tráng gương", "cuộn 62cm × 70m", "m", 70, 1215000),
-    material("muc", "Mực in", "lọ", "lọ", 1, 1100000),
+    ...inkBottles(),
     material("vien", "Viền bo", "thùng 600m", "m", 600, 870000),
     material("nam-cham", "Nam châm dẻo", "tấm 62cm × 1m", "tấm", 1, 176000),
     material("chan", "Chân nhựa để bàn", "cái", "cái", 1, 1000),
@@ -476,7 +478,9 @@ export async function verifyPassword(password: string, stored: string): Promise<
 export async function buildSeed(): Promise<ShopState> {
   const settings = structuredClone(DEFAULT_SETTINGS);
   const { skus, boms } = buildCatalog(settings);
+  const materialRows = materials();
   stampSheetCosts(skus);
+  applyDeskSheetCosts(skus, materialRows, settings);
   const passwordHash = await hashPassword(INITIAL_PASSWORD);
   const staffBase = {
     passwordHash,
@@ -505,7 +509,7 @@ export async function buildSeed(): Promise<ShopState> {
     groups: groups(),
     skus,
     prices: prices(skus),
-    materials: materials(),
+    materials: materialRows,
     boms,
     customers: [],
     orders: [],
