@@ -14,16 +14,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CircleCheck, CircleDashed, MoreHorizontal, PackagePlus, PackageSearch, TriangleAlert } from "lucide-react";
 import { useEffect } from "react";
 import { formatMaybe } from "@/lib/brand";
+import { WasteDesk } from "@/components/admin/waste-desk";
 import { approvePrice, countStock, downloadExcel, getInventory, getMe, markInkOpened, receiveStock, saveMaterial } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/kho")({
   validateSearch: (search: Record<string, unknown>): { m: string } => ({
-    m: search.m === "nhap" ? "nhap" : "",
+    m: search.m === "nhap" ? "nhap" : search.m === "hong" ? "hong" : "",
   }),
   component: StockPage,
 });
 
 function StockPage() {
+  const { m } = Route.useSearch();
+  if (m === "hong") return <WasteDesk />;
+  return <StockBody />;
+}
+
+function StockBody() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const stock = useQuery({ queryKey: ["stock"], queryFn: () => getInventory() });
   const owner = me.data?.role === "owner";
@@ -59,7 +66,7 @@ function StockPage() {
   const list = useListPage(materials, `${q}|${stockFilter}`);
   const movements = (stock.data?.movements ?? []).filter((move) => {
     const needle = q.trim().toLowerCase();
-    return !needle || `${move.materialName} ${move.reason} ${move.note}`.toLowerCase().includes(needle);
+    return !needle || `${move.materialName} ${move.reason} ${move.note} ${move.channelLabel ?? ""}`.toLowerCase().includes(needle);
   });
   const moveList = useListPage(movements, q);
 
@@ -249,6 +256,11 @@ function StockPage() {
       </Dialog>
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Nhập xuất</h2>
+        {(stock.data?.usageByChannel ?? []).length > 0 ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Phiếu trừ theo kênh: {(stock.data?.usageByChannel ?? []).map((row) => `${row.label} ${row.lines}`).join(" · ")}
+          </p>
+        ) : null}
         <div className="mt-2">
           <ListPager page={moveList.page} pages={moveList.pages} total={moveList.total} start={moveList.start} count={moveList.slice.length} noun="phiếu" onPage={moveList.setPage} />
         </div>
@@ -256,6 +268,7 @@ function StockPage() {
           {moveList.slice.map((move) => (
             <li key={move.id}>
               {move.materialName}: {move.qty} · {move.reason} {move.note}
+              {move.channelLabel ? ` · ${move.channelLabel}` : ""}
             </li>
           ))}
           {moveList.total === 0 ? <li className="text-muted-foreground">{(stock.data?.movements ?? []).length === 0 ? "Chưa có phiếu." : "Không có phiếu khớp bộ lọc."}</li> : null}

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { CHANNELS } from "@/domain/types";
 import type { Actor } from "@/server/service";
 
 async function session(): Promise<Actor> {
@@ -114,7 +115,7 @@ export const createDeskOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
       .object({
-        channel: z.enum(["tai_tiem", "facebook", "tiktok", "shopee"]),
+        channel: z.enum(CHANNELS),
         fullName: z.string().min(2),
         phone: z.string().min(8),
         address: z.string().optional().default(""),
@@ -153,6 +154,21 @@ export const reviseOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { reviseOrder: revise } = await import("@/server/service");
     await revise(await actor(), data);
+    return { ok: true };
+  });
+
+export const setFulfillment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        orderId: z.string().uuid(),
+        fulfillment: z.enum(["pickup", "delivery"]),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { setOrderFulfillment } = await import("@/server/service");
+    await setOrderFulfillment(await actor(), data);
     return { ok: true };
   });
 
@@ -247,7 +263,7 @@ export const savePrice = createServerFn({ method: "POST" })
     z
       .object({
         skuId: z.string(),
-        channel: z.enum(["tai_tiem", "facebook", "tiktok", "shopee"]),
+        channel: z.enum(CHANNELS),
         price: z.number().int().min(0).nullable(),
         status: z.enum(["dang_ban", "nhap", "cho_duyet"]),
         note: z.string().optional().default(""),
@@ -265,6 +281,7 @@ const priceMap = z.object({
   facebook: z.number().int().min(1000).max(100_000_000).optional(),
   tiktok: z.number().int().min(1000).max(100_000_000).optional(),
   shopee: z.number().int().min(1000).max(100_000_000).optional(),
+  mo_home: z.number().int().min(1000).max(100_000_000).optional(),
 });
 
 export const createPriceSize = createServerFn({ method: "POST" })
@@ -281,11 +298,12 @@ export const createPriceSize = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { createPriceSize: create } = await import("@/server/service");
-    const prices: Partial<Record<"tai_tiem" | "facebook" | "tiktok" | "shopee", number>> = {};
+    const prices: Partial<Record<(typeof CHANNELS)[number], number>> = {};
     if (data.prices.tai_tiem !== undefined) prices.tai_tiem = data.prices.tai_tiem;
     if (data.prices.facebook !== undefined) prices.facebook = data.prices.facebook;
     if (data.prices.tiktok !== undefined) prices.tiktok = data.prices.tiktok;
     if (data.prices.shopee !== undefined) prices.shopee = data.prices.shopee;
+    if (data.prices.mo_home !== undefined) prices.mo_home = data.prices.mo_home;
     return create(await actor(), { ...data, prices });
   });
 
@@ -304,6 +322,14 @@ export const importPriceSheet = createServerFn({ method: "POST" })
     return load(await actor(), data);
   });
 
+export const setSkuSold = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ skuId: z.string(), channel: z.enum(CHANNELS), sold: z.boolean() }).parse(data))
+  .handler(async ({ data }) => {
+    const { setSkuSold: save } = await import("@/server/service");
+    await save(await actor(), data);
+    return { ok: true };
+  });
+
 export const savePieces = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ skuId: z.string(), pieces: z.number().int().positive().nullable() }).parse(data))
   .handler(async ({ data }) => {
@@ -317,7 +343,7 @@ export const runQuote = createServerFn({ method: "POST" })
     z
       .object({
         skuId: z.string(),
-        channel: z.enum(["tai_tiem", "facebook", "tiktok", "shopee"]),
+        channel: z.enum(CHANNELS),
         price: z.number().nullable(),
         affiliate: z.boolean(),
       })
@@ -385,6 +411,74 @@ export const saveBomQty = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { updateBom } = await import("@/server/service");
     await updateBom(await actor(), data);
+    return { ok: true };
+  });
+
+export const getWaste = createServerFn({ method: "GET" }).handler(async () => {
+  const { wasteBoard } = await import("@/server/service");
+  return wasteBoard(await actor());
+});
+
+export const reportDamage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        materialId: z.string(),
+        qty: z.number().positive(),
+        reason: z.enum(["in_loi", "lech_vien", "bong_mang", "rach", "roi_vo", "khac"]),
+        orderId: z.string().nullable().optional(),
+        note: z.string().max(500).optional().default(""),
+        photoName: z.string().max(120).optional(),
+        photoMime: z.string().max(80).optional(),
+        photoBase64: z.string().max(14_000_000).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { reportWaste } = await import("@/server/service");
+    await reportWaste(await actor(), data);
+    return { ok: true };
+  });
+
+export const closeDamageDay = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ day: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { closeWasteDay } = await import("@/server/service");
+    await closeWasteDay(await actor(), data.day);
+    return { ok: true };
+  });
+
+export const approveDamage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { approveWasteReport } = await import("@/server/service");
+    await approveWasteReport(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const editDamage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string(),
+        qty: z.number().positive(),
+        reason: z.enum(["in_loi", "lech_vien", "bong_mang", "rach", "roi_vo", "khac", "chua_ro"]),
+        materialId: z.string(),
+        note: z.string().max(500),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { editWasteReport } = await import("@/server/service");
+    await editWasteReport(await actor(), data);
+    return { ok: true };
+  });
+
+export const voidDamage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { voidWasteReport } = await import("@/server/service");
+    await voidWasteReport(await actor(), data.id);
     return { ok: true };
   });
 
@@ -511,10 +605,18 @@ export const getProfit = createServerFn({ method: "GET" })
   });
 
 export const getReport = createServerFn({ method: "GET" })
-  .inputValidator((data: unknown) => z.object({ month: z.string(), grain: z.enum(["day", "week", "month"]) }).parse(data))
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        month: z.string(),
+        grain: z.enum(["day", "week", "month"]),
+        scope: z.enum(["all", "nha_in", ...CHANNELS]).optional().default("all"),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
     const { ownerReport } = await import("@/server/service");
-    return ownerReport(await actor(), data.month, data.grain);
+    return ownerReport(await actor(), data.month, data.grain, data.scope);
   });
 
 export const getKpi = createServerFn({ method: "GET" })

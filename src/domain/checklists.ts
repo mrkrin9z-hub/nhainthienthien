@@ -56,6 +56,7 @@ export const SHEET_COVERAGE: SheetCoverage[] = [
   { sheet: "Chính sách bảo hành", inApp: "Nội quy trên Việc cần làm, phiếu in lại", gap: "Chưa có trang chính sách cho khách. Câu không thu thêm khi lỗi xưởng chỉ hiện nội bộ." },
   { sheet: "Kế hoạch A–Z 22/10", inApp: "Quy tắc copy, giá, việc setup", gap: "Lịch đăng bài từng ngày chưa thành lịch riêng." },
   { sheet: "Đặc tả web quản trị", inApp: "App này", gap: "" },
+  { sheet: "Bảng giá Mơ Home", inApp: "Kênh Mơ Home (nội bộ), giá để trống", gap: "Không thấy bảng giá trong file import hay Drive. Cần mã, tên, khổ, số tấm, giá nội bộ và vốn vật tư." },
 ];
 
 export type TaskCard = {

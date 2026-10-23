@@ -2,15 +2,16 @@ import type { ShopChatMessage, ShopConversation } from "./shop-chat.ts";
 
 export type { ChatChannel, ShopChatMessage, ShopConversation } from "./shop-chat.ts";
 
-export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee"] as const;
+export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee", "mo_home"] as const;
 export type Channel = (typeof CHANNELS)[number];
 
-/** Kênh bán = “nhánh” vận hành (offline / online / sàn). */
+/** Kênh bán = “nhánh” vận hành (offline / online / sàn / nội bộ). */
 export const CHANNEL_LABEL: Record<Channel, string> = {
   tai_tiem: "Tại tiệm (offline)",
   facebook: "Online / Facebook",
   tiktok: "TikTok",
   shopee: "Shopee",
+  mo_home: "Mơ Home (nội bộ)",
 };
 
 export const ROLES = ["owner", "sale", "production"] as const;
@@ -98,6 +99,8 @@ export type Settings = {
   marginYellowPercent: number;
   marginRedPercent: number;
   wasteRate: number;
+  /** Cảnh báo khi hao hụt vượt % doanh thu. Trống = không cảnh báo. */
+  wasteAlertPercent?: number | null;
   tapeOrdersPerRoll: number;
   magnetPiecesPerSheet: number;
   ppRollWidthCm: number;
@@ -120,6 +123,8 @@ export type Settings = {
   saleBase: number;
   saleProbationPercent: number;
   productionBase: number;
+  /** Phần trăm lương sản xuất tính cho kênh Mơ Home. Thiếu = 50. Phần còn lại thuộc Nhà In. */
+  moHomeLaborPercent?: number;
   kpiTargets: number[];
   commissionTiers: { upto: number | null; percent: number }[];
   /** shop = doanh thu cả tiệm. handled = đơn người đó xử lý. Thiếu thì toàn tiệm. */
@@ -135,6 +140,8 @@ export type Settings = {
   publicHours: string;
   /** Đã nhập bảng giá 22/10 một lần. Không chạy lại. */
   catalogImport20261022?: boolean;
+  /** Đã ghi giá khách trả theo bảng TikTok 23/10 một lần. Không chạy lại. */
+  tiktokPrice20261023?: boolean;
   /** Đề xuất lương, KPI, hoa hồng. Khi pendingOwnerApproval = false thì số đã vào kpiTargets / lương / hoa hồng. */
   hrDraft?: HrDraft;
   /** Đã chép đề xuất nhân sự vào số đang dùng. Không chạy lại. */
@@ -182,8 +189,8 @@ export type Settings = {
   /** Cảnh báo trong app (không phải Web Push). */
   notifyPrefs?: NotifyPrefs;
   /**
-   * Kênh cửa hàng Thiên Thiên — bật/tắt + tên hiển thị.
-   * Thiếu = cả 4 kênh mặc định bật với CHANNEL_LABEL.
+   * Kênh cửa hàng — bật/tắt + tên hiển thị.
+   * Thiếu một kênh thì kênh đó được bật với CHANNEL_LABEL.
    */
   shopChannels?: { id: Channel; enabled: boolean; label: string }[];
 };
@@ -346,6 +353,8 @@ export type Sku = {
   sort: number;
   /** Vốn vật tư + gói trên bảng 22/10. Thiếu thì chưa có. */
   sheetCost?: number | null;
+  /** Kênh được bán mã này. Thiếu hoặc rỗng = 4 kênh Nhà In, không gồm Mơ Home. */
+  soldOn?: Channel[];
 };
 
 export type ChannelPrice = {
@@ -540,6 +549,35 @@ export type Movement = {
   orderId: string | null;
   by: string | null;
   note: string;
+  /** Kênh của đơn khi trừ hoặc hoàn. Thiếu với phiếu cũ và phiếu nhập kho. */
+  channel?: Channel;
+  /** Phiếu hao hụt gắn với dòng trừ này. */
+  wasteId?: string;
+};
+
+export type WasteReason = "in_loi" | "lech_vien" | "bong_mang" | "rach" | "roi_vo" | "khac" | "chua_ro";
+export type WasteStatus = "pending" | "confirmed" | "approved" | "void";
+
+export type WasteReport = {
+  id: string;
+  at: string;
+  /** Ngày lịch Việt Nam yyyy-mm-dd. */
+  day: string;
+  materialId: string;
+  /** Số dương đã trừ. */
+  qty: number;
+  reason: WasteReason;
+  orderId: string | null;
+  channel?: Channel;
+  by: string | null;
+  note: string;
+  photoId: string | null;
+  movementId: string;
+  status: WasteStatus;
+  confirmedAt?: string | null;
+  confirmedBy?: string | null;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
 };
 
 export type StockCount = {
@@ -649,6 +687,10 @@ export type ShopState = {
   reprints: Reprint[];
   movements: Movement[];
   counts: StockCount[];
+  /** Phiếu báo hỏng / hao hụt. Thiếu trên sổ cũ. */
+  wasteReports?: WasteReport[];
+  /** Ảnh đính kèm phiếu hỏng. */
+  wastePhotos?: OrderFile[];
   punches: Punch[];
   leaves: Leave[];
   expenses: Expense[];

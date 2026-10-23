@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -11,9 +11,6 @@ import { statusLabelOf } from "@/lib/display-labels";
 import { getDashboard, punchClock } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/")({
-  beforeLoad: () => {
-    throw redirect({ to: "/admin/don-hang", search: { status: "all", q: "" } });
-  },
   component: DashboardPage,
 });
 
@@ -175,6 +172,21 @@ function DashboardPage() {
       </section>
 
       {"revenueToday" in data ? (
+        <nav aria-label="Sổ tiền" className="flex flex-wrap gap-2">
+          <Link to="/admin/thu" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Thu</Link>
+          <Link to="/admin/bao-cao" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Báo cáo</Link>
+          <Link to="/admin/loi-nhuan" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Lợi nhuận</Link>
+        </nav>
+      ) : null}
+
+      {"kpiPercent" in data ? (
+        <nav aria-label="Sổ tiền" className="flex flex-wrap gap-2">
+          <Link to="/admin/thu" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Thu</Link>
+          <Link to="/admin/cong-no" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Công nợ</Link>
+        </nav>
+      ) : null}
+
+      {"revenueToday" in data ? (
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <Card label="Doanh thu hôm nay" value={formatMaybe(data.revenueToday)} hint="Đơn đã xong" icon={Wallet} tone="bg-blue-500/10 text-blue-700" />
           <Card label="Doanh thu tháng" value={formatMaybe(data.revenueMonth)} hint={data.breakevenPercent === null ? "Chưa đặt mốc hòa vốn" : `${data.breakevenPercent}% mốc hòa vốn`} icon={CalendarDays} tone="bg-emerald-500/10 text-emerald-700" />
@@ -184,7 +196,7 @@ function DashboardPage() {
           ) : (
             <>
               <Card label="Lãi gộp tháng" value={formatMaybe(data.gross)} hint="Giá bán trừ vật tư, mực, phí kênh" icon={TrendingUp} tone="bg-teal-500/10 text-teal-700" />
-              <Card label="Lợi nhuận tháng" value={formatMaybe(data.profit)} hint={data.beforeOpen ? "Chưa trừ định phí vì tiệm chưa khai trương." : "Lãi gộp trừ định phí và chi phát sinh"} icon={PiggyBank} tone="bg-violet-500/10 text-violet-700" />
+              <Card label="Lợi nhuận tháng" value={formatMaybe(data.profit)} hint={data.beforeOpen ? `Chưa trừ định phí vì tiệm chưa khai trương. Hao hụt ${formatMaybe(data.wasteCost)}.` : `Lãi gộp trừ định phí, chi phát sinh và hao hụt ${formatMaybe(data.wasteCost)}.`} icon={PiggyBank} tone="bg-violet-500/10 text-violet-700" />
             </>
           )}
         </section>

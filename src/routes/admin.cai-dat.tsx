@@ -39,7 +39,7 @@ export const Route = createFileRoute("/admin/cai-dat")({
   component: SettingsPage,
 });
 
-const COST_KEYS = ["inkPercent", "marginYellowPercent", "marginRedPercent", "wasteRate"] as const;
+const COST_KEYS = ["inkPercent", "marginYellowPercent", "marginRedPercent", "wasteRate", "wasteAlertPercent"] as const;
 const FEE_KEYS = [
   "tiktokFeePercent",
   "tiktokExtraPercent",
@@ -65,6 +65,7 @@ const SALARY_KEYS = [
   "saleBase",
   "saleProbationPercent",
   "productionBase",
+  "moHomeLaborPercent",
   "lateDeductionPerMinute",
   "absenceDeductionPerDay",
   "lateGraceMinutes",
@@ -88,6 +89,7 @@ const NUMBER_FIELDS: { key: string; label: string; nullable?: boolean }[] = [
   { key: "marginYellowPercent", label: "Ngưỡng vàng lãi gộp (%)" },
   { key: "marginRedPercent", label: "Ngưỡng đỏ (lãi dưới số này là LỖ)" },
   { key: "wasteRate", label: "Hao hụt giấy/màng (0.1 = 10%)" },
+  { key: "wasteAlertPercent", label: "Cảnh báo khi hao hụt vượt % doanh thu", nullable: true },
   { key: "tiktokFeePercent", label: "TikTok phí %" },
   { key: "tiktokExtraPercent", label: "TikTok phí thêm %" },
   { key: "tiktokFixed", label: "TikTok phí/đơn" },
@@ -110,6 +112,7 @@ const NUMBER_FIELDS: { key: string; label: string; nullable?: boolean }[] = [
   { key: "saleBase", label: "Lương cứng sale" },
   { key: "saleProbationPercent", label: "Thử việc sale %" },
   { key: "productionBase", label: "Lương sản xuất" },
+  { key: "moHomeLaborPercent", label: "Phần lương sản xuất tính cho Mơ Home %" },
   { key: "lateDeductionPerMinute", label: "Trừ mỗi phút đi trễ", nullable: true },
   { key: "absenceDeductionPerDay", label: "Trừ mỗi ngày vắng", nullable: true },
   { key: "lateGraceMinutes", label: "Ân hạn đi trễ (phút)" },
@@ -272,7 +275,7 @@ function SettingsBody() {
         <div className="space-y-4">
           <NumberGroup
             title="Lương và công"
-            hint="Lương cứng, thử việc, ân hạn và mức trừ. Mức trừ để trống thì chưa trừ."
+            hint="Lương cứng, thử việc, phần lương sản xuất tính cho Mơ Home, ân hạn và mức trừ. Mức trừ để trống thì chưa trừ."
             keys={SALARY_KEYS}
             values={values}
             onSave={async (next) => {

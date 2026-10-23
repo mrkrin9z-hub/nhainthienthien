@@ -97,7 +97,7 @@ test("sổ cũ được nhập một lần, sổ không có giá thì không đ�
   assert.equal(legacy.settings.catalogImport20261022, true);
   assert.equal(legacy.settings.breakevenMonth, 45126608);
   assert.equal(legacy.settings.fixedCosts.find((row) => row.key === "luong_sx")?.amount, 5500000);
-  assert.equal(legacy.prices.find((row) => row.skuId === "TG-13x18-C1" && row.channel === "tai_tiem")?.price, 35000);
+  assert.equal(legacy.prices.find((row) => row.skuId === "TG-13x18-C1" && row.channel === "tai_tiem")?.price, 37000);
   assert.equal(legacy.prices.find((row) => row.skuId === "TG-13x18-C4" && row.channel === "facebook")?.price, 100000);
   assert.equal(legacy.prices.find((row) => row.skuId === "NX-9x19-C1" && row.channel === "tai_tiem")?.status, "nhap");
   assert.equal(legacy.groups.find((group) => group.id === "trang_guong")?.name, "Ảnh ép gỗ tráng gương để bàn");
@@ -117,7 +117,7 @@ test("sổ cũ được nhập một lần, sổ không có giá thì không đ�
   assert.equal(legacy.roleModules.find((row) => row.role === "production")?.modules.includes("/admin/don-moi"), false);
   assert.match(legacy.prices.find((row) => row.skuId === "TG-13x18-C3" && row.channel === "tai_tiem")?.note ?? "", /89\.000/);
   const inactive = inactiveSkuRows(legacy.skus, legacy.prices, legacy.groups);
-  assert.equal(inactive.length, 81);
+  assert.equal(inactive.length, 28);
   assert.equal(applyStoreMigrations(legacy), false);
 
   const bare = {
@@ -139,9 +139,12 @@ test("sổ cũ được nhập một lần, sổ không có giá thì không đ�
     packages: [],
     sepaySeen: [],
   };
-  assert.equal(applyStoreMigrations(bare), false);
+  applyStoreMigrations(bare);
   assert.equal(bare.groups[0]?.name, "Tên chủ đã sửa");
   assert.equal(bare.settings.catalogImport20261022, undefined);
+  assert.equal(bare.settings.shopChannels?.find((row) => row.id === "tai_tiem")?.label, "Tại tiệm");
+  assert.equal(bare.settings.shopChannels?.some((row) => row.id === "mo_home"), true);
+  assert.equal(applyStoreMigrations(bare), false);
 });
 
 test("chữ hỏng được sửa, tiếng Việt đúng thì giữ", () => {

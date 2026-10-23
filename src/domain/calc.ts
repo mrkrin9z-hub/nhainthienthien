@@ -8,6 +8,7 @@ import type {
   Settings,
   Sku,
 } from "./types.ts";
+import { skuSoldOn } from "./mohome.ts";
 import { needsPackCheck } from "./print-shop.ts";
 
 export const STANDARD_SIZES = [
@@ -192,6 +193,7 @@ export function feeLines(
     lines.push(fixed("Phí ship Facebook", settings.fbShipping));
     return lines;
   }
+  if (channel === "mo_home") return [];
   return [pct("Hoa hồng sale", settings.walkinCommissionPercent)];
 }
 
@@ -392,6 +394,8 @@ export function statusChangeError(input: {
   packReady?: boolean;
   /** false khi sang in từ chờ duyệt mà chưa có ảnh khách duyệt. Thiếu thì không chặn. */
   approvalReady?: boolean;
+  /** Đơn Mơ Home: sản xuất được chuyển hết các bước, trừ hủy. */
+  channel?: Channel;
 }): string | null {
   const reopening = (input.current === "huy" || input.current === "xong") && input.next !== input.current;
   if (reopening) {
@@ -400,7 +404,8 @@ export function statusChangeError(input: {
   }
   if (input.next === "huy" && input.role === "production") return "Sản xuất không hủy đơn.";
   if (input.next === "huy" && input.current !== "huy" && !input.reason?.trim()) return "Hủy đơn cần ghi lý do.";
-  if (input.role === "production" && (!isProductionStep(input.current) || !isProductionStep(input.next))) {
+  const internal = input.channel === "mo_home";
+  if (input.role === "production" && !internal && (!isProductionStep(input.current) || !isProductionStep(input.next))) {
     return "Sản xuất chỉ chuyển đơn đang in, đóng gói hoặc giao giữa ba bước đó.";
   }
   if (!reopening && input.current !== input.next && PROGRESS.includes(input.current) && PROGRESS.includes(input.next)) {
@@ -635,6 +640,7 @@ export function walkInPublicOffers(state: {
       state.skus
         .filter((sku) => sku.groupId === group.id)
         .filter((sku) => !isMergedWoodAlias(sku))
+        .filter((sku) => skuSoldOn(sku, "tai_tiem"))
         .filter((sku) => walkInListed(priceOf(state.prices, sku.id, "tai_tiem")?.status))
         .map((sku) => {
           const price = priceOf(state.prices, sku.id, "tai_tiem")?.price ?? null;

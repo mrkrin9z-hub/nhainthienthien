@@ -6,6 +6,7 @@ export function driveRootName(order: { source?: string | null; channel?: string 
   if (order.channel === "facebook") return "Đơn Facebook";
   if (order.channel === "tiktok") return "Đơn TikTok";
   if (order.channel === "shopee") return "Đơn Shopee";
+  if (order.channel === "mo_home") return "Đơn Mơ Home";
   return "Đơn tại tiệm";
 }
 

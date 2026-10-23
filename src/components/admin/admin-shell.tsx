@@ -47,6 +47,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ADMIN_MODULE_GROUPS, modulesForRole, type AdminModule, type AdminModuleGroup } from "@/admin-os/modules";
+import { DeskTabs } from "@/components/admin/desk-tabs";
 import { LOGO_HORIZONTAL } from "@/lib/assets";
 import { changeOwnPassword, getMe, getNavCounts, loginStaff, logoutStaff } from "@/lib/admin.functions";
 import { ROLE_LABEL, type Role } from "@/domain/types";
@@ -105,6 +106,17 @@ function pathActive(pathname: string, to: string) {
   if (to === "/admin") return pathname === "/admin" || pathname === "/admin/";
   if (to === "/admin/don-hang") return pathname.startsWith("/admin/don-hang");
   if (to === "/admin/don-moi") return pathname.startsWith("/admin/don-moi") || pathname.startsWith("/orders/");
+  if (to === "/admin/gia") return pathname.startsWith("/admin/gia") || pathname.startsWith("/admin/san-pham");
+  if (to === "/admin/viec") {
+    return ["/admin/viec", "/admin/cham-cong", "/admin/check-cong", "/admin/luong", "/admin/thuong"].some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`),
+    );
+  }
+  if (to === "/admin/cai-dat") {
+    return ["/admin/cai-dat", "/admin/nhan-vien", "/admin/nhom-quyen", "/admin/ket-noi"].some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`),
+    );
+  }
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
@@ -130,9 +142,30 @@ function pageTitle(pathname: string, role: Role, search: Record<string, unknown>
   const match = items
     .filter((item) => itemActive(pathname, search, item, items))
     .sort((a, b) => b.to.length - a.to.length)[0];
-  if (!match) return "Quản trị";
-  if (match.to === "/admin/luong" && role !== "owner") return "Lương của tôi";
-  return match.label;
+  if (match) {
+    if (match.to === "/admin/luong" && role !== "owner") return "Lương của tôi";
+    return match.label;
+  }
+  const extra: [string, string][] = [
+    ["/admin/san-pham", "Sản phẩm"],
+    ["/admin/cham-cong", "Chấm công"],
+    ["/admin/check-cong", "Check công"],
+    ["/admin/luong", role === "owner" ? "Lương" : "Lương của tôi"],
+    ["/admin/thuong", "Thưởng"],
+    ["/admin/nhan-vien", "Nhân viên"],
+    ["/admin/nhom-quyen", "Nhóm quyền"],
+    ["/admin/ket-noi", "Kết nối"],
+    ["/admin/thu", "Thu"],
+    ["/admin/chuyen-nop", "Chuyển nộp"],
+    ["/admin/chi-phi", "Chi"],
+    ["/admin/duyet-chi", "Duyệt chi"],
+    ["/admin/cong-no", "Công nợ"],
+    ["/admin/bao-cao-chi", "Báo cáo chi"],
+    ["/admin/bao-cao", "Báo cáo"],
+    ["/admin/loi-nhuan", "Lợi nhuận"],
+  ];
+  const titled = extra.find(([path]) => pathname === path || pathname.startsWith(`${path}/`));
+  return titled?.[1] ?? "Quản trị";
 }
 
 function initials(name: string) {
@@ -177,7 +210,7 @@ export function AdminShell() {
     event.preventDefault();
     const value = find.trim();
     if (!value) return;
-    if (/^TT/i.test(value)) {
+    if (/^(TT|MH)/i.test(value)) {
       void router.navigate({ to: "/admin/don-hang/$code", params: { code: value.toUpperCase() } });
     } else {
       void router.navigate({ to: "/admin/don-hang", search: { status: "all", q: value } as never });
@@ -237,7 +270,7 @@ export function AdminShell() {
           <button type="button" className="flex size-8 items-center justify-center rounded md:hidden" aria-label="Mở menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}>
             <Menu className="size-4" />
           </button>
-          <Link to="/admin/don-hang" search={{ status: "all", q: "" } as never} className="hidden shrink-0 items-center sm:flex" aria-label="Nhận đơn">
+          <Link to="/admin" className="hidden shrink-0 items-center sm:flex" aria-label="Tổng quan">
             <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="h-8 w-auto" />
           </Link>
           <form className="relative min-w-0 flex-1" onSubmit={goFind}>
@@ -279,7 +312,10 @@ export function AdminShell() {
               }}
             />
           ) : (
-            <Outlet />
+            <>
+              <DeskTabs role={role} />
+              <Outlet />
+            </>
           )}
         </main>
       </div>
@@ -288,20 +324,21 @@ export function AdminShell() {
 }
 
 const GROUP_ICONS: Record<string, typeof LayoutDashboard> = {
+  "Tổng quan": LayoutDashboard,
   "Đơn hàng": ClipboardList,
+  "Sản xuất": ClipboardList,
+  "Sản phẩm & giá": Tags,
+  "Kho vật tư": Package,
   "Nhân sự": Users,
-  "Thu chi": Landmark,
-  "Báo cáo": BarChart3,
-  Kho: Package,
   "Cài đặt": Settings,
 };
 
 function groupTile(title: string | undefined): string {
   if (title === "Nhân sự") return "bg-[#ffedd5] text-[#ea580c]";
-  if (title === "Thu chi") return "bg-[#dcfce7] text-[#16a34a]";
-  if (title === "Báo cáo") return "bg-[#f3e8ff] text-[#9333ea]";
-  if (title === "Kho") return "bg-[#ccfbf1] text-[#0f766e]";
+  if (title === "Kho vật tư") return "bg-[#ccfbf1] text-[#0f766e]";
   if (title === "Cài đặt") return "bg-[#f1f5f9] text-[#475569]";
+  if (title === "Sản phẩm & giá") return "bg-[#fef3c7] text-[#b45309]";
+  if (title === "Sản xuất") return "bg-[#ede9fe] text-[#6d28d9]";
   return "bg-[#e0eefe] text-[#2563eb]";
 }
 
@@ -344,6 +381,34 @@ function DeskNav({
   return (
     <>
       {groups.map((group) => {
+        if (group.items.length === 1) {
+          const item = group.items[0]!;
+          const active = pathActive(pathname, item.to);
+          const Icon = GROUP_ICONS[group.title] ?? LayoutDashboard;
+          const tone = groupTile(group.title);
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              title={item.label}
+              aria-current={active ? "page" : undefined}
+              className={`mb-0.5 flex min-h-9 items-center gap-2 rounded-xl px-1.5 text-[13px] font-semibold ${active ? "bg-[#e0eefe] text-[#1d4ed8]" : "text-sidebar-foreground hover:bg-[#f8fafc]"}`}
+              onClick={onNavigate}
+            >
+              <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${active ? "bg-[#2563eb] text-white" : tone}`}>
+                <Icon className="size-3.5" />
+              </span>
+              {narrow ? null : (
+                <>
+                  <span className="truncate">{item.label}</span>
+                  <span className="ml-auto">
+                    <CountBadge n={counts[item.to] ?? 0} />
+                  </span>
+                </>
+              )}
+            </Link>
+          );
+        }
         const title = group.title || "Menu";
         const tone = groupTile(title);
         const GroupIcon = GROUP_ICONS[title] ?? LayoutDashboard;

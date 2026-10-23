@@ -5,6 +5,7 @@ import { materialForecast } from "./forecast.ts";
 import { depositEvents, remainOf } from "./money.ts";
 import { bankLabel, deskAlerts, hasPackingPhoto, itemChangeNote, transferQrUrl } from "./print-shop.ts";
 import { onDeliveryDesk, orderShipping } from "./shipping.ts";
+import { wasteMonth } from "./waste.ts";
 import type { Order, OrderStatus, Role, ShopState } from "./types.ts";
 import { CHANNEL_LABEL, STATUS_LABEL, STATUS_REPLY } from "./types.ts";
 
@@ -72,7 +73,7 @@ export function extraTotal(state: ShopState, month: string): number {
 
 export function buildDashboard(state: ShopState, actor: Viewer) {
   const clock = vnParts();
-  const visible = state.orders.filter((order) => order.status !== "draft_upload");
+  const visible = state.orders.filter((order) => order.status !== "draft_upload" && (actor.role !== "sale" || order.channel !== "mo_home"));
   const byStatus = (["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"] as OrderStatus[]).map(
     (status) => ({ status, label: STATUS_LABEL[status], count: visible.filter((order) => order.status === status).length }),
   );
@@ -106,7 +107,11 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
       name: actor.name,
       byStatus: byStatus.filter((row) => ["thiet_ke", "cho_duyet", "in", "dong_goi", "giao"].includes(row.status)),
       queue: visible
-        .filter((order) => ["thiet_ke", "cho_duyet", "in", "dong_goi"].includes(order.status))
+        .filter((order) =>
+          order.channel === "mo_home"
+            ? !["xong", "huy", "upload_error"].includes(order.status)
+            : ["thiet_ke", "cho_duyet", "in", "dong_goi"].includes(order.status),
+        )
         .map((order) => orderSummary(state, order, actor.role)),
       late,
       alerts,
@@ -138,7 +143,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     };
   }
   const doneMonth = state.orders.filter(
-    (order) => order.status === "xong" && !order.isTest && vnMonth(order.completedAt ?? "") === clock.month,
+    (order) => order.status === "xong" && !order.isTest && order.channel !== "mo_home" && vnMonth(order.completedAt ?? "") === clock.month,
   );
   const revenueMonth = doneMonth.reduce((sum, order) => sum + (order.total ?? 0), 0);
   const revenueToday = doneMonth
@@ -172,6 +177,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
   const workingDays = state.settings.workingDays || 26;
   const dayTarget = workingDays > 0 ? Math.round(state.settings.breakevenMonth / workingDays) : state.settings.breakevenDay;
   const fixedCharged = beforeOpen ? 0 : fixed;
+  const waste = wasteMonth(state, clock.month, "nha_in", revenueMonth);
   return {
     role: actor.role,
     name: actor.name,
@@ -193,7 +199,9 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     grossIncomplete,
     fixed,
     fixedCharged,
-    profit: grossIncomplete ? null : Math.round(gross - fixedCharged - extraTotal(state, clock.month)),
+    wasteCost: waste.wasteCost,
+    wasteUnknown: waste.wasteUnknown,
+    profit: grossIncomplete ? null : Math.round(gross - fixedCharged - extraTotal(state, clock.month) - waste.wasteCost),
     orders: visible.slice(0, 12).map((order) => orderSummary(state, order, actor.role)),
   };
 }
@@ -232,6 +240,20 @@ export function stockLabel(material: { stock: number; minStock: number | null; o
   return "Đủ";
 }
 
+function usageLines(state: ShopState): { channel: string; label: string; lines: number }[] {
+  const counts = new Map<string, number>();
+  for (const move of state.movements) {
+    if (move.qty >= 0) continue;
+    const key = move.channel ?? "";
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([channel, lines]) => ({
+    channel,
+    label: channel ? CHANNEL_LABEL[channel as keyof typeof CHANNEL_LABEL] : "Chưa gắn kênh",
+    lines,
+  }));
+}
+
 export function inventoryView(state: ShopState, role: Role) {
   const showCost = role === "owner";
   const forecast = new Map(materialForecast(state).map((row) => [row.materialId, row]));
@@ -255,6 +277,7 @@ export function inventoryView(state: ShopState, role: Role) {
         : {}),
       low: material.minStock !== null && material.stock <= material.minStock,
     })),
+    usageByChannel: usageLines(state),
     movements: state.movements.slice(0, 80).map((move) => ({
       id: move.id,
       at: move.at,
@@ -263,6 +286,8 @@ export function inventoryView(state: ShopState, role: Role) {
       reason: move.reason,
       orderId: move.orderId,
       note: move.note,
+      channel: move.channel ?? "",
+      channelLabel: move.channel ? CHANNEL_LABEL[move.channel] : "",
       materialName: state.materials.find((item) => item.id === move.materialId)?.name ?? move.materialId,
       byName: state.staff.find((item) => item.id === move.by)?.name ?? "",
     })),

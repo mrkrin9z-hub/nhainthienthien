@@ -10,7 +10,7 @@ function reasons(phase: "print" | "pack") {
   return phase === "print" ? { out: PRINT_OUT, back: PRINT_BACK } : { out: PACK_OUT, back: PACK_BACK };
 }
 
-/** Số đã trừ ròng cho đơn và pha này (trừ − hoàn). */
+/** Số đã trừ ròng cho đơn và pha này (trừ − hoàn). Hao hụt là phiếu riêng, không hoàn khi hủy đơn. */
 function netTaken(state: ShopState, orderId: string, phase: "print" | "pack"): Map<string, number> {
   const { out, back } = reasons(phase);
   const map = new Map<string, number>();
@@ -48,6 +48,7 @@ function take(state: ShopState, order: Order, phase: "print" | "pack", by: strin
       orderId: order.id,
       by,
       note: order.code,
+      channel: order.channel,
     });
   }
   order.stockWarning = names.length ? `Chưa trừ được: ${[...new Set(names)].join(", ")} (chưa có định mức).` : "";
@@ -68,6 +69,7 @@ function giveBack(state: ShopState, order: Order, phase: "print" | "pack", by: s
       orderId: order.id,
       by,
       note: order.code,
+      channel: order.channel,
     });
   }
 }

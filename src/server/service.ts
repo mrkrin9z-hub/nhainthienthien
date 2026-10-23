@@ -24,6 +24,8 @@ import {
   walkInListed,
 } from "@/domain/calc";
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
+import { orderCodePrefix, skuSoldOn, withChannelSold, type ReportScope } from "@/domain/mohome";
+import { applyStockCount, approveWaste, confirmWasteDay, editWaste, previousMonth, recordWaste, voidWaste, wasteDayStats, wasteDesk, wasteMonth, wasteMonthCompare, type EditWasteInput } from "@/domain/waste";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/images";
 import { albumPhone, photoTooBig, publicUploadCard, uploadTokenShape } from "@/domain/order-upload";
@@ -481,6 +483,7 @@ function buildItems(
   if (!items.length) throw new Error("Đơn chưa có sản phẩm.");
   return items.map((item) => {
     const sku = skuOrThrow(state, item.skuId);
+    if (!skuSoldOn(sku, channel)) throw new Error("Sản phẩm này không bán ở kênh đang chọn.");
     const group = state.groups.find((g) => g.id === sku.groupId);
     const listed = priceOf(state.prices, sku.id, channel);
     let unitPrice = listed?.price ?? null;
@@ -539,9 +542,8 @@ function refreshDeposit(state: ShopState, order: Order) {
   });
 }
 
-function nextCode(state: ShopState): string {
-  const ymd = vnParts().ymd;
-  const prefix = `TT${ymd.slice(2).replaceAll("-", "")}`;
+function nextCode(state: ShopState, channel: Channel = "tai_tiem"): string {
+  const prefix = orderCodePrefix(channel, vnParts().ymd);
   const seq = state.orders.filter((order) => order.code.startsWith(`${prefix}-`)).length + 1;
   return `${prefix}-${String(seq).padStart(3, "0")}`;
 }
@@ -1186,7 +1188,8 @@ export async function listOrders(actor: Actor) {
   const state = await readState();
   return visibleToRole(actor.role, {
     orders: state.orders
-      .filter((order) => order.status !== "draft_upload" && (actor.role !== "production" || isProductionStep(order.status)))
+      .filter((order) => order.status !== "draft_upload" && (actor.role !== "sale" || order.channel !== "mo_home"))
+      .filter((order) => order.status !== "draft_upload" && (actor.role !== "production" || order.channel === "mo_home" || isProductionStep(order.status)))
       .map((order) => orderSummary(state, order, actor.role)),
   });
 }
@@ -1195,6 +1198,7 @@ export async function getOrder(actor: Actor, code: string) {
   const state = await readState();
   const order = state.orders.find((item) => item.code.toUpperCase() === code.toUpperCase());
   if (!order) throw new Error("Không tìm thấy đơn hàng.");
+  if (actor.role === "sale" && order.channel === "mo_home") throw new Error("Đơn Mơ Home chỉ chủ và sản xuất xem.");
   return visibleToRole(actor.role, orderDetail(state, order, actor.role));
 }
 
@@ -1216,7 +1220,8 @@ export async function createManualOrder(
     items: { skuId: string; quantity: number; unitPrice?: number | null; priceReason?: string }[];
   },
 ) {
-  assertRole(actor, ["owner", "sale"]);
+  if (input.channel === "mo_home") assertRole(actor, ["owner"]);
+  else assertRole(actor, ["owner", "sale"]);
   if (input.dueDate && input.dueDate < vnParts().ymd) throw new Error("Ngày hẹn không được ở quá khứ.");
   return mutate(async (state) => {
     const customer = upsertCustomer(state, { name: input.fullName, phone: input.phone, address: input.address });
@@ -1224,7 +1229,7 @@ export async function createManualOrder(
     const totals = sumItems(items);
     const order: Order = {
       id: nid(),
-      code: nextCode(state),
+      code: nextCode(state, input.channel),
       channel: input.channel,
       source: "manual",
       customerId: customer.id,
@@ -1303,6 +1308,7 @@ export async function reviseOrder(
   await mutate(async (state) => {
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
+    if (actor.role === "sale" && order.channel === "mo_home") throw new Error("Đơn Mơ Home chỉ chủ sửa.");
     if (marketplaceEditLocked(order.channel)) throw new Error("Đơn TikTok hoặc Shopee không sửa trên web.");
     const changingItems = input.items != null;
     const blocked = orderRevisionBlock(order, changingItems);
@@ -1366,6 +1372,21 @@ export async function reviseOrder(
   });
 }
 
+export async function setOrderFulfillment(actor: Actor, input: { orderId: string; fulfillment: "pickup" | "delivery" }) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === input.orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    if (actor.role === "sale" && order.channel === "mo_home") throw new Error("Đơn Mơ Home chỉ chủ sửa.");
+    if (order.fulfillment === input.fulfillment) return;
+    const before = order.fulfillment;
+    order.fulfillment = input.fulfillment;
+    if (input.fulfillment === "pickup") order.address = "";
+    order.updatedAt = nowIso();
+    audit(state, actor.id, "order.fulfillment", order.id, { fulfillment: before }, { fulfillment: order.fulfillment });
+  });
+}
+
 export async function setOrderStatus(
   actor: Actor,
   input: { orderId: string; status: OrderStatus; note: string; ownerOverride?: boolean },
@@ -1385,6 +1406,7 @@ export async function setOrderStatus(
       depositPaid: order.depositPaid,
       packReady: packReady(order.packCheck, hasPackingPhoto(order.files)),
       approvalReady: order.files.some((file) => !file.deletedAt && file.status === "complete" && file.kind === "approval"),
+      channel: order.channel,
     });
     if (blocked) throw new Error(blocked);
     const from = order.status;
@@ -1666,12 +1688,13 @@ export async function priceBoard(actor: Actor, groupId?: string) {
       sheets: sku.sheets,
       piecesPerPack: sku.piecesPerPack,
       sheetCost: sku.sheetCost ?? null,
+      soldOn: sku.soldOn && sku.soldOn.length > 0 ? sku.soldOn : (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]),
       prices: Object.fromEntries(
-        (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]).map((channel) => {
+        CHANNELS.map((channel) => {
           const row = priceOf(state.prices, sku.id, channel);
           const price = row?.price ?? null;
           const margin = sheetMargin(channel, price, sku.sheetCost ?? null, state.settings);
-          return [channel, { price, listPrice: row?.listPrice ?? null, status: row?.status ?? "nhap", note: row?.note ?? "", profit: margin.profit, marginPercent: margin.marginPercent }];
+          return [channel, { price, listPrice: row?.listPrice ?? null, status: row?.status ?? "nhap", note: row?.note ?? "", profit: margin.profit, marginPercent: margin.marginPercent, sold: skuSoldOn(sku, channel) }];
         }),
       ),
     })),
@@ -1704,6 +1727,7 @@ export async function updateChannelPrice(
       row.status = status;
       row.note = input.note;
     }
+    if (input.price !== null) sku.soldOn = withChannelSold(sku, input.channel, true);
     audit(state, actor.id, "price.update", `${sku.code}:${input.channel}`, before, input);
   });
 }
@@ -1740,6 +1764,16 @@ export async function importPriceSheet(actor: Actor, input: { groupId: string; f
     const result = applyPriceDrafts(state, input.groupId, drafts);
     audit(state, actor.id, "price.import", input.groupId, null, { filename: input.filename, ...result });
     return result;
+  });
+}
+
+export async function setSkuSold(actor: Actor, input: { skuId: string; channel: Channel; sold: boolean }) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const sku = skuOrThrow(state, input.skuId);
+    const before = sku.soldOn ?? null;
+    sku.soldOn = withChannelSold(sku, input.channel, input.sold);
+    audit(state, actor.id, "sku.sold", `${sku.code}:${input.channel}`, before, sku.soldOn);
   });
 }
 
@@ -1863,21 +1897,136 @@ export async function recount(actor: Actor, input: { materialId: string; actual:
     const material = state.materials.find((item) => item.id === input.materialId);
     if (!material) throw new Error("Không thấy vật tư.");
     const systemQty = material.stock;
-    const delta = input.actual - systemQty;
-    material.stock = input.actual;
-    material.openingCounted = true;
-    state.counts.unshift({ id: nid(), at: nowIso(), materialId: material.id, systemQty, actualQty: input.actual, by: actor.id, note: input.note.trim() });
-    state.movements.unshift({
-      id: nid(),
-      at: nowIso(),
-      materialId: material.id,
-      qty: delta,
-      reason: "Kiểm kho",
-      orderId: null,
-      by: actor.id,
-      note: input.note.trim(),
-    });
+    applyStockCount(state, { materialId: input.materialId, actual: input.actual, note: input.note, by: actor.id, at: nowIso(), id: nid });
     audit(state, actor.id, "stock.count", material.id, { stock: systemQty }, { stock: input.actual });
+  });
+}
+
+const WASTE_ROLES: Role[] = ["owner", "sale", "production"];
+
+function photoBytes(value: string): Uint8Array {
+  const cleaned = value.replace(/^data:[^,]*,/, "").trim();
+  if (cleaned.length > 14_000_000) throw new Error("Ảnh tối đa 10MB.");
+  const binary = atob(cleaned);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+export async function wasteBoard(actor: Actor) {
+  assertRole(actor, WASTE_ROLES);
+  return wasteDesk(await readState(), actor.role);
+}
+
+export async function reportWaste(
+  actor: Actor,
+  input: {
+    materialId: string;
+    qty: number;
+    reason: "in_loi" | "lech_vien" | "bong_mang" | "rach" | "roi_vo" | "khac";
+    orderId?: string | null;
+    note?: string;
+    photoName?: string;
+    photoMime?: string;
+    photoBase64?: string;
+  },
+) {
+  assertRole(actor, WASTE_ROLES);
+  let bytes: Uint8Array | null = null;
+  let mime = input.photoMime || "image/jpeg";
+  if (input.photoBase64 && input.photoBase64.trim()) {
+    const limit = await photoByteLimit();
+    bytes = photoBytes(input.photoBase64);
+    if (photoTooBig(bytes.byteLength, limit)) throw new Error("Mỗi ảnh tối đa 10MB khi chưa nối Google Drive.");
+    if (!imageMimeAllowed(mime) || !imageBytesMatch(mime, bytes)) throw new Error("Chỉ nhận ảnh JPG, PNG, WEBP hoặc HEIC.");
+  }
+  await mutate(async (state) => {
+    let photoId: string | null = null;
+    if (bytes) {
+      const file: OrderFile = {
+        id: nid(),
+        name: (input.photoName || "hong.jpg").replace(/[\\/]/g, "-").slice(-80) || "hong.jpg",
+        mime,
+        size: bytes.byteLength,
+        status: "uploading",
+        kind: "task",
+        storage: "local",
+        path: "",
+        driveFileId: null,
+        createdAt: nowIso(),
+        deletedAt: null,
+      };
+      photoId = file.id;
+      const photos = state.wastePhotos ?? (state.wastePhotos = []);
+      photos.push(file);
+      const order = input.orderId ? state.orders.find((item) => item.id === input.orderId) : null;
+      await storeImage(
+        file,
+        bytes,
+        mime,
+        {
+          orderId: "hao-hut",
+          code: "HAO-HUT",
+          customerName: "Hao hụt",
+          createdAt: file.createdAt,
+          source: "manual",
+          channel: order?.channel ?? "tai_tiem",
+        },
+        ["Hao hut", vnYmd()],
+      );
+    }
+    const report = recordWaste(state, {
+      materialId: input.materialId,
+      qty: input.qty,
+      reason: input.reason,
+      orderId: input.orderId,
+      by: actor.id,
+      note: input.note,
+      photoId,
+      at: nowIso(),
+      id: nid,
+    });
+    audit(state, actor.id, "waste.report", report.id, null, { materialId: report.materialId, qty: report.qty, orderId: report.orderId });
+  });
+}
+
+export async function closeWasteDay(actor: Actor, day: string) {
+  assertRole(actor, ["owner", "production"]);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("Ngày không hợp lệ.");
+  await mutate(async (state) => {
+    const count = confirmWasteDay(state, day, actor.id, nowIso());
+    audit(state, actor.id, "waste.confirm", day, null, { day, count });
+  });
+}
+
+export async function approveWasteReport(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    approveWaste(state, id, actor.id, nowIso());
+    const report = state.wasteReports?.find((item) => item.id === id);
+    audit(state, actor.id, "waste.approve", id, null, { materialId: report?.materialId ?? "" });
+  });
+}
+
+export async function editWasteReport(actor: Actor, input: EditWasteInput) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const found = state.wasteReports?.find((item) => item.id === input.id);
+    const before = found ? { qty: found.qty, materialId: found.materialId } : null;
+    editWaste(state, input);
+    audit(state, actor.id, "waste.edit", input.id, before, {
+      qty: input.qty,
+      materialId: input.materialId,
+    });
+  });
+}
+
+export async function voidWasteReport(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const before = state.wasteReports?.find((item) => item.id === id);
+    voidWaste(state, id);
+    audit(state, actor.id, "waste.void", id, before ? { materialId: before.materialId, qty: before.qty } : null, { status: "void" });
   });
 }
 
@@ -2144,7 +2293,7 @@ export async function lockPayroll(actor: Actor, month: string) {
 export async function profitReport(actor: Actor, month: string) {
   assertRole(actor, ["owner"]);
   const state = await readState();
-  const orders = state.orders.filter((order) => order.status === "xong" && vnMonth(order.completedAt) === month);
+  const orders = state.orders.filter((order) => order.status === "xong" && order.channel !== "mo_home" && vnMonth(order.completedAt) === month);
   const revenue = orders.reduce((sum, order) => sum + (order.total ?? 0), 0);
   let gross = 0;
   let incomplete = false;
@@ -2185,6 +2334,14 @@ export async function profitReport(actor: Actor, month: string) {
   const extras = state.expenses.filter((row) => row.month === month);
   const fixedSum = fixed.reduce((sum, row) => sum + row.amount, 0);
   const extraSum = extras.reduce((sum, row) => sum + row.amount, 0);
+  const waste = wasteMonth(state, month, "nha_in", revenue);
+  const prevKey = previousMonth(month);
+  const previousRevenue = state.orders
+    .filter((order) => order.status === "xong" && order.channel !== "mo_home" && vnMonth(order.completedAt) === prevKey)
+    .reduce((sum, order) => sum + (order.total ?? 0), 0);
+  const previousWaste = wasteMonth(state, prevKey, "nha_in", previousRevenue);
+  const compare = wasteMonthCompare(waste, previousWaste, prevKey);
+  const wasteDays = wasteDayStats(state, month, "nha_in");
   const reprints = state.reprints.filter((row) => vnMonth(row.reportedAt) === month);
   const today = vnParts();
   const todayRevenue = orders
@@ -2200,7 +2357,24 @@ export async function profitReport(actor: Actor, month: string) {
     fixedSum,
     extras,
     extraSum,
-    profit: incomplete ? null : Math.round(gross - fixedSum - extraSum),
+    wasteCost: waste.wasteCost,
+    wasteUnknown: waste.wasteUnknown,
+    wasteLines: waste.wasteLines,
+    wasteRate: waste.wasteRate,
+    wasteAlert: waste.wasteAlert,
+    wasteThreshold: waste.wasteThreshold,
+    wasteByDay: waste.byDay,
+    wasteByMaterial: waste.byMaterial,
+    wasteByReason: waste.byReason,
+    wasteByPerson: waste.byPerson,
+    wasteByChannel: waste.byChannel,
+    wasteDays,
+    wastePreviousMonth: compare.previousMonth,
+    wastePreviousCost: compare.previousCost,
+    wastePreviousRate: compare.previousRate,
+    wasteCostDelta: compare.costDelta,
+    wasteRateDelta: compare.rateDelta,
+    profit: incomplete ? null : Math.round(gross - fixedSum - extraSum - waste.wasteCost),
     breakevenPercent: state.settings.breakevenMonth ? Math.round((revenue / state.settings.breakevenMonth) * 1000) / 10 : null,
     todayGap: Math.max(0, state.settings.breakevenDay - todayRevenue),
     byChannel: [...byChannel.entries()].map(([channel, value]) => ({ channel, label: CHANNEL_LABEL[channel as Channel], ...value })),
@@ -2214,9 +2388,9 @@ export async function profitReport(actor: Actor, month: string) {
   };
 }
 
-export async function ownerReport(actor: Actor, month: string, grain: "day" | "week" | "month") {
+export async function ownerReport(actor: Actor, month: string, grain: "day" | "week" | "month", scope: ReportScope = "nha_in") {
   assertRole(actor, ["owner"]);
-  return businessReport(await readState(), month, grain);
+  return businessReport(await readState(), month, grain, scope);
 }
 
 export async function kpiReport(actor: Actor, month: string) {
@@ -2521,6 +2695,7 @@ const SETTING_NUMBERS = [
   "saleBase",
   "saleProbationPercent",
   "productionBase",
+  "moHomeLaborPercent",
   "fileRetentionDays",
   "videoRetentionDays",
   "rentFromJune2027",
@@ -2567,7 +2742,7 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
       if (value === null || value === "") continue;
       const number = Number(value);
       if (!Number.isFinite(number)) throw new Error(`Số liệu "${key}" không hợp lệ.`);
-      (state.settings[key] as number) = number;
+      (state.settings[key] as number) = key === "moHomeLaborPercent" ? Math.min(100, Math.max(0, number)) : number;
     }
     if ("fbShipping" in patch) {
       const value = patch.fbShipping;
@@ -2580,6 +2755,15 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
     if ("absenceDeductionPerDay" in patch) {
       const value = patch.absenceDeductionPerDay;
       state.settings.absenceDeductionPerDay = value === null || value === "" ? null : Number(value);
+    }
+    if ("wasteAlertPercent" in patch) {
+      const value = patch.wasteAlertPercent;
+      if (value === null || value === "") state.settings.wasteAlertPercent = null;
+      else {
+        const number = Number(value);
+        if (!Number.isFinite(number)) throw new Error("Ngưỡng hao hụt không hợp lệ.");
+        state.settings.wasteAlertPercent = Math.min(100, Math.max(0, number));
+      }
     }
     if (typeof patch.zaloPhone === "string") state.settings.zaloPhone = patch.zaloPhone.replace(/\D/g, "");
     if (typeof patch.showZalo === "boolean") state.settings.showZalo = patch.showZalo;
@@ -2778,6 +2962,7 @@ export async function fileForStaff(
     ...(state.albums ?? []).map((album) => album.files),
     ...(state.tasks ?? []).map((task) => task.files),
     ...(state.taskChecks ?? []).map((task) => task.files),
+    state.wastePhotos ?? [],
   ];
   for (const files of pools) {
     const file = files.find((item) => item.id === fileId && !item.deletedAt);
@@ -2913,10 +3098,29 @@ export async function exportWorkbook(actor: Actor, kind: "orders" | "stock" | "m
         ["Lãi gộp", report.gross],
         ["Chi phí cố định", report.fixedSum],
         ["Chi phí phát sinh", report.extraSum],
+        ["Hao hụt", report.wasteCost],
+        ["Hao hụt % doanh thu", report.wasteRate ?? ""],
+        ["Hao hụt tháng trước", report.wastePreviousCost],
+        ["Lệch hao hụt", report.wasteCostDelta],
         ["Lợi nhuận", report.profit],
         [],
         ["Khoản cố định", "Số tiền"],
         ...report.fixed.map((row) => [row.name, row.amount]),
+        [],
+        ["Ngày", "Tiền hao hụt", "% doanh thu ngày"],
+        ...report.wasteDays.map((row) => [row.day, row.wasteCost, row.wasteRate ?? ""]),
+        [],
+        ["Vật tư", "Tiền", "% doanh thu tháng"],
+        ...report.wasteByMaterial.map((row) => [row.label, row.cost, row.rate ?? ""]),
+        [],
+        ["Lý do", "Tiền", "% doanh thu tháng"],
+        ...report.wasteByReason.map((row) => [row.label, row.cost, row.rate ?? ""]),
+        [],
+        ["Người", "Tiền", "% doanh thu tháng"],
+        ...report.wasteByPerson.map((row) => [row.label, row.cost, row.rate ?? ""]),
+        [],
+        ["Kênh", "Tiền", "% doanh thu tháng"],
+        ...report.wasteByChannel.map((row) => [row.label, row.cost, row.rate ?? ""]),
       ],
     });
   }
@@ -2940,6 +3144,7 @@ export async function skuOptions(actor: Actor) {
         label: `${sku.code} · ${group?.name ?? ""} · ${sku.name}`,
         groupId: sku.groupId,
         size: sku.size,
+        soldOn: sku.soldOn && sku.soldOn.length > 0 ? sku.soldOn : (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]),
         prices,
         price: prices.tai_tiem,
       };
@@ -3151,8 +3356,8 @@ async function commitMarketplaceOrders(actor: Actor, channel: MarketplaceChannel
       const notes = [note, ...planned.flags];
       const order: Order = {
         id: nid(),
-        code: nextCode(state),
-        channel,
+      code: nextCode(state, channel),
+      channel,
         source: "manual",
         customerId: customer.id,
         status: planned.status,
