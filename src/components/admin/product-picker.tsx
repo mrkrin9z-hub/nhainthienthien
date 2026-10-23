@@ -32,6 +32,7 @@ export function ProductPickerDialog({
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("all");
   const [selected, setSelected] = useState<string[]>([]);
+  const [showUnpriced, setShowUnpriced] = useState(false);
 
   const groups = useMemo(() => {
     const names = new Set<string>();
@@ -42,11 +43,12 @@ export function ProductPickerDialog({
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return catalog.filter((sku) => {
+      if (!showUnpriced && (sku.prices?.[channel] ?? null) === null) return false;
       if (group !== "all" && (sku.groupName || "Khác") !== group) return false;
       if (!needle) return true;
       return `${sku.label} ${sku.code} ${sku.name} ${sku.groupName}`.toLowerCase().includes(needle);
     });
-  }, [catalog, group, q]);
+  }, [catalog, group, q, showUnpriced, channel]);
 
   function toggle(id: string) {
     setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
@@ -95,6 +97,9 @@ export function ProductPickerDialog({
               </option>
             ))}
           </select>
+          <button type="button" className="h-10 rounded-full border px-3 text-sm" onClick={() => setShowUnpriced((value) => !value)}>
+            {showUnpriced ? "Đang hiện khổ chưa có giá" : "Hiện khổ chưa có giá"}
+          </button>
         </div>
         <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {rows.map((sku) => {

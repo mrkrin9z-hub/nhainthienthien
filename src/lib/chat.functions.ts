@@ -15,6 +15,12 @@ async function assertChatRole() {
   return actor;
 }
 
+export const listInquiries = createServerFn({ method: "GET" }).handler(async () => {
+  const actor = await assertChatRole();
+  const { listInquiries: load } = await import("@/server/service");
+  return load(actor);
+});
+
 export const chatStatus = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await assertChatRole();
   const { metaPageStatus } = await import("@/server/service");

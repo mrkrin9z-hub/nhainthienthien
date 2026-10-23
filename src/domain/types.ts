@@ -92,6 +92,8 @@ export type Settings = {
   fbAdsPercent: number;
   fbCodPercent: number;
   fbShipping: number | null;
+  /** Đóng gói Facebook, đồng/đơn. Thiếu thì chưa tính vào lãi. */
+  fbPackFixed?: number | null;
   walkinCommissionPercent: number;
   marginYellowPercent: number;
   marginRedPercent: number;
@@ -106,6 +108,8 @@ export type Settings = {
   depositPercent: number;
   breakevenMonth: number;
   breakevenDay: number;
+  /** Số ngày làm việc để chia hòa vốn ngày. Thiếu thì 26. */
+  workingDays?: number;
   workStart: string;
   workEnd: string;
   /** 0 = Chủ nhật … 6 = Thứ bảy. Trống = làm cả tuần (hợp đồng ghi 8:00–18:00 hằng ngày). */
@@ -129,6 +133,20 @@ export type Settings = {
   /** Đã tắt Zalo một lần trên sổ seed cũ. Sau mốc này, ô trong Cài đặt được giữ nguyên. */
   zaloDefaultMigrated?: boolean;
   publicHours: string;
+  /** Đã nhập bảng giá 22/10 một lần. Không chạy lại. */
+  catalogImport20261022?: boolean;
+  /** Đề xuất lương, KPI, hoa hồng. Khi pendingOwnerApproval = false thì số đã vào kpiTargets / lương / hoa hồng. */
+  hrDraft?: HrDraft;
+  /** Đã chép đề xuất nhân sự vào số đang dùng. Không chạy lại. */
+  hrApproved20261022?: boolean;
+  /** Đã thêm Lên đơn, COD, Nhập đơn vào menu một lần. */
+  menuLinks20261022?: boolean;
+  /** Đã thêm việc hằng ngày (in đơn, chuyển nộp, duyệt chi, thưởng) vào menu một lần. */
+  taskMenu20261023?: boolean;
+  /** Đã gắn gỗ cho ảnh TG, định mức nam châm theo khổ, và 9 lọ mực. Không chạy lại. */
+  deskBom20261023?: boolean;
+  /** Phí sàn để đối chiếu. Không thay mức 27% + 11.000đ. */
+  platformFeeNote?: string;
   showAnhThe: boolean;
   showAlbum: boolean;
   groupListed: Record<string, boolean>;
@@ -164,6 +182,20 @@ export type Settings = {
    * Thiếu = cả 4 kênh mặc định bật với CHANNEL_LABEL.
    */
   shopChannels?: { id: Channel; enabled: boolean; label: string }[];
+};
+
+/** Đề xuất nhân sự. pendingOwnerApproval false = chủ đã duyệt, số đang dùng. */
+export type HrDraft = {
+  pendingOwnerApproval: boolean;
+  note: string;
+  saleBase: number;
+  probationPercent: number;
+  productionBase: number;
+  olderJdMonth1: number | null;
+  kpiMonth2: number;
+  kpiMonth3: number;
+  kpiFromMonth4: number;
+  commissionTiers: { upto: number | null; percent: number }[];
 };
 
 export type Staff = {
@@ -308,6 +340,8 @@ export type Sku = {
   sheets: number;
   piecesPerPack: number | null;
   sort: number;
+  /** Vốn vật tư + gói trên bảng 22/10. Thiếu thì chưa có. */
+  sheetCost?: number | null;
 };
 
 export type ChannelPrice = {
@@ -316,6 +350,8 @@ export type ChannelPrice = {
   price: number | null;
   status: PriceStatus;
   note: string;
+  /** Giá niêm yết sàn trước khi giảm. Thiếu với kênh tại tiệm và Facebook. */
+  listPrice?: number | null;
 };
 
 export type Material = {
@@ -333,6 +369,10 @@ export type Material = {
   leadTimeDays?: number | null;
   supplier: string;
   pendingPrice: number | null;
+  /** Đã có lần đếm tồn đầu. Thiếu hoặc false và tồn 0 thì hiện "Chưa đếm". */
+  openingCounted?: boolean;
+  /** Mã mực / mã vật tư chủ sửa. Thiếu thì để trống. */
+  code?: string;
 };
 
 export type BomPhase = "print" | "pack";
@@ -393,6 +433,10 @@ export type OrderShipping = {
   codReceivedAt: string | null;
   /** Trạng thái đọc từ hãng. Không tạo vận đơn. */
   carrierStatus?: string;
+  /** Tiền khách trả thêm cho giao hàng, cộng vào số phải thu. */
+  customerShip?: number | null;
+  /** Dòng ví đã ghi khi nhận COD. Có rồi thì không ghi lần hai. */
+  codWalletId?: string | null;
 };
 
 export type SkuMap = {
@@ -436,6 +480,8 @@ export type Order = {
   total: number | null;
   depositRequired: number | null;
   depositPaid: number;
+  /** Giảm giá trên tổng đơn. Thiếu thì không giảm. */
+  discount?: number | null;
   depositMethod: string;
   depositBy: string | null;
   /** Từng lần thu. Đơn cũ chỉ có depositPaid thì ví đọc một khoản tại lúc tạo đơn. */
@@ -464,6 +510,8 @@ export type Order = {
   }[];
   /** Hội thoại chat local gắn đơn (nếu tạo từ Chat). */
   chatConversationId?: string | null;
+  /** Đơn thử. Không tính doanh thu, công nợ, COD, tỉ lệ hủy. */
+  isTest?: boolean;
 };
 
 export type Reprint = {
@@ -537,6 +585,8 @@ export type Expense = {
   by: string | null;
   category?: string;
   wallet?: string;
+  /** Thiếu = khoản cũ, coi như đã duyệt. null = chờ duyệt. Chuỗi = thời điểm chủ duyệt. */
+  approvedAt?: string | null;
 };
 
 export type WalletAdjust = {
@@ -626,4 +676,15 @@ export type ShopState = {
   packages?: ServicePackage[];
   /** Id giao dịch SePay đã xử lý (idempotent). */
   sepaySeen?: string[];
+  /** Tin khách gửi từ trang liên hệ. */
+  inquiries?: Inquiry[];
+};
+
+export type Inquiry = {
+  id: string;
+  at: string;
+  name: string;
+  message: string;
+  orderCode: string;
+  phone: string;
 };

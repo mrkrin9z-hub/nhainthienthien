@@ -4,8 +4,8 @@ export const PHOTO_PRINT_SIZES = ["13x18", "15x21", "20x30", "30x45", "40x60", "
 /** Nam châm tủ lạnh (ảnh). */
 export const FRIDGE_MAGNET_SIZES = ["6x9"] as const;
 
-/** Nam châm dán xe, sản phẩm riêng. */
-export const CAR_MAGNET_SIZES = ["9x19", "17x22"] as const;
+/** Nam châm dán xe, sản phẩm riêng. 9×19 giữ mã cũ, không có giá. 12×25 thay từ 22/10. */
+export const CAR_MAGNET_SIZES = ["9x19", "12x25", "17x22"] as const;
 
 const PRINT_GROUPS = new Set(["ep_go", "giay_khen", "trang_guong"]);
 

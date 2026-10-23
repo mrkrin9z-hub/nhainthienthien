@@ -23,6 +23,61 @@ export const Route = createFileRoute("/admin/lich")({
   component: CalendarPage,
 });
 
+function MonthGrid({
+  month,
+  today,
+  days,
+}: {
+  month: string;
+  today: string;
+  days: { day: string; orders: { id: string; code: string; customerName: string; status: string }[] }[];
+}) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const first = new Date(Date.UTC(year ?? 2026, (monthNumber ?? 1) - 1, 1));
+  const pad = (first.getUTCDay() + 6) % 7;
+  const count = new Date(Date.UTC(year ?? 2026, monthNumber ?? 1, 0)).getUTCDate();
+  const cells: (string | null)[] = [...Array(pad).fill(null)];
+  for (let day = 1; day <= count; day += 1) cells.push(`${month}-${String(day).padStart(2, "0")}`);
+  const byDay = new Map(days.map((bucket) => [bucket.day, bucket.orders]));
+  const headers = ["Th 2", "Th 3", "Th 4", "Th 5", "Th 6", "Th 7", "CN"];
+  return (
+    <section className="overflow-hidden rounded-2xl border bg-card">
+      <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        {headers.map((label) => (
+          <div key={label} className={`px-1 py-2 ${label === "CN" ? "text-rose-600" : ""}`}>{label}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7">
+        {cells.map((day, index) => {
+          const orders = day ? byDay.get(day) ?? [] : [];
+          const isToday = day === today;
+          return (
+            <div key={day ?? `empty-${index}`} className="min-h-20 border-t border-r p-1.5">
+              {day ? (
+                <>
+                  <span className={`inline-flex size-6 items-center justify-center rounded-full text-[12px] font-semibold ${isToday ? "bg-[#2563eb] text-white" : ""}`}>
+                    {Number(day.slice(-2))}
+                  </span>
+                  <ul className="mt-1 space-y-1">
+                    {orders.slice(0, 3).map((order) => (
+                      <li key={order.id}>
+                        <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="block truncate rounded-full bg-[#e0eefe] px-1.5 py-0.5 text-[10px] font-semibold text-[#1d4ed8]">
+                          {order.code}
+                        </Link>
+                      </li>
+                    ))}
+                    {orders.length > 3 ? <li className="text-[10px] text-muted-foreground">+{orders.length - 3} đơn khác</li> : null}
+                  </ul>
+                </>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function CalendarPage() {
   const orders = useQuery({ queryKey: ["orders"], queryFn: () => getOrders() });
   const today = vnToday();
@@ -81,6 +136,8 @@ function CalendarPage() {
           Tháng này chưa có đơn trên lịch. Ghi <strong>Hẹn giao</strong> khi tạo/sửa đơn để hiện đúng ngày.
         </p>
       ) : null}
+
+      <MonthGrid month={month} today={today} days={days} />
 
       <div className="space-y-3">
         {days.map((bucket) => {

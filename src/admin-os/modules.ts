@@ -14,6 +14,8 @@ export type AdminModule = {
   managePath?: string;
   printShopOnly?: boolean;
   mode?: "live";
+  /** Search gắn với route, ví dụ panel Giá vốn trong Cài đặt. */
+  search?: Record<string, string>;
 };
 
 export type AdminModuleGroup = {
@@ -21,68 +23,63 @@ export type AdminModuleGroup = {
   items: AdminModule[];
 };
 
+/** Việc hằng ngày của tiệm. Mỗi việc là một mục, mở từ nhóm — tối đa hai lần bấm. */
 export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
   {
-    title: "",
-    items: [{ to: "/admin", label: "Trang chủ", roles: ["owner", "sale", "production"], managePath: "/manage/dashboard", mode: "live" }],
-  },
-  {
-    title: "Kinh doanh",
+    title: "Đơn hàng",
     items: [
-      { to: "/admin/chat", label: "Chat", roles: ["owner", "sale"], mode: "live" },
-      { to: "/admin/don-hang", label: "Đơn hàng", roles: ["owner", "sale", "production"], managePath: "/manage/orders", mode: "live" },
-      { to: "/admin/khach", label: "Khách hàng", roles: ["owner", "sale"], managePath: "/manage/customers", mode: "live" },
-      { to: "/admin/thu", label: "Thu tiền", roles: ["owner", "sale"], managePath: "/manage/wallet", mode: "live" },
-      { to: "/admin/nhac-khach", label: "Nhắc khách", roles: ["owner", "sale"], mode: "live", printShopOnly: true },
+      { to: "/admin/don-hang", label: "Nhận đơn", roles: ["owner", "sale", "production"], managePath: "/manage/orders", mode: "live" },
+      { to: "/admin/don-moi", label: "Nhập/Tạo đơn", roles: ["owner", "sale"], mode: "live" },
+      { to: "/admin/in-don", label: "In đơn (K80)", roles: ["owner", "sale", "production"], mode: "live" },
+      { to: "/admin/giao-hang", label: "Giao đơn", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },
     ],
   },
   {
-    title: "Sản xuất",
+    title: "Nhân sự",
     items: [
-      { to: "/admin/san-xuat", label: "Sản xuất", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },
-      { to: "/admin/giao-hang", label: "Giao hàng", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },
-      { to: "/admin/lich", label: "Lịch nhận/in", roles: ["owner", "sale", "production"], managePath: "/manage/calendar", mode: "live" },
-      { to: "/admin/cong-viec", label: "Công việc", roles: ["owner", "sale", "production"], managePath: "/manage/tasks", mode: "live" },
-      { to: "/admin/san-pham", label: "Sản phẩm", roles: ["owner"], managePath: "/manage/products", mode: "live" },
-      { to: "/admin/goi", label: "Gói dịch vụ", roles: ["owner", "sale"], mode: "live", printShopOnly: true },
-      { to: "/admin/gia", label: "Bảng giá", roles: ["owner", "sale"], managePath: "/manage/products", mode: "live" },
-      { to: "/admin/kho", label: "Kho", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },
-      { to: "/admin/album", label: "Album / file ảnh", roles: ["owner", "sale", "production"], managePath: "/manage/photos", mode: "live" },
-    ],
-  },
-  {
-    title: "Vận hành",
-    items: [
-      { to: "/admin/nhan-vien", label: "Nhân viên", roles: ["owner"], managePath: "/manage/staff", mode: "live" },
       { to: "/admin/cham-cong", label: "Chấm công", roles: ["owner", "sale", "production"], managePath: "/manage/staff/attendance", mode: "live" },
-      { to: "/admin/luong", label: "Lương", roles: ["owner", "sale", "production"], managePath: "/manage/staff/salary", mode: "live" },
+      { to: "/admin/check-cong", label: "Check công", roles: ["owner", "sale", "production"], mode: "live" },
+      { to: "/admin/luong", label: "Check lương", roles: ["owner", "sale", "production"], managePath: "/manage/staff/salary", mode: "live" },
+      { to: "/admin/thuong", label: "Check thưởng", roles: ["owner", "sale"], mode: "live" },
+    ],
+  },
+  {
+    title: "Thu chi",
+    items: [
+      { to: "/admin/thu", label: "Nhập thu", roles: ["owner", "sale"], managePath: "/manage/wallet", mode: "live" },
+      { to: "/admin/chuyen-nop", label: "Chuyển nộp", roles: ["owner", "sale"], mode: "live" },
+      { to: "/admin/chi-phi", label: "Nhập chi", roles: ["owner", "sale"], managePath: "/manage/expenses", mode: "live" },
+      { to: "/admin/duyet-chi", label: "Duyệt chi", roles: ["owner"], mode: "live" },
+      { to: "/admin/cong-no", label: "Công nợ", roles: ["owner", "sale"], mode: "live" },
+    ],
+  },
+  {
+    title: "Báo cáo",
+    items: [
+      { to: "/admin/bao-cao", label: "Báo cáo tổng", roles: ["owner"], managePath: "/manage/statistics", mode: "live" },
+      { to: "/admin/bao-cao-chi", label: "Báo cáo chi phí", roles: ["owner"], managePath: "/manage/expenses", mode: "live" },
+      { to: "/admin/loi-nhuan", label: "Lợi nhuận", roles: ["owner"], mode: "live" },
+    ],
+  },
+  {
+    title: "Kho",
+    items: [
+      { to: "/admin/san-pham", label: "Tồn kho sản phẩm", roles: ["owner", "sale"], managePath: "/manage/products", mode: "live" },
+      { to: "/admin/san-pham", label: "Nhập sản phẩm", roles: ["owner"], search: { m: "nhap" }, mode: "live" },
+      { to: "/admin/kho", label: "Nhập vật tư", roles: ["owner", "sale"], search: { m: "nhap" }, printShopOnly: true, mode: "live" },
+      { to: "/admin/kho", label: "Tồn kho vật tư", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },
+    ],
+  },
+  {
+    title: "Cài đặt",
+    items: [
+      { to: "/admin/gia", label: "Bảng giá", roles: ["owner", "sale"], mode: "live" },
+      { to: "/admin/cai-dat", label: "Giá vốn", roles: ["owner"], search: { m: "chi-phi" }, mode: "live" },
+      { to: "/admin/cai-dat", label: "Kênh bán", roles: ["owner"], search: { m: "kenh" }, mode: "live" },
+      { to: "/admin/nhan-vien", label: "Nhân viên", roles: ["owner"], managePath: "/manage/staff", mode: "live" },
       { to: "/admin/nhom-quyen", label: "Nhóm quyền", roles: ["owner"], managePath: "/manage/settings/roles", mode: "live" },
-      { to: "/admin/tai-khoan", label: "Tài khoản", roles: ["sale", "production"], mode: "live" },
-    ],
-  },
-  {
-    title: "Tài chính",
-    items: [
-      { to: "/admin/vi", label: "Ví tiền", roles: ["owner", "sale"], managePath: "/manage/wallet", mode: "live" },
-      { to: "/admin/chi-phi", label: "Chi phí", roles: ["owner"], managePath: "/manage/expenses", mode: "live" },
-      { to: "/admin/bao-cao-chi", label: "Báo cáo chi", roles: ["owner"], managePath: "/manage/expenses", mode: "live" },
-      { to: "/admin/loi-nhuan", label: "Thu chi", roles: ["owner"], managePath: "/manage/expenses", mode: "live" },
-      { to: "/admin/bao-cao", label: "Báo cáo", roles: ["owner"], managePath: "/manage/statistics", mode: "live" },
-      { to: "/admin/kpi", label: "KPI", roles: ["owner", "sale"], managePath: "/manage/settings/targets", mode: "live" },
-      { to: "/admin/muc-tieu", label: "Mục tiêu", roles: ["owner"], managePath: "/manage/settings/targets", mode: "live" },
-      { to: "/admin/sepay", label: "SePay", roles: ["owner"], managePath: "/manage/settings/sepay", mode: "live" },
-    ],
-  },
-  {
-    title: "Hệ thống",
-    items: [
       { to: "/admin/ket-noi", label: "Kết nối", roles: ["owner"], mode: "live", printShopOnly: true },
-      { to: "/admin/tin-mau", label: "Tin mẫu", roles: ["owner", "sale"], mode: "live" },
-      { to: "/admin/sao-luu", label: "Sao lưu", roles: ["owner"], managePath: "/manage/settings/backup", mode: "live" },
-      { to: "/admin/thong-bao", label: "Thông báo đẩy", roles: ["owner"], managePath: "/manage/settings/notifications", mode: "live" },
-      { to: "/admin/nhat-ky", label: "Nhật ký", roles: ["owner"], managePath: "/manage/activity-log", mode: "live" },
-      { to: "/admin/danh-gia", label: "Đánh giá ĐH", roles: ["owner", "sale"], managePath: "/manage/order-feedback", mode: "live" },
-      { to: "/admin/cai-dat", label: "Cài đặt", roles: ["owner"], managePath: "/manage/settings", mode: "live" },
+      { to: "/admin/cai-dat", label: "Cửa hàng", roles: ["owner"], search: { m: "cua-hang" }, mode: "live" },
     ],
   },
 ];

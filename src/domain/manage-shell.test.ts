@@ -4,28 +4,38 @@ import test from "node:test";
 import { STUDIO_BRIDGES } from "../admin-os/bridges.ts";
 import { ADMIN_MODULE_GROUPS, MANAGE_SKIP, modulesForRole } from "../admin-os/modules.ts";
 
-test("menu đủ nhóm vận hành và ẩn garment/tools", () => {
+test("menu đủ nhóm việc hằng ngày và ẩn garment/tools", () => {
   const titles = ADMIN_MODULE_GROUPS.map((group) => group.title);
-  assert.ok(titles.includes("Kinh doanh"));
-  assert.ok(titles.includes("Sản xuất"));
-  assert.ok(titles.includes("Vận hành"));
-  assert.ok(titles.includes("Tài chính"));
-  assert.ok(titles.includes("Hệ thống"));
+  assert.deepEqual(titles, ["Đơn hàng", "Nhân sự", "Thu chi", "Báo cáo", "Kho", "Cài đặt"]);
+  const orders = ADMIN_MODULE_GROUPS.find((group) => group.title === "Đơn hàng")?.items.map((item) => item.label) ?? [];
+  assert.deepEqual(orders, ["Nhận đơn", "Nhập/Tạo đơn", "In đơn (K80)", "Giao đơn"]);
+  const people = ADMIN_MODULE_GROUPS.find((group) => group.title === "Nhân sự")?.items.map((item) => item.label) ?? [];
+  assert.deepEqual(people, ["Chấm công", "Check công", "Check lương", "Check thưởng"]);
+  const money = ADMIN_MODULE_GROUPS.find((group) => group.title === "Thu chi")?.items.map((item) => item.label) ?? [];
+  assert.deepEqual(money, ["Nhập thu", "Chuyển nộp", "Nhập chi", "Duyệt chi", "Công nợ"]);
+  const stock = ADMIN_MODULE_GROUPS.find((group) => group.title === "Kho")?.items.map((item) => item.label) ?? [];
+  assert.deepEqual(stock, ["Tồn kho sản phẩm", "Nhập sản phẩm", "Nhập vật tư", "Tồn kho vật tư"]);
   assert.deepEqual([...MANAGE_SKIP].sort(), ["/manage/garments", "/manage/tools"].sort());
 });
 
-test("không còn bridge StudioBase; tin mẫu local", () => {
+test("không còn bridge StudioBase; menu việc không kéo trang phụ", () => {
   const paths = ADMIN_MODULE_GROUPS.flatMap((group) => group.items).map((item) => item.to);
   assert.ok(!paths.includes("/admin/chien-dich"));
   assert.ok(!paths.includes("/admin/chi-nhanh"));
   assert.ok(!paths.includes("/admin/bo-phan"));
   assert.ok(!paths.includes("/admin/studio/tin-mau"));
-  assert.ok(paths.includes("/admin/tin-mau"));
-  assert.ok(paths.includes("/admin/goi"));
-  assert.ok(paths.includes("/admin/sepay"));
+  assert.ok(!paths.includes("/admin/tin-mau"));
+  assert.ok(!paths.includes("/admin/goi"));
+  assert.ok(!paths.includes("/admin/sepay"));
+  assert.ok(!paths.includes("/admin/danh-gia"));
+  assert.ok(!paths.includes("/admin/nhac-khach"));
+  assert.ok(!paths.includes("/admin/cong-viec"));
+  assert.ok(!paths.includes("/admin/chat"));
+  assert.ok(!paths.includes("/admin/lich"));
   assert.ok(paths.includes("/admin/nhom-quyen"));
-  assert.ok(paths.includes("/admin/thong-bao"));
-  assert.ok(paths.includes("/admin/chat"));
+  assert.ok(paths.includes("/admin/in-don"));
+  assert.ok(paths.includes("/admin/chuyen-nop"));
+  assert.ok(paths.includes("/admin/duyet-chi"));
   assert.deepEqual(STUDIO_BRIDGES, {});
   const modes = ADMIN_MODULE_GROUPS.flatMap((g) => g.items).map((i) => i.mode);
   assert.ok(modes.every((mode) => mode === "live" || mode === undefined));
@@ -33,22 +43,25 @@ test("không còn bridge StudioBase; tin mẫu local", () => {
 });
 
 test("modulesForRole tôn trọng danh sách allowed", () => {
-  const sale = modulesForRole("sale").flatMap((g) => g.items).map((i) => i.to);
-  assert.ok(sale.includes("/admin/chat"));
-  assert.ok(sale.includes("/admin/goi"));
-  assert.ok(sale.includes("/admin/tin-mau"));
-  assert.ok(!sale.includes("/admin/sepay"));
-  const trimmed = modulesForRole("sale", ["/admin", "/admin/chat"]).flatMap((g) => g.items).map((i) => i.to);
-  assert.deepEqual(trimmed.sort(), ["/admin", "/admin/chat"].sort());
+  const sale = modulesForRole("sale").flatMap((g) => g.items).map((i) => i.label);
+  assert.ok(sale.includes("Nhận đơn"));
+  assert.ok(sale.includes("Check thưởng"));
+  assert.ok(sale.includes("Nhập chi"));
+  assert.ok(!sale.includes("Duyệt chi"));
+  assert.ok(!sale.includes("Nhập sản phẩm"));
+  const trimmed = modulesForRole("sale", ["/admin/don-hang", "/admin/thu"]).flatMap((g) => g.items).map((i) => i.to);
+  assert.deepEqual(trimmed.sort(), ["/admin/don-hang", "/admin/thu"].sort());
 });
 
-test("owner thấy SePay, gói, nhóm quyền; không thấy chi nhánh", () => {
+test("owner thấy nhóm quyền và duyệt chi; không thấy SePay, gói hay chat", () => {
   const owner = modulesForRole("owner").flatMap((group) => group.items).map((item) => item.to);
-  assert.ok(owner.includes("/admin/sepay"));
-  assert.ok(owner.includes("/admin/goi"));
+  assert.ok(!owner.includes("/admin/sepay"));
+  assert.ok(!owner.includes("/admin/goi"));
+  assert.ok(!owner.includes("/admin/danh-gia"));
+  assert.ok(!owner.includes("/admin/thong-bao"));
+  assert.ok(!owner.includes("/admin/tin-mau"));
   assert.ok(owner.includes("/admin/nhom-quyen"));
-  assert.ok(owner.includes("/admin/thong-bao"));
-  assert.ok(owner.includes("/admin/tin-mau"));
+  assert.ok(owner.includes("/admin/duyet-chi"));
   assert.ok(!owner.includes("/admin/chi-nhanh"));
   assert.ok(!owner.includes("/admin/studio/tin-mau"));
 });

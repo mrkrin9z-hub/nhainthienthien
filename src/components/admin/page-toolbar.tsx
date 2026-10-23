@@ -32,10 +32,15 @@ export function PageToolbar({
   const showSearch = onSearch != null;
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-          {hint ? <p className="mt-0.5 text-[13px] text-muted-foreground">{hint}</p> : null}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#e0eefe]">
+            <span className="size-2.5 rounded-sm bg-[#2563eb]" />
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+            {hint ? <p className="mt-0.5 text-[13px] text-muted-foreground">{hint}</p> : null}
+          </div>
         </div>
         {actions ? <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
@@ -66,13 +71,14 @@ export function PageToolbar({
           {onFilter ? (
             <button
               type="button"
-              className="relative flex size-11 shrink-0 items-center justify-center rounded-full border bg-background active:scale-[0.97] sm:hidden"
+              className="relative inline-flex h-10 shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium sm:h-9"
               aria-label="Bộ lọc"
               onClick={onFilter}
             >
               <SlidersHorizontal className="size-4" />
+              Bộ lọc
               {filterCount > 0 ? (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
                   {filterCount > 9 ? "9+" : filterCount}
                 </span>
               ) : null}

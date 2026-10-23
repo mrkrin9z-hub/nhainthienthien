@@ -52,7 +52,7 @@ function PackagesBody() {
     <div className="space-y-4">
       <PageToolbar
         title="Gói dịch vụ"
-        hint="Gói bán tại xưởng (combo in, album, ảnh thờ…). Không phải gói subscription StudioBase."
+        hint="Gói bán tại tiệm: combo in, album, ảnh thờ."
         actions={
           canEdit ? (
             <ToolbarButton

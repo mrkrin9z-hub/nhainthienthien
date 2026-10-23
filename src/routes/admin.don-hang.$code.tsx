@@ -8,10 +8,12 @@ import { OrderQrDialog } from "@/components/admin/order-qr-dialog";
 import { WaybillBox } from "@/components/admin/waybill-box";
 import { canPreviewPhoto, PhotoViewer, saveStaffFile, saveStaffFiles, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
-import { changeStatus, getMe, getOrderDetail, getSkuOptions, orderUploadLink, recordDeposit, reviseOrder, saveNote, savePackCheck, saveReprint, setPrintChoice, storeShipping } from "@/lib/admin.functions";
+import { changeStatus, getMe, getOrderDetail, getSkuOptions, markApproval, orderUploadLink, recordDeposit, reviseOrder, saveNote, savePackCheck, saveReprint, setPrintChoice, storeShipping } from "@/lib/admin.functions";
 import { isMergedWoodAlias, isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
 import { marketplaceEditLocked } from "@/domain/order-edit";
 import { JT_CARRIER, jtOrder } from "@/domain/jt";
@@ -23,6 +25,13 @@ export const Route = createFileRoute("/admin/don-hang/$code")({
 });
 
 const NEXT: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"];
+const FLOW: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
+
+function stepChoices(current: OrderStatus): OrderStatus[] {
+  const index = FLOW.indexOf(current);
+  const near = index < 0 ? [] : [FLOW[index - 1], FLOW[index + 1]].filter((item): item is OrderStatus => Boolean(item));
+  return [...near, "huy"];
+}
 const FILE_KIND: Record<string, string> = {
   original: "Ảnh gốc",
   design: "Thiết kế",
@@ -42,6 +51,7 @@ function OrderDetailPage() {
   const [override, setOverride] = useState(false);
   const [reason, setReason] = useState("");
   const [reopenReason, setReopenReason] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [savingFiles, setSavingFiles] = useState(false);
   const skus = useQuery({ queryKey: ["sku-options"], queryFn: () => getSkuOptions(), enabled: me.data?.role !== "production" });
@@ -60,12 +70,25 @@ function OrderDetailPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
-        <div className="flex flex-wrap gap-2">
-          {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
-            <Button asChild variant="outline" className="min-h-11">
-              <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
-            </Button>
-          ) : null}
+        <div className="flex items-center gap-2">
+          <Button asChild className="min-h-11">
+            <Link to="/admin/phieu/$code" params={{ code: data.code }}>In K80</Link>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="inline-flex size-9 items-center justify-center rounded-md border" aria-label={`Thao tác ${data.code}`}>
+                <MoreHorizontal className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setTab("trang-thai")}>Chuyển bước</DropdownMenuItem>
+              {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
+                <DropdownMenuItem asChild>
+                  <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       <p className="break-words text-sm">
@@ -142,6 +165,8 @@ function OrderDetailPage() {
               note: data.customerNote,
               dueDate: data.dueDate ? data.dueDate.slice(0, 10) : "",
               marketplaceCode: data.marketplaceCode,
+              discount: data.discount,
+              customerShip: data.shipping?.customerShip ?? null,
               lines: data.items.map((item) => ({
                 key: item.id,
                 skuId: item.skuId,
@@ -159,6 +184,8 @@ function OrderDetailPage() {
                   fulfillment: value.fulfillment,
                   note: value.note,
                   dueDate: value.dueDate,
+                  discount: value.discount,
+                  customerShip: value.customerShip,
                   ...(value.items ? { items: value.items } : {}),
                 },
               });
@@ -284,8 +311,11 @@ function OrderDetailPage() {
         {role === "owner" && closed ? (
           <Textarea className="mt-2" placeholder="Lý do mở lại" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} />
         ) : null}
+        {role !== "production" && !closed ? (
+          <Textarea className="mt-2" placeholder="Lý do nếu hủy đơn" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+        ) : null}
         <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          {(role === "production" ? (productionCanMove ? [...PRODUCTION_STEPS] : []) : closed && role !== "owner" ? [] : NEXT).map((status) => (
+          {(role === "production" ? (productionCanMove ? [...PRODUCTION_STEPS] : []) : closed && role !== "owner" ? [] : closed ? NEXT.filter((status) => status !== "huy") : stepChoices(data.status)).map((status) => (
             <Button
               key={status}
               variant={data.status === status ? "default" : "outline"}
@@ -296,9 +326,14 @@ function OrderDetailPage() {
                   toast.error("Mở lại đơn đã hủy hoặc đã xong cần ghi lý do.");
                   return;
                 }
+                if (status === "huy" && !cancelReason.trim()) {
+                  toast.error("Hủy đơn cần ghi lý do.");
+                  return;
+                }
+                if (status === "huy" && !window.confirm("Hủy đơn này? Đơn hủy không tính công nợ.")) return;
                 try {
                   await changeStatus({
-                    data: { orderId: data.id, status, note: reopening ? reopenReason.trim() : "", ownerOverride: override },
+                    data: { orderId: data.id, status, note: reopening ? reopenReason.trim() : status === "huy" ? cancelReason.trim() : "", ownerOverride: override },
                   });
                   toast.success(STATUS_LABEL[status]);
                   if (reopening) setReopenReason("");
@@ -420,18 +455,40 @@ function OrderDetailPage() {
                   <span className="block px-2 pb-1 text-[11px] text-foreground/80">{file.comment}</span>
                 ) : null}
               </button>
-              {file.kind === "original" ? (
-                <button
-                  type="button"
-                  className={`w-full px-2 py-1 text-left text-[11px] font-semibold ${file.print ? "text-primary" : "text-muted-foreground"}`}
-                  onClick={() => {
-                    void setPrintChoice({ data: { orderId: data.id, fileId: file.id, print: !file.print } })
-                      .then(() => refresh())
-                      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không lưu được lựa chọn."));
-                  }}
-                >
-                  {file.print ? "Bỏ chọn in" : "In ảnh này"}
-                </button>
+              {file.kind === "original" || file.kind === "design" || file.kind === "approval" ? (
+                <div className="flex flex-col">
+                  {file.kind === "original" ? (
+                    <button
+                      type="button"
+                      className={`w-full px-2 py-1 text-left text-[11px] font-semibold ${file.print ? "text-primary" : "text-muted-foreground"}`}
+                      onClick={() => {
+                        void setPrintChoice({ data: { orderId: data.id, fileId: file.id, print: !file.print } })
+                          .then(() => refresh())
+                          .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không lưu được lựa chọn."));
+                      }}
+                    >
+                      {file.print ? "Bỏ chọn in" : "In ảnh này"}
+                    </button>
+                  ) : null}
+                  {role !== "production" && file.kind !== "approval" ? (
+                    <button
+                      type="button"
+                      className="w-full px-2 py-1 text-left text-[11px] font-semibold text-primary"
+                      onClick={() => {
+                        void markApproval({ data: { orderId: data.id, fileId: file.id } })
+                          .then(() => {
+                            toast.success("Đã đánh dấu khách duyệt ảnh này");
+                            return refresh();
+                          })
+                          .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không lưu được ảnh duyệt."));
+                      }}
+                    >
+                      Khách đã duyệt ảnh này
+                    </button>
+                  ) : (
+                    <span className="block px-2 pb-2 text-[11px] font-semibold text-primary">Ảnh khách đã duyệt</span>
+                  )}
+                </div>
               ) : (
                 <span className="block px-2 pb-2" />
               )}
@@ -631,7 +688,7 @@ function ShippingForm({
   onDone,
 }: {
   orderId: string;
-  shipping?: { carrier: string; tracking: string; shipFee: number | null; codAmount: number | null; carrierStatus?: string };
+  shipping?: { carrier: string; tracking: string; shipFee: number | null; codAmount: number | null; customerShip?: number | null; carrierStatus?: string };
   channel: string;
   source: string;
   fulfillment: string;
@@ -643,6 +700,7 @@ function ShippingForm({
   const [carrier, setCarrier] = useState(shipping?.carrier || (jt ? JT_CARRIER : ""));
   const [tracking, setTracking] = useState(shipping?.tracking ?? "");
   const [shipFee, setShipFee] = useState(shipping?.shipFee === null || shipping?.shipFee === undefined ? "" : String(shipping.shipFee));
+  const [customerShip, setCustomerShip] = useState(shipping?.customerShip === null || shipping?.customerShip === undefined ? "" : String(shipping.customerShip));
   const [codAmount, setCodAmount] = useState(shipping?.codAmount === null || shipping?.codAmount === undefined ? "" : String(shipping.codAmount));
   return (
     <section className="glass-card space-y-2 rounded-3xl p-4">
@@ -654,7 +712,8 @@ function ShippingForm({
       ) : null}
       <Input className="min-h-12" placeholder="Hãng vận chuyển" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
       <Input className="min-h-12" placeholder="Mã vận đơn" value={tracking} onChange={(e) => setTracking(e.target.value)} />
-      <Input className="min-h-12" inputMode="numeric" placeholder="Phí ship" value={shipFee} onChange={(e) => setShipFee(e.target.value.replace(/[^\d]/g, ""))} />
+      <Input className="min-h-12" inputMode="numeric" placeholder="Phí hãng (nội bộ)" value={shipFee} onChange={(e) => setShipFee(e.target.value.replace(/[^\d]/g, ""))} />
+      <Input className="min-h-12" inputMode="numeric" placeholder="Phí giao khách trả" value={customerShip} onChange={(e) => setCustomerShip(e.target.value.replace(/[^\d]/g, ""))} />
       <Input className="min-h-12" inputMode="numeric" placeholder="Tiền thu hộ COD" value={codAmount} onChange={(e) => setCodAmount(e.target.value.replace(/[^\d]/g, ""))} />
       <Button
         className="min-h-11"
@@ -666,6 +725,7 @@ function ShippingForm({
                 carrier,
                 tracking,
                 shipFee: shipFee === "" ? null : Number(shipFee),
+                customerShip: customerShip === "" ? null : Number(customerShip),
                 codAmount: codAmount === "" ? null : Number(codAmount),
               },
             });

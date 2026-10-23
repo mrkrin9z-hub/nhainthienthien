@@ -31,7 +31,7 @@ export const Route = createFileRoute("/san-pham")({
       { property: "og:title", content: "Sản phẩm & bảng giá in ảnh — Nhà In Thiên Thiên" },
       {
         property: "og:description",
-        content: "Chọn size, chọn số lượng, đặt mua trong vài giây. Giá xưởng cho mọi nhà.",
+        content: "Chọn khổ, chọn số lượng, đặt in trên web. Bảng giá công khai.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

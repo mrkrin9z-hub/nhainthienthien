@@ -30,7 +30,7 @@ const GUIDE = [
   {
     title: "Bước 1 — Chọn sản phẩm và quy cách",
     points: [
-      "Chọn ảnh ép gỗ tráng gương bo viền, ảnh thờ, giấy khen ép gỗ hoặc nam châm. Giá lấy từ bảng giá tại tiệm.",
+      "Chọn ảnh ép gỗ tráng gương để bàn, ảnh thờ, giấy khen ép gỗ hoặc nam châm. Giá lấy từ bảng giá tại tiệm.",
       "Chọn kích thước và số lượng cho từng quy cách.",
     ],
   },
@@ -38,7 +38,7 @@ const GUIDE = [
     title: "Bước 2 — Gửi ảnh gốc",
     points: [
       "Gửi file gốc từ máy ảnh hoặc điện thoại, không chụp lại màn hình.",
-      "Định dạng JPG, PNG, WEBP hoặc HEIC. Đã nối Google Drive thì không giới hạn dung lượng. Chưa nối thì mỗi ảnh tối đa 10MB.",
+      "Định dạng JPG, PNG, WEBP hoặc HEIC.",
       "Ảnh càng lớn (cạnh dài trên 2000px) thì bản in càng sắc nét.",
     ],
   },
@@ -46,7 +46,7 @@ const GUIDE = [
     title: "Bước 3 — Số điện thoại và địa chỉ",
     points: [
       "Gửi ảnh xong mới nhập họ tên và số điện thoại. Số này dùng để tra cứu đơn.",
-      "Chọn nhận tại xưởng hoặc giao tận nơi kèm địa chỉ chi tiết.",
+      "Chọn nhận tại tiệm hoặc giao hàng kèm địa chỉ chi tiết.",
     ],
   },
 ];

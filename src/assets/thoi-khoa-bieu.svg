@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#e7f0e4"/>
+  <rect x="80" y="50" width="640" height="500" rx="16" fill="#fff" stroke="#2f6b4f" stroke-width="8"/>
+  <text x="400" y="120" text-anchor="middle" font-family="sans-serif" font-size="36" font-weight="700" fill="#1f4d38">THÜI KHÓA BIÂU</text>
+  <g font-family="sans-serif" font-size="22" fill="#244">
+    <rect x="120" y="160" width="560" height="56" fill="#e7f0e4"/>
+    <text x="150" y="196">Thé 2</text>
+    <rect x="120" y="230" width="560" height="56" fill="#f7faf6"/>
+    <text x="150" y="266">Thé 3</text>
+    <rect x="120" y="300" width="560" height="56" fill="#e7f0e4"/>
+    <text x="150" y="336">Thé 4</text>
+    <rect x="120" y="370" width="560" height="56" fill="#f7faf6"/>
+    <text x="150" y="406">Thé 5</text>
+    <rect x="120" y="440" width="560" height="56" fill="#e7f0e4"/>
+    <text x="150" y="476">Thé 6</text>
+  </g>
+</svg>

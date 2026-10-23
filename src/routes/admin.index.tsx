@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -11,6 +11,9 @@ import { statusLabelOf } from "@/lib/display-labels";
 import { getDashboard, punchClock } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/")({
+  beforeLoad: () => {
+    throw redirect({ to: "/admin/don-hang", search: { status: "all", q: "" } });
+  },
   component: DashboardPage,
 });
 
@@ -98,7 +101,7 @@ function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-card px-3 py-2.5">
           <p className="text-[13px] text-muted-foreground">
-            {data.clockedIn ? `Đang trong ca${since ? ` từ ${since}` : ""}.` : "Bạn chưa chấm công hôm nay."} Giờ làm 8:00–18:00.
+            {data.clockedIn ? `Đang trong ca hôm nay${since ? ` từ ${since}` : ""}.` : data.stalePunchAt ? "Ca trước chưa bấm ra." : "Bạn chưa chấm công hôm nay."} Giờ làm 8:00–18:00.
           </p>
           <div className="flex gap-2">
             <button
@@ -175,9 +178,15 @@ function DashboardPage() {
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <Card label="Doanh thu hôm nay" value={formatMaybe(data.revenueToday)} hint="Đơn đã xong" icon={Wallet} tone="bg-blue-500/10 text-blue-700" />
           <Card label="Doanh thu tháng" value={formatMaybe(data.revenueMonth)} hint={data.breakevenPercent === null ? "Chưa đặt mốc hòa vốn" : `${data.breakevenPercent}% mốc hòa vốn`} icon={CalendarDays} tone="bg-emerald-500/10 text-emerald-700" />
-          <Card label="Hôm nay còn thiếu" value={formatMaybe(data.todayGap)} hint="So với mốc hòa vốn ngày" icon={CircleAlert} tone="bg-orange-500/10 text-orange-700" />
-          <Card label="Lãi gộp tháng" value={data.grossIncomplete ? "Chưa đủ số" : formatMaybe(data.gross)} hint="Giá bán trừ vật tư, mực, phí kênh" icon={TrendingUp} tone="bg-teal-500/10 text-teal-700" />
-          <Card label="Lợi nhuận tháng" value={data.profit === null ? "Chưa đủ số" : formatMaybe(data.profit)} hint="Lãi gộp trừ chi phí" icon={PiggyBank} tone="bg-violet-500/10 text-violet-700" />
+          <Card label="Hôm nay còn thiếu" value={formatMaybe(data.todayGap)} hint={data.beforeOpen ? "Trước ngày khai trương thì mốc ngày bằng 0." : data.dayOff ? "Ngày nghỉ thì mốc ngày bằng 0." : "So với doanh thu hòa vốn chia cho ngày làm việc."} icon={CircleAlert} tone="bg-orange-500/10 text-orange-700" />
+          {data.grossIncomplete ? (
+            <Card label="Lãi tháng" value="Chưa đủ số" hint="Thiếu giá vốn hoặc phí thì không tách lãi gộp và lợi nhuận." icon={TrendingUp} tone="bg-teal-500/10 text-teal-700" />
+          ) : (
+            <>
+              <Card label="Lãi gộp tháng" value={formatMaybe(data.gross)} hint="Giá bán trừ vật tư, mực, phí kênh" icon={TrendingUp} tone="bg-teal-500/10 text-teal-700" />
+              <Card label="Lợi nhuận tháng" value={formatMaybe(data.profit)} hint={data.beforeOpen ? "Chưa trừ định phí vì tiệm chưa khai trương." : "Lãi gộp trừ định phí và chi phát sinh"} icon={PiggyBank} tone="bg-violet-500/10 text-violet-700" />
+            </>
+          )}
         </section>
       ) : null}
 
@@ -253,10 +262,10 @@ function greeting() {
 
 function Card({ label, value, hint, icon: Icon, tone }: { label: string; value: string; hint?: string; icon: LucideIcon; tone: string }) {
   return (
-    <div className="rounded-md border bg-card p-4 shadow-none">
+    <div className="rounded-2xl border bg-card p-4">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
-        <span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${tone}`}>
+        <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${tone}`}>
           <Icon className="size-3.5" />
         </span>
       </div>

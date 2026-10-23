@@ -289,7 +289,7 @@ function CustomerUploadPage() {
                   {info.createdAt ? ` · ${formatWhen(info.createdAt)}` : ""}
                 </p>
                 <p className="text-muted-foreground">
-                  {channelLabel(info.channel)} · {info.fulfillment === "delivery" ? "Giao tận nơi" : "Nhận tại xưởng"}
+                  {channelLabel(info.channel)} · {info.fulfillment === "delivery" ? "Giao hàng" : "Nhận tại tiệm"}
                 </p>
                 {info.marketplaceCode ? <p className="text-muted-foreground">Mã trên sàn: {info.marketplaceCode}</p> : null}
                 {info.address ? <p className="text-muted-foreground">{info.address}</p> : null}

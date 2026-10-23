@@ -17,6 +17,7 @@ import {
   isMergedWoodAlias,
   priceOf,
   quoteSku,
+  sheetMargin,
   isProductionStep,
   statusChangeError,
   vnParts,
@@ -61,7 +62,8 @@ import {
   type WaybillDraft,
 } from "@/domain/carriers";
 import { defaultCarrier } from "@/domain/jt";
-import { blankShipping, orderShipping, shipsOut } from "@/domain/shipping";
+import { amountDue, codExpected } from "@/domain/money";
+import { blankShipping, onDeliveryDesk, orderShipping, shipsOut } from "@/domain/shipping";
 import { publicContact } from "@/domain/public-contact";
 import { applyPriceDrafts, parsePriceRows, type PriceDraft } from "@/domain/price-sheet";
 import { applyShelfOffers, cloneChannelPrices, type ShelfOffer } from "@/domain/catalog-sync";
@@ -102,7 +104,7 @@ import { CHANNEL_LABEL, CHANNELS, MESSAGE_TEMPLATE_KINDS, ROLE_LABEL, STATUS_LAB
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
 import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, handoverError, holderBalances, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
-import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, orderDetail, orderSummary } from "@/domain/views";
+import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, navCounts, orderDetail, orderSummary } from "@/domain/views";
 import { getRequest } from "@tanstack/react-start/server";
 
 import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
@@ -308,6 +310,32 @@ function groupListed(state: ShopState, groupId: string): boolean {
   return groupIsListed(state.settings, group);
 }
 
+export async function submitInquiry(input: { name: string; message: string; orderCode?: string; phone?: string }) {
+  const name = input.name.trim();
+  const message = input.message.trim();
+  if (name.length < 2) throw new Error("Tên cần ít nhất 2 ký tự.");
+  if (message.length < 5) throw new Error("Nội dung cần ít nhất 5 ký tự.");
+  await mutate(async (state) => {
+    state.inquiries = state.inquiries ?? [];
+    state.inquiries.unshift({
+      id: nid(),
+      at: nowIso(),
+      name: name.slice(0, 80),
+      message: message.slice(0, 2000),
+      orderCode: (input.orderCode ?? "").trim().slice(0, 40),
+      phone: (input.phone ?? "").trim().slice(0, 20),
+    });
+    state.inquiries = state.inquiries.slice(0, 200);
+  });
+  return { ok: true as const };
+}
+
+export async function listInquiries(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  return state.inquiries ?? [];
+}
+
 export async function publicConfig() {
   const state = await readState();
   const contact = publicContact(state.settings);
@@ -318,7 +346,7 @@ export async function publicConfig() {
     phoneRaw: contact.phoneRaw,
     zalo: contact.zalo,
     hours: state.settings.publicHours,
-    region: "Xuân Lộc, Đồng Nai",
+    region: "",
     maxPhotoBytes: await photoByteLimit(),
   };
 }
@@ -439,7 +467,7 @@ function buildItems(
   state: ShopState,
   channel: Channel,
   actorRole: Role | "web",
-  items: { skuId: string; quantity: number; unitPrice?: number | null }[],
+  items: { skuId: string; quantity: number; unitPrice?: number | null; priceReason?: string }[],
 ) {
   if (!items.length) throw new Error("Đơn chưa có sản phẩm.");
   return items.map((item) => {
@@ -447,8 +475,12 @@ function buildItems(
     const group = state.groups.find((g) => g.id === sku.groupId);
     const listed = priceOf(state.prices, sku.id, channel);
     let unitPrice = listed?.price ?? null;
+    if ((listed?.status !== "dang_ban" || listed.price === null) && actorRole !== "owner") {
+      throw new Error("Khổ này chưa có giá, không đưa vào đơn.");
+    }
     if (item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== unitPrice) {
       if (actorRole !== "owner") throw new Error("Chỉ chủ tiệm sửa được giá bán.");
+      if (!item.priceReason?.trim()) throw new Error("Sửa giá cần ghi lý do.");
       unitPrice = item.unitPrice;
     }
     return {
@@ -1118,6 +1150,11 @@ export async function dashboard(actor: Actor) {
   return visibleToRole(actor.role, buildDashboard(await readState(), actor));
 }
 
+export async function navBadges(actor: Actor) {
+  void actor;
+  return navCounts(await readState());
+}
+
 export async function listOrders(actor: Actor) {
   await pullDueQuiet(actor);
   const state = await readState();
@@ -1148,10 +1185,13 @@ export async function createManualOrder(
     marketplaceCode: string;
     depositPaid: number;
     depositMethod: string;
-    items: { skuId: string; quantity: number; unitPrice?: number | null }[];
+    discount?: number | null;
+    customerShip?: number | null;
+    items: { skuId: string; quantity: number; unitPrice?: number | null; priceReason?: string }[];
   },
 ) {
   assertRole(actor, ["owner", "sale"]);
+  if (input.dueDate && input.dueDate < vnParts().ymd) throw new Error("Ngày hẹn không được ở quá khứ.");
   return mutate(async (state) => {
     const customer = upsertCustomer(state, { name: input.fullName, phone: input.phone, address: input.address });
     const items = buildItems(state, input.channel, actor.role, input.items);
@@ -1172,10 +1212,12 @@ export async function createManualOrder(
       shipping: {
         ...blankShipping(),
         carrier: defaultCarrier({ channel: input.channel, source: "manual", fulfillment: input.fulfillment }),
+        customerShip: input.customerShip ?? null,
       },
       items,
       subtotal: totals.subtotal,
       total: totals.total,
+      discount: input.discount ?? null,
       depositRequired: 0,
       depositPaid: 0,
       depositMethod: "",
@@ -1223,10 +1265,13 @@ export async function reviseOrder(
     fulfillment: "pickup" | "delivery";
     note: string;
     dueDate: string | null;
-    items?: { skuId: string; quantity: number; unitPrice?: number | null }[];
+    discount?: number | null;
+    customerShip?: number | null;
+    items?: { skuId: string; quantity: number; unitPrice?: number | null; priceReason?: string }[];
   },
 ) {
   assertRole(actor, ["owner", "sale"]);
+  if (input.dueDate && input.dueDate < vnParts().ymd) throw new Error("Ngày hẹn không được ở quá khứ.");
   const name = input.fullName.trim();
   if (name.length < 2) throw new Error("Tên khách cần ít nhất 2 ký tự.");
   await mutate(async (state) => {
@@ -1244,6 +1289,10 @@ export async function reviseOrder(
     order.customerNote = input.note.trim();
     order.fulfillment = input.fulfillment;
     order.dueDate = input.dueDate;
+    if (input.discount !== undefined) order.discount = input.discount;
+    if (input.customerShip !== undefined) {
+      order.shipping = { ...orderShipping(order), customerShip: input.customerShip };
+    }
     if (input.items) {
       const items = input.items.map((item) => {
         const sku = skuOrThrow(state, item.skuId);
@@ -1253,7 +1302,10 @@ export async function reviseOrder(
         let unitPrice = listed;
         if (item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== listed) {
           const kept = previous?.unitPrice === item.unitPrice;
-          if (actor.role !== "owner" && !kept) throw new Error("Chỉ chủ tiệm sửa được giá bán.");
+          if (!kept) {
+            if (actor.role !== "owner") throw new Error("Chỉ chủ tiệm sửa được giá bán.");
+            if (!item.priceReason?.trim()) throw new Error("Sửa giá cần ghi lý do.");
+          }
           unitPrice = item.unitPrice;
         }
         return {
@@ -1306,6 +1358,7 @@ export async function setOrderStatus(
       depositRequired: order.depositRequired,
       depositPaid: order.depositPaid,
       packReady: packReady(order.packCheck, hasPackingPhoto(order.files)),
+      approvalReady: order.files.some((file) => !file.deletedAt && file.status === "complete" && file.kind === "approval"),
     });
     if (blocked) throw new Error(blocked);
     const from = order.status;
@@ -1369,6 +1422,27 @@ export async function setFilePrint(actor: Actor, orderId: string, fileId: string
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
     markPrint(order, fileId, print, actor.id, actor.name);
+  });
+}
+
+export async function markFileApproval(actor: Actor, orderId: string, fileId: string) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    const file = order.files.find((item) => item.id === fileId && !item.deletedAt);
+    if (!file || file.status !== "complete") throw new Error("Chỉ đánh dấu ảnh đã tải xong.");
+    if (file.kind === "packing_photo" || file.kind === "packing_video") throw new Error("Ảnh đóng gói không dùng làm ảnh duyệt.");
+    file.kind = "approval";
+    order.updatedAt = nowIso();
+    order.history.push({
+      at: order.updatedAt,
+      from: order.status,
+      to: order.status,
+      by: actor.id,
+      note: `${actor.name} đánh dấu khách đã duyệt ảnh ${file.name}`,
+    });
+    audit(state, actor.id, "order.approval", order.id, null, { fileId, name: file.name });
   });
 }
 
@@ -1565,10 +1639,13 @@ export async function priceBoard(actor: Actor, groupId?: string) {
       size: sku.size,
       sheets: sku.sheets,
       piecesPerPack: sku.piecesPerPack,
+      sheetCost: sku.sheetCost ?? null,
       prices: Object.fromEntries(
         (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]).map((channel) => {
           const row = priceOf(state.prices, sku.id, channel);
-          return [channel, { price: row?.price ?? null, status: row?.status ?? "nhap", note: row?.note ?? "" }];
+          const price = row?.price ?? null;
+          const margin = sheetMargin(channel, price, sku.sheetCost ?? null, state.settings);
+          return [channel, { price, listPrice: row?.listPrice ?? null, status: row?.status ?? "nhap", note: row?.note ?? "", profit: margin.profit, marginPercent: margin.marginPercent }];
         }),
       ),
     })),
@@ -1592,11 +1669,13 @@ export async function updateChannelPrice(
     if (error) throw new Error(error);
     const row = state.prices.find((item) => item.skuId === sku.id && item.channel === input.channel);
     const before = row ? { ...row } : null;
+    const status = input.price === null ? "nhap" : input.status;
+    if (status === "dang_ban" && input.price === null) throw new Error("Chưa có giá thì không để đang bán.");
     if (!row) {
-      state.prices.push({ skuId: sku.id, channel: input.channel, price: input.price, status: input.status, note: input.note });
+      state.prices.push({ skuId: sku.id, channel: input.channel, price: input.price, status, note: input.note });
     } else {
       row.price = input.price;
-      row.status = input.status;
+      row.status = status;
       row.note = input.note;
     }
     audit(state, actor.id, "price.update", `${sku.code}:${input.channel}`, before, input);
@@ -1721,18 +1800,22 @@ export async function updateMaterial(
     minStock: number | null;
     supplier: string;
     leadTimeDays?: number | null;
+    name?: string;
+    code?: string;
   },
 ) {
   assertRole(actor, ["owner"]);
   await mutate(async (state) => {
     const material = state.materials.find((item) => item.id === input.materialId);
     if (!material) throw new Error("Không thấy vật tư.");
-    const before = { packPrice: material.packPrice, packSize: material.packSize, minStock: material.minStock, leadTimeDays: material.leadTimeDays ?? null };
+    const before = { packPrice: material.packPrice, packSize: material.packSize, minStock: material.minStock, leadTimeDays: material.leadTimeDays ?? null, name: material.name, code: material.code ?? "" };
     material.packPrice = input.packPrice;
     material.packSize = input.packSize;
     material.minStock = input.minStock;
     material.supplier = input.supplier;
     if (input.leadTimeDays !== undefined) material.leadTimeDays = input.leadTimeDays;
+    if (input.name !== undefined && input.name.trim()) material.name = input.name.trim();
+    if (input.code !== undefined) material.code = input.code.trim();
     audit(state, actor.id, "material.update", material.id, before, input);
   });
 }
@@ -1756,6 +1839,7 @@ export async function recount(actor: Actor, input: { materialId: string; actual:
     const systemQty = material.stock;
     const delta = input.actual - systemQty;
     material.stock = input.actual;
+    material.openingCounted = true;
     state.counts.unshift({ id: nid(), at: nowIso(), materialId: material.id, systemQty, actualQty: input.actual, by: actor.id, note: input.note.trim() });
     state.movements.unshift({
       id: nid(),
@@ -1771,9 +1855,10 @@ export async function recount(actor: Actor, input: { materialId: string; actual:
   });
 }
 
-export async function openInk(actor: Actor) {
+export async function openInk(actor: Actor, materialId: string) {
+  if (!/^muc-[1-9]$/.test(materialId)) throw new Error("Chọn một lọ mực.");
   await mutate(async (state) => {
-    const ink = state.materials.find((item) => item.id === "muc");
+    const ink = state.materials.find((item) => item.id === materialId);
     if (!ink) throw new Error("Không thấy mực.");
     ink.stock -= 1;
     state.movements.unshift({
@@ -1959,8 +2044,10 @@ export async function addLeave(actor: Actor, input: { staffId: string; date: str
 function payrollRow(state: ShopState, person: Staff, month: string) {
   const settings = state.settings;
   const today = vnParts().ymd;
-  const base =
-    person.role === "production"
+  const beforeOpen = month < settings.shopOpenDate.slice(0, 7);
+  const base = beforeOpen
+    ? 0
+    : person.role === "production"
       ? settings.productionBase
       : person.probation
         ? Math.round((settings.saleBase * settings.saleProbationPercent) / 100)
@@ -1975,8 +2062,8 @@ function payrollRow(state: ShopState, person: Staff, month: string) {
     return !punches.some((punch) => vnYmd(punch.inAt) === day);
   }).length;
   const pay = person.role === "sale" ? commissionForSale(state, person.id, month) : null;
-  const revenue = pay?.revenue ?? 0;
-  const commission = pay?.commission ?? 0;
+  const revenue = beforeOpen ? 0 : (pay?.revenue ?? 0);
+  const commission = beforeOpen ? 0 : (pay?.commission ?? 0);
   const target = kpiTarget(settings.shopOpenDate, month, settings.kpiTargets);
   let deduction: number | null = 0;
   if (lateMinutes > 0) {
@@ -1993,6 +2080,8 @@ function payrollRow(state: ShopState, person: Staff, month: string) {
     name: person.name,
     role: person.role,
     base,
+    beforeOpen,
+    probation: person.probation,
     commission,
     kpiBonus: 0,
     deduction,
@@ -2126,7 +2215,7 @@ export async function addExpense(
   actor: Actor,
   input: { month: string; name: string; amount: number; note: string; category?: string; wallet?: string; date?: string },
 ) {
-  assertRole(actor, ["owner"]);
+  assertRole(actor, ["owner", "sale"]);
   const name = input.name.trim();
   const amount = Math.round(input.amount);
   if (!name || !Number.isFinite(amount) || amount <= 0) throw new Error("Chi phí chưa đủ.");
@@ -2151,6 +2240,7 @@ export async function addExpense(
       by: actor.id,
       category,
       wallet,
+      approvedAt: null,
     };
     state.expenses.unshift(row);
     audit(state, actor.id, "cost.expense", row.id, null, { name, amount, wallet, category });
@@ -2165,6 +2255,17 @@ export async function deleteExpense(actor: Actor, id: string) {
     const [row] = state.expenses.splice(index, 1);
     if (!row) throw new Error("Không thấy khoản chi.");
     audit(state, actor.id, "cost.expense", row.id, { name: row.name, amount: row.amount }, null);
+  });
+}
+
+export async function approveExpense(actor: Actor, id: string) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const row = state.expenses.find((item) => item.id === id);
+    if (!row) throw new Error("Không thấy khoản chi.");
+    if (row.approvedAt) return;
+    row.approvedAt = nowIso();
+    audit(state, actor.id, "cost.expense.approve", row.id, { approvedAt: null }, { approvedAt: row.approvedAt });
   });
 }
 
@@ -2257,6 +2358,7 @@ export async function moneyDesk(actor: Actor, month: string) {
     }));
   const expenses = state.expenses
     .filter((row) => row.month === month)
+    .filter((row) => actor.role !== "sale" || row.by === actor.id)
     .map((row) => ({
       id: row.id,
       name: row.name,
@@ -2268,6 +2370,9 @@ export async function moneyDesk(actor: Actor, month: string) {
       wallet: row.wallet ?? "",
       categoryLabel: row.category ? categoryLabel(row.category) : "Chưa phân nhóm",
       walletLabel: walletLabel(row.wallet ?? ""),
+      pending: row.approvedAt === null,
+      approvedAt: row.approvedAt ?? null,
+      by: row.by,
     }))
     .sort((a, b) => b.at.localeCompare(a.at));
   const holders = holderBalances({
@@ -2291,8 +2396,8 @@ export async function moneyDesk(actor: Actor, month: string) {
       holders: mine ? [mine] : [],
       handovers: [],
       lines: myLines,
-      expenses: [],
-      report: expenseReport([], month),
+      expenses,
+      report: expenseReport(expenses, month),
       collected: myLines.filter((line) => line.kind === "thu").reduce((sum, line) => sum + line.amount, 0),
     };
   }
@@ -3167,7 +3272,14 @@ export async function removeSkuMap(actor: Actor, input: { channel: MarketplaceCh
 
 export async function saveOrderShipping(
   actor: Actor,
-  input: { orderId: string; carrier: string; tracking: string; shipFee: number | null; codAmount: number | null },
+  input: {
+    orderId: string;
+    carrier: string;
+    tracking: string;
+    shipFee: number | null;
+    codAmount: number | null;
+    customerShip?: number | null;
+  },
 ) {
   assertRole(actor, ["owner", "sale"]);
   await mutate(async (state) => {
@@ -3175,12 +3287,19 @@ export async function saveOrderShipping(
     if (!order) throw new Error("Không tìm thấy đơn.");
     const previous = orderShipping(order);
     const tracking = input.tracking.trim();
+    const customerShip = input.customerShip === undefined ? previous.customerShip ?? null : input.customerShip;
+    const due = amountDue({ ...order, shipping: { ...previous, customerShip } });
+    if (input.codAmount !== null && due !== null && input.codAmount > due + 0.5) {
+      throw new Error("Tiền thu hộ không được cao hơn số còn lại.");
+    }
     order.shipping = {
       carrier: input.carrier.trim(),
       tracking,
       shipFee: input.shipFee,
       codAmount: input.codAmount,
+      customerShip,
       codReceivedAt: previous.codReceivedAt,
+      ...(previous.codWalletId ? { codWalletId: previous.codWalletId } : {}),
       ...(tracking === previous.tracking && previous.carrierStatus ? { carrierStatus: previous.carrierStatus } : {}),
     };
     audit(state, actor.id, "order.shipping", order.id, previous, order.shipping);
@@ -3377,7 +3496,31 @@ export async function markCodReceived(actor: Actor, orderId: string, received: b
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
     const previous = orderShipping(order);
-    order.shipping = { ...previous, codReceivedAt: received ? nowIso() : null };
+    if (received && (order.status === "huy" || order.isTest)) throw new Error("Đơn hủy hoặc đơn thử không ghi nhận COD.");
+    if (received) {
+      if (!previous.codWalletId) {
+        const net = Math.round((previous.codAmount ?? 0) - (previous.shipFee ?? 0));
+        if (net !== 0) {
+          const id = nid();
+          state.walletAdjusts = state.walletAdjusts ?? [];
+          state.walletAdjusts.push({
+            id,
+            at: nowIso(),
+            wallet: "chuyen_khoan",
+            amount: net,
+            note: `COD ${order.code} sau trừ phí ship`,
+            by: actor.id,
+          });
+          previous.codWalletId = id;
+        }
+      }
+      order.shipping = { ...previous, codReceivedAt: previous.codReceivedAt ?? nowIso() };
+    } else {
+      if (previous.codWalletId) {
+        state.walletAdjusts = (state.walletAdjusts ?? []).filter((row) => row.id !== previous.codWalletId);
+      }
+      order.shipping = { ...previous, codReceivedAt: null, codWalletId: null };
+    }
     audit(state, actor.id, "order.cod", order.id, { codReceivedAt: previous.codReceivedAt }, { received });
   });
 }
@@ -3385,7 +3528,7 @@ export async function markCodReceived(actor: Actor, orderId: string, received: b
 export async function deliveryBoard(actor: Actor) {
   const state = await readState();
   const money = actor.role !== "production";
-  return state.orders.filter(shipsOut).map((order) => {
+  return state.orders.filter(onDeliveryDesk).map((order) => {
     const customer = customerName(state, order.customerId);
     const ship = orderShipping(order);
     return {
@@ -3395,6 +3538,7 @@ export async function deliveryBoard(actor: Actor) {
       statusLabel: STATUS_LABEL[order.status],
       channel: order.channel,
       channelLabel: CHANNEL_LABEL[order.channel],
+      fulfillment: order.fulfillment,
       customerName: customer.name,
       recipientName: order.recipientName ?? "",
       phone: customer.phone,
@@ -3405,6 +3549,7 @@ export async function deliveryBoard(actor: Actor) {
       carrierStatus: ship.carrierStatus ?? "",
       shipFee: money ? ship.shipFee : null,
       codAmount: money ? ship.codAmount : null,
+      codNet: money ? Math.round((ship.codAmount ?? 0) - (ship.shipFee ?? 0)) : null,
       codReceivedAt: money ? ship.codReceivedAt : null,
       canLabel: order.channel === "tai_tiem" || order.channel === "facebook",
     };
@@ -3415,16 +3560,17 @@ export async function codBoard(actor: Actor, month: string) {
   assertRole(actor, ["owner", "sale"]);
   const state = await readState();
   const rows = state.orders
-    .filter((order) => vnMonth(order.createdAt) === month)
+    .filter((order) => vnMonth(order.createdAt) === month && order.status !== "huy" && !order.isTest)
     .map((order) => ({ order, ship: orderShipping(order) }))
     .filter((row) => (row.ship.codAmount ?? 0) > 0);
   const byCarrier = new Map<string, { carrier: string; orders: number; expected: number; received: number }>();
   const lines = rows.map(({ order, ship }) => {
     const carrier = ship.carrier || "Chưa ghi hãng";
+    const expected = codExpected(order);
     const bucket = byCarrier.get(carrier) ?? { carrier, orders: 0, expected: 0, received: 0 };
     bucket.orders += 1;
-    bucket.expected += ship.codAmount ?? 0;
-    if (ship.codReceivedAt) bucket.received += ship.codAmount ?? 0;
+    bucket.expected += expected;
+    if (ship.codReceivedAt) bucket.received += Math.round((ship.codAmount ?? 0) - (ship.shipFee ?? 0));
     byCarrier.set(carrier, bucket);
     const customer = customerName(state, order.customerId);
     return {
@@ -3433,6 +3579,11 @@ export async function codBoard(actor: Actor, month: string) {
       carrier,
       customerName: customer.name,
       codAmount: ship.codAmount,
+      expected,
+      shipFee: ship.shipFee,
+      net: Math.round((ship.codAmount ?? 0) - (ship.shipFee ?? 0)),
+      over: expected < (ship.codAmount ?? 0),
+      tracking: ship.tracking,
       codReceivedAt: ship.codReceivedAt,
       createdAt: order.createdAt,
     };

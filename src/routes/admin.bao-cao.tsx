@@ -3,9 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { MoneyLinks } from "@/components/admin/sections";
+import { FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { vnMonth } from "@/domain/calc";
 import { formatMaybe } from "@/lib/brand";
@@ -30,6 +31,7 @@ function ReportPage() {
 function ReportBody() {
   const [month, setMonth] = useState(monthNow());
   const [grain, setGrain] = useState<"day" | "week" | "month">("day");
+  const [filters, setFilters] = useState(false);
   const queryClient = useQueryClient();
   const report = useQuery({ queryKey: ["report", month, grain], queryFn: () => getReport({ data: { month, grain } }) });
   const data = report.data;
@@ -37,21 +39,25 @@ function ReportBody() {
 
   return (
     <div className="space-y-4">
-      <MoneyLinks />
-      <div>
-        <h1 className="text-2xl font-extrabold text-primary">Báo cáo</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Doanh thu và lãi gộp lấy đơn đã xong. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh. Mặc định chi phí cố định 29.400.000đ/tháng. Chi phí phát sinh ghi ở Chi phí.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Input className="min-h-12 max-w-xs" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-        {(["day", "week", "month"] as const).map((item) => (
-          <Button key={item} variant={grain === item ? "default" : "outline"} className="min-h-12" onClick={() => setGrain(item)}>
-            {item === "day" ? "Ngày" : item === "week" ? "Tuần" : "Tháng"}
-          </Button>
-        ))}
-      </div>
+      <PageToolbar
+        title="Báo cáo tổng"
+        hint="Doanh thu và lãi gộp lấy đơn đã xong, trừ đơn thử. Lãi ròng trừ định phí chỉ từ tháng khai trương."
+        filterCount={1}
+        onFilter={() => setFilters(true)}
+      />
+      <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc báo cáo">
+        <label className="text-sm font-semibold">
+          Tháng
+          <Input className="mt-1 min-h-11" type="month" aria-label="Tháng báo cáo" value={month} onChange={(e) => setMonth(e.target.value)} />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {(["day", "week", "month"] as const).map((item) => (
+            <Button key={item} variant={grain === item ? "default" : "outline"} className="min-h-11" onClick={() => setGrain(item)}>
+              {item === "day" ? "Ngày" : item === "week" ? "Tuần" : "Tháng"}
+            </Button>
+          ))}
+        </div>
+      </FilterSheet>
       {report.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {report.isError ? <p className="font-semibold text-destructive">{(report.error as Error).message}</p> : null}
       {data ? (
@@ -167,26 +173,81 @@ function FixedEditor({
   rows: { key: string; name: string; amount: number; note: string }[];
   onSave: (rows: { key: string; amount: number }[]) => Promise<void>;
 }) {
+  const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(rows.map((row) => ({ ...row })));
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave(draft.map((row) => ({ key: row.key, amount: Number.isFinite(row.amount) ? row.amount : 0 })));
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div className="mt-3 space-y-2">
-      {draft.map((row, index) => (
-        <label key={row.key} className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="w-48">{row.name}</span>
-          <Input
-            className="h-11 w-36"
-            value={String(row.amount)}
-            onChange={(e) => {
-              const next = [...draft];
-              next[index] = { ...row, amount: Number(e.target.value) };
-              setDraft(next);
-            }}
-          />
-        </label>
-      ))}
-      <Button className="min-h-11" onClick={() => onSave(draft.map((row) => ({ key: row.key, amount: Number.isFinite(row.amount) ? row.amount : 0 })))}>
-        Lưu chi phí tháng này
-      </Button>
+    <div className="mt-3 space-y-3">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          className="min-h-11"
+          onClick={() => {
+            setDraft(rows.map((row) => ({ ...row })));
+            setOpen(true);
+          }}
+        >
+          Sửa
+        </Button>
+      </div>
+      <div className="overflow-hidden rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <tr>
+              <th className="px-3 py-2">Khoản</th>
+              <th className="px-3 py-2 text-right">Số tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className="border-t">
+                <td className="px-3 py-2">{row.name}</td>
+                <td className="px-3 py-2 text-right font-semibold">{formatMaybe(row.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sửa chi phí tháng</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {draft.map((row, index) => (
+              <label key={row.key} className="block text-sm font-semibold">
+                {row.name}
+                <Input
+                  className="mt-1 min-h-11"
+                  inputMode="numeric"
+                  value={String(row.amount)}
+                  onChange={(event) => {
+                    const next = [...draft];
+                    next[index] = { ...row, amount: Number(event.target.value.replace(/[^\d]/g, "")) };
+                    setDraft(next);
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button type="button" className="min-h-11" disabled={saving} onClick={() => void save()}>
+              {saving ? "Đang lưu…" : "Lưu chi phí tháng này"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

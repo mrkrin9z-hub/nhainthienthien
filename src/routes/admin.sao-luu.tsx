@@ -10,6 +10,12 @@ export const Route = createFileRoute("/admin/sao-luu")({
   component: BackupPage,
 });
 
+function backupTitle(key: string): string {
+  if (key.includes("manual")) return "Bản lưu tay";
+  const day = key.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
+  return day ? `Bản ngày ${day}` : "Bản sao lưu";
+}
+
 function BackupPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const queryClient = useQueryClient();
@@ -38,7 +44,7 @@ function BackupPage() {
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Mỗi ngày một khóa shop_backup:năm-tháng-ngày theo giờ Việt Nam, ghi đè an toàn. Giữ 30 ngày. Nút Sao lưu ngay ghi shop_backup:manual và giữ 10 bản.
+        Mỗi ngày một bản theo giờ Việt Nam, ghi đè an toàn, giữ 30 ngày. Sao lưu ngay giữ 10 bản tay.
       </p>
       {backups.isError ? <p className="font-semibold text-destructive">{(backups.error as Error).message}</p> : null}
       {preview ? (
@@ -72,7 +78,7 @@ function BackupPage() {
         {(backups.data ?? []).map((item) => (
           <li key={item.key} className="glass-card flex flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-3 text-sm">
             <span>
-              <span className="font-semibold">{item.key}</span>
+              <span className="font-semibold">{backupTitle(item.key)}</span>
               <span className="mt-1 block text-muted-foreground">{new Date(item.at).toLocaleString("vi-VN")}</span>
             </span>
             <span className="flex gap-2">

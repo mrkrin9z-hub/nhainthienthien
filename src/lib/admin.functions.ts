@@ -55,6 +55,11 @@ export const getDashboard = createServerFn({ method: "GET" }).handler(async () =
   return dashboard(await actor());
 });
 
+export const getNavCounts = createServerFn({ method: "GET" }).handler(async () => {
+  const { navBadges } = await import("@/server/service");
+  return navBadges(await actor());
+});
+
 export const getOrders = createServerFn({ method: "GET" }).handler(async () => {
   const { listOrders } = await import("@/server/service");
   return listOrders(await actor());
@@ -97,7 +102,13 @@ const itemSchema = z.object({
   skuId: z.string().min(2),
   quantity: z.number().int().min(1).max(500),
   unitPrice: z.number().int().min(0).nullable().optional(),
+  priceReason: z.string().max(300).optional(),
 });
+
+const moneyAdjust = {
+  discount: z.number().int().min(0).max(100_000_000).nullable().optional(),
+  customerShip: z.number().int().min(0).max(100_000_000).nullable().optional(),
+};
 
 export const createDeskOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
@@ -113,6 +124,7 @@ export const createDeskOrder = createServerFn({ method: "POST" })
         marketplaceCode: z.string().optional().default(""),
         depositPaid: z.number().int().min(0).max(100_000_000).optional().default(0),
         depositMethod: z.string().optional().default(""),
+        ...moneyAdjust,
         items: z.array(itemSchema).min(1),
       })
       .parse(data),
@@ -133,6 +145,7 @@ export const reviseOrder = createServerFn({ method: "POST" })
         fulfillment: z.enum(["pickup", "delivery"]),
         note: z.string().optional().default(""),
         dueDate: z.string().nullable().optional().default(null),
+        ...moneyAdjust,
         items: z.array(itemSchema).min(1).optional(),
       })
       .parse(data),
@@ -165,6 +178,14 @@ export const setPrintChoice = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { setFilePrint } = await import("@/server/service");
     await setFilePrint(await actor(), data.orderId, data.fileId, data.print);
+    return { ok: true };
+  });
+
+export const markApproval = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), fileId: z.string().uuid() }).parse(data))
+  .handler(async ({ data }) => {
+    const { markFileApproval } = await import("@/server/service");
+    await markFileApproval(await actor(), data.orderId, data.fileId);
     return { ok: true };
   });
 
@@ -348,6 +369,8 @@ export const saveMaterial = createServerFn({ method: "POST" })
         minStock: z.number().min(0).nullable(),
         supplier: z.string(),
         leadTimeDays: z.number().int().min(0).nullable().optional(),
+        name: z.string().optional(),
+        code: z.string().optional(),
       })
       .parse(data),
   )
@@ -373,11 +396,13 @@ export const countStock = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const markInkOpened = createServerFn({ method: "POST" }).handler(async () => {
-  const { openInk } = await import("@/server/service");
-  await openInk(await actor());
-  return { ok: true };
-});
+export const markInkOpened = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ materialId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { openInk } = await import("@/server/service");
+    await openInk(await actor(), data.materialId);
+    return { ok: true };
+  });
 
 export const getBom = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => z.object({ skuId: z.string() }).parse(data))
@@ -532,6 +557,14 @@ export const removeExpense = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { deleteExpense } = await import("@/server/service");
     await deleteExpense(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const approveExpense = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data }) => {
+    const { approveExpense: approve } = await import("@/server/service");
+    await approve(await actor(), data.id);
     return { ok: true };
   });
 
@@ -800,6 +833,7 @@ export const storeShipping = createServerFn({ method: "POST" })
         tracking: z.string(),
         shipFee: z.number().nullable(),
         codAmount: z.number().nullable(),
+        customerShip: z.number().int().min(0).max(100_000_000).nullable().optional(),
       })
       .parse(data),
   )

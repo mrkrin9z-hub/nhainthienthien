@@ -23,16 +23,16 @@ export const Route = createFileRoute("/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(catalogQueryOptions),
   head: () => ({
     meta: [
-      { title: "Nhà In Thiên Thiên — In ảnh giá xưởng, gửi ảnh online" },
+      { title: "Nhà In Thiên Thiên — Gửi ảnh online" },
       {
         name: "description",
         content:
-          "In ảnh ép gỗ, ảnh thờ, giấy khen và nam châm tại Xuân Lộc, Đồng Nai. Gửi ảnh online 3 bước, nhận mã đơn và theo dõi tiến trình.",
+          "In ảnh ép gỗ, ảnh thờ, giấy khen và nam châm. Gửi ảnh online 3 bước, nhận mã đơn và theo dõi tiến trình.",
       },
       { property: "og:title", content: "Nhà In Thiên Thiên — In đẹp từng khoảnh khắc" },
       {
         property: "og:description",
-        content: "Gửi ảnh online, in đẹp giá xưởng, giao tận nơi hoặc nhận tại xưởng.",
+        content: "Gửi ảnh online, xem bảng giá, nhận tại tiệm hoặc giao hàng.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -60,9 +60,9 @@ const STEPS = [
 ];
 
 const BENEFITS = [
-  { icon: ShieldCheck, title: "Giá xưởng", desc: "Bảng giá công khai, không phát sinh." },
-  { icon: Clock, title: "Xưởng nhận in", desc: "Lịch trả hàng được báo khi nhận đơn." },
-  { icon: Truck, title: "Giao tận nơi", desc: "Nhận tại xưởng hoặc giao toàn quốc." },
+  { icon: ShieldCheck, title: "Bảng giá công khai", desc: "Giá trên web lấy từ bảng tại tiệm." },
+  { icon: Clock, title: "Xưởng nhận in", desc: "Xưởng xem ảnh rồi báo lại trên đơn." },
+  { icon: Truck, title: "Nhận tại tiệm", desc: "Hoặc giao hàng theo địa chỉ trên đơn." },
   { icon: Heart, title: "Kiểm ảnh thủ công", desc: "Chỉnh sáng, canh nét trước khi in." },
 ];
 
@@ -80,11 +80,11 @@ const FAQS = [
   },
   {
     q: "Thanh toán như thế nào?",
-    a: "Bạn đặt đơn trước, xưởng xác nhận rồi mới thanh toán. Nhận tại xưởng hoặc chuyển khoản trước khi giao.",
+    a: "Bạn đặt đơn trước, xưởng xác nhận rồi mới thanh toán. Nhận tại tiệm hoặc chuyển khoản trước khi giao.",
   },
   {
-    q: "Bao lâu thì nhận được hàng?",
-    a: "Xưởng báo lịch khi nhận đơn. Ảnh thờ có hỗ trợ chỉnh sửa ảnh cơ bản. Đơn số lượng lớn được hẹn lịch riêng.",
+    q: "Khi nào thì biết tiến trình đơn?",
+    a: "Sau khi nhận đơn, xưởng cập nhật từng bước trên trang tra cứu. Ảnh thờ có hỗ trợ chỉnh sửa ảnh cơ bản.",
   },
 ];
 
@@ -101,13 +101,16 @@ function ShopCard({ product }: { product: CatalogProduct }) {
         width={800}
         height={600}
         className="aspect-[16/10] w-full object-cover"
+        onError={(event) => {
+          event.currentTarget.src = catalogImage(product.slug, null);
+        }}
       />
       <div className="p-4">
         <h3 className="text-lg font-extrabold leading-tight text-foreground">{product.name}</h3>
         <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{product.description}</p>
-        <ul className="mt-3 flex flex-wrap gap-1.5">
+        <ul className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
           {lines.map((line) => (
-            <li key={line.label} className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">
+            <li key={line.label} className="shrink-0 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-foreground">
               {line.label}
               {line.price === null ? "" : ` · ${line.from ? "từ " : ""}${formatVnd(line.price)}`}
             </li>
@@ -143,7 +146,7 @@ function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
-      <main className="pb-24 md:pb-0">
+      <main className="pb-32 md:pb-0">
         {/* Hero */}
         <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 md:grid-cols-2 md:px-6 md:py-20">
           <div className="rise min-w-0">
@@ -180,8 +183,8 @@ function HomePage() {
 
           <div className="rise overflow-hidden rounded-[2rem] bg-secondary">
             <img
-              src={catalogImage(products[0]?.slug ?? "trang-guong", products[0]?.cover_path)}
-              alt="Ảnh mẫu in tại xưởng"
+              src={catalogImage("anh-tho", null)}
+              alt="Ảnh mẫu in tại tiệm"
               width={800}
               height={1000}
               fetchPriority="high"
@@ -218,7 +221,7 @@ function HomePage() {
               <p className="mt-1 text-sm text-muted-foreground">Đủ sản phẩm đang bán, khổ và giá lấy từ sổ tiệm.</p>
             </div>
             <Link to="/san-pham" className="shrink-0 text-sm font-semibold text-accent">
-              Bảng giá
+              Tất cả sản phẩm
             </Link>
           </div>
 

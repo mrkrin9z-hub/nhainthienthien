@@ -2,7 +2,7 @@ export const BRAND = {
   name: "NHÀ IN THIÊN THIÊN",
   shortName: "Thiên Thiên",
   slogan: "In đẹp từng khoảnh khắc.",
-  message: "Giá xưởng cho mọi nhà.",
+  message: "Bảng giá công khai cho mọi nhà.",
   website: "nhainthienthien.com",
   region: "Xuân Lộc, Đồng Nai",
 } as const;

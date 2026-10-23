@@ -8,6 +8,12 @@ export function orderShipping(order: { shipping?: OrderShipping | null }): Order
   return { ...blankShipping(), ...(order.shipping ?? {}) };
 }
 
+/** Bảng giao hàng: giao tận nơi và nhận tại tiệm, từ đóng gói trở đi. Không gồm đơn hủy, đơn thử. */
+export function onDeliveryDesk(order: Pick<Order, "status" | "fulfillment"> & { isTest?: boolean }): boolean {
+  if (order.isTest) return false;
+  return order.status === "dong_goi" || order.status === "giao" || order.status === "xong";
+}
+
 export function shipsOut(order: Pick<Order, "status" | "fulfillment" | "channel">): boolean {
   if (order.status === "draft_upload" || order.status === "huy" || order.status === "upload_error") return false;
   if (order.fulfillment === "delivery") return true;

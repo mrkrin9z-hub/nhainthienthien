@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#f4efe4"/>
+  <rect x="70" y="50" width="660" height="500" fill="#fffdf8" stroke="#8a6a32" stroke-width="8"/>
+  <rect x="90" y="70" width="620" height="460" fill="none" stroke="#c4a15a" stroke-width="3"/>
+  <text x="400" y="180" text-anchor="middle" font-family="Georgia, serif" font-size="54" fill="#6b4e16">GI¤Y KHEN</text>
+  <text x="400" y="250" text-anchor="middle" font-family="Georgia, serif" font-size="28" fill="#3f3424">Ép g× tráng g°¡ng</text>
+  <rect x="250" y="300" width="300" height="8" fill="#c4a15a"/>
+  <text x="400" y="380" text-anchor="middle" font-family="Georgia, serif" font-size="22" fill="#6b4e16">Nhà In Thiên Thiên</text>
+</svg>

@@ -60,6 +60,9 @@ export type CashOrder = {
   depositBy?: string | null;
   createdAt: string;
   payments?: CashPayment[];
+  isTest?: boolean;
+  discount?: number | null;
+  shipping?: { customerShip?: number | null; codAmount?: number | null } | null;
 };
 
 export type CashExpense = {
@@ -101,14 +104,38 @@ export function depositEvents(order: CashOrder): CashPayment[] {
   return [];
 }
 
-export function remainOf(order: Pick<CashOrder, "total" | "depositPaid">): number | null {
+type DueOrder = Pick<CashOrder, "total" | "depositPaid" | "status"> & {
+  isTest?: boolean;
+  discount?: number | null;
+  shipping?: { customerShip?: number | null; codAmount?: number | null } | null;
+};
+
+/** Số còn phải thu. Đơn hủy thì 0. Giảm giá trừ, tiền giao khách trả thì cộng. */
+export function remainOf(order: DueOrder): number | null {
+  if (order.status === "huy") return 0;
   if (order.total === null) return null;
-  return order.total - order.depositPaid;
+  const discount = order.discount ?? 0;
+  const ship = order.shipping?.customerShip ?? 0;
+  return order.total - discount + ship - order.depositPaid;
+}
+
+export function amountDue(order: DueOrder): number | null {
+  return remainOf(order);
+}
+
+/** COD được tính vào công nợ: không quá số còn lại, đơn hủy và đơn thử thì 0. */
+export function codExpected(order: DueOrder): number {
+  if (order.status === "huy" || order.isTest) return 0;
+  const cod = order.shipping?.codAmount ?? 0;
+  if (cod <= 0) return 0;
+  const due = remainOf(order);
+  if (due === null) return cod;
+  return Math.min(cod, Math.max(0, due));
 }
 
 export function ordersToCollect(orders: CashOrder[]): CashOrder[] {
   return orders
-    .filter((order) => order.status !== "huy" && order.status !== "draft_upload" && order.status !== "upload_error")
+    .filter((order) => order.status !== "huy" && order.status !== "draft_upload" && order.status !== "upload_error" && !order.isTest)
     .filter((order) => {
       const remain = remainOf(order);
       return remain === null || remain > 0;
