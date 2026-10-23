@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
+import { WasteCostReport } from "@/components/admin/waste-stats";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -85,12 +86,34 @@ function ProfitBody() {
             <Stat label="Lợi nhuận" value={data.profit === null ? "Chưa đủ số" : formatMaybe(data.profit)} />
             <Stat label="Hòa vốn" value={data.breakevenPercent === null ? "—" : `${data.breakevenPercent}%`} />
           </section>
+          <p className="text-sm text-muted-foreground">Lợi nhuận đã trừ hao hụt tháng {month}: {formatMaybe(data.wasteCost)}. Tháng {data.wastePreviousMonth}: {formatMaybe(data.wastePreviousCost)}. Lệch {formatMaybe(data.wasteCostDelta)}.</p>
           {data.wasteUnknown > 0 ? <p className="text-sm font-semibold">{data.wasteUnknown} phiếu hao hụt chưa có giá mua, chưa trừ vào lợi nhuận.</p> : null}
           {data.wasteAlert ? (
             <p className="text-sm font-semibold text-destructive">
               Hao hụt {data.wasteRate}% doanh thu, vượt ngưỡng {data.wasteThreshold}%.
             </p>
           ) : null}
+          <WasteCostReport
+            month={month}
+            summary={{
+              wasteCost: data.wasteCost,
+              wasteRate: data.wasteRate,
+              wasteUnknown: data.wasteUnknown,
+              wasteLines: data.wasteLines,
+              byMaterial: data.wasteByMaterial,
+              byReason: data.wasteByReason,
+              byPerson: data.wasteByPerson,
+              byChannel: data.wasteByChannel,
+            }}
+            days={data.wasteDays}
+            compare={{
+              previousMonth: data.wastePreviousMonth,
+              previousCost: data.wastePreviousCost,
+              previousRate: data.wastePreviousRate,
+              costDelta: data.wasteCostDelta,
+              rateDelta: data.wasteRateDelta,
+            }}
+          />
           {data.shippingUnknown ? <p className="text-sm font-semibold">Có đơn Facebook chưa trừ phí ship vì chưa có số.</p> : null}
           <p className="text-sm text-muted-foreground">Hôm nay còn thiếu {formatMaybe(data.todayGap)} để đạt mốc ngày. Khai trương dự kiến {data.openDate}.</p>
           <section className="glass-card rounded-3xl p-4">

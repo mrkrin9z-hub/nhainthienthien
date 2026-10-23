@@ -1,6 +1,6 @@
 import { vnMonth, vnYmd } from "./calc.ts";
 import { orderInScope, type ReportScope } from "./mohome.ts";
-import type { Channel, Material, ShopState, WasteReason, WasteReport, WasteStatus } from "./types.ts";
+import type { Channel, Material, Order, ShopState, WasteReason, WasteReport, WasteStatus } from "./types.ts";
 import { CHANNEL_LABEL } from "./types.ts";
 
 /** Lý do nhân viên chọn khi báo hỏng. Không gồm hao hụt kiểm kho. */
@@ -93,7 +93,7 @@ function lineDong(state: ShopState, report: WasteReport): number | null {
   return Math.round(report.qty * unit);
 }
 
-export type WasteSlice = { key: string; label: string; lines: number; qty: number; cost: number };
+export type WasteSlice = { key: string; label: string; lines: number; qty: number; cost: number; rate: number | null };
 
 export type WasteMonth = {
   wasteCost: number;
@@ -110,7 +110,27 @@ export type WasteMonth = {
   byChannel: WasteSlice[];
 };
 
-function addSlice(map: Map<string, WasteSlice>, key: string, label: string, qty: number, cost: number) {
+export type WasteDayStat = {
+  day: string;
+  wasteCost: number;
+  wasteRate: number | null;
+  wasteUnknown: number;
+  wasteLines: number;
+  byMaterial: WasteSlice[];
+  byReason: WasteSlice[];
+  byPerson: WasteSlice[];
+  byChannel: WasteSlice[];
+};
+
+export type WasteCompare = {
+  previousMonth: string;
+  previousCost: number;
+  previousRate: number | null;
+  costDelta: number;
+  rateDelta: number | null;
+};
+
+function addSlice(map: Map<string, Omit<WasteSlice, "rate">>, key: string, label: string, qty: number, cost: number) {
   const row = map.get(key) ?? { key, label, lines: 0, qty: 0, cost: 0 };
   row.lines += 1;
   row.qty = round4(row.qty + qty);
@@ -118,14 +138,50 @@ function addSlice(map: Map<string, WasteSlice>, key: string, label: string, qty:
   map.set(key, row);
 }
 
-/** Hao hụt trong tháng, trừ phiếu đã hủy. Tiền chỉ cộng dòng đã có giá mua. */
-export function wasteMonth(state: ShopState, month: string, scope: ReportScope, revenue: number): WasteMonth {
-  const rows = readReports(state).filter((report) => report.status !== "void" && report.day.slice(0, 7) === month && wasteInScope(report.channel, scope));
-  const byDay = new Map<string, WasteSlice>();
-  const byMaterial = new Map<string, WasteSlice>();
-  const byReason = new Map<string, WasteSlice>();
-  const byPerson = new Map<string, WasteSlice>();
-  const byChannel = new Map<string, WasteSlice>();
+/** % doanh thu. Không có doanh thu thì null, không bịa 0%. */
+export function wastePercent(cost: number, revenue: number): number | null {
+  if (!(revenue > 0)) return null;
+  return Math.round((cost / revenue) * 1000) / 10;
+}
+
+function doneStamp(order: Order): string {
+  return order.completedAt || order.updatedAt || order.createdAt;
+}
+
+function doneRevenue(state: ShopState, scope: ReportScope, match: (order: Order) => boolean): number {
+  return Math.round(
+    (state.orders ?? [])
+      .filter((order) => order.status === "xong" && !order.isTest && orderInScope(order.channel, scope) && match(order))
+      .reduce((sum, order) => sum + (order.total ?? 0), 0),
+  );
+}
+
+function dayRevenue(state: ShopState, day: string, scope: ReportScope): number {
+  return doneRevenue(state, scope, (order) => vnYmd(doneStamp(order)) === day);
+}
+
+export function monthRevenue(state: ShopState, month: string, scope: ReportScope): number {
+  return doneRevenue(state, scope, (order) => vnMonth(doneStamp(order)) === month);
+}
+
+/** Tháng liền trước, dạng YYYY-MM. */
+export function previousMonth(month: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) return month;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 2, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function activeReports(state: ShopState, scope: ReportScope, match: (report: WasteReport) => boolean): WasteReport[] {
+  return readReports(state).filter((report) => report.status !== "void" && wasteInScope(report.channel, scope) && match(report));
+}
+
+function summarize(state: ShopState, rows: WasteReport[], revenue: number, scope: ReportScope, month: string): WasteMonth {
+  const byDay = new Map<string, Omit<WasteSlice, "rate">>();
+  const byMaterial = new Map<string, Omit<WasteSlice, "rate">>();
+  const byReason = new Map<string, Omit<WasteSlice, "rate">>();
+  const byPerson = new Map<string, Omit<WasteSlice, "rate">>();
+  const byChannel = new Map<string, Omit<WasteSlice, "rate">>();
   let wasteCost = 0;
   let wasteUnknown = 0;
   for (const report of rows) {
@@ -145,8 +201,10 @@ export function wasteMonth(state: ShopState, month: string, scope: ReportScope, 
     (order) => !order.isTest && !OPEN.has(order.status) && vnMonth(order.createdAt) === month && orderInScope(order.channel, scope),
   ).length;
   const threshold = state.settings.wasteAlertPercent ?? null;
-  const wasteRate = revenue > 0 ? Math.round((wasteCost / revenue) * 1000) / 10 : null;
-  const sortCost = (rows: WasteSlice[]) => rows.sort((a, b) => b.cost - a.cost || b.lines - a.lines || a.label.localeCompare(b.label, "vi"));
+  const wasteRate = wastePercent(wasteCost, revenue);
+  const sortCost = (list: WasteSlice[]) => list.sort((a, b) => b.cost - a.cost || b.lines - a.lines || a.label.localeCompare(b.label, "vi"));
+  const rated = (map: Map<string, Omit<WasteSlice, "rate">>) =>
+    sortCost([...map.values()].map((row) => ({ ...row, rate: wastePercent(row.cost, revenue) })));
   return {
     wasteCost,
     wasteUnknown,
@@ -155,11 +213,64 @@ export function wasteMonth(state: ShopState, month: string, scope: ReportScope, 
     wasteAlert: wasteRate !== null && threshold !== null && wasteRate > threshold,
     wasteThreshold: threshold,
     placed,
-    byDay: [...byDay.values()].sort((a, b) => a.key.localeCompare(b.key)),
-    byMaterial: sortCost([...byMaterial.values()]),
-    byReason: sortCost([...byReason.values()]),
-    byPerson: sortCost([...byPerson.values()]),
-    byChannel: sortCost([...byChannel.values()]),
+    byDay: [...byDay.values()]
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .map((row) => ({ ...row, rate: wastePercent(row.cost, dayRevenue(state, row.key, scope)) })),
+    byMaterial: rated(byMaterial),
+    byReason: rated(byReason),
+    byPerson: rated(byPerson),
+    byChannel: rated(byChannel),
+  };
+}
+
+/** Hao hụt trong tháng, trừ phiếu đã hủy. Tiền chỉ cộng dòng đã có giá mua. */
+export function wasteMonth(state: ShopState, month: string, scope: ReportScope, revenue: number): WasteMonth {
+  return summarize(
+    state,
+    activeReports(state, scope, (report) => report.day.slice(0, 7) === month),
+    revenue,
+    scope,
+    month,
+  );
+}
+
+/** Hao hụt một ngày. % doanh thu tính trên đơn xong trong ngày đó. */
+export function wasteDay(state: ShopState, day: string, scope: ReportScope, revenue: number): WasteMonth {
+  return summarize(
+    state,
+    activeReports(state, scope, (report) => report.day === day),
+    revenue,
+    scope,
+    day.slice(0, 7),
+  );
+}
+
+/** Từng ngày trong tháng có phiếu. % của ngày là tiền hao hụt chia doanh thu ngày. */
+export function wasteDayStats(state: ShopState, month: string, scope: ReportScope): WasteDayStat[] {
+  const days = [...new Set(activeReports(state, scope, (report) => report.day.slice(0, 7) === month).map((report) => report.day))].sort();
+  return days.map((day) => {
+    const stats = wasteDay(state, day, scope, dayRevenue(state, day, scope));
+    return {
+      day,
+      wasteCost: stats.wasteCost,
+      wasteRate: stats.wasteRate,
+      wasteUnknown: stats.wasteUnknown,
+      wasteLines: stats.wasteLines,
+      byMaterial: stats.byMaterial,
+      byReason: stats.byReason,
+      byPerson: stats.byPerson,
+      byChannel: stats.byChannel,
+    };
+  });
+}
+
+export function wasteMonthCompare(current: WasteMonth, previous: WasteMonth, previousMonthKey: string): WasteCompare {
+  return {
+    previousMonth: previousMonthKey,
+    previousCost: previous.wasteCost,
+    previousRate: previous.wasteRate,
+    costDelta: current.wasteCost - previous.wasteCost,
+    rateDelta: current.wasteRate !== null && previous.wasteRate !== null ? Math.round((current.wasteRate - previous.wasteRate) * 10) / 10 : null,
   };
 }
 
@@ -417,10 +528,15 @@ export function wasteDesk(state: ShopState, role: "owner" | "sale" | "production
   const day = vnYmd();
   const month = day.slice(0, 7);
   const showCost = role === "owner";
-  const done = state.orders.filter((order) => order.status === "xong" && !order.isTest && vnMonth(order.completedAt || order.updatedAt || order.createdAt) === month);
-  const revenue = done.reduce((sum, order) => sum + (order.total ?? 0), 0);
+  const revenue = monthRevenue(state, month, "all");
   const rawSummary = wasteMonth(state, month, "all", revenue);
   const summary = showCost ? rawSummary : blankMoney(rawSummary);
+  const prevKey = previousMonth(month);
+  const previous = wasteMonth(state, prevKey, "all", monthRevenue(state, prevKey, "all"));
+  const compare = showCost ? wasteMonthCompare(rawSummary, previous, prevKey) : { previousMonth: prevKey, previousCost: 0, previousRate: null, costDelta: 0, rateDelta: null };
+  const days = showCost ? wasteDayStats(state, month, "all") : [];
+  const todayRevenue = dayRevenue(state, day, "all");
+  const today = showCost ? wasteDay(state, day, "all", todayRevenue) : blankMoney(wasteDay(state, day, "all", todayRevenue));
   const rows = readReports(state)
     .filter((report) => report.status !== "void")
     .map((report) => rowOf(state, report, showCost))
@@ -435,6 +551,9 @@ export function wasteDesk(state: ShopState, role: "owner" | "sale" | "production
     pending: rows.filter((row) => row.status === "pending" || row.status === "confirmed").length,
     rows,
     summary,
+    today,
+    days,
+    compare,
     materials: [...state.materials]
       .sort((a, b) => a.name.localeCompare(b.name, "vi"))
       .map((material) => ({ id: material.id, name: material.name, unit: material.unit, stock: material.stock })),
@@ -453,7 +572,7 @@ export function wasteDesk(state: ShopState, role: "owner" | "sale" | "production
 }
 
 function blankMoney(summary: WasteMonth): WasteMonth {
-  const hide = (rows: WasteSlice[]) => rows.map((row) => ({ ...row, cost: 0 }));
+  const hide = (rows: WasteSlice[]) => rows.map((row) => ({ ...row, cost: 0, rate: null }));
   return {
     ...summary,
     wasteCost: 0,

@@ -13,6 +13,7 @@ import {
   confirmWasteDay,
   editWaste,
   ensureWaste,
+  previousMonth,
   recordWaste,
   voidWaste,
   WASTE_MOVE_REASON,
@@ -198,7 +199,7 @@ test("hao hụt trừ vào lãi theo kênh và không bịa giá", () => {
   const state = {
     settings: { ...DEFAULT_SETTINGS, wasteAlertPercent: 2 },
     skus: [],
-    orders: [done("tai_tiem", 100000), done("mo_home", 80000)],
+    orders: [done("tai_tiem", 100000), done("mo_home", 80000), { ...done("tai_tiem", 50000), id: "nov", completedAt: "2026-11-05T02:00:00.000Z", createdAt: "2026-11-05T02:00:00.000Z", updatedAt: "2026-11-05T02:00:00.000Z" }],
     expenses: [{ id: "e", month: "2026-12", name: "Điện", amount: 10000, note: "", at: stamp, by: null }],
     monthlyFixed: [],
     materials: [
@@ -212,6 +213,7 @@ test("hao hụt trừ vào lãi theo kênh và không bịa giá", () => {
       line({ id: "shop", qty: 1, channel: "facebook", reason: "lech_vien" }),
       line({ id: "ink", materialId: "muc", qty: 1, reason: "rach", status: "confirmed" }),
       line({ id: "gone", qty: 9, channel: "tai_tiem", status: "void" }),
+      line({ id: "nov", qty: 1, day: "2026-11-05", at: "2026-11-05T02:00:00.000Z" }),
     ],
   } as unknown as ShopState;
 
@@ -238,6 +240,22 @@ test("hao hụt trừ vào lãi theo kênh và không bịa giá", () => {
   assert.equal(all.wasteByReason.some((row) => row.label === "In lỗi"), true);
   assert.equal(all.wasteByPerson[0]?.label, "Sản xuất");
   assert.equal(all.wasteByChannel.some((row) => row.label === "Không thuộc kênh"), true);
+  assert.equal(all.wasteByDay[0]?.key, "2026-12-05");
+  assert.equal(all.wasteByDay[0]?.cost, 4000);
+  assert.equal(all.wasteByDay[0]?.rate, 2.2);
+  assert.equal(all.wasteByMaterial.find((row) => row.label === "Túi")?.rate, 2.2);
+  assert.equal(all.wasteByReason.find((row) => row.label === "In lỗi")?.cost, 3000);
+  assert.equal(all.wasteByReason.find((row) => row.label === "In lỗi")?.rate, 1.7);
+  assert.equal(all.wasteDays[0]?.wasteCost, 4000);
+  assert.equal(all.wasteDays[0]?.wasteRate, 2.2);
+  assert.equal(all.wasteDays[0]?.byChannel.find((row) => row.label === "Mơ Home (nội bộ)")?.cost, 1000);
+  assert.equal(all.wastePreviousMonth, "2026-11");
+  assert.equal(all.wastePreviousCost, 1000);
+  assert.equal(all.wastePreviousRate, 2);
+  assert.equal(all.wasteCostDelta, 3000);
+  assert.equal(all.wasteRateDelta, 0.2);
+  assert.equal(shop.wasteByDay[0]?.rate, null);
+  assert.equal(previousMonth("2026-01"), "2025-12");
 
   const october = {
     ...state,

@@ -1,6 +1,6 @@
 import { fixedCostsApply, quoteSku, vnMonth, vnYmd } from "./calc.ts";
 import { laborBill, orderInScope, reportScopeLabel, type ReportScope } from "./mohome.ts";
-import { wasteMonth, type WasteSlice } from "./waste.ts";
+import { previousMonth, wasteDayStats, wasteMonth, wasteMonthCompare, type WasteDayStat, type WasteSlice } from "./waste.ts";
 import { fixedRows } from "./views.ts";
 import type { Channel, Order, ShopState } from "./types.ts";
 import { CHANNEL_LABEL } from "./types.ts";
@@ -50,6 +50,12 @@ export type BusinessReport = {
   wasteByReason: WasteSlice[];
   wasteByPerson: WasteSlice[];
   wasteByChannel: WasteSlice[];
+  wasteDays: WasteDayStat[];
+  wastePreviousMonth: string;
+  wastePreviousCost: number;
+  wastePreviousRate: number | null;
+  wasteCostDelta: number;
+  wasteRateDelta: number | null;
   breakEvenPercent: number | null;
   cancelRate: number | null;
   cancelled: number;
@@ -173,6 +179,15 @@ export function businessReport(state: ShopState, month: string, grain: ReportGra
   const extrasCharged = shopScope ? extraSum : 0;
   const roundedRevenue = Math.round(revenue);
   const waste = wasteMonth(state, month, scope, roundedRevenue);
+  const prevKey = previousMonth(month);
+  let previousRevenue = 0;
+  for (const order of state.orders.filter((item) => item.status === "xong" && !item.isTest && monthOf(doneStamp(item)) === prevKey && inScope(item))) {
+    const money = lineProfit(state, order);
+    previousRevenue += order.total ?? money.revenue;
+  }
+  const previousWaste = wasteMonth(state, prevKey, scope, Math.round(previousRevenue));
+  const compare = wasteMonthCompare(waste, previousWaste, prevKey);
+  const wasteDays = wasteDayStats(state, month, scope);
   return {
     month,
     grain,
@@ -205,6 +220,12 @@ export function businessReport(state: ShopState, month: string, grain: ReportGra
     wasteByReason: waste.byReason,
     wasteByPerson: waste.byPerson,
     wasteByChannel: waste.byChannel,
+    wasteDays,
+    wastePreviousMonth: compare.previousMonth,
+    wastePreviousCost: compare.previousCost,
+    wastePreviousRate: compare.previousRate,
+    wasteCostDelta: compare.costDelta,
+    wasteRateDelta: compare.rateDelta,
     breakEvenPercent:
       scope === "nha_in" && state.settings.breakevenMonth > 0 ? Math.round((revenue / state.settings.breakevenMonth) * 1000) / 10 : null,
     cancelRate: placedOrders.length ? Math.round((cancelled / placedOrders.length) * 1000) / 10 : null,

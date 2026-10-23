@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { WasteSlice } from "@/domain/waste";
+import { WasteCostReport } from "@/components/admin/waste-stats";
 import { formatMaybe } from "@/lib/brand";
 import { approveDamage, closeDamageDay, countStock, editDamage, getWaste, reportDamage, voidDamage } from "@/lib/admin.functions";
 
@@ -144,22 +145,24 @@ export function WasteDesk() {
               {list.total === 0 ? <li className="text-muted-foreground">Chưa có phiếu hỏng.</li> : null}
             </ul>
           </section>
-          <section className="glass-card rounded-3xl p-4">
-            <h2 className="font-bold text-primary">Tháng {data.month}</h2>
-            <p className="mt-1 text-sm">
-              {data.summary.wasteLines} phiếu / {data.summary.placed} đơn
-              {data.showCost ? ` · ${formatMaybe(data.summary.wasteCost)}` : ""}
-              {data.showCost && data.summary.wasteRate !== null ? ` · ${data.summary.wasteRate}% doanh thu` : ""}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">Phiếu không gắn kênh tính vào Nhà In.</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Groups title="Theo ngày" rows={data.summary.byDay} showCost={data.showCost} />
-              <Groups title="Theo vật tư" rows={data.summary.byMaterial} showCost={data.showCost} />
-              <Groups title="Theo lý do" rows={data.summary.byReason} showCost={data.showCost} />
-              <Groups title="Theo người" rows={data.summary.byPerson} showCost={data.showCost} />
-              <Groups title="Theo kênh" rows={data.summary.byChannel} showCost={data.showCost} />
-            </div>
-          </section>
+          {data.showCost ? (
+            <WasteCostReport month={data.month} summary={data.summary} days={data.days} compare={data.compare} focusDay={data.day} />
+          ) : (
+            <section className="glass-card rounded-3xl p-4">
+              <h2 className="font-bold text-primary">Tháng {data.month}</h2>
+              <p className="mt-1 text-sm">
+                {data.summary.wasteLines} phiếu / {data.summary.placed} đơn
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">Tiền hao hụt chỉ chủ xem.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <Groups title="Theo ngày" rows={data.summary.byDay} />
+                <Groups title="Theo vật tư" rows={data.summary.byMaterial} />
+                <Groups title="Theo lý do" rows={data.summary.byReason} />
+                <Groups title="Theo người" rows={data.summary.byPerson} />
+                <Groups title="Theo kênh" rows={data.summary.byChannel} />
+              </div>
+            </section>
+          )}
           <ReportDialog
             open={reportOpen}
             day={data.day}
@@ -178,7 +181,7 @@ export function WasteDesk() {
   );
 }
 
-function Groups({ title, rows, showCost }: { title: string; rows: WasteSlice[]; showCost: boolean }) {
+function Groups({ title, rows }: { title: string; rows: WasteSlice[] }) {
   return (
     <div>
       <h3 className="text-sm font-semibold">{title}</h3>
@@ -186,7 +189,6 @@ function Groups({ title, rows, showCost }: { title: string; rows: WasteSlice[]; 
         {rows.slice(0, 6).map((row) => (
           <li key={row.key}>
             {row.label}: {row.lines} · {row.qty}
-            {showCost ? ` · ${formatMaybe(row.cost)}` : ""}
           </li>
         ))}
         {rows.length === 0 ? <li className="text-muted-foreground">Chưa có.</li> : null}

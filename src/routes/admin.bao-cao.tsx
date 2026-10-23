@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
+import { WasteCostReport } from "@/components/admin/waste-stats";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -113,26 +114,32 @@ function ReportBody() {
             </ul>
             <p className="mt-2 font-semibold">Cộng chi phí phát sinh: {formatMaybe(data.extraSum)}</p>
           </section>
-          <section className="glass-card rounded-3xl p-4">
-            <h2 className="font-bold text-primary">Hao hụt</h2>
-            <p className="mt-1 text-sm">
-              {data.wasteLines} phiếu / {data.placed} đơn
-              {data.wasteRate === null ? "" : ` · ${data.wasteRate}% doanh thu`}
+          {data.wasteAlert ? (
+            <p className="text-sm font-semibold text-destructive">
+              Hao hụt {data.wasteRate}% doanh thu, vượt ngưỡng {data.wasteThreshold}%.
             </p>
-            {data.wasteAlert ? (
-              <p className="mt-1 text-sm font-semibold text-destructive">
-                Vượt ngưỡng {data.wasteThreshold}%.
-              </p>
-            ) : null}
-            {data.wasteUnknown > 0 ? <p className="mt-1 text-sm">{data.wasteUnknown} phiếu chưa có giá mua.</p> : null}
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <WasteLines title="Theo ngày" rows={data.wasteByDay} />
-              <WasteLines title="Theo vật tư" rows={data.wasteByMaterial} />
-              <WasteLines title="Theo lý do" rows={data.wasteByReason} />
-              <WasteLines title="Theo người" rows={data.wasteByPerson} />
-              <WasteLines title="Theo kênh" rows={data.wasteByChannel} />
-            </div>
-          </section>
+          ) : null}
+          <WasteCostReport
+            month={month}
+            summary={{
+              wasteCost: data.wasteCost,
+              wasteRate: data.wasteRate,
+              wasteUnknown: data.wasteUnknown,
+              wasteLines: data.wasteLines,
+              byMaterial: data.wasteByMaterial,
+              byReason: data.wasteByReason,
+              byPerson: data.wasteByPerson,
+              byChannel: data.wasteByChannel,
+            }}
+            days={data.wasteDays}
+            compare={{
+              previousMonth: data.wastePreviousMonth,
+              previousCost: data.wastePreviousCost,
+              previousRate: data.wastePreviousRate,
+              costDelta: data.wasteCostDelta,
+              rateDelta: data.wasteRateDelta,
+            }}
+          />
           <section className="glass-card rounded-3xl p-4">
             <h2 className="font-bold text-primary">Theo {grain === "day" ? "ngày" : grain === "week" ? "tuần" : "tháng"}</h2>
             <ul className="mt-2 space-y-1 text-sm">
@@ -193,22 +200,6 @@ function ReportBody() {
           </section>
         </>
       ) : null}
-    </div>
-  );
-}
-
-function WasteLines({ title, rows }: { title: string; rows: { key: string; label: string; lines: number; qty: number; cost: number }[] }) {
-  return (
-    <div>
-      <h3 className="text-sm font-semibold">{title}</h3>
-      <ul className="mt-1 text-sm">
-        {rows.slice(0, 6).map((row) => (
-          <li key={row.key}>
-            {row.label}: {row.lines} · {row.qty} · {formatMaybe(row.cost)}
-          </li>
-        ))}
-        {rows.length === 0 ? <li className="text-muted-foreground">Chưa có.</li> : null}
-      </ul>
     </div>
   );
 }

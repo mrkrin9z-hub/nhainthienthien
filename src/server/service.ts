@@ -25,7 +25,7 @@ import {
 } from "@/domain/calc";
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { orderCodePrefix, skuSoldOn, withChannelSold, type ReportScope } from "@/domain/mohome";
-import { applyStockCount, approveWaste, confirmWasteDay, editWaste, recordWaste, voidWaste, wasteDesk, wasteMonth, type EditWasteInput } from "@/domain/waste";
+import { applyStockCount, approveWaste, confirmWasteDay, editWaste, previousMonth, recordWaste, voidWaste, wasteDayStats, wasteDesk, wasteMonth, wasteMonthCompare, type EditWasteInput } from "@/domain/waste";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/images";
 import { albumPhone, photoTooBig, publicUploadCard, uploadTokenShape } from "@/domain/order-upload";
@@ -2320,6 +2320,13 @@ export async function profitReport(actor: Actor, month: string) {
   const fixedSum = fixed.reduce((sum, row) => sum + row.amount, 0);
   const extraSum = extras.reduce((sum, row) => sum + row.amount, 0);
   const waste = wasteMonth(state, month, "nha_in", revenue);
+  const prevKey = previousMonth(month);
+  const previousRevenue = state.orders
+    .filter((order) => order.status === "xong" && order.channel !== "mo_home" && vnMonth(order.completedAt) === prevKey)
+    .reduce((sum, order) => sum + (order.total ?? 0), 0);
+  const previousWaste = wasteMonth(state, prevKey, "nha_in", previousRevenue);
+  const compare = wasteMonthCompare(waste, previousWaste, prevKey);
+  const wasteDays = wasteDayStats(state, month, "nha_in");
   const reprints = state.reprints.filter((row) => vnMonth(row.reportedAt) === month);
   const today = vnParts();
   const todayRevenue = orders
@@ -2341,6 +2348,17 @@ export async function profitReport(actor: Actor, month: string) {
     wasteRate: waste.wasteRate,
     wasteAlert: waste.wasteAlert,
     wasteThreshold: waste.wasteThreshold,
+    wasteByDay: waste.byDay,
+    wasteByMaterial: waste.byMaterial,
+    wasteByReason: waste.byReason,
+    wasteByPerson: waste.byPerson,
+    wasteByChannel: waste.byChannel,
+    wasteDays,
+    wastePreviousMonth: compare.previousMonth,
+    wastePreviousCost: compare.previousCost,
+    wastePreviousRate: compare.previousRate,
+    wasteCostDelta: compare.costDelta,
+    wasteRateDelta: compare.rateDelta,
     profit: incomplete ? null : Math.round(gross - fixedSum - extraSum - waste.wasteCost),
     breakevenPercent: state.settings.breakevenMonth ? Math.round((revenue / state.settings.breakevenMonth) * 1000) / 10 : null,
     todayGap: Math.max(0, state.settings.breakevenDay - todayRevenue),
@@ -3066,10 +3084,28 @@ export async function exportWorkbook(actor: Actor, kind: "orders" | "stock" | "m
         ["Chi phí cố định", report.fixedSum],
         ["Chi phí phát sinh", report.extraSum],
         ["Hao hụt", report.wasteCost],
+        ["Hao hụt % doanh thu", report.wasteRate ?? ""],
+        ["Hao hụt tháng trước", report.wastePreviousCost],
+        ["Lệch hao hụt", report.wasteCostDelta],
         ["Lợi nhuận", report.profit],
         [],
         ["Khoản cố định", "Số tiền"],
         ...report.fixed.map((row) => [row.name, row.amount]),
+        [],
+        ["Ngày", "Tiền hao hụt", "% doanh thu ngày"],
+        ...report.wasteDays.map((row) => [row.day, row.wasteCost, row.wasteRate ?? ""]),
+        [],
+        ["Vật tư", "Tiền", "% doanh thu tháng"],
+        ...report.wasteByMaterial.map((row) => [row.label, row.cost, row.rate ?? ""]),
+        [],
+        ["Lý do", "Tiền", "% doanh thu tháng"],
+        ...report.wasteByReason.map((row) => [row.label, row.cost, row.rate ?? ""]),
+        [],
+        ["Người", "Tiền", "% doanh thu tháng"],
+        ...report.wasteByPerson.map((row) => [row.label, row.cost, row.rate ?? ""]),
+        [],
+        ["Kênh", "Tiền", "% doanh thu tháng"],
+        ...report.wasteByChannel.map((row) => [row.label, row.cost, row.rate ?? ""]),
       ],
     });
   }
