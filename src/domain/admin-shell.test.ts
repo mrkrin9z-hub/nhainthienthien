@@ -83,10 +83,13 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../routes/admin.thu.tsx", import.meta.url), "utf8"), /Nộp tiền mặt/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Két tiệm/);
   const modules = readFileSync(new URL("../admin-os/modules.ts", import.meta.url), "utf8");
-  assert.match(modules, /label: "Nhận đơn"/);
-  assert.match(modules, /label: "Nhập thu"/);
-  assert.match(modules, /label: "Chuyển nộp"/);
-  assert.match(modules, /label: "In đơn \(K80\)"/);
+  assert.match(modules, /label: "Đơn hàng"/);
+  assert.match(modules, /label: "Tổng quan"/);
+  assert.match(modules, /label: "Sản phẩm & giá"/);
+  assert.doesNotMatch(modules, /label: "Nhận đơn"/);
+  assert.doesNotMatch(modules, /label: "In đơn \(K80\)"/);
+  assert.doesNotMatch(modules, /to: "\/admin\/in-don"/);
+  assert.doesNotMatch(modules, /to: "\/admin\/giao-hang"/);
   assert.doesNotMatch(modules, /label: "Chat"/);
   assert.doesNotMatch(modules, /label: "Ví tiền"/);
   assert.match(modules, /managePath: "\/manage\/orders"/);
@@ -130,7 +133,9 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../routes/api/public/meta-webhook.ts", import.meta.url), "utf8"), /meta-webhook/);
   assert.match(readFileSync(new URL("../routes/gui-anh.\$token.tsx", import.meta.url), "utf8"), /Gửi ảnh/);
   assert.match(readFileSync(new URL("../components/admin/order-qr-dialog.tsx", import.meta.url), "utf8"), /gui-anh|QR|upload/i);
-  assert.match(modules, /Thu chi/);
+  assert.match(readFileSync(new URL("../components/admin/desk-tabs.tsx", import.meta.url), "utf8"), /Chuyển nộp/);
+  assert.match(readFileSync(new URL("../components/admin/desk-tabs.tsx", import.meta.url), "utf8"), /Báo hỏng/);
+  assert.match(readFileSync(new URL("../routes/admin.don-hang.index.tsx", import.meta.url), "utf8"), /In bill/);
   assert.match(desk, /modulesForRole/);
   assert.match(readFileSync(new URL("../routes/admin.bao-cao-chi.tsx", import.meta.url), "utf8"), /Báo cáo chi phí/);
   const prices = readFileSync(new URL("../routes/admin.gia.tsx", import.meta.url), "utf8");

@@ -223,24 +223,27 @@ test("seed dùng giá chủ duyệt và catalog khách không hiện Liên hệ 
   const state = await buildSeed();
   const price = (code: string, channel: string) =>
     state.prices.find((row) => row.skuId === code && row.channel === channel)?.price ?? null;
-  assert.equal(price("TG-13x18-C1", "tai_tiem"), 35000);
-  assert.equal(price("TG-13x18-C1", "facebook"), 35000);
-  assert.equal(price("TG-13x18-C1", "tiktok"), 35000);
-  assert.equal(state.prices.find((row) => row.skuId === "TG-13x18-C1" && row.channel === "tiktok")?.listPrice, 50000);
+  assert.equal(price("TG-13x18-C1", "tai_tiem"), 37000);
+  assert.equal(price("TG-13x18-C1", "facebook"), 37000);
+  assert.equal(price("TG-13x18-C1", "tiktok"), 37000);
+  assert.equal(state.prices.find((row) => row.skuId === "TG-13x18-C1" && row.channel === "tiktok")?.listPrice, 70000);
+  assert.equal(state.prices.find((row) => row.skuId === "TG-13x18-C1" && row.channel === "tai_tiem")?.listPrice, undefined);
   assert.equal(price("TG-13x18-C4", "tai_tiem"), 100000);
   assert.equal(price("TG-13x18-C4", "tiktok"), 100000);
-  assert.equal(state.prices.find((row) => row.skuId === "TG-13x18-C4" && row.channel === "shopee")?.listPrice, 139000);
+  assert.equal(state.prices.find((row) => row.skuId === "TG-13x18-C4" && row.channel === "shopee")?.listPrice, 190000);
   assert.equal(price("AT-20x30-C1", "tai_tiem"), 56000);
   assert.equal(price("AT-20x30-C1", "tiktok"), 56000);
   assert.equal(price("GK-20x30-C1", "tiktok"), 56000);
-  assert.equal(price("NCT-6x9-10", "tiktok"), 85000);
+  assert.equal(price("NCT-6x9-10", "tiktok"), 90000);
   assert.equal(price("NCT-6x9-1", "tai_tiem"), null);
   assert.equal(price("NCT-6x9-1", "tiktok"), null);
   assert.equal(price("TG-13x18-C2", "tai_tiem"), 69000);
   assert.equal(price("TG-13x18-C2", "tiktok"), 69000);
   assert.equal(price("TG-13x18-C3", "tai_tiem"), 89000);
-  assert.equal(price("TG-13x18-C5", "facebook"), 119000);
-  assert.match(state.prices.find((row) => row.skuId === "TG-13x18-C2" && row.channel === "tai_tiem")?.note ?? "", /xác nhận/);
+  assert.equal(price("TG-13x18-C5", "facebook"), 125000);
+  assert.match(state.prices.find((row) => row.skuId === "TG-13x18-C2" && row.channel === "tai_tiem")?.note ?? "", /23\/10/);
+  assert.equal(price("TG-40x60-C2", "tai_tiem"), null);
+  assert.equal(price("EG-40x60-C2", "tiktok"), null);
   assert.deepEqual(
     state.staff.map((person) => person.name),
     ["Admin", "Sale", "Sản xuất"],
@@ -443,7 +446,7 @@ test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và đ
   assert.equal(seeded.boms.some((row) => row.skuId === "EG-40x60-C1" && row.materialId === "go-40x60"), true);
   assert.equal(seeded.boms.some((row) => row.skuId === "TG-40x60-C1" && row.materialId === "go-40x60"), true);
   const walkIn: Record<string, number> = {
-    "13x18": 35000,
+    "13x18": 37000,
     "15x21": 39000,
     "20x30": 56000,
     "30x45": 86000,
@@ -568,7 +571,7 @@ test("gỗ TG, nam châm theo khổ và 9 lọ mực", async () => {
   assert.equal(after.marginPercent, 67.9);
   assert.equal(state.boms.some((row) => row.skuId === "TG-13x18-C4" && row.materialId === "go-13x18" && row.qty === 1), true);
   assert.equal(state.skus.find((sku) => sku.code === "TG-13x18-C4")?.sheetCost, 21592 + 1900 * 4);
-  assert.equal(state.prices.find((row) => row.skuId === "TG-13x18-C1" && row.channel === "tai_tiem")?.price, 35000);
+  assert.equal(state.prices.find((row) => row.skuId === "TG-13x18-C1" && row.channel === "tai_tiem")?.price, 37000);
 
   const piece = (code: string) => {
     const sku = state.skus.find((row) => row.code === code);

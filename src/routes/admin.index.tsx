@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -11,9 +11,6 @@ import { statusLabelOf } from "@/lib/display-labels";
 import { getDashboard, punchClock } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/")({
-  beforeLoad: () => {
-    throw redirect({ to: "/admin/don-hang", search: { status: "all", q: "" } });
-  },
   component: DashboardPage,
 });
 
@@ -173,6 +170,21 @@ function DashboardPage() {
           })}
         </div>
       </section>
+
+      {"revenueToday" in data ? (
+        <nav aria-label="Sổ tiền" className="flex flex-wrap gap-2">
+          <Link to="/admin/thu" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Thu</Link>
+          <Link to="/admin/bao-cao" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Báo cáo</Link>
+          <Link to="/admin/loi-nhuan" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Lợi nhuận</Link>
+        </nav>
+      ) : null}
+
+      {"kpiPercent" in data ? (
+        <nav aria-label="Sổ tiền" className="flex flex-wrap gap-2">
+          <Link to="/admin/thu" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Thu</Link>
+          <Link to="/admin/cong-no" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Công nợ</Link>
+        </nav>
+      ) : null}
 
       {"revenueToday" in data ? (
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">

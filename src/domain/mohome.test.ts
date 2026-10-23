@@ -17,11 +17,11 @@ test("Mơ Home có giá riêng, không hoa hồng, không đụng giá Nhà In",
   const walk = channelPriceFor({ id: "TG-13x18-C1", code: "TG-13x18-C1" }, "tai_tiem", master);
   assert.equal(internal.price, null);
   assert.equal(internal.status, "nhap");
-  assert.equal(walk.price, 35000);
+  assert.equal(walk.price, 37000);
 
   const seededPrices = catalogPrices([{ id: "TG-13x18-C1", code: "TG-13x18-C1" }]);
   assert.equal(seededPrices.some((row) => row.channel === "mo_home"), false);
-  assert.equal(seededPrices.find((row) => row.channel === "tai_tiem")?.price, 35000);
+  assert.equal(seededPrices.find((row) => row.channel === "tai_tiem")?.price, 37000);
 
   assert.deepEqual(feeLines("mo_home", 100000, DEFAULT_SETTINGS, false), []);
   assert.equal(feeLines("tai_tiem", 100000, DEFAULT_SETTINGS, false)[0]?.name, "Hoa hồng sale");
@@ -180,8 +180,9 @@ test("migration gắn cờ bán kênh và không ghi giá Mơ Home", () => {
   };
   applyStoreMigrations(state);
   assert.equal(state.prices.length, 1);
-  assert.equal(state.prices[0]?.price, 35000);
-  assert.equal(state.prices[0]?.note, "giữ");
+  assert.equal(state.prices[0]?.price, 37000);
+  assert.match(state.prices[0]?.note ?? "", /23\/10/);
+  assert.equal(state.prices.some((row) => row.channel === "mo_home"), false);
   assert.deepEqual(state.skus[0]?.soldOn, ["tai_tiem", "facebook", "tiktok", "shopee"]);
   assert.equal(state.settings.moHomeLaborPercent, 50);
   assert.equal(state.settings.groupListed.ep_lua, false);

@@ -1,6 +1,7 @@
 import { magnetPiecesOnSheet, money } from "./calc.ts";
 import { PRICE_SHEET_20261022 } from "./price-sheet-20261022.ts";
 import { NHA_IN_CHANNELS } from "./mohome.ts";
+import { tiktokPriceFor } from "./tiktok-price.ts";
 import type { Channel, ChannelPrice, HrDraft, Settings, Sku } from "./types.ts";
 
 /** Tên khách thấy cho ảnh ép gỗ tráng gương. */
@@ -158,6 +159,24 @@ export function channelPriceFor(sku: { id: string; code: string }, channel: Chan
   if (channel === "mo_home") {
     return { skuId: sku.id, channel, price: null, status: "nhap", note: "Giá nội bộ Mơ Home. Chưa có bảng giá riêng." };
   }
+  const quoted = tiktokPriceFor(sku.code);
+  if (quoted) {
+    const price = quoted.sale;
+    const listPrice = channel === "tiktok" || channel === "shopee" ? quoted.list : null;
+    const base =
+      price === null
+        ? "Chủ chưa chốt giá combo 2 ảnh 40×60, 23/10."
+        : `Giá khách trả theo bảng TikTok 23/10 (giá sau giảm): ${vnd(price)}đ.`;
+    const note = sku.code === "NX-12x25-C1" && price !== null ? `${base} ${nx12MagnetNote()}` : base;
+    return {
+      skuId: sku.id,
+      channel,
+      price,
+      status: price === null ? "nhap" : "dang_ban",
+      note,
+      ...(listPrice !== null ? { listPrice } : {}),
+    };
+  }
   if (!row) {
     return { skuId: sku.id, channel, price: null, status: "nhap", note: "" };
   }
@@ -309,6 +328,7 @@ export function applyApprovedHr(settings: Settings): void {
 }
 
 export function confirmedComboNote(code: string): string | null {
+  if (tiktokPriceFor(code)) return null;
   return CONFIRMED_COMBO_NOTE[code] ?? null;
 }
 

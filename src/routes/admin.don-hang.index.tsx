@@ -1,15 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { AlarmClock, HandCoins, MoreHorizontal, Plus } from "lucide-react";
+import { toast } from "sonner";
+import { AlarmClock, HandCoins, MoreHorizontal, Plus, Printer } from "lucide-react";
 
 import { DateRangeField, vnDayOf } from "@/components/admin/date-range";
 import { ListPager, useListPage } from "@/components/admin/list-page";
-import { ClearFilters, FilterSheet, PageToolbar, ToolbarLink } from "@/components/admin/page-toolbar";
+import { ClearFilters, FilterSheet, PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
 import { ALL_TONE, FilterChips, STATUS_TONE, type FilterChip } from "@/components/admin/filter-chips";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatMaybe } from "@/lib/brand";
-import { downloadExcel, getMe, getOrders } from "@/lib/admin.functions";
+import { changeStatus, downloadExcel, getMe, getOrders, setFulfillment } from "@/lib/admin.functions";
 import { CHANNEL_LABEL, CHANNELS, STATUS_LABEL, type OrderStatus } from "@/domain/types";
 import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
 
@@ -24,7 +25,26 @@ export const Route = createFileRoute("/admin/don-hang/")({
 const SALE_FLOW: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"];
 const PRODUCTION_FLOW: OrderStatus[] = ["in", "dong_goi", "giao"];
 
+type OrderRow = {
+  id: string;
+  code: string;
+  status: string;
+  statusLabel: string;
+  customerName: string;
+  phone: string;
+  channel: string;
+  channelLabel: string;
+  itemSummary: string;
+  total: number | null;
+  depositPaid?: number | null;
+  remain?: number | null;
+  fileCount: number;
+  late: boolean;
+  fulfillment: "pickup" | "delivery";
+};
+
 function OrdersPage() {
+  const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const orders = useQuery({ queryKey: ["orders"], queryFn: () => getOrders() });
   const navigate = useNavigate();
@@ -38,6 +58,9 @@ function OrdersPage() {
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [fromDay, setFromDay] = useState("");
   const [toDay, setToDay] = useState("");
+  const [place, setPlace] = useState("all");
+  const [picked, setPicked] = useState<string[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
   const [view, setView] = useState<"list" | "board">("list");
   useEffect(() => {
@@ -76,6 +99,7 @@ function OrdersPage() {
     if (channel !== "all" && order.channel !== channel) return false;
     if (lateOnly && !order.late) return false;
     if (unpaidOnly && !(order.remain != null && order.remain > 0)) return false;
+    if (place !== "all" && order.fulfillment !== place) return false;
     const day = vnDayOf(order.createdAt);
     if (fromDay && day && day < fromDay) return false;
     if (toDay && day && day > toDay) return false;
@@ -86,8 +110,8 @@ function OrdersPage() {
       .toLowerCase()
       .includes(needle);
   });
-  const filterCount = (status !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (lateOnly ? 1 : 0) + (unpaidOnly ? 1 : 0) + (fromDay || toDay ? 1 : 0);
-  const list = useListPage(shown, `${status}|${channel}|${lateOnly}|${unpaidOnly}|${q}|${fromDay}|${toDay}`);
+  const filterCount = (status !== "all" ? 1 : 0) + (channel !== "all" ? 1 : 0) + (lateOnly ? 1 : 0) + (unpaidOnly ? 1 : 0) + (place !== "all" ? 1 : 0) + (fromDay || toDay ? 1 : 0);
+  const list = useListPage(shown, `${status}|${channel}|${lateOnly}|${unpaidOnly}|${place}|${q}|${fromDay}|${toDay}`);
   const pageRows = list.slice;
 
   function clearFilters() {
@@ -97,6 +121,48 @@ function OrdersPage() {
     setUnpaidOnly(false);
     setFromDay("");
     setToDay("");
+    setPlace("all");
+  }
+
+  function togglePick(id: string) {
+    setPicked((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  }
+
+  function printBills(codes: string[]) {
+    let blocked = 0;
+    for (const code of codes) {
+      const opened = window.open(`/admin/phieu/${encodeURIComponent(code)}`, "_blank", "noopener");
+      if (!opened) blocked += 1;
+    }
+    if (blocked) toast.error("Trình duyệt chặn cửa sổ in. Hãy cho phép popup rồi in lại.");
+  }
+
+  async function markDelivered(order: OrderRow) {
+    setBusy(order.id);
+    try {
+      const note = order.fulfillment === "pickup" ? "Khách đã nhận tại tiệm" : "Đã giao";
+      await changeStatus({ data: { orderId: order.id, status: "xong", note } });
+      toast.success(order.fulfillment === "pickup" ? `${order.code}: khách đã nhận` : `${order.code}: đã giao`);
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["nav-counts"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function choosePlace(order: OrderRow, fulfillment: "pickup" | "delivery") {
+    if (order.fulfillment === fulfillment) return;
+    setBusy(order.id);
+    try {
+      await setFulfillment({ data: { orderId: order.id, fulfillment } });
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusy(null);
+    }
   }
 
   function extraFilters() {
@@ -115,6 +181,16 @@ function OrdersPage() {
               {CHANNEL_LABEL[id]} ({rows.filter((row) => row.channel === id).length})
             </option>
           ))}
+        </select>
+        <select
+          className="h-9 min-w-[10rem] rounded-md border border-input bg-background px-3 text-[13px]"
+          aria-label="Lọc nơi nhận"
+          value={place}
+          onChange={(event) => setPlace(event.target.value)}
+        >
+          <option value="all">Mọi nơi nhận</option>
+          <option value="pickup">Lấy tại xưởng</option>
+          <option value="delivery">Giao hàng</option>
         </select>
         <button
           type="button"
@@ -149,8 +225,8 @@ function OrdersPage() {
   return (
     <div className="space-y-3">
       <PageToolbar
-        title="Nhận đơn"
-        hint={production ? "Chỉ hiện đơn đang In, Đóng gói hoặc Giao." : "Đơn đang xử lý. Tạo đơn mới bằng nút bên phải."}
+        title="Đơn hàng"
+        hint={production ? "In, đóng gói và giao ngay trên danh sách." : "In bill và giao hàng ngay trên danh sách."}
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm tên, SĐT, mã đơn…"
@@ -158,7 +234,11 @@ function OrdersPage() {
         onFilter={() => setSheet(true)}
         actions={
           <>
-            {production ? null : <ToolbarLink label="Tạo đơn" icon={Plus} primary to="/orders/create" />}
+            {picked.length > 0 ? (
+              <ToolbarButton label={`In bill (${picked.length})`} icon={Printer} primary onClick={() => printBills(rows.filter((order) => picked.includes(order.id)).map((order) => order.code))} />
+            ) : production ? null : (
+              <ToolbarLink label="Tạo đơn" icon={Plus} primary to="/orders/create" />
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className="inline-flex size-9 items-center justify-center rounded-md border bg-background" aria-label="Thêm thao tác">
@@ -214,7 +294,16 @@ function OrdersPage() {
                 </header>
                 <div className="space-y-2">
                   {column.rows.map((order) => (
-                    <OrderCard key={order.id} order={order} money={!production} />
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      money={!production}
+                      picked={picked.includes(order.id)}
+                      busy={busy === order.id}
+                      onPick={() => togglePick(order.id)}
+                      onPlace={(fulfillment) => void choosePlace(order, fulfillment)}
+                      onDone={() => void markDelivered(order)}
+                    />
                   ))}
                   {column.rows.length === 0 ? <p className="rounded-2xl border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">Không có đơn</p> : null}
                 </div>
@@ -227,50 +316,55 @@ function OrdersPage() {
       <>
       <div className="grid gap-2 md:hidden">
         {pageRows.map((order) => (
-          <OrderCard key={order.id} order={order} money={!production} />
+          <OrderCard
+            key={order.id}
+            order={order}
+            money={!production}
+            picked={picked.includes(order.id)}
+            busy={busy === order.id}
+            onPick={() => togglePick(order.id)}
+            onPlace={(fulfillment) => void choosePlace(order, fulfillment)}
+            onDone={() => void markDelivered(order)}
+          />
         ))}
       </div>
       <div className="hidden overflow-hidden rounded-md border bg-card md:block">
         <table className="w-full text-left text-[13px]">
           <thead className="bg-muted/40 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             <tr>
-              <th className="px-3 py-2.5">STT</th>
+              <th className="w-10 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  aria-label="Chọn đơn trên trang"
+                  checked={pageRows.length > 0 && pageRows.every((order) => picked.includes(order.id))}
+                  onChange={() => {
+                    const ids = pageRows.map((order) => order.id);
+                    const all = ids.every((id) => picked.includes(id));
+                    setPicked((current) => (all ? current.filter((id) => !ids.includes(id)) : [...new Set([...current, ...ids])]));
+                  }}
+                />
+              </th>
               <th className="px-3 py-2.5">Mã đơn</th>
               <th className="px-3 py-2.5">Khách hàng</th>
               <th className="px-3 py-2.5">Trạng thái</th>
-              <th className="px-3 py-2.5">Kênh</th>
-              {production ? null : <th className="px-3 py-2.5 text-right">Số tiền</th>}
-              {production ? null : <th className="px-3 py-2.5 text-right">Đã thu</th>}
+              <th className="px-3 py-2.5">Nhận hàng</th>
               {production ? null : <th className="px-3 py-2.5 text-right">Còn lại</th>}
             </tr>
           </thead>
           <tbody>
-            {pageRows.map((order, index) => (
+            {pageRows.map((order) => (
               <tr
                 key={order.id}
                 className="cursor-pointer border-t hover:bg-muted/30"
                 onClick={() => navigate({ to: "/admin/don-hang/$code", params: { code: order.code } })}
               >
-                <td className="px-3 py-2.5 text-muted-foreground">{list.start + index + 1}</td>
+                <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
+                  <input type="checkbox" aria-label={`Chọn ${order.code}`} checked={picked.includes(order.id)} onChange={() => togglePick(order.id)} />
+                </td>
                 <td className="px-3 py-2.5 font-semibold">
                   <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="text-primary">
                     {order.code}
                   </Link>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button type="button" className="ml-1 inline-flex size-7 items-center justify-center rounded-md hover:bg-muted" aria-label={`Thao tác ${order.code}`} onClick={(event) => event.stopPropagation()}>
-                        <MoreHorizontal className="size-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin/phieu/$code" params={{ code: order.code }}>In K80</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin/giao-hang">Giao đơn</Link>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                   {order.late ? <span className="ml-2 text-[11px] font-bold text-destructive">Trễ</span> : null}
                 </td>
                 <td className="px-3 py-2.5">
@@ -278,13 +372,11 @@ function OrdersPage() {
                   <p className="text-[11px] text-muted-foreground">{order.phone}</p>
                 </td>
                 <td className="px-3 py-2.5"><StatusPill status={order.status} label={statusLabelOf(order.status, order.statusLabel)} /></td>
-                <td className="px-3 py-2.5">{channelLabelOf(order.channel, order.channelLabel)}</td>
+                <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
+                  <OrderActions order={order} busy={busy === order.id} onPlace={(fulfillment) => void choosePlace(order, fulfillment)} onDone={() => void markDelivered(order)} />
+                </td>
                 {production ? null : (
-                  <>
-                    <td className="px-3 py-2.5 text-right font-semibold">{order.total == null ? "Chưa có giá" : formatMaybe(order.total)}</td>
-                    <td className="px-3 py-2.5 text-right">{formatMaybe(order.depositPaid)}</td>
-                    <td className="px-3 py-2.5 text-right font-semibold">{order.remain == null ? "—" : formatMaybe(order.remain)}</td>
-                  </>
+                  <td className="px-3 py-2.5 text-right font-semibold">{order.remain == null ? "—" : formatMaybe(order.remain)}</td>
                 )}
               </tr>
             ))}
@@ -322,46 +414,96 @@ function StatusPill({ status, label }: { status: string; label: string }) {
   );
 }
 
+function OrderActions({
+  order,
+  busy,
+  onPlace,
+  onDone,
+}: {
+  order: OrderRow;
+  busy: boolean;
+  onPlace: (fulfillment: "pickup" | "delivery") => void;
+  onDone: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <select
+        className="h-8 rounded-md border bg-background px-2 text-[12px]"
+        aria-label={`Nơi nhận ${order.code}`}
+        value={order.fulfillment}
+        disabled={busy}
+        onChange={(event) => onPlace(event.target.value as "pickup" | "delivery")}
+      >
+        <option value="pickup">Lấy tại xưởng</option>
+        <option value="delivery">Giao hàng</option>
+      </select>
+      <a
+        href={`/admin/phieu/${encodeURIComponent(order.code)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex h-8 items-center rounded-md border px-2 text-[12px] font-semibold"
+        onClick={(event) => event.stopPropagation()}
+      >
+        In bill
+      </a>
+      {order.status === "giao" ? (
+        <button
+          type="button"
+          className="inline-flex h-8 items-center rounded-md bg-[#2563eb] px-2 text-[12px] font-semibold text-white disabled:opacity-50"
+          disabled={busy}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDone();
+          }}
+        >
+          {order.fulfillment === "pickup" ? "Khách đã nhận" : "Đã giao"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 function OrderCard({
   order,
   money,
+  picked,
+  busy,
+  onPick,
+  onPlace,
+  onDone,
 }: {
-  order: {
-    id: string;
-    code: string;
-    status: string;
-    statusLabel: string;
-    customerName: string;
-    phone: string;
-    channel: string;
-    channelLabel: string;
-    itemSummary: string;
-    total: number | null;
-    depositPaid?: number | null;
-    remain?: number | null;
-    fileCount: number;
-    late: boolean;
-  };
+  order: OrderRow;
   money: boolean;
+  picked: boolean;
+  busy: boolean;
+  onPick: () => void;
+  onPlace: (fulfillment: "pickup" | "delivery") => void;
+  onDone: () => void;
 }) {
   return (
-    <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="block rounded-2xl border border-border/70 bg-card p-4">
+    <article className="rounded-2xl border border-border/70 bg-card p-4">
       <div className="mb-2 flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-semibold text-primary">{order.code}</p>
-          <p className="truncate text-sm text-muted-foreground">{order.customerName} · {order.phone}</p>
+        <div className="flex min-w-0 items-start gap-2">
+          <input type="checkbox" className="mt-1" aria-label={`Chọn ${order.code}`} checked={picked} onChange={onPick} />
+          <div className="min-w-0">
+            <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="font-semibold text-primary">{order.code}</Link>
+            <p className="truncate text-sm text-muted-foreground">{order.customerName} · {order.phone}</p>
+          </div>
         </div>
         <StatusPill status={order.status} label={statusLabelOf(order.status, order.statusLabel)} />
       </div>
       <p className="line-clamp-2 text-sm">{order.itemSummary}</p>
       {order.late ? <p className="mt-1 text-sm font-semibold text-destructive">Trễ mốc</p> : null}
-      <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-sm">
         <span className="text-muted-foreground">{channelLabelOf(order.channel, order.channelLabel)}</span>
         <span className="text-right font-semibold">
           {money && order.total != null ? formatMaybe(order.total) : `${order.fileCount} ảnh`}
           {money && order.remain != null ? <span className="block text-xs font-normal text-muted-foreground">Còn {formatMaybe(order.remain)}</span> : null}
         </span>
       </div>
-    </Link>
+      <div className="mt-3">
+        <OrderActions order={order} busy={busy} onPlace={onPlace} onDone={onDone} />
+      </div>
+    </article>
   );
 }
