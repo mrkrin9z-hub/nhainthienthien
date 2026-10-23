@@ -1,5 +1,6 @@
 import { ensureChecklistTasks } from "./checklists.ts";
 import { ensureMoHome } from "./mohome.ts";
+import { ensureWaste } from "./waste.ts";
 import { applyDeskSheetCosts, applyDeskSupplies } from "./desk-supply.ts";
 import { ensureOrgCollections } from "./org-desk.ts";
 import {
@@ -182,6 +183,7 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (ensureChecklistTasks(state)) changed = true;
   if (ensureOrgCollections(state)) changed = true;
   if (ensureMoHome(state)) changed = true;
+  if (ensureWaste(state as Parameters<typeof ensureWaste>[0])) changed = true;
   return changed;
 }
 

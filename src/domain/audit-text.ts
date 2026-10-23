@@ -23,6 +23,11 @@ export const AUDIT_ACTIONS: { action: string; label: string }[] = [
   { action: "sku.map", label: "Map SKU" },
   { action: "stock.in", label: "Nhập kho" },
   { action: "stock.count", label: "Kiểm kho" },
+  { action: "waste.report", label: "Báo hỏng" },
+  { action: "waste.edit", label: "Sửa hao hụt" },
+  { action: "waste.void", label: "Hủy hao hụt" },
+  { action: "waste.confirm", label: "Chốt hao hụt" },
+  { action: "waste.approve", label: "Duyệt hao hụt" },
   { action: "stock.ink", label: "Mở mực" },
   { action: "material.price", label: "Giá vật tư" },
   { action: "material.update", label: "Vật tư" },
@@ -66,7 +71,8 @@ const SETTING_LABEL: Record<string, string> = {
   walkinCommissionPercent: "Tại tiệm hoa hồng %",
   marginYellowPercent: "Ngưỡng vàng lãi gộp (%)",
   marginRedPercent: "Ngưỡng đỏ",
-  wasteRate: "Hao hụt",
+  wasteRate: "Hao hụt giấy/màng",
+  wasteAlertPercent: "Ngưỡng cảnh báo hao hụt (%)",
   tapeOrdersPerRoll: "Số đơn / cuộn băng keo",
   magnetPiecesPerSheet: "Miếng nam châm / tấm",
   ppRollWidthCm: "Khổ cuộn PP (cm)",
@@ -209,6 +215,16 @@ function detailOf(item: Pick<Audit, "action" | "entity" | "before" | "after">, s
       return `nhập kho ${materialBit(shop, item.entity, num(after?.qty), true)}${after?.packPrice != null ? ` · giá gói ${dong(after.packPrice)}` : ""}`;
     case "stock.count":
       return `kiểm kho ${materialName(shop, item.entity)}: ${qty(num(before?.stock), unitOf(shop, item.entity))} → ${qty(num(after?.stock), unitOf(shop, item.entity))}`;
+    case "waste.report":
+      return `báo hỏng ${materialBit(shop, text(after?.materialId), num(after?.qty), false)}`;
+    case "waste.edit":
+      return `sửa hao hụt ${materialBit(shop, text(after?.materialId), num(after?.qty), false)}`;
+    case "waste.void":
+      return `hủy phiếu hao hụt ${materialName(shop, text(before?.materialId))}`;
+    case "waste.confirm":
+      return `chốt hao hụt ngày ${text(after?.day)}`;
+    case "waste.approve":
+      return `duyệt phiếu hao hụt ${materialName(shop, text(after?.materialId))}`;
     case "stock.ink":
       return "mở một lọ mực";
     case "material.price":

@@ -39,7 +39,7 @@ export const Route = createFileRoute("/admin/cai-dat")({
   component: SettingsPage,
 });
 
-const COST_KEYS = ["inkPercent", "marginYellowPercent", "marginRedPercent", "wasteRate"] as const;
+const COST_KEYS = ["inkPercent", "marginYellowPercent", "marginRedPercent", "wasteRate", "wasteAlertPercent"] as const;
 const FEE_KEYS = [
   "tiktokFeePercent",
   "tiktokExtraPercent",
@@ -89,6 +89,7 @@ const NUMBER_FIELDS: { key: string; label: string; nullable?: boolean }[] = [
   { key: "marginYellowPercent", label: "Ngưỡng vàng lãi gộp (%)" },
   { key: "marginRedPercent", label: "Ngưỡng đỏ (lãi dưới số này là LỖ)" },
   { key: "wasteRate", label: "Hao hụt giấy/màng (0.1 = 10%)" },
+  { key: "wasteAlertPercent", label: "Cảnh báo khi hao hụt vượt % doanh thu", nullable: true },
   { key: "tiktokFeePercent", label: "TikTok phí %" },
   { key: "tiktokExtraPercent", label: "TikTok phí thêm %" },
   { key: "tiktokFixed", label: "TikTok phí/đơn" },

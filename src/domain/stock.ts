@@ -10,7 +10,7 @@ function reasons(phase: "print" | "pack") {
   return phase === "print" ? { out: PRINT_OUT, back: PRINT_BACK } : { out: PACK_OUT, back: PACK_BACK };
 }
 
-/** Số đã trừ ròng cho đơn và pha này (trừ − hoàn). */
+/** Số đã trừ ròng cho đơn và pha này (trừ − hoàn). Hao hụt là phiếu riêng, không hoàn khi hủy đơn. */
 function netTaken(state: ShopState, orderId: string, phase: "print" | "pack"): Map<string, number> {
   const { out, back } = reasons(phase);
   const map = new Map<string, number>();

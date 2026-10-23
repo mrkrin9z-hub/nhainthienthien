@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { FilterSheet, PageToolbar } from "@/components/admin/page-toolbar";
+import { WasteCostReport } from "@/components/admin/waste-stats";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -76,6 +77,7 @@ function ReportBody() {
             <Stat label="Lãi gộp" value={data.incomplete ? "Chưa đủ giá vốn" : formatMaybe(data.gross)} />
             <Stat label="Chi phí cố định" value={formatMaybe(data.costBasis)} />
             <Stat label="Chi phí phát sinh" value={formatMaybe(data.extraSum)} />
+            <Stat label="Hao hụt" value={formatMaybe(data.wasteCost)} />
             <Stat label="Lãi ròng" value={data.net === null ? "Chưa đủ số" : formatMaybe(data.net)} />
             <Stat label="Giá trị đơn trung bình" value={data.averageOrder === null ? "—" : formatMaybe(data.averageOrder)} />
             <Stat label="Tỉ lệ hủy" value={data.cancelRate === null ? "—" : `${data.cancelRate}% (${data.cancelled}/${data.placed})`} />
@@ -100,7 +102,7 @@ function ReportBody() {
           ) : null}
           <section className="glass-card rounded-3xl p-4">
             <h2 className="font-bold text-primary">Chi phí phát sinh tháng {month}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Khoản này trừ riêng, không gộp vào chi phí cố định. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Khoản này trừ riêng, không gộp vào chi phí cố định. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh − hao hụt.</p>
             <ul className="mt-2 space-y-1 text-sm">
               {data.extras.map((row) => (
                 <li key={`${row.name}-${row.amount}-${row.note}`}>
@@ -112,6 +114,32 @@ function ReportBody() {
             </ul>
             <p className="mt-2 font-semibold">Cộng chi phí phát sinh: {formatMaybe(data.extraSum)}</p>
           </section>
+          {data.wasteAlert ? (
+            <p className="text-sm font-semibold text-destructive">
+              Hao hụt {data.wasteRate}% doanh thu, vượt ngưỡng {data.wasteThreshold}%.
+            </p>
+          ) : null}
+          <WasteCostReport
+            month={month}
+            summary={{
+              wasteCost: data.wasteCost,
+              wasteRate: data.wasteRate,
+              wasteUnknown: data.wasteUnknown,
+              wasteLines: data.wasteLines,
+              byMaterial: data.wasteByMaterial,
+              byReason: data.wasteByReason,
+              byPerson: data.wasteByPerson,
+              byChannel: data.wasteByChannel,
+            }}
+            days={data.wasteDays}
+            compare={{
+              previousMonth: data.wastePreviousMonth,
+              previousCost: data.wastePreviousCost,
+              previousRate: data.wastePreviousRate,
+              costDelta: data.wasteCostDelta,
+              rateDelta: data.wasteRateDelta,
+            }}
+          />
           <section className="glass-card rounded-3xl p-4">
             <h2 className="font-bold text-primary">Theo {grain === "day" ? "ngày" : grain === "week" ? "tuần" : "tháng"}</h2>
             <ul className="mt-2 space-y-1 text-sm">

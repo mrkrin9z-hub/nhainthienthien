@@ -14,16 +14,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CircleCheck, CircleDashed, MoreHorizontal, PackagePlus, PackageSearch, TriangleAlert } from "lucide-react";
 import { useEffect } from "react";
 import { formatMaybe } from "@/lib/brand";
+import { WasteDesk } from "@/components/admin/waste-desk";
 import { approvePrice, countStock, downloadExcel, getInventory, getMe, markInkOpened, receiveStock, saveMaterial } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/kho")({
   validateSearch: (search: Record<string, unknown>): { m: string } => ({
-    m: search.m === "nhap" ? "nhap" : "",
+    m: search.m === "nhap" ? "nhap" : search.m === "hong" ? "hong" : "",
   }),
   component: StockPage,
 });
 
 function StockPage() {
+  const { m } = Route.useSearch();
+  if (m === "hong") return <WasteDesk />;
+  return <StockBody />;
+}
+
+function StockBody() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const stock = useQuery({ queryKey: ["stock"], queryFn: () => getInventory() });
   const owner = me.data?.role === "owner";

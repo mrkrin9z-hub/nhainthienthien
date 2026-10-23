@@ -399,6 +399,74 @@ export const saveBomQty = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const getWaste = createServerFn({ method: "GET" }).handler(async () => {
+  const { wasteBoard } = await import("@/server/service");
+  return wasteBoard(await actor());
+});
+
+export const reportDamage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        materialId: z.string(),
+        qty: z.number().positive(),
+        reason: z.enum(["in_loi", "lech_vien", "bong_mang", "rach", "roi_vo", "khac"]),
+        orderId: z.string().nullable().optional(),
+        note: z.string().max(500).optional().default(""),
+        photoName: z.string().max(120).optional(),
+        photoMime: z.string().max(80).optional(),
+        photoBase64: z.string().max(14_000_000).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { reportWaste } = await import("@/server/service");
+    await reportWaste(await actor(), data);
+    return { ok: true };
+  });
+
+export const closeDamageDay = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ day: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { closeWasteDay } = await import("@/server/service");
+    await closeWasteDay(await actor(), data.day);
+    return { ok: true };
+  });
+
+export const approveDamage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { approveWasteReport } = await import("@/server/service");
+    await approveWasteReport(await actor(), data.id);
+    return { ok: true };
+  });
+
+export const editDamage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        id: z.string(),
+        qty: z.number().positive(),
+        reason: z.enum(["in_loi", "lech_vien", "bong_mang", "rach", "roi_vo", "khac", "chua_ro"]),
+        materialId: z.string(),
+        note: z.string().max(500),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { editWasteReport } = await import("@/server/service");
+    await editWasteReport(await actor(), data);
+    return { ok: true };
+  });
+
+export const voidDamage = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { voidWasteReport } = await import("@/server/service");
+    await voidWasteReport(await actor(), data.id);
+    return { ok: true };
+  });
+
 export const countStock = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ materialId: z.string(), actual: z.number().min(0), note: z.string().optional().default("") }).parse(data))
   .handler(async ({ data }) => {
