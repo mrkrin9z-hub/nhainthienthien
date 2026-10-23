@@ -139,9 +139,12 @@ test("sổ cũ được nhập một lần, sổ không có giá thì không đ�
     packages: [],
     sepaySeen: [],
   };
-  assert.equal(applyStoreMigrations(bare), false);
+  applyStoreMigrations(bare);
   assert.equal(bare.groups[0]?.name, "Tên chủ đã sửa");
   assert.equal(bare.settings.catalogImport20261022, undefined);
+  assert.equal(bare.settings.shopChannels?.find((row) => row.id === "tai_tiem")?.label, "Tại tiệm");
+  assert.equal(bare.settings.shopChannels?.some((row) => row.id === "mo_home"), true);
+  assert.equal(applyStoreMigrations(bare), false);
 });
 
 test("chữ hỏng được sửa, tiếng Việt đúng thì giữ", () => {

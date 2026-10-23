@@ -1,4 +1,5 @@
 import { DEFAULT_REMIND_MESSAGE } from "./crm.ts";
+import { MO_HOME_GROUPS, NHA_IN_CHANNELS } from "./mohome.ts";
 import { ensureChecklistTasks } from "./checklists.ts";
 import { applyDeskSheetCosts, inkBottles } from "./desk-supply.ts";
 import { catalogPrices, DESK_PRODUCT_DESCRIPTION, DESK_PRODUCT_NAME, MIN_STOCK_20261022, stampSheetCosts } from "./price-import.ts";
@@ -54,6 +55,7 @@ export const DEFAULT_SETTINGS: Settings = {
   saleBase: 8000000,
   saleProbationPercent: 85,
   productionBase: 11000000,
+  moHomeLaborPercent: 50,
   kpiTargets: [25000000, 20000000, 40000000, 60000000],
   commissionTiers: [
     { upto: 100000000, percent: 3 },
@@ -89,6 +91,10 @@ export const DEFAULT_SETTINGS: Settings = {
     lua: true,
     anh_the: false,
     album: false,
+    ep_lua: false,
+    khung_go: false,
+    khung_nhom: false,
+    photobook: false,
   },
   marketplaceCutoff: "14:00",
   marketplaceHandover: "18:00",
@@ -264,6 +270,7 @@ function groups(): Group[] {
       sort: 10,
       gate: "album",
     },
+    ...MO_HOME_GROUPS,
   ];
 }
 
@@ -333,18 +340,19 @@ function buildCatalog(settings: Settings): { skus: Sku[]; boms: BomLine[] } {
   };
   for (const spec of SPECS) {
     if (spec.groupId === "album") {
-      const sku: Sku = {
-        id: "ALBUM",
-        code: "ALBUM",
-        groupId: "album",
-        name: "Thiết kế theo yêu cầu",
-        size: null,
-        widthCm: null,
-        heightCm: null,
-        sheets: 1,
-        piecesPerPack: null,
-        sort: ++sort,
-      };
+        const sku: Sku = {
+          id: "ALBUM",
+          code: "ALBUM",
+          groupId: "album",
+          name: "Thiết kế theo yêu cầu",
+          size: null,
+          widthCm: null,
+          heightCm: null,
+          sheets: 1,
+          piecesPerPack: null,
+          sort: ++sort,
+          soldOn: [...NHA_IN_CHANNELS],
+        };
       skus.push(sku);
       continue;
     }
@@ -371,6 +379,7 @@ function buildCatalog(settings: Settings): { skus: Sku[]; boms: BomLine[] } {
           sheets: count,
           piecesPerPack: packed ? count : null,
           sort: ++sort,
+          soldOn: [...NHA_IN_CHANNELS],
         };
         skus.push(sku);
         if (spec.kind === "none") continue;

@@ -20,7 +20,9 @@ export function CreateOrderForm({
   const skus = useQuery({ queryKey: ["sku-options"], queryFn: () => getSkuOptions() });
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => loadSettings() });
   const catalog = ((skus.data ?? []) as DeskSku[]).filter((sku) => !isMergedWoodAlias(sku));
-  const channels = normalizeShopChannels(settings.data?.settings.shopChannels).filter((row) => row.enabled);
+  const channels = normalizeShopChannels(settings.data?.settings.shopChannels)
+    .filter((row) => row.enabled)
+    .filter((row) => me.data?.role === "owner" || row.id !== "mo_home");
 
   return (
     <OrderDesk

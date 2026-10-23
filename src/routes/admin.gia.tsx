@@ -12,14 +12,13 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatMaybe } from "@/lib/brand";
-import { cloneShelf, createPriceSize, getBom, getMe, getPriceBoard, importPriceSheet, pullCatalog, runQuote, runRecalc, saveBomQty, savePieces, savePrice } from "@/lib/admin.functions";
-import { CHANNEL_LABEL, type Channel } from "@/domain/types";
+import { cloneShelf, createPriceSize, getBom, getMe, getPriceBoard, importPriceSheet, pullCatalog, runQuote, runRecalc, saveBomQty, savePieces, savePrice, setSkuSold } from "@/lib/admin.functions";
+import { isMoHomeGroup } from "@/domain/mohome";
+import { CHANNEL_LABEL, CHANNELS, type Channel } from "@/domain/types";
 
 export const Route = createFileRoute("/admin/gia")({
   component: PricePage,
 });
-
-const CHANNELS: Channel[] = ["tai_tiem", "facebook", "tiktok", "shopee"];
 
 function PricePage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
@@ -57,7 +56,11 @@ function PricePage() {
       <GoodsLinks />
       <PageToolbar
         title="Bảng giá theo kênh"
-        hint="Giá chung cho tại tiệm, web và Facebook. TikTok/Shopee: giá bán là giá sau giảm, niêm yết để đối chiếu. Lãi tính từ vốn bảng 22/10, mực 4,4%, hoa hồng 3% tại tiệm và Facebook, sàn 27% + 11.000đ, quảng cáo Facebook 10% và đóng gói 8.000đ."
+        hint={
+          channel === "mo_home"
+            ? "Giá nội bộ Mơ Home, tách khỏi giá Nhà In. Hoa hồng sale = 0. Bật «Bán ở kênh này» khi mã được bán. Chưa có bảng giá thì để trống, không lấy giá tại tiệm."
+            : "Giá chung cho tại tiệm, web và Facebook. TikTok/Shopee: giá bán là giá sau giảm, niêm yết để đối chiếu. Lãi tính từ vốn bảng 22/10, mực 4,4%, hoa hồng 3% tại tiệm và Facebook, sàn 27% + 11.000đ, quảng cáo Facebook 10% và đóng gói 8.000đ. Mơ Home không dùng giá này."
+        }
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm mã hoặc quy cách…"
@@ -114,7 +117,12 @@ function PricePage() {
           </button>
         ))}
       </div>
-      {owner ? <ShelfTools groupId={groupId} channel={channel} /> : null}
+      {owner && channel !== "mo_home" ? <ShelfTools groupId={groupId} channel={channel} /> : null}
+      {(board.data?.rows.length ?? 0) === 0 && !board.isLoading ? (
+        <p className="rounded-2xl bg-card px-4 py-3 text-sm">
+          Nhóm này chưa có mã. Cần bảng giá: mã, tên, nhóm (ép gỗ lụa, khung gỗ, khung nhôm hoặc album photobook), khổ cm, số tấm, giá bán nội bộ, vốn vật tư, và định mức nếu khác hàng Nhà In.
+        </p>
+      ) : null}
       {(board.data?.warnings ?? []).length > 0 ? (
         <div className="rounded-2xl bg-accent/40 px-4 py-3 text-sm font-semibold text-foreground">
           {(board.data?.warnings ?? []).map((warning) => (
@@ -224,7 +232,8 @@ function PriceRow({
     name: string;
     piecesPerPack: number | null;
     sheetCost?: number | null;
-    prices: Record<string, { price: number | null; listPrice?: number | null; status: string; note: string; profit?: number | null; marginPercent?: number | null }>;
+    soldOn?: Channel[];
+    prices: Record<string, { price: number | null; listPrice?: number | null; status: string; note: string; profit?: number | null; marginPercent?: number | null; sold?: boolean }>;
   };
   channel: Channel;
   owner: boolean;
@@ -241,6 +250,7 @@ function PriceRow({
   const [status, setStatus] = useState(cell.status);
   const [note, setNote] = useState(cell.note);
   const [pieces, setPieces] = useState("");
+  const [sold, setSold] = useState(Boolean(cell.sold));
   const [saving, setSaving] = useState(false);
   const pack = row.code.endsWith("-GOI");
 
@@ -249,7 +259,19 @@ function PriceRow({
     setStatus(cell.status);
     setNote(cell.note);
     setPieces(row.piecesPerPack === null ? "" : String(row.piecesPerPack));
+    setSold(Boolean(cell.sold));
     setOpen(true);
+  }
+
+  async function toggleSold(next: boolean) {
+    setSold(next);
+    try {
+      await setSkuSold({ data: { skuId: row.skuId, channel, sold: next } });
+      await queryClient.invalidateQueries({ queryKey: ["prices"] });
+    } catch (error) {
+      setSold(!next);
+      toast.error((error as Error).message);
+    }
   }
 
   async function save() {
@@ -286,6 +308,7 @@ function PriceRow({
       <div className="text-[13px]">
         <p className="font-medium">{row.name}</p>
         <p className="text-xs text-muted-foreground">Vốn {formatMaybe(row.sheetCost)}</p>
+        {cell.sold ? null : <p className="text-xs font-semibold text-muted-foreground">Không bán ở kênh này</p>}
         {pack ? <p className="text-xs text-muted-foreground">Gói {row.piecesPerPack ?? "—"} miếng</p> : null}
       </div>
       <div>
@@ -310,6 +333,12 @@ function PriceRow({
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">{row.name} · {CHANNEL_LABEL[channel]}</p>
+            {owner ? (
+              <label className="flex min-h-11 items-center gap-2 text-sm font-semibold">
+                <input type="checkbox" checked={sold} onChange={(event) => void toggleSold(event.target.checked)} />
+                Bán ở kênh này
+              </label>
+            ) : null}
             <label className="block text-sm font-semibold">
               Giá bán
               <Input className="mt-1 min-h-11" inputMode="numeric" value={price} placeholder="Chưa có" aria-label={`Giá ${row.name}`} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
@@ -360,6 +389,7 @@ function CreatePriceDialog({
   const [height, setHeight] = useState("");
   const [sheets, setSheets] = useState("1");
   const [walkIn, setWalkIn] = useState("");
+  const [moHome, setMoHome] = useState("");
   const [facebook, setFacebook] = useState("");
   const [tiktok, setTiktok] = useState("");
   const [shopee, setShopee] = useState("");
@@ -370,12 +400,14 @@ function CreatePriceDialog({
   }
 
   async function save() {
-    if (!width || !height || !sheets || !walkIn) {
-      toast.error("Nhập rộng, cao, số tấm và giá tại tiệm.");
+    const internal = isMoHomeGroup(groupId);
+    if (!width || !height || !sheets || (internal ? !moHome : !walkIn)) {
+      toast.error(internal ? "Nhập rộng, cao, số tấm và giá nội bộ Mơ Home." : "Nhập rộng, cao, số tấm và giá tại tiệm.");
       return;
     }
     const prices: Partial<Record<Channel, number>> = {};
     if (walkIn) prices.tai_tiem = Number(walkIn);
+    if (moHome) prices.mo_home = Number(moHome);
     if (facebook) prices.facebook = Number(facebook);
     if (tiktok) prices.tiktok = Number(tiktok);
     if (shopee) prices.shopee = Number(shopee);
@@ -396,6 +428,7 @@ function CreatePriceDialog({
       setHeight("");
       setSheets("1");
       setWalkIn("");
+      setMoHome("");
       setFacebook("");
       setTiktok("");
       setShopee("");
@@ -427,9 +460,25 @@ function CreatePriceDialog({
             <Input className="mt-1 min-h-11" inputMode="numeric" value={sheets} onChange={(event) => setSheets(digits(event.target.value))} />
           </label>
           <label className="text-sm font-semibold">
-            Giá tại tiệm
-            <Input className="mt-1 min-h-11" inputMode="numeric" value={walkIn} onChange={(event) => setWalkIn(digits(event.target.value))} />
+            {isMoHomeGroup(groupId) ? "Giá nội bộ Mơ Home" : "Giá tại tiệm"}
+            <Input
+              className="mt-1 min-h-11"
+              inputMode="numeric"
+              value={isMoHomeGroup(groupId) ? moHome : walkIn}
+              onChange={(event) => (isMoHomeGroup(groupId) ? setMoHome(digits(event.target.value)) : setWalkIn(digits(event.target.value)))}
+            />
           </label>
+          {isMoHomeGroup(groupId) ? (
+            <label className="text-sm font-semibold">
+              Giá tại tiệm, nếu bán cả Nhà In
+              <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chỉ nội bộ" value={walkIn} onChange={(event) => setWalkIn(digits(event.target.value))} />
+            </label>
+          ) : (
+            <label className="text-sm font-semibold">
+              Giá nội bộ Mơ Home
+              <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chưa bán nội bộ" value={moHome} onChange={(event) => setMoHome(digits(event.target.value))} />
+            </label>
+          )}
           <label className="text-sm font-semibold">
             Facebook
             <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chưa có" value={facebook} onChange={(event) => setFacebook(digits(event.target.value))} />

@@ -1,6 +1,7 @@
 import { formulaQty, magnetPiecesOnSheet, materialUnitCost, money } from "./calc.ts";
 import { channelPriceFor, masterByCode, MIN_STOCK_20261022, nx12MagnetNote, sheetCostFor } from "./price-import.ts";
-import { CHANNELS, type BomLine, type ChannelPrice, type Material, type Settings, type Sku } from "./types.ts";
+import { NHA_IN_CHANNELS } from "./mohome.ts";
+import { type BomLine, type ChannelPrice, type Material, type Settings, type Sku } from "./types.ts";
 
 /** Ước tính phôi nam châm trên dòng NX-12×25 của bảng 22/10. Thay bằng 176.000 ÷ số miếng. */
 export const MAGNET_12x25_ESTIMATE = 7500;
@@ -122,7 +123,7 @@ export function applyDeskSupplies(state: DeskState): boolean {
     };
     skus.push(sku);
     const row = masterByCode().get(sku.code);
-    for (const channel of CHANNELS) {
+    for (const channel of NHA_IN_CHANNELS) {
       if (prices.some((price) => price.skuId === sku.id && price.channel === channel)) continue;
       prices.push(channelPriceFor(sku, channel, row));
     }

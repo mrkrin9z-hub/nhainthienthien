@@ -86,6 +86,7 @@ const SETTING_LABEL: Record<string, string> = {
   saleBase: "Lương cứng sale",
   saleProbationPercent: "Thử việc sale %",
   productionBase: "Lương sản xuất",
+  moHomeLaborPercent: "Phần lương sản xuất tính cho Mơ Home %",
   kpiTargets: "Mốc KPI",
   commissionTiers: "Bậc hoa hồng",
   commissionBasis: "Cách tính hoa hồng",

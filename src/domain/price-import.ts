@@ -1,7 +1,7 @@
 import { magnetPiecesOnSheet, money } from "./calc.ts";
 import { PRICE_SHEET_20261022 } from "./price-sheet-20261022.ts";
+import { NHA_IN_CHANNELS } from "./mohome.ts";
 import type { Channel, ChannelPrice, HrDraft, Settings, Sku } from "./types.ts";
-import { CHANNELS } from "./types.ts";
 
 /** Tên khách thấy cho ảnh ép gỗ tráng gương. */
 export const DESK_PRODUCT_NAME = "Ảnh ép gỗ tráng gương để bàn";
@@ -155,6 +155,9 @@ function priceNote(row: MasterRow, channel: Channel): string {
 }
 
 export function channelPriceFor(sku: { id: string; code: string }, channel: Channel, row: MasterRow | undefined): ChannelPrice {
+  if (channel === "mo_home") {
+    return { skuId: sku.id, channel, price: null, status: "nhap", note: "Giá nội bộ Mơ Home. Chưa có bảng giá riêng." };
+  }
   if (!row) {
     return { skuId: sku.id, channel, price: null, status: "nhap", note: "" };
   }
@@ -175,7 +178,7 @@ export function catalogPrices(skus: { id: string; code: string }[]): ChannelPric
   const prices: ChannelPrice[] = [];
   for (const sku of skus) {
     const row = rows.get(sku.code);
-    for (const channel of CHANNELS) prices.push(channelPriceFor(sku, channel, row));
+    for (const channel of NHA_IN_CHANNELS) prices.push(channelPriceFor(sku, channel, row));
   }
   return prices;
 }

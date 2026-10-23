@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { vnYmd } from "@/domain/calc";
+import { skuSoldOn } from "@/domain/mohome";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { getCustomers } from "@/lib/admin.functions";
 import { formatMaybe, formatVnd } from "@/lib/brand";
@@ -23,6 +24,7 @@ export type DeskSku = {
   groupName: string;
   label: string;
   prices?: Partial<Record<Channel, number | null>>;
+  soldOn?: Channel[];
 };
 
 type Line = {
@@ -133,6 +135,10 @@ export function OrderDesk({
   const channelList = channelOptions?.length
     ? channelOptions
     : (Object.keys(CHANNEL_LABEL) as Channel[]).map((id) => ({ id, label: CHANNEL_LABEL[id] }));
+  const sellable = useMemo(
+    () => catalog.filter((sku) => skuSoldOn(sku, channel)),
+    [catalog, channel],
+  );
 
   const priced = useMemo(() => {
     return lines.map((line) => {
@@ -362,7 +368,7 @@ export function OrderDesk({
                   key={line.key}
                   index={index}
                   line={line}
-                  catalog={catalog}
+                  catalog={sellable}
                   owner={owner}
                   locked={itemsLocked}
                   canRemove={!itemsLocked && lines.length > 0}
@@ -382,7 +388,7 @@ export function OrderDesk({
             </div>
           )}
           {itemsLocked ? null : (
-            <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} catalog={catalog} channel={channel} onConfirm={addSkus} />
+            <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} catalog={sellable} channel={channel} onConfirm={addSkus} />
           )}
         </section>
       </div>

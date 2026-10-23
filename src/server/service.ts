@@ -24,6 +24,7 @@ import {
   walkInListed,
 } from "@/domain/calc";
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
+import { orderCodePrefix, skuSoldOn, withChannelSold, type ReportScope } from "@/domain/mohome";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/images";
 import { albumPhone, photoTooBig, publicUploadCard, uploadTokenShape } from "@/domain/order-upload";
@@ -481,6 +482,7 @@ function buildItems(
   if (!items.length) throw new Error("Đơn chưa có sản phẩm.");
   return items.map((item) => {
     const sku = skuOrThrow(state, item.skuId);
+    if (!skuSoldOn(sku, channel)) throw new Error("Sản phẩm này không bán ở kênh đang chọn.");
     const group = state.groups.find((g) => g.id === sku.groupId);
     const listed = priceOf(state.prices, sku.id, channel);
     let unitPrice = listed?.price ?? null;
@@ -539,9 +541,8 @@ function refreshDeposit(state: ShopState, order: Order) {
   });
 }
 
-function nextCode(state: ShopState): string {
-  const ymd = vnParts().ymd;
-  const prefix = `TT${ymd.slice(2).replaceAll("-", "")}`;
+function nextCode(state: ShopState, channel: Channel = "tai_tiem"): string {
+  const prefix = orderCodePrefix(channel, vnParts().ymd);
   const seq = state.orders.filter((order) => order.code.startsWith(`${prefix}-`)).length + 1;
   return `${prefix}-${String(seq).padStart(3, "0")}`;
 }
@@ -1186,7 +1187,8 @@ export async function listOrders(actor: Actor) {
   const state = await readState();
   return visibleToRole(actor.role, {
     orders: state.orders
-      .filter((order) => order.status !== "draft_upload" && (actor.role !== "production" || isProductionStep(order.status)))
+      .filter((order) => order.status !== "draft_upload" && (actor.role !== "sale" || order.channel !== "mo_home"))
+      .filter((order) => order.status !== "draft_upload" && (actor.role !== "production" || order.channel === "mo_home" || isProductionStep(order.status)))
       .map((order) => orderSummary(state, order, actor.role)),
   });
 }
@@ -1195,6 +1197,7 @@ export async function getOrder(actor: Actor, code: string) {
   const state = await readState();
   const order = state.orders.find((item) => item.code.toUpperCase() === code.toUpperCase());
   if (!order) throw new Error("Không tìm thấy đơn hàng.");
+  if (actor.role === "sale" && order.channel === "mo_home") throw new Error("Đơn Mơ Home chỉ chủ và sản xuất xem.");
   return visibleToRole(actor.role, orderDetail(state, order, actor.role));
 }
 
@@ -1216,7 +1219,8 @@ export async function createManualOrder(
     items: { skuId: string; quantity: number; unitPrice?: number | null; priceReason?: string }[];
   },
 ) {
-  assertRole(actor, ["owner", "sale"]);
+  if (input.channel === "mo_home") assertRole(actor, ["owner"]);
+  else assertRole(actor, ["owner", "sale"]);
   if (input.dueDate && input.dueDate < vnParts().ymd) throw new Error("Ngày hẹn không được ở quá khứ.");
   return mutate(async (state) => {
     const customer = upsertCustomer(state, { name: input.fullName, phone: input.phone, address: input.address });
@@ -1224,7 +1228,7 @@ export async function createManualOrder(
     const totals = sumItems(items);
     const order: Order = {
       id: nid(),
-      code: nextCode(state),
+      code: nextCode(state, input.channel),
       channel: input.channel,
       source: "manual",
       customerId: customer.id,
@@ -1303,6 +1307,7 @@ export async function reviseOrder(
   await mutate(async (state) => {
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
+    if (actor.role === "sale" && order.channel === "mo_home") throw new Error("Đơn Mơ Home chỉ chủ sửa.");
     if (marketplaceEditLocked(order.channel)) throw new Error("Đơn TikTok hoặc Shopee không sửa trên web.");
     const changingItems = input.items != null;
     const blocked = orderRevisionBlock(order, changingItems);
@@ -1385,6 +1390,7 @@ export async function setOrderStatus(
       depositPaid: order.depositPaid,
       packReady: packReady(order.packCheck, hasPackingPhoto(order.files)),
       approvalReady: order.files.some((file) => !file.deletedAt && file.status === "complete" && file.kind === "approval"),
+      channel: order.channel,
     });
     if (blocked) throw new Error(blocked);
     const from = order.status;
@@ -1666,12 +1672,13 @@ export async function priceBoard(actor: Actor, groupId?: string) {
       sheets: sku.sheets,
       piecesPerPack: sku.piecesPerPack,
       sheetCost: sku.sheetCost ?? null,
+      soldOn: sku.soldOn && sku.soldOn.length > 0 ? sku.soldOn : (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]),
       prices: Object.fromEntries(
-        (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]).map((channel) => {
+        CHANNELS.map((channel) => {
           const row = priceOf(state.prices, sku.id, channel);
           const price = row?.price ?? null;
           const margin = sheetMargin(channel, price, sku.sheetCost ?? null, state.settings);
-          return [channel, { price, listPrice: row?.listPrice ?? null, status: row?.status ?? "nhap", note: row?.note ?? "", profit: margin.profit, marginPercent: margin.marginPercent }];
+          return [channel, { price, listPrice: row?.listPrice ?? null, status: row?.status ?? "nhap", note: row?.note ?? "", profit: margin.profit, marginPercent: margin.marginPercent, sold: skuSoldOn(sku, channel) }];
         }),
       ),
     })),
@@ -1704,6 +1711,7 @@ export async function updateChannelPrice(
       row.status = status;
       row.note = input.note;
     }
+    if (input.price !== null) sku.soldOn = withChannelSold(sku, input.channel, true);
     audit(state, actor.id, "price.update", `${sku.code}:${input.channel}`, before, input);
   });
 }
@@ -1740,6 +1748,16 @@ export async function importPriceSheet(actor: Actor, input: { groupId: string; f
     const result = applyPriceDrafts(state, input.groupId, drafts);
     audit(state, actor.id, "price.import", input.groupId, null, { filename: input.filename, ...result });
     return result;
+  });
+}
+
+export async function setSkuSold(actor: Actor, input: { skuId: string; channel: Channel; sold: boolean }) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const sku = skuOrThrow(state, input.skuId);
+    const before = sku.soldOn ?? null;
+    sku.soldOn = withChannelSold(sku, input.channel, input.sold);
+    audit(state, actor.id, "sku.sold", `${sku.code}:${input.channel}`, before, sku.soldOn);
   });
 }
 
@@ -2144,7 +2162,7 @@ export async function lockPayroll(actor: Actor, month: string) {
 export async function profitReport(actor: Actor, month: string) {
   assertRole(actor, ["owner"]);
   const state = await readState();
-  const orders = state.orders.filter((order) => order.status === "xong" && vnMonth(order.completedAt) === month);
+  const orders = state.orders.filter((order) => order.status === "xong" && order.channel !== "mo_home" && vnMonth(order.completedAt) === month);
   const revenue = orders.reduce((sum, order) => sum + (order.total ?? 0), 0);
   let gross = 0;
   let incomplete = false;
@@ -2214,9 +2232,9 @@ export async function profitReport(actor: Actor, month: string) {
   };
 }
 
-export async function ownerReport(actor: Actor, month: string, grain: "day" | "week" | "month") {
+export async function ownerReport(actor: Actor, month: string, grain: "day" | "week" | "month", scope: ReportScope = "nha_in") {
   assertRole(actor, ["owner"]);
-  return businessReport(await readState(), month, grain);
+  return businessReport(await readState(), month, grain, scope);
 }
 
 export async function kpiReport(actor: Actor, month: string) {
@@ -2521,6 +2539,7 @@ const SETTING_NUMBERS = [
   "saleBase",
   "saleProbationPercent",
   "productionBase",
+  "moHomeLaborPercent",
   "fileRetentionDays",
   "videoRetentionDays",
   "rentFromJune2027",
@@ -2567,7 +2586,7 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
       if (value === null || value === "") continue;
       const number = Number(value);
       if (!Number.isFinite(number)) throw new Error(`Số liệu "${key}" không hợp lệ.`);
-      (state.settings[key] as number) = number;
+      (state.settings[key] as number) = key === "moHomeLaborPercent" ? Math.min(100, Math.max(0, number)) : number;
     }
     if ("fbShipping" in patch) {
       const value = patch.fbShipping;
@@ -2940,6 +2959,7 @@ export async function skuOptions(actor: Actor) {
         label: `${sku.code} · ${group?.name ?? ""} · ${sku.name}`,
         groupId: sku.groupId,
         size: sku.size,
+        soldOn: sku.soldOn && sku.soldOn.length > 0 ? sku.soldOn : (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]),
         prices,
         price: prices.tai_tiem,
       };
@@ -3151,8 +3171,8 @@ async function commitMarketplaceOrders(actor: Actor, channel: MarketplaceChannel
       const notes = [note, ...planned.flags];
       const order: Order = {
         id: nid(),
-        code: nextCode(state),
-        channel,
+      code: nextCode(state, channel),
+      channel,
         source: "manual",
         customerId: customer.id,
         status: planned.status,
