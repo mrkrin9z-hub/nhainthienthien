@@ -534,9 +534,12 @@ test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và đ
     packages: [],
     sepaySeen: [],
   };
-  assert.equal(applyStoreMigrations(renamedByOwner), false);
+  applyStoreMigrations(renamedByOwner);
   assert.equal(renamedByOwner.groups[0]?.name, "Tên chủ đã sửa");
   assert.equal(renamedByOwner.groups[0]?.turnaround, "3 ngày");
+  assert.equal(renamedByOwner.settings.shopChannels?.find((row) => row.id === "tai_tiem")?.label, "Tại tiệm (offline)");
+  assert.equal(renamedByOwner.settings.shopChannels?.some((row) => row.id === "mo_home"), true);
+  assert.equal(applyStoreMigrations(renamedByOwner), false);
 
   const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
   for (const file of ["../routes/index.tsx", "../routes/huong-dan.tsx", "../routes/san-pham.tsx", "./seed.ts", "../../README.md"]) {

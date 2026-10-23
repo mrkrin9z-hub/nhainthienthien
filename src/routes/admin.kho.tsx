@@ -59,7 +59,7 @@ function StockPage() {
   const list = useListPage(materials, `${q}|${stockFilter}`);
   const movements = (stock.data?.movements ?? []).filter((move) => {
     const needle = q.trim().toLowerCase();
-    return !needle || `${move.materialName} ${move.reason} ${move.note}`.toLowerCase().includes(needle);
+    return !needle || `${move.materialName} ${move.reason} ${move.note} ${move.channelLabel ?? ""}`.toLowerCase().includes(needle);
   });
   const moveList = useListPage(movements, q);
 
@@ -249,6 +249,11 @@ function StockPage() {
       </Dialog>
       <section className="glass-card rounded-3xl p-4">
         <h2 className="font-bold text-primary">Nhập xuất</h2>
+        {(stock.data?.usageByChannel ?? []).length > 0 ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Phiếu trừ theo kênh: {(stock.data?.usageByChannel ?? []).map((row) => `${row.label} ${row.lines}`).join(" · ")}
+          </p>
+        ) : null}
         <div className="mt-2">
           <ListPager page={moveList.page} pages={moveList.pages} total={moveList.total} start={moveList.start} count={moveList.slice.length} noun="phiếu" onPage={moveList.setPage} />
         </div>
@@ -256,6 +261,7 @@ function StockPage() {
           {moveList.slice.map((move) => (
             <li key={move.id}>
               {move.materialName}: {move.qty} · {move.reason} {move.note}
+              {move.channelLabel ? ` · ${move.channelLabel}` : ""}
             </li>
           ))}
           {moveList.total === 0 ? <li className="text-muted-foreground">{(stock.data?.movements ?? []).length === 0 ? "Chưa có phiếu." : "Không có phiếu khớp bộ lọc."}</li> : null}

@@ -58,7 +58,8 @@ function OrderDetailPage() {
   const data = order.data;
   const role = me.data?.role;
   const closed = data?.status === "huy" || data?.status === "xong";
-  const productionCanMove = Boolean(data && role === "production" && isProductionStep(data.status));
+  const moHomeProduction = Boolean(data && role === "production" && data.channel === "mo_home");
+  const productionCanMove = Boolean(data && role === "production" && (data.channel === "mo_home" || isProductionStep(data.status)));
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["order", code] });
@@ -293,7 +294,9 @@ function OrderDetailPage() {
         <h2 className="font-bold text-primary">Chuyển bước</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {role === "production"
-            ? productionCanMove
+            ? moHomeProduction
+              ? "Đơn Mơ Home: sản xuất chuyển từng bước, không hủy đơn. Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."
+              : productionCanMove
               ? "Sản xuất chỉ chuyển đơn đang In, Đóng gói hoặc Giao giữa ba bước đó. Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."
               : "Đơn này không nằm ở In, Đóng gói hoặc Giao. Sản xuất không chuyển bước."
             : closed && role === "owner"
@@ -315,7 +318,7 @@ function OrderDetailPage() {
           <Textarea className="mt-2" placeholder="Lý do nếu hủy đơn" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
         ) : null}
         <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          {(role === "production" ? (productionCanMove ? [...PRODUCTION_STEPS] : []) : closed && role !== "owner" ? [] : closed ? NEXT.filter((status) => status !== "huy") : stepChoices(data.status)).map((status) => (
+          {(role === "production" ? (moHomeProduction ? (closed ? [] : stepChoices(data.status).filter((status) => status !== "huy")) : productionCanMove ? [...PRODUCTION_STEPS] : []) : closed && role !== "owner" ? [] : closed ? NEXT.filter((status) => status !== "huy") : stepChoices(data.status)).map((status) => (
             <Button
               key={status}
               variant={data.status === status ? "default" : "outline"}

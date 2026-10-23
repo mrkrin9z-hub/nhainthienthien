@@ -2,15 +2,16 @@ import type { ShopChatMessage, ShopConversation } from "./shop-chat.ts";
 
 export type { ChatChannel, ShopChatMessage, ShopConversation } from "./shop-chat.ts";
 
-export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee"] as const;
+export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee", "mo_home"] as const;
 export type Channel = (typeof CHANNELS)[number];
 
-/** Kênh bán = “nhánh” vận hành (offline / online / sàn). */
+/** Kênh bán = “nhánh” vận hành (offline / online / sàn / nội bộ). */
 export const CHANNEL_LABEL: Record<Channel, string> = {
   tai_tiem: "Tại tiệm (offline)",
   facebook: "Online / Facebook",
   tiktok: "TikTok",
   shopee: "Shopee",
+  mo_home: "Mơ Home (nội bộ)",
 };
 
 export const ROLES = ["owner", "sale", "production"] as const;
@@ -120,6 +121,8 @@ export type Settings = {
   saleBase: number;
   saleProbationPercent: number;
   productionBase: number;
+  /** Phần trăm lương sản xuất tính cho kênh Mơ Home. Thiếu = 50. Phần còn lại thuộc Nhà In. */
+  moHomeLaborPercent?: number;
   kpiTargets: number[];
   commissionTiers: { upto: number | null; percent: number }[];
   /** shop = doanh thu cả tiệm. handled = đơn người đó xử lý. Thiếu thì toàn tiệm. */
@@ -182,8 +185,8 @@ export type Settings = {
   /** Cảnh báo trong app (không phải Web Push). */
   notifyPrefs?: NotifyPrefs;
   /**
-   * Kênh cửa hàng Thiên Thiên — bật/tắt + tên hiển thị.
-   * Thiếu = cả 4 kênh mặc định bật với CHANNEL_LABEL.
+   * Kênh cửa hàng — bật/tắt + tên hiển thị.
+   * Thiếu một kênh thì kênh đó được bật với CHANNEL_LABEL.
    */
   shopChannels?: { id: Channel; enabled: boolean; label: string }[];
 };
@@ -346,6 +349,8 @@ export type Sku = {
   sort: number;
   /** Vốn vật tư + gói trên bảng 22/10. Thiếu thì chưa có. */
   sheetCost?: number | null;
+  /** Kênh được bán mã này. Thiếu hoặc rỗng = 4 kênh Nhà In, không gồm Mơ Home. */
+  soldOn?: Channel[];
 };
 
 export type ChannelPrice = {
@@ -540,6 +545,8 @@ export type Movement = {
   orderId: string | null;
   by: string | null;
   note: string;
+  /** Kênh của đơn khi trừ hoặc hoàn. Thiếu với phiếu cũ và phiếu nhập kho. */
+  channel?: Channel;
 };
 
 export type StockCount = {

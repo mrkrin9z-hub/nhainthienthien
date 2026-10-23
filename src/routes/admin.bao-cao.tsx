@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { vnMonth } from "@/domain/calc";
+import { CHANNEL_LABEL, CHANNELS, type Channel } from "@/domain/types";
 import { formatMaybe } from "@/lib/brand";
 import { getReport, saveFixedMonth } from "@/lib/admin.functions";
 
@@ -31,9 +32,10 @@ function ReportPage() {
 function ReportBody() {
   const [month, setMonth] = useState(monthNow());
   const [grain, setGrain] = useState<"day" | "week" | "month">("day");
+  const [scope, setScope] = useState<"all" | "nha_in" | Channel>("all");
   const [filters, setFilters] = useState(false);
   const queryClient = useQueryClient();
-  const report = useQuery({ queryKey: ["report", month, grain], queryFn: () => getReport({ data: { month, grain } }) });
+  const report = useQuery({ queryKey: ["report", month, grain, scope], queryFn: () => getReport({ data: { month, grain, scope } }) });
   const data = report.data;
   const progress = data?.breakEvenPercent === null || data?.breakEvenPercent === undefined ? 0 : Math.min(100, Math.max(0, data.breakEvenPercent));
 
@@ -41,7 +43,7 @@ function ReportBody() {
     <div className="space-y-4">
       <PageToolbar
         title="Báo cáo tổng"
-        hint="Doanh thu và lãi gộp lấy đơn đã xong, trừ đơn thử. Lãi ròng trừ định phí chỉ từ tháng khai trương."
+        hint="Doanh thu và lãi gộp lấy đơn đã xong, trừ đơn thử. Lọc Nhà In, Mơ Home hoặc từng kênh. Lãi ròng trừ định phí chỉ từ tháng khai trương. Mơ Home không có hoa hồng sale."
         filterCount={1}
         onFilter={() => setFilters(true)}
       />
@@ -58,6 +60,13 @@ function ReportBody() {
           ))}
         </div>
       </FilterSheet>
+      <div className="flex flex-wrap gap-2">
+        {(["all", "nha_in", ...CHANNELS] as const).map((item) => (
+          <Button key={item} variant={scope === item ? "default" : "outline"} className="min-h-11" onClick={() => setScope(item)}>
+            {item === "all" ? "Tất cả" : item === "nha_in" ? "Nhà In" : CHANNEL_LABEL[item]}
+          </Button>
+        ))}
+      </div>
       {report.isLoading ? <p className="text-muted-foreground">Đang tải…</p> : null}
       {report.isError ? <p className="font-semibold text-destructive">{(report.error as Error).message}</p> : null}
       {data ? (
@@ -65,12 +74,21 @@ function ReportBody() {
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Stat label="Doanh thu" value={formatMaybe(data.revenue)} />
             <Stat label="Lãi gộp" value={data.incomplete ? "Chưa đủ giá vốn" : formatMaybe(data.gross)} />
-            <Stat label="Chi phí cố định" value={formatMaybe(data.fixedSum)} />
+            <Stat label="Chi phí cố định" value={formatMaybe(data.costBasis)} />
             <Stat label="Chi phí phát sinh" value={formatMaybe(data.extraSum)} />
             <Stat label="Lãi ròng" value={data.net === null ? "Chưa đủ số" : formatMaybe(data.net)} />
             <Stat label="Giá trị đơn trung bình" value={data.averageOrder === null ? "—" : formatMaybe(data.averageOrder)} />
             <Stat label="Tỉ lệ hủy" value={data.cancelRate === null ? "—" : `${data.cancelRate}% (${data.cancelled}/${data.placed})`} />
           </section>
+          <section className="glass-card rounded-3xl p-4">
+            <h2 className="font-bold text-primary">Lương sản xuất theo kênh</h2>
+            <p className="mt-1 text-sm">{data.laborNote}</p>
+            <p className="mt-2 text-sm font-semibold">
+              Mơ Home {formatMaybe(data.moHomeLabor)} · Nhà In {formatMaybe(data.nhaInLabor)} · {data.laborPercent}%
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Tháng này tính vào lãi: {formatMaybe(data.fixedCharged)}.</p>
+          </section>
+          {data.scope === "nha_in" ? (
           <section className="glass-card rounded-3xl p-4">
             <h2 className="font-bold text-primary">Hòa vốn tháng</h2>
             <p className="mt-1 text-sm text-muted-foreground">Lãi gộp so với chi phí cố định tháng này.</p>
@@ -79,6 +97,7 @@ function ReportBody() {
             </div>
             <p className="mt-2 text-sm font-semibold">{data.breakEvenPercent === null ? "Chưa đủ lãi gộp để tính." : `${data.breakEvenPercent}%`}</p>
           </section>
+          ) : null}
           <section className="glass-card rounded-3xl p-4">
             <h2 className="font-bold text-primary">Chi phí phát sinh tháng {month}</h2>
             <p className="mt-1 text-sm text-muted-foreground">Khoản này trừ riêng, không gộp vào chi phí cố định. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh.</p>

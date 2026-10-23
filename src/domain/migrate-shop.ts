@@ -1,4 +1,5 @@
 import { ensureChecklistTasks } from "./checklists.ts";
+import { ensureMoHome } from "./mohome.ts";
 import { applyDeskSheetCosts, applyDeskSupplies } from "./desk-supply.ts";
 import { ensureOrgCollections } from "./org-desk.ts";
 import {
@@ -180,6 +181,7 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (applyDeskSupplies(state as unknown as Parameters<typeof applyDeskSupplies>[0])) changed = true;
   if (ensureChecklistTasks(state)) changed = true;
   if (ensureOrgCollections(state)) changed = true;
+  if (ensureMoHome(state)) changed = true;
   return changed;
 }
 
@@ -268,6 +270,7 @@ function importCatalogOnce(state: Migratable): boolean {
   }
   const skuById = new Map(skus.map((sku) => [sku.id, sku]));
   for (const price of state.prices) {
+    if (price.channel === "mo_home") continue;
     const sku = skuById.get(price.skuId);
     const next = channelPriceFor({ id: price.skuId, code: sku?.code ?? "" }, price.channel, sku ? rows.get(sku.code) : undefined);
     price.price = next.price;

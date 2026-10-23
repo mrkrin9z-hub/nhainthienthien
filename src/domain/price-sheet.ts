@@ -1,4 +1,5 @@
 import { comboPriceError, formulaQty, isMergedWoodAlias, priceOf } from "./calc.ts";
+import { isMoHomeGroup, soldOnForNewSku, withChannelSold } from "./mohome.ts";
 import type { BomLine, Channel, ChannelPrice, Group, Material, Settings, Sku } from "./types.ts";
 import { CHANNELS } from "./types.ts";
 import { uniqueKey } from "./web-product.ts";
@@ -99,8 +100,11 @@ export function applyPriceDrafts(
     if (draft.widthCm === null || draft.heightCm === null) {
       throw new Error(draft.code ? `Không thấy mã ${draft.code}.` : "Thiếu khổ.");
     }
-    if (draft.prices.tai_tiem === undefined) {
+    if (!isMoHomeGroup(groupId) && draft.prices.tai_tiem === undefined) {
       throw new Error(`Khổ ${draft.widthCm}×${draft.heightCm} cần giá tại tiệm.`);
+    }
+    if (isMoHomeGroup(groupId) && draft.prices.mo_home === undefined && draft.prices.tai_tiem === undefined) {
+      throw new Error(`Khổ ${draft.widthCm}×${draft.heightCm} cần giá nội bộ Mơ Home.`);
     }
     const peers = state.skus.filter((sku) => sku.groupId === groupId && !isMergedWoodAlias(sku));
     const code = draft.code ? freshCode(draft.code, taken) : nextCode(peers, draft, taken);
@@ -116,6 +120,7 @@ export function applyPriceDrafts(
       sheets: draft.sheets,
       piecesPerPack: peers.some((item) => item.piecesPerPack !== null) ? draft.sheets : null,
       sort: nextSort(state.skus, pending, groupId),
+      soldOn: soldOnForNewSku(groupId, draft.prices),
     };
     pending.set(sku.id, { sku, isNew: true, prices: { ...draft.prices } });
   }
@@ -147,6 +152,7 @@ export function applyPriceDrafts(
   let updated = 0;
   for (const item of pending.values()) {
     if (item.isNew) {
+      item.sku.soldOn = soldOnForNewSku(groupId, item.prices);
       state.skus.push(item.sku);
       state.boms.push(...copiedBoms(state, groupId, item.sku));
       created += 1;
@@ -154,6 +160,7 @@ export function applyPriceDrafts(
     for (const channel of CHANNELS) {
       const price = item.prices[channel];
       if (price === undefined) continue;
+      item.sku.soldOn = withChannelSold(item.sku, channel, true);
       const row = state.prices.find((entry) => entry.skuId === item.sku.id && entry.channel === channel);
       if (!row) {
         state.prices.push({

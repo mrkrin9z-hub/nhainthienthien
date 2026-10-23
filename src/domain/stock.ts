@@ -48,6 +48,7 @@ function take(state: ShopState, order: Order, phase: "print" | "pack", by: strin
       orderId: order.id,
       by,
       note: order.code,
+      channel: order.channel,
     });
   }
   order.stockWarning = names.length ? `Chưa trừ được: ${[...new Set(names)].join(", ")} (chưa có định mức).` : "";
@@ -68,6 +69,7 @@ function giveBack(state: ShopState, order: Order, phase: "print" | "pack", by: s
       orderId: order.id,
       by,
       note: order.code,
+      channel: order.channel,
     });
   }
 }

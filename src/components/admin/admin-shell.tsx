@@ -177,7 +177,7 @@ export function AdminShell() {
     event.preventDefault();
     const value = find.trim();
     if (!value) return;
-    if (/^TT/i.test(value)) {
+    if (/^(TT|MH)/i.test(value)) {
       void router.navigate({ to: "/admin/don-hang/$code", params: { code: value.toUpperCase() } });
     } else {
       void router.navigate({ to: "/admin/don-hang", search: { status: "all", q: value } as never });

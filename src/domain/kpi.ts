@@ -31,6 +31,7 @@ export function saleKpi(state: ShopState, month: string): SaleKpi[] {
     .filter((person) => person.role === "sale" && person.active)
     .map((person) => {
       const handled = state.orders.filter((order) => {
+        if (order.channel === "mo_home") return false;
         if (order.status === "draft_upload" || order.status === "upload_error") return false;
         return (order.history ?? []).some((entry) => entry.by === person.id && vnMonth(entry.at) === month);
       });

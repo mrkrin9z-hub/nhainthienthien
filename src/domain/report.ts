@@ -1,4 +1,5 @@
 import { fixedCostsApply, quoteSku, vnMonth, vnYmd } from "./calc.ts";
+import { laborBill, orderInScope, reportScopeLabel, type ReportScope } from "./mohome.ts";
 import { fixedRows } from "./views.ts";
 import type { Channel, Order, ShopState } from "./types.ts";
 import { CHANNEL_LABEL } from "./types.ts";
@@ -17,6 +18,8 @@ export type ReportBucket = {
 export type BusinessReport = {
   month: string;
   grain: ReportGrain;
+  scope: ReportScope;
+  scopeLabel: string;
   revenue: number;
   orderCount: number;
   averageOrder: number | null;
@@ -25,6 +28,12 @@ export type BusinessReport = {
   fixedSum: number;
   /** Phần định phí đã tính vào lãi. Trước ngày khai trương thì 0. */
   fixedCharged: number;
+  /** Định phí của phạm vi đang xem, kể cả khi tháng này chưa tính vào lãi. */
+  costBasis: number;
+  laborPercent: number;
+  moHomeLabor: number;
+  nhaInLabor: number;
+  laborNote: string;
   fixed: { key: string; name: string; amount: number; note: string }[];
   extraSum: number;
   extras: { name: string; amount: number; note: string }[];
@@ -91,13 +100,13 @@ function lineProfit(state: ShopState, order: Order): LineProfit {
   return { revenue, gross, incomplete };
 }
 
-export function businessReport(state: ShopState, month: string, grain: ReportGrain = "day"): BusinessReport {
-  const placedOrders = state.orders.filter((order) => !order.isTest && !OPEN.has(order.status) && monthOf(order.createdAt) === month);
+export function businessReport(state: ShopState, month: string, grain: ReportGrain = "day", scope: ReportScope = "nha_in"): BusinessReport {
+  const inScope = (order: Order) => orderInScope(order.channel, scope);
+  const placedOrders = state.orders.filter((order) => !order.isTest && !OPEN.has(order.status) && monthOf(order.createdAt) === month && inScope(order));
   const cancelled = placedOrders.filter((order) => order.status === "huy").length;
-  const done = state.orders.filter((order) => order.status === "xong" && !order.isTest && monthOf(doneStamp(order)) === month);
+  const done = state.orders.filter((order) => order.status === "xong" && !order.isTest && monthOf(doneStamp(order)) === month && inScope(order));
   const fixed = fixedRows(state, month);
   const fixedSum = fixed.reduce((sum, row) => sum + row.amount, 0);
-  const fixedCharged = fixedCostsApply(state.settings.shopOpenDate, month) ? fixedSum : 0;
   const extras = (state.expenses ?? [])
     .filter((row) => row.month === month)
     .map((row) => ({ name: row.name, amount: row.amount, note: row.note }));
@@ -146,22 +155,34 @@ export function businessReport(state: ShopState, month: string, grain: ReportGra
   }
 
   const knownGross = incomplete ? null : Math.round(gross);
+  const bill = laborBill(state.settings, fixed, scope, fixedCostsApply(state.settings.shopOpenDate, month));
+  const shopScope = scope === "all" || scope === "nha_in";
+  const extrasShown = shopScope ? extras : [];
+  const extrasCharged = shopScope ? extraSum : 0;
+  const roundedRevenue = Math.round(revenue);
   return {
     month,
     grain,
-    revenue: Math.round(revenue),
+    scope,
+    scopeLabel: reportScopeLabel(scope),
+    revenue: roundedRevenue,
     orderCount: done.length,
     averageOrder: done.length ? Math.round(revenue / done.length) : null,
     gross: knownGross,
     incomplete,
     fixedSum,
-    fixedCharged,
+    fixedCharged: bill.charged,
+    costBasis: bill.basis,
+    laborPercent: bill.percent,
+    moHomeLabor: bill.moHome,
+    nhaInLabor: bill.nhaIn,
+    laborNote: bill.note,
     fixed,
-    extraSum,
-    extras,
-    net: knownGross === null ? null : knownGross - fixedCharged - extraSum,
+    extraSum: extrasCharged,
+    extras: extrasShown,
+    net: knownGross === null ? null : knownGross - bill.charged - extrasCharged,
     breakEvenPercent:
-      state.settings.breakevenMonth > 0 ? Math.round((revenue / state.settings.breakevenMonth) * 1000) / 10 : null,
+      scope === "nha_in" && state.settings.breakevenMonth > 0 ? Math.round((revenue / state.settings.breakevenMonth) * 1000) / 10 : null,
     cancelRate: placedOrders.length ? Math.round((cancelled / placedOrders.length) * 1000) / 10 : null,
     cancelled,
     placed: placedOrders.length,

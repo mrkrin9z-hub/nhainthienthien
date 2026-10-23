@@ -15,7 +15,7 @@ type Paper = "k80" | "a5" | "a4";
 
 function SlipPage() {
   return (
-    <RoleGate allow={["owner", "sale"]} deny="Chỉ chủ và sale in phiếu.">
+    <RoleGate allow={["owner", "sale", "production"]} deny="Chỉ chủ, sale và sản xuất in phiếu.">
       <SlipBody />
     </RoleGate>
   );
@@ -140,6 +140,7 @@ function K80Slip({
         <p className="text-[11px]">{BRAND.website}</p>
         <p className="mt-1 text-[13px] font-extrabold">Phiếu giao nhận</p>
         <p className="font-mono text-[12px] font-bold">{data.code}</p>
+        <p className="text-[12px] font-semibold">{data.channelLabel}</p>
         <p>{when}</p>
       </header>
       <section className="mt-2 space-y-0.5">
@@ -203,6 +204,7 @@ function OfficeSlip({
         <div className="text-right">
           <p className="text-lg font-extrabold">Phiếu giao nhận</p>
           <p className="font-mono text-sm">{data.code}</p>
+          <p className="text-sm font-semibold">{data.channelLabel}</p>
           <p className="text-sm">{when}</p>
         </div>
       </header>

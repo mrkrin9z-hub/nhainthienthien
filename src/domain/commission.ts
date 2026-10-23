@@ -28,7 +28,8 @@ export function commissionForSale(
   month: string,
 ): { revenue: number; commission: number; basis: CommissionBasis } {
   const basis = commissionBasisOf(state.settings);
-  const source = basis === "handled" ? state.orders.filter((order) => saleHandledOrder(order, staffId)) : state.orders;
+  const outside = state.orders.filter((order) => order.channel !== "mo_home");
+  const source = basis === "handled" ? outside.filter((order) => saleHandledOrder(order, staffId)) : outside;
   const revenue = collectedRevenue(source, month);
   return { revenue, commission: commissionOf(revenue, state.settings.commissionTiers), basis };
 }
