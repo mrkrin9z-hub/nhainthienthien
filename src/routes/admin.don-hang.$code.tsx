@@ -431,7 +431,7 @@ function OrderDetailPage() {
             ) : null}
             {role !== "production" && data.status !== "huy" ? (
               <Button type="button" variant="outline" className="min-h-11" onClick={() => setQrOpen(true)}>
-                Mã QR gửi khách
+                Mã QR ảnh
               </Button>
             ) : null}
           </div>

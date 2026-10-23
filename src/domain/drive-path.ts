@@ -19,6 +19,14 @@ export function albumFolderParts(phone: string): [string, string] {
   return ["Album khách", phone];
 }
 
+/** Thư mục con trong đơn, theo SOP: ảnh gốc, bản sửa, file in, duyệt và video. */
+export function orderKindFolder(kind: string): string {
+  if (kind === "original") return "1-anh-goc";
+  if (kind === "design") return "2-ban-sua";
+  if (kind === "approval" || kind === "packing_photo" || kind === "packing_video") return "4-duyet-va-video";
+  return "3-file-in";
+}
+
 /** `Đơn web / YYYY-MM / <mã> - <khách>`, tháng theo giờ Việt Nam. */
 export function driveFolderParts(order: {
   code: string;

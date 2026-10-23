@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { BRAND, formatMaybe } from "@/lib/brand";
-import { getOrderDetail } from "@/lib/admin.functions";
+import { getOrderDetail, orderUploadLink } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/phieu/$code")({
   component: SlipPage,
@@ -29,14 +29,18 @@ function SlipBody() {
   const [k80Height, setK80Height] = useState(160);
   const sheetRef = useRef<HTMLElement>(null);
   const data = order.data;
+  const upload = useQuery({
+    queryKey: ["slip-upload", data?.id],
+    queryFn: () => orderUploadLink({ data: { orderId: data!.id, rotate: false } }),
+    enabled: Boolean(data?.id),
+  });
+  const designUrl = upload.data?.token ? `${typeof window === "undefined" ? `https://${BRAND.website}` : window.location.origin}/q/don/${upload.data.token}` : "";
 
   useEffect(() => {
-    if (!data) return;
-    const payload =
-      paper === "k80" ? data.code : `https://${BRAND.website}/tra-cuu?code=${encodeURIComponent(data.code)}`;
+    if (!designUrl) return;
     let cancel = false;
     void import("qrcode").then((QR) =>
-      QR.toDataURL(payload, {
+      QR.toDataURL(designUrl, {
         width: paper === "k80" ? 180 : 280,
         margin: paper === "k80" ? 0 : 1,
         errorCorrectionLevel: "M",
@@ -47,7 +51,7 @@ function SlipBody() {
     return () => {
       cancel = true;
     };
-  }, [data, paper]);
+  }, [designUrl, paper]);
 
   useEffect(() => {
     if (paper !== "k80" || !sheetRef.current) return;
@@ -168,7 +172,8 @@ function K80Slip({
       </dl>
       {data.customerNote ? <p className="mt-2 break-words">Ghi chú: {data.customerNote}</p> : null}
       <div className="mt-3 text-center">
-        {qr ? <img src={qr} alt={`Mã đơn ${data.code}`} className="mx-auto h-[28mm] w-[28mm]" /> : null}
+        {qr ? <img src={qr} alt={`Mã gửi ảnh thiết kế ${data.code}`} className="mx-auto h-[28mm] w-[28mm]" /> : null}
+        <p className="text-[11px] font-semibold">Gửi ảnh thiết kế</p>
         <p className="mt-2 font-semibold">Cảm ơn anh/chị.</p>
       </div>
     </article>
@@ -250,7 +255,10 @@ function OfficeSlip({
             <p className="mt-16 border-t border-black pt-1 text-xs">Ký, ghi rõ họ tên</p>
           </div>
         </div>
-        {qr ? <img src={qr} alt={`Mã tra cứu đơn ${data.code}`} className="h-28 w-28" /> : <div className="h-28 w-28" />}
+        <div className="text-center">
+          {qr ? <img src={qr} alt={`Mã gửi ảnh thiết kế ${data.code}`} className="h-28 w-28" /> : <div className="h-28 w-28" />}
+          <p className="text-xs font-semibold">Gửi ảnh thiết kế</p>
+        </div>
       </div>
     </article>
   );

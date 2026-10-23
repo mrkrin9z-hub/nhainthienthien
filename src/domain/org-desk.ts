@@ -69,6 +69,7 @@ export const DEFAULT_ROLE_MODULES: RoleModules[] = [
       "/admin/cai-dat",
       "/admin/in-don",
       "/admin/check-cong",
+      "/admin/viec",
       "/admin/thuong",
       "/admin/chuyen-nop",
       "/admin/duyet-chi",
@@ -104,6 +105,7 @@ export const DEFAULT_ROLE_MODULES: RoleModules[] = [
       "/admin/tin-mau",
       "/admin/in-don",
       "/admin/check-cong",
+      "/admin/viec",
       "/admin/thuong",
       "/admin/chuyen-nop",
       "/admin/cong-no",
@@ -127,6 +129,7 @@ export const DEFAULT_ROLE_MODULES: RoleModules[] = [
       "/admin/tai-khoan",
       "/admin/in-don",
       "/admin/check-cong",
+      "/admin/viec",
     ],
   },
 ];

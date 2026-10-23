@@ -19,8 +19,10 @@ export function OrderQrDialog({
 }) {
   const [token, setToken] = useState<string | null>(null);
   const [image, setImage] = useState<string | null>(null);
+  const [staffImage, setStaffImage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const link = token && typeof window !== "undefined" ? `${window.location.origin}${customerUploadPath(token)}` : "";
+  const staffLink = token && typeof window !== "undefined" ? `${window.location.origin}/q/don/${token}` : "";
 
   useEffect(() => {
     if (!open) return;
@@ -44,15 +46,20 @@ export function OrderQrDialog({
   useEffect(() => {
     if (!link) return;
     let cancel = false;
-    void import("qrcode").then((QR) =>
-      QR.toDataURL(link, { width: 320, margin: 2, errorCorrectionLevel: "M" }).then((url) => {
+    void import("qrcode").then((QR) => {
+      void QR.toDataURL(link, { width: 320, margin: 2, errorCorrectionLevel: "M" }).then((url) => {
         if (!cancel) setImage(url);
-      }),
-    );
+      });
+      if (staffLink) {
+        void QR.toDataURL(staffLink, { width: 320, margin: 2, errorCorrectionLevel: "M" }).then((url) => {
+          if (!cancel) setStaffImage(url);
+        });
+      }
+    });
     return () => {
       cancel = true;
     };
-  }, [link]);
+  }, [link, staffLink]);
 
   async function rotate() {
     if (!window.confirm("Mã cũ sẽ hết hạn. Khách đã nhận mã cũ sẽ không gửi được.")) return;
@@ -61,6 +68,7 @@ export function OrderQrDialog({
       const result = await orderUploadLink({ data: { orderId, rotate: true } });
       setToken(result.token);
       setImage(null);
+      setStaffImage(null);
       toast.success("Đã đổi mã");
     } catch (error) {
       toast.error((error as Error).message);
@@ -76,14 +84,25 @@ export function OrderQrDialog({
           <DialogTitle>Mã gửi ảnh · {code}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Khách quét mã này để gửi ảnh gốc vào đúng đơn {code}. Ảnh hiện ở mục Ảnh khách.
+          Khách quét mã đầu để gửi ảnh gốc. Nhân viên quét mã thứ hai, nhập PIN, gửi ảnh thiết kế, ảnh duyệt hoặc ảnh đóng gói.
         </p>
-        <div className="flex justify-center">
-          {image ? (
-            <img src={image} alt={`Mã QR gửi ảnh cho đơn ${code}`} width={280} height={280} className="h-auto w-[280px] max-w-full" />
-          ) : (
-            <p className="grid h-[280px] place-items-center text-sm text-muted-foreground">{busy ? "Đang tạo mã…" : "Chưa có mã"}</p>
-          )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="text-center">
+            {image ? (
+              <img src={image} alt={`Mã QR khách gửi ảnh cho đơn ${code}`} width={220} height={220} className="mx-auto h-auto w-[220px] max-w-full" />
+            ) : (
+              <p className="grid h-[220px] place-items-center text-sm text-muted-foreground">{busy ? "Đang tạo mã…" : "Chưa có mã"}</p>
+            )}
+            <p className="text-sm font-semibold">Khách gửi ảnh</p>
+          </div>
+          <div className="text-center">
+            {staffImage ? (
+              <img src={staffImage} alt={`Mã QR nhân viên gửi ảnh thiết kế cho đơn ${code}`} width={220} height={220} className="mx-auto h-auto w-[220px] max-w-full" />
+            ) : (
+              <p className="grid h-[220px] place-items-center text-sm text-muted-foreground">{busy ? "Đang tạo mã…" : "Chưa có mã"}</p>
+            )}
+            <p className="text-sm font-semibold">Gửi ảnh thiết kế</p>
+          </div>
         </div>
         {link ? <p className="break-all text-xs text-muted-foreground">{link}</p> : null}
         <div className="flex flex-wrap gap-2">

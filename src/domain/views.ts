@@ -1,4 +1,5 @@
 import { fixedCostsApply, isWeeklyOff, kpiTarget, quoteSku, vnParts, vnYmd, vnMonth } from "./calc.ts";
+import { checklistBadge } from "./checklists.ts";
 import { commissionForSale } from "./commission.ts";
 import { materialForecast } from "./forecast.ts";
 import { depositEvents, remainOf } from "./money.ts";
@@ -220,6 +221,7 @@ export function navCounts(state: ShopState): Record<string, number> {
     "/admin/san-xuat": making,
     "/admin/cong-viec": open,
     "/admin/kho": low,
+    "/admin/viec": checklistBadge(state, vnYmd()),
   };
 }
 

@@ -1,0 +1,65 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { orderKindFolder } from "./drive-path.ts";
+import { applyStoreMigrations } from "./migrate-shop.ts";
+import { buildSeed } from "./seed.ts";
+import { CHECKLIST_TEMPLATES } from "./checklist-catalog.ts";
+import {
+  applyTaskStatus,
+  checklistBadge,
+  checklistCards,
+  ensureChecklistTasks,
+  orderStepKind,
+  SHEET_COVERAGE,
+  taskFolderParts,
+  weekKey,
+} from "./checklists.ts";
+
+test("sheet checklist đủ việc và không mang câu hứa ra app", async () => {
+  const count = (list: string) => CHECKLIST_TEMPLATES.filter((item) => item.list === list).length;
+  assert.equal(count("setup"), 56);
+  assert.equal(count("anh"), 54);
+  assert.equal(count("sale_ngay"), 19);
+  assert.equal(count("sale_tuan"), 9);
+  assert.equal(count("chot"), 24);
+  assert.equal(count("sop"), 7);
+  assert.ok(count("khai_truong") >= 70);
+  assert.equal(count("dao_tao"), 10);
+  const blob = JSON.stringify(CHECKLIST_TEMPLATES);
+  assert.doesNotMatch(blob, /miễn phí|tặng quà|tặng 1/i);
+  assert.ok(CHECKLIST_TEMPLATES.filter((item) => item.list === "sale_ngay").every((item) => item.draft));
+  assert.match(CHECKLIST_TEMPLATES.find((item) => item.id === "ngay-1")?.detail ?? "", /chưa duyệt/);
+  const seeded = await buildSeed();
+  assert.equal(applyStoreMigrations(seeded), false);
+  assert.equal(seeded.tasks?.length, CHECKLIST_TEMPLATES.filter((item) => item.repeat === "once").length);
+  const bare = { settings: { zaloDefaultMigrated: true, groupListed: {} } };
+  assert.equal(ensureChecklistTasks(bare), false);
+});
+
+test("việc lặp theo ngày và ảnh đơn theo bước", () => {
+  const state = { tasks: [], taskChecks: [] };
+  const ymd = "2026-10-23";
+  const cards = checklistCards(state, ymd);
+  const morning = cards.find((card) => card.id === "sop-1");
+  assert.equal(morning?.status, "chua_lam");
+  assert.equal(morning?.repeat, "daily");
+  applyTaskStatus(state, { taskId: "sop-1", status: "xong", by: "sale", ymd, at: "2026-10-23T01:00:00.000Z" });
+  assert.equal(checklistCards(state, ymd).find((card) => card.id === "sop-1")?.status, "xong");
+  assert.equal(checklistCards(state, "2026-10-24").find((card) => card.id === "sop-1")?.status, "chua_lam");
+  assert.equal(weekKey("2026-10-23"), weekKey("2026-10-19"));
+  assert.notEqual(weekKey("2026-10-23"), weekKey("2026-10-26"));
+  const open = checklistBadge({ tasks: state.tasks, taskChecks: state.taskChecks }, ymd);
+  assert.ok(open > 20);
+  assert.equal(orderKindFolder("original"), "1-anh-goc");
+  assert.equal(orderKindFolder("design"), "2-ban-sua");
+  assert.equal(orderKindFolder("approval"), "4-duyet-va-video");
+  assert.equal(orderKindFolder("packing_photo"), "4-duyet-va-video");
+  assert.deepEqual(taskFolderParts("2026-10-23", "Lau kệ"), ["Việc tiệm", "2026-10-23", "Lau kệ"]);
+  assert.equal(orderStepKind("duyet"), "approval");
+  assert.equal(orderStepKind("goi"), "packing_photo");
+  assert.equal(orderStepKind("thiet-ke"), "design");
+  assert.equal(orderStepKind("anh"), "original");
+  assert.ok(SHEET_COVERAGE.some((row) => row.sheet.includes("setup tiệm") && row.gap === ""));
+  assert.ok(SHEET_COVERAGE.some((row) => row.gap.length > 0));
+});

@@ -565,6 +565,7 @@ function StorePanel({
     showAlbum: boolean;
     groupListed: Record<string, boolean>;
     bank: { id: string; account: string; holder: string };
+    staffPin?: string;
   }) => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -579,6 +580,7 @@ function StorePanel({
   const [bankId, setBankId] = useState(data.settings.bank?.id ?? "");
   const [bankAccount, setBankAccount] = useState(data.settings.bank?.account ?? "");
   const [bankHolder, setBankHolder] = useState(data.settings.bank?.holder ?? "");
+  const [staffPin, setStaffPin] = useState("");
   const bankName = TRANSFER_BANKS.find((bank) => bank.id === data.settings.bank?.id)?.label ?? "Chưa gắn";
 
   function begin() {
@@ -592,6 +594,7 @@ function StorePanel({
     setBankId(data.settings.bank?.id ?? "");
     setBankAccount(data.settings.bank?.account ?? "");
     setBankHolder(data.settings.bank?.holder ?? "");
+    setStaffPin("");
     setOpen(true);
   }
 
@@ -607,6 +610,7 @@ function StorePanel({
         showAlbum: album,
         groupListed: listed,
         bank: { id: bankId, account: bankAccount, holder: bankHolder },
+        ...(staffPin.trim() ? { staffPin: staffPin.trim() } : {}),
       });
       setOpen(false);
     } catch (error) {
@@ -634,6 +638,7 @@ function StorePanel({
         <Info label="Ngân hàng" value={bankName} />
         <Info label="Số tài khoản" value={data.settings.bank?.account || "Chưa có"} />
         <Info label="Chủ tài khoản" value={data.settings.bank?.holder || "Chưa có"} />
+        <Info label="PIN điện thoại" value={data.settings.staffPinSet ? "Đã đặt 4 số" : "Chưa đặt"} />
       </dl>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
@@ -652,6 +657,10 @@ function StorePanel({
             <label className="block text-sm font-semibold">
               Giờ ra ca
               <Input className="mt-1 min-h-11" value={workEnd} onChange={(event) => setWorkEnd(event.target.value)} />
+            </label>
+            <label className="block text-sm font-semibold">
+              Mã PIN 4 số cho điện thoại (/q). Để trống nếu giữ mã cũ.
+              <Input className="mt-1 min-h-11" inputMode="numeric" autoComplete="off" value={staffPin} onChange={(event) => setStaffPin(event.target.value.replace(/\D/g, "").slice(0, 4))} aria-label="Mã PIN nhân viên" />
             </label>
             <label className="block text-sm font-semibold">
               Ngày nghỉ trong tuần (0=CN … 6=T7, cách nhau bởi dấu phẩy). Để trống = làm cả tuần.

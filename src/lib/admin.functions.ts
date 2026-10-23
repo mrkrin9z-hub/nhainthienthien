@@ -1230,3 +1230,18 @@ export const deletePackage = createServerFn({ method: "POST" })
     await removePackage(await actor(), data.id);
     return { ok: true };
   });
+
+export const loadChecklist = createServerFn({ method: "GET" }).handler(async () => {
+  const { staffChecklist } = await import("@/server/service");
+  return staffChecklist(await actor());
+});
+
+export const saveChecklistStatus = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ taskId: z.string().min(3).max(40), status: z.enum(["chua_lam", "dang_lam", "xong"]), note: z.string().max(400).optional() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { setChecklistStatus } = await import("@/server/service");
+    await setChecklistStatus(await actor(), data);
+    return { ok: true };
+  });

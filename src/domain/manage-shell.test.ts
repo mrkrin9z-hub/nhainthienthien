@@ -10,7 +10,7 @@ test("menu đủ nhóm việc hằng ngày và ẩn garment/tools", () => {
   const orders = ADMIN_MODULE_GROUPS.find((group) => group.title === "Đơn hàng")?.items.map((item) => item.label) ?? [];
   assert.deepEqual(orders, ["Nhận đơn", "Nhập/Tạo đơn", "In đơn (K80)", "Giao đơn"]);
   const people = ADMIN_MODULE_GROUPS.find((group) => group.title === "Nhân sự")?.items.map((item) => item.label) ?? [];
-  assert.deepEqual(people, ["Chấm công", "Check công", "Check lương", "Check thưởng"]);
+  assert.deepEqual(people, ["Việc cần làm", "Chấm công", "Check công", "Check lương", "Check thưởng"]);
   const money = ADMIN_MODULE_GROUPS.find((group) => group.title === "Thu chi")?.items.map((item) => item.label) ?? [];
   assert.deepEqual(money, ["Nhập thu", "Chuyển nộp", "Nhập chi", "Duyệt chi", "Công nợ"]);
   const stock = ADMIN_MODULE_GROUPS.find((group) => group.title === "Kho")?.items.map((item) => item.label) ?? [];

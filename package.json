@@ -12,7 +12,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types --test src/domain/domain.test.ts src/domain/audit.test.ts src/domain/phase2.test.ts src/domain/phase3.test.ts src/domain/crm.test.ts src/domain/phase8.test.ts src/domain/phase9.test.ts src/domain/catalog-label.test.ts src/domain/web-product.test.ts src/domain/admin-shell.test.ts src/domain/manage-shell.test.ts src/domain/ops-desk.test.ts src/domain/org-desk.test.ts src/domain/sepay.test.ts src/domain/money.test.ts src/domain/price-sheet.test.ts src/domain/order-upload.test.ts src/domain/marketplace-api.test.ts src/domain/catalog-sync.test.ts src/domain/order-lookup.test.ts src/domain/carriers.test.ts src/domain/print-shop.test.ts src/domain/shop-import.test.ts src/domain/shop-chat.test.ts src/domain/meta-page.test.ts",
+    "test": "node --experimental-strip-types --test src/domain/domain.test.ts src/domain/audit.test.ts src/domain/phase2.test.ts src/domain/phase3.test.ts src/domain/crm.test.ts src/domain/phase8.test.ts src/domain/phase9.test.ts src/domain/catalog-label.test.ts src/domain/web-product.test.ts src/domain/admin-shell.test.ts src/domain/manage-shell.test.ts src/domain/ops-desk.test.ts src/domain/org-desk.test.ts src/domain/sepay.test.ts src/domain/money.test.ts src/domain/price-sheet.test.ts src/domain/order-upload.test.ts src/domain/marketplace-api.test.ts src/domain/catalog-sync.test.ts src/domain/order-lookup.test.ts src/domain/carriers.test.ts src/domain/print-shop.test.ts src/domain/shop-import.test.ts src/domain/shop-chat.test.ts src/domain/meta-page.test.ts src/domain/checklist.test.ts",
     "format": "prettier --write ."
   },
   "overrides": {
