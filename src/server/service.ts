@@ -46,7 +46,16 @@ import { canExport, payrollForActor } from "@/domain/guard";
 import { applyMarketplaceProfile, customerCard, customerCards, customerReminders, findCustomer, ordersForCustomer, type SpecialDate } from "@/domain/crm";
 import { EXPECTED_COLUMNS, fileOrderAdapter, listDifference, normalizeMarketplacePhone, parseMarketplaceTable, planMarketplaceImport, type MarketplaceChannel, type ParsedLine, type PlannedItem, type PlannedOrder } from "@/domain/marketplace";
 import { applyRestore, restoreSummary } from "@/domain/restore";
-import { albumFolderParts, driveFolderParts } from "@/domain/drive-path";
+import { albumFolderParts, driveFolderParts, orderKindFolder } from "@/domain/drive-path";
+import {
+  applyTaskStatus,
+  checklistCards,
+  orderStepKind,
+  SHEET_COVERAGE,
+  SHOP_RULES,
+  taskFileBucket,
+  taskFolderParts,
+} from "@/domain/checklists";
 import {
   CARRIER_NAME,
   carrierIdFromName,
@@ -970,18 +979,29 @@ export async function saveDirectUpload(input: {
     const file = order.files.find((item) => item.id === input.fileId);
     if (!file) throw new Error("Không thấy file của đơn.");
     const customer = state.customers.find((item) => item.id === order.customerId);
+    const customerName = customer?.name ?? "";
     await putPhoto(
       file,
       {
         orderId: order.id,
         code: order.code,
-        customerName: customer?.name ?? "",
+        customerName,
         createdAt: order.createdAt,
         source: order.source,
         channel: order.channel,
       },
       input.bytes,
       input.mime,
+      [
+        ...driveFolderParts({
+          code: order.code,
+          customerName,
+          createdAt: order.createdAt,
+          source: order.source,
+          channel: order.channel,
+        }),
+        orderKindFolder(file.kind),
+      ],
     );
     file.status = "complete";
     file.size = input.bytes.byteLength;
@@ -1001,13 +1021,16 @@ export async function prepareOrderDriveUpload(input: { orderId: string; accessTo
     name: file.name,
     mime: file.mime,
     sizeBytes: file.size,
-    folders: driveFolderParts({
-      code: order.code,
-      customerName: customer?.name ?? "",
-      createdAt: order.createdAt,
-      source: order.source,
-      channel: order.channel,
-    }),
+    folders: [
+      ...driveFolderParts({
+        code: order.code,
+        customerName: customer?.name ?? "",
+        createdAt: order.createdAt,
+        source: order.source,
+        channel: order.channel,
+      }),
+      orderKindFolder(file.kind),
+    ],
   });
 }
 
@@ -1020,13 +1043,16 @@ export async function finishOrderDriveUpload(input: { orderId: string; accessTok
   if (!file) throw new Error("Không thấy file của đơn.");
   if (file.status === "complete" && file.driveFileId === input.driveFileId) return { ok: true as const };
   const customer = state.customers.find((item) => item.id === order.customerId);
-  const folders = driveFolderParts({
-    code: order.code,
-    customerName: customer?.name ?? "",
-    createdAt: order.createdAt,
-    source: order.source,
-    channel: order.channel,
-  });
+  const folders = [
+    ...driveFolderParts({
+      code: order.code,
+      customerName: customer?.name ?? "",
+      createdAt: order.createdAt,
+      source: order.source,
+      channel: order.channel,
+    }),
+    orderKindFolder(file.kind),
+  ];
   const seen = await acceptDriveImage(input.driveFileId, folders, file.mime);
   await mutate(async (next) => {
     const current = await orderByToken(next, input.orderId, input.accessToken);
@@ -2505,8 +2531,10 @@ const SETTING_NUMBERS = [
 export async function getSettings(actor: Actor) {
   assertRole(actor, ["owner"]);
   const state = await readState();
-  return {
-    settings: state.settings,
+    const settings = structuredClone(state.settings);
+    delete settings.staffPinHash;
+    return {
+    settings: { ...settings, staffPinSet: Boolean(state.settings.staffPinHash) },
     audits: state.audits.slice(0, 40).map((item) => ({
       id: item.id,
       at: item.at,
@@ -2556,6 +2584,11 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
     if (typeof patch.zaloPhone === "string") state.settings.zaloPhone = patch.zaloPhone.replace(/\D/g, "");
     if (typeof patch.showZalo === "boolean") state.settings.showZalo = patch.showZalo;
     if (typeof patch.publicHours === "string") state.settings.publicHours = patch.publicHours;
+    if (typeof patch.staffPin === "string" && patch.staffPin.trim()) {
+      const pin = patch.staffPin.trim();
+      if (!/^\d{4}$/.test(pin)) throw new Error("Mã PIN nhân viên là đúng 4 chữ số.");
+      state.settings.staffPinHash = await sha256(`tt-staff-pin:v1:${pin}`);
+    }
     if (typeof patch.workStart === "string") state.settings.workStart = patch.workStart;
     if (typeof patch.workEnd === "string") state.settings.workEnd = patch.workEnd;
     if (typeof patch.shopOpenDate === "string") state.settings.shopOpenDate = patch.shopOpenDate;
@@ -2740,7 +2773,12 @@ export async function fileForStaff(
   preview: 480 | 1600 | null = null,
 ): Promise<{ name: string; mime: string; bytes?: Uint8Array; redirect?: string }> {
   const state = await readState();
-  const pools = [...state.orders.map((order) => order.files), ...(state.albums ?? []).map((album) => album.files)];
+  const pools = [
+    ...state.orders.map((order) => order.files),
+    ...(state.albums ?? []).map((album) => album.files),
+    ...(state.tasks ?? []).map((task) => task.files),
+    ...(state.taskChecks ?? []).map((task) => task.files),
+  ];
   for (const files of pools) {
     const file = files.find((item) => item.id === fileId && !item.deletedAt);
     if (!file) continue;
@@ -4538,4 +4576,224 @@ export async function removePackage(actor: Actor, id: string) {
     const [removed] = list.splice(at, 1);
     audit(state, actor.id, "package.remove", id, removed, null);
   });
+}
+
+const STAFF_PIN_PREFIX = "tt-staff-pin:v1:";
+
+function pinFailKey(ip: string): string {
+  return `pin_fail:${ip}`;
+}
+
+function sameHex(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let index = 0; index < left.length; index++) diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return diff === 0;
+}
+
+export async function staffPinReady(): Promise<{ set: boolean }> {
+  const state = await readState();
+  return { set: Boolean(state.settings.staffPinHash) };
+}
+
+export async function assertStaffPin(pin: string): Promise<void> {
+  if (!/^\d{4}$/.test(pin)) throw new Error("Mã PIN là 4 chữ số.");
+  const state = await readState();
+  if (!state.settings.staffPinHash) throw new Error("Chủ chưa đặt mã PIN. Vào Cài đặt, mục Cửa hàng.");
+  const ip = clientIp();
+  if ((await failCount(pinFailKey(ip), Date.now())) >= LOGIN_FAIL_LIMIT) {
+    throw new Error("Nhập sai quá nhiều. Thử lại sau 15 phút.");
+  }
+  const hash = await sha256(`${STAFF_PIN_PREFIX}${pin}`);
+  if (!sameHex(hash, state.settings.staffPinHash)) {
+    await bumpFail(pinFailKey(ip), new Date().toISOString(), LOGIN_FAIL_LIMIT);
+    throw new Error("Mã PIN chưa đúng.");
+  }
+}
+
+function checklistPayload(state: ShopState, drive: boolean) {
+  return {
+    pinSet: Boolean(state.settings.staffPinHash),
+    drive,
+    cards: checklistCards(state, vnYmd()),
+    coverage: SHEET_COVERAGE,
+    rules: SHOP_RULES,
+    today: vnYmd(),
+  };
+}
+
+export async function staffChecklist(actor: Actor) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  const state = await readState();
+  return checklistPayload(state, await driveConnected());
+}
+
+export async function phoneChecklist(pin: string) {
+  await assertStaffPin(pin);
+  const state = await readState();
+  return checklistPayload(state, await driveConnected());
+}
+
+export async function setChecklistStatus(actor: Actor, input: { taskId: string; status: "chua_lam" | "dang_lam" | "xong"; note?: string }) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  await mutate(async (state) => {
+    const saved = applyTaskStatus(state, { ...input, by: actor.id, ymd: vnYmd(), at: nowIso() });
+    audit(state, actor.id, "task.status", input.taskId, null, { status: input.status, title: saved.title });
+  });
+}
+
+export async function phoneSetChecklistStatus(input: { pin: string; taskId: string; status: "chua_lam" | "dang_lam" | "xong"; note?: string }) {
+  await assertStaffPin(input.pin);
+  await mutate(async (state) => {
+    applyTaskStatus(state, { taskId: input.taskId, status: input.status, note: input.note, by: null, ymd: vnYmd(), at: nowIso() });
+  });
+}
+
+async function storeImage(file: OrderFile, bytes: Uint8Array, mime: string, folder: { orderId: string; code: string; customerName: string; createdAt: string; source: string; channel: string }, folders: readonly string[]) {
+  await putPhoto(file, folder, bytes, mime, folders);
+  file.status = "complete";
+  file.size = bytes.byteLength;
+  file.mime = mime;
+}
+
+export async function saveStaffPhoto(input: {
+  pin: string;
+  taskId?: string;
+  token?: string;
+  step?: string;
+  name: string;
+  mime: string;
+  bytes: Uint8Array;
+}) {
+  await assertStaffPin(input.pin);
+  const limit = await photoByteLimit();
+  if (photoTooBig(input.bytes.byteLength, limit)) throw new Error("Mỗi ảnh tối đa 10MB khi chưa nối Google Drive.");
+  const mime = input.mime || "image/jpeg";
+  if (!imageMimeAllowed(mime) || !imageBytesMatch(mime, input.bytes)) throw new Error("Chỉ nhận ảnh JPG, PNG, WEBP hoặc HEIC.");
+  const drive = await driveConnected();
+  await mutate(async (state) => {
+    const file: OrderFile = {
+      id: nid(),
+      name: input.name.replace(/[\\/]/g, "-").slice(-80) || "anh.jpg",
+      mime,
+      size: input.bytes.byteLength,
+      status: "uploading",
+      kind: "task",
+      storage: "local",
+      path: "",
+      driveFileId: null,
+      createdAt: nowIso(),
+      deletedAt: null,
+    };
+    if (input.taskId) {
+      const bucket = taskFileBucket(state, input.taskId, vnYmd());
+      file.kind = "task";
+      bucket.files.push(file);
+      await storeImage(file, input.bytes, mime, {
+        orderId: input.taskId,
+        code: input.taskId,
+        customerName: bucket.title,
+        createdAt: file.createdAt,
+        source: "manual",
+        channel: "tai_tiem",
+      }, taskFolderParts(bucket.period, bucket.title));
+      applyTaskStatus(state, { taskId: input.taskId, status: "xong", by: null, ymd: vnYmd(), at: file.createdAt });
+      return;
+    }
+    if (!input.token) throw new Error("Thiếu việc hoặc mã đơn.");
+    const order = await orderByUploadToken(state, input.token);
+    const kind = orderStepKind(input.step || "anh");
+    file.kind = kind;
+    order.files.push(file);
+    const customer = state.customers.find((item) => item.id === order.customerId);
+    await storeImage(
+      file,
+      input.bytes,
+      mime,
+      {
+        orderId: order.id,
+        code: order.code,
+        customerName: customer?.name ?? "",
+        createdAt: order.createdAt,
+        source: order.source,
+        channel: order.channel,
+      },
+      [
+        ...driveFolderParts({
+          code: order.code,
+          customerName: customer?.name ?? "",
+          createdAt: order.createdAt,
+          source: order.source,
+          channel: order.channel,
+        }),
+        orderKindFolder(kind),
+      ],
+    );
+    order.updatedAt = nowIso();
+  });
+  return { ok: true as const, drive };
+}
+
+export async function saveActorTaskPhoto(
+  actor: Actor,
+  input: { taskId: string; name: string; mime: string; bytes: Uint8Array },
+) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  const limit = await photoByteLimit();
+  if (photoTooBig(input.bytes.byteLength, limit)) throw new Error("Mỗi ảnh tối đa 10MB khi chưa nối Google Drive.");
+  const mime = input.mime || "image/jpeg";
+  if (!imageMimeAllowed(mime) || !imageBytesMatch(mime, input.bytes)) throw new Error("Chỉ nhận ảnh JPG, PNG, WEBP hoặc HEIC.");
+  const drive = await driveConnected();
+  await mutate(async (state) => {
+    const bucket = taskFileBucket(state, input.taskId, vnYmd());
+    const file: OrderFile = {
+      id: nid(),
+      name: input.name.replace(/[\\/]/g, "-").slice(-80) || "anh.jpg",
+      mime,
+      size: input.bytes.byteLength,
+      status: "uploading",
+      kind: "task",
+      storage: "local",
+      path: "",
+      driveFileId: null,
+      createdAt: nowIso(),
+      deletedAt: null,
+    };
+    bucket.files.push(file);
+    await storeImage(
+      file,
+      input.bytes,
+      mime,
+      {
+        orderId: input.taskId,
+        code: input.taskId,
+        customerName: bucket.title,
+        createdAt: file.createdAt,
+        source: "manual",
+        channel: "tai_tiem",
+      },
+      taskFolderParts(bucket.period, bucket.title),
+    );
+    applyTaskStatus(state, { taskId: input.taskId, status: "xong", by: actor.id, ymd: vnYmd(), at: file.createdAt });
+  });
+  return { ok: true as const, drive };
+}
+
+export async function phoneOrderCard(pin: string, token: string) {
+  await assertStaffPin(pin);
+  const state = await readState();
+  const order = await orderByUploadToken(state, token);
+  const customer = state.customers.find((item) => item.id === order.customerId);
+  const files = order.files.filter((file) => !file.deletedAt && file.status === "complete");
+  return {
+    code: order.code,
+    customerName: customer?.name ?? "",
+    drive: await driveConnected(),
+    counts: {
+      original: files.filter((file) => file.kind === "original").length,
+      design: files.filter((file) => file.kind === "design").length,
+      approval: files.filter((file) => file.kind === "approval").length,
+      packing_photo: files.filter((file) => file.kind === "packing_photo").length,
+    },
+  };
 }

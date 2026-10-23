@@ -1,3 +1,4 @@
+import { ensureChecklistTasks } from "./checklists.ts";
 import { applyDeskSheetCosts, applyDeskSupplies } from "./desk-supply.ts";
 import { ensureOrgCollections } from "./org-desk.ts";
 import {
@@ -63,6 +64,8 @@ type Migratable = {
   roleModules?: RoleModules[];
   packages?: ServicePackage[];
   sepaySeen?: string[];
+  tasks?: { id: string; status: "chua_lam" | "dang_lam" | "xong"; note: string; updatedAt: string | null; updatedBy: string | null; files: [] }[];
+  taskChecks?: [];
 };
 
 /** Đổi tên cũ đúng nguyên văn. Tên chủ đã sửa thì giữ. */
@@ -175,6 +178,7 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (grantDeskLinks(state)) changed = true;
   if (grantTaskMenu(state)) changed = true;
   if (applyDeskSupplies(state as unknown as Parameters<typeof applyDeskSupplies>[0])) changed = true;
+  if (ensureChecklistTasks(state)) changed = true;
   if (ensureOrgCollections(state)) changed = true;
   return changed;
 }

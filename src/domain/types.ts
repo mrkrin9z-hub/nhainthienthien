@@ -145,6 +145,10 @@ export type Settings = {
   taskMenu20261023?: boolean;
   /** Đã gắn gỗ cho ảnh TG, định mức nam châm theo khổ, và 9 lọ mực. Không chạy lại. */
   deskBom20261023?: boolean;
+  /** Đã đổ checklist sheet vào sổ việc. */
+  checklist20261023?: boolean;
+  /** SHA-256 của mã PIN 4 số. Không gửi ra trình duyệt. */
+  staffPinHash?: string;
   /** Phí sàn để đối chiếu. Không thay mức 27% + 11.000đ. */
   platformFeeNote?: string;
   showAnhThe: boolean;
@@ -413,7 +417,7 @@ export type OrderFile = {
   mime: string;
   size: number;
   status: "uploading" | "complete" | "error";
-  kind: "original" | "design" | "approval" | "packing_video" | "packing_photo";
+  kind: "original" | "design" | "approval" | "packing_video" | "packing_photo" | "task";
   storage: "supabase" | "drive" | "local" | "r2" | "kv";
   path: string;
   driveFileId: string | null;
@@ -678,6 +682,30 @@ export type ShopState = {
   sepaySeen?: string[];
   /** Tin khách gửi từ trang liên hệ. */
   inquiries?: Inquiry[];
+  /** Việc một lần (setup, khai trương, ảnh, đào tạo). */
+  tasks?: ShopTaskRecord[];
+  /** Việc lặp theo ngày hoặc tuần. */
+  taskChecks?: ShopTaskCheck[];
+};
+
+export type ShopTaskRecord = {
+  id: string;
+  status: "chua_lam" | "dang_lam" | "xong";
+  note: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  files: OrderFile[];
+};
+
+export type ShopTaskCheck = {
+  id: string;
+  taskId: string;
+  period: string;
+  status: "chua_lam" | "dang_lam" | "xong";
+  note: string;
+  updatedAt: string;
+  updatedBy: string | null;
+  files: OrderFile[];
 };
 
 export type Inquiry = {

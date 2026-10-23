@@ -37,6 +37,7 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
   {
     title: "Nhân sự",
     items: [
+      { to: "/admin/viec", label: "Việc cần làm", roles: ["owner", "sale", "production"], mode: "live" },
       { to: "/admin/cham-cong", label: "Chấm công", roles: ["owner", "sale", "production"], managePath: "/manage/staff/attendance", mode: "live" },
       { to: "/admin/check-cong", label: "Check công", roles: ["owner", "sale", "production"], mode: "live" },
       { to: "/admin/luong", label: "Check lương", roles: ["owner", "sale", "production"], managePath: "/manage/staff/salary", mode: "live" },

@@ -16,6 +16,7 @@ import { Route as DatInRouteImport } from './routes/dat-in'
 import { Route as HuongDanRouteImport } from './routes/huong-dan'
 import { Route as LienHeRouteImport } from './routes/lien-he'
 import { Route as OrdersRouteImport } from './routes/orders'
+import { Route as QRouteImport } from './routes/q'
 import { Route as SanPhamRouteImport } from './routes/san-pham'
 import { Route as TraCuuRouteImport } from './routes/tra-cuu'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -60,6 +61,7 @@ import { Route as AdminThuRouteImport } from './routes/admin.thu'
 import { Route as AdminThuongRouteImport } from './routes/admin.thuong'
 import { Route as AdminTinMauRouteImport } from './routes/admin.tin-mau'
 import { Route as AdminViRouteImport } from './routes/admin.vi'
+import { Route as AdminViecRouteImport } from './routes/admin.viec'
 import { Route as DanhGiaTokenRouteImport } from './routes/danh-gia.$token'
 import { Route as GuiAnhIndexRouteImport } from './routes/gui-anh.index'
 import { Route as GuiAnhTokenRouteImport } from './routes/gui-anh.$token'
@@ -77,9 +79,12 @@ import { Route as ApiPublicAlbumRouteImport } from './routes/api/public/album'
 import { Route as ApiPublicCleanupFilesRouteImport } from './routes/api/public/cleanup-files'
 import { Route as ApiPublicMetaWebhookRouteImport } from './routes/api/public/meta-webhook'
 import { Route as ApiPublicSepayRouteImport } from './routes/api/public/sepay'
+import { Route as ApiPublicStaffPhotoRouteImport } from './routes/api/public/staff-photo'
 import { Route as ApiPublicStudiobaseWebhookRouteImport } from './routes/api/public/studiobase-webhook'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiStaffPackingPhotoRouteImport } from './routes/api/staff/packing-photo'
+import { Route as ApiStaffTaskPhotoRouteImport } from './routes/api/staff/task-photo'
+import { Route as QDonTokenRouteImport } from './routes/q_.don.$token'
 import { Route as ApiAdminDriveCallbackRouteImport } from './routes/api/admin/drive.callback'
 import { Route as ApiAdminDriveStartRouteImport } from './routes/api/admin/drive.start'
 import { Route as ApiAdminMetaCallbackRouteImport } from './routes/api/admin/meta.callback'
@@ -125,6 +130,11 @@ const LienHeRoute = LienHeRouteImport.update({
 const OrdersRoute = OrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QRoute = QRouteImport.update({
+  id: '/q',
+  path: '/q',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SanPhamRoute = SanPhamRouteImport.update({
@@ -347,6 +357,11 @@ const AdminViRoute = AdminViRouteImport.update({
   path: '/vi',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminViecRoute = AdminViecRouteImport.update({
+  id: '/viec',
+  path: '/viec',
+  getParentRoute: () => AdminRoute,
+} as any)
 const DanhGiaTokenRoute = DanhGiaTokenRouteImport.update({
   id: '/danh-gia/$token',
   path: '/danh-gia/$token',
@@ -432,6 +447,11 @@ const ApiPublicSepayRoute = ApiPublicSepayRouteImport.update({
   path: '/api/public/sepay',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStaffPhotoRoute = ApiPublicStaffPhotoRouteImport.update({
+  id: '/api/public/staff-photo',
+  path: '/api/public/staff-photo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicStudiobaseWebhookRoute =
   ApiPublicStudiobaseWebhookRouteImport.update({
     id: '/api/public/studiobase-webhook',
@@ -446,6 +466,16 @@ const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
 const ApiStaffPackingPhotoRoute = ApiStaffPackingPhotoRouteImport.update({
   id: '/api/staff/packing-photo',
   path: '/api/staff/packing-photo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStaffTaskPhotoRoute = ApiStaffTaskPhotoRouteImport.update({
+  id: '/api/staff/task-photo',
+  path: '/api/staff/task-photo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QDonTokenRoute = QDonTokenRouteImport.update({
+  id: '/q_/don/$token',
+  path: '/q/don/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdminDriveCallbackRoute = ApiAdminDriveCallbackRouteImport.update({
@@ -514,6 +544,7 @@ export interface FileRoutesByFullPath {
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
   '/orders': typeof OrdersRouteWithChildren
+  '/q': typeof QRoute
   '/san-pham': typeof SanPhamRoute
   '/tra-cuu': typeof TraCuuRoute
   '/admin/anh': typeof AdminAnhRoute
@@ -557,6 +588,7 @@ export interface FileRoutesByFullPath {
   '/admin/thuong': typeof AdminThuongRoute
   '/admin/tin-mau': typeof AdminTinMauRoute
   '/admin/vi': typeof AdminViRoute
+  '/admin/viec': typeof AdminViecRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/orders/create': typeof OrdersCreateRoute
@@ -572,9 +604,12 @@ export interface FileRoutesByFullPath {
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
   '/api/public/meta-webhook': typeof ApiPublicMetaWebhookRoute
   '/api/public/sepay': typeof ApiPublicSepayRoute
+  '/api/public/staff-photo': typeof ApiPublicStaffPhotoRoute
   '/api/public/studiobase-webhook': typeof ApiPublicStudiobaseWebhookRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/staff/packing-photo': typeof ApiStaffPackingPhotoRoute
+  '/api/staff/task-photo': typeof ApiStaffTaskPhotoRoute
+  '/q/don/$token': typeof QDonTokenRoute
   '/admin/album/': typeof AdminAlbumIndexRoute
   '/admin/don-hang/': typeof AdminDonHangIndexRoute
   '/admin/khach/': typeof AdminKhachIndexRoute
@@ -597,6 +632,7 @@ export interface FileRoutesByTo {
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
   '/orders': typeof OrdersRouteWithChildren
+  '/q': typeof QRoute
   '/san-pham': typeof SanPhamRoute
   '/tra-cuu': typeof TraCuuRoute
   '/admin/anh': typeof AdminAnhRoute
@@ -640,6 +676,7 @@ export interface FileRoutesByTo {
   '/admin/thuong': typeof AdminThuongRoute
   '/admin/tin-mau': typeof AdminTinMauRoute
   '/admin/vi': typeof AdminViRoute
+  '/admin/viec': typeof AdminViecRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/orders/create': typeof OrdersCreateRoute
@@ -655,9 +692,12 @@ export interface FileRoutesByTo {
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
   '/api/public/meta-webhook': typeof ApiPublicMetaWebhookRoute
   '/api/public/sepay': typeof ApiPublicSepayRoute
+  '/api/public/staff-photo': typeof ApiPublicStaffPhotoRoute
   '/api/public/studiobase-webhook': typeof ApiPublicStudiobaseWebhookRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/staff/packing-photo': typeof ApiStaffPackingPhotoRoute
+  '/api/staff/task-photo': typeof ApiStaffTaskPhotoRoute
+  '/q/don/$token': typeof QDonTokenRoute
   '/admin/album': typeof AdminAlbumIndexRoute
   '/admin/don-hang': typeof AdminDonHangIndexRoute
   '/admin/khach': typeof AdminKhachIndexRoute
@@ -682,6 +722,7 @@ export interface FileRoutesById {
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
   '/orders': typeof OrdersRouteWithChildren
+  '/q': typeof QRoute
   '/san-pham': typeof SanPhamRoute
   '/tra-cuu': typeof TraCuuRoute
   '/admin/anh': typeof AdminAnhRoute
@@ -725,6 +766,7 @@ export interface FileRoutesById {
   '/admin/thuong': typeof AdminThuongRoute
   '/admin/tin-mau': typeof AdminTinMauRoute
   '/admin/vi': typeof AdminViRoute
+  '/admin/viec': typeof AdminViecRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/orders/create': typeof OrdersCreateRoute
@@ -740,9 +782,12 @@ export interface FileRoutesById {
   '/api/public/cleanup-files': typeof ApiPublicCleanupFilesRoute
   '/api/public/meta-webhook': typeof ApiPublicMetaWebhookRoute
   '/api/public/sepay': typeof ApiPublicSepayRoute
+  '/api/public/staff-photo': typeof ApiPublicStaffPhotoRoute
   '/api/public/studiobase-webhook': typeof ApiPublicStudiobaseWebhookRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/staff/packing-photo': typeof ApiStaffPackingPhotoRoute
+  '/api/staff/task-photo': typeof ApiStaffTaskPhotoRoute
+  '/q_/don/$token': typeof QDonTokenRoute
   '/admin/album/': typeof AdminAlbumIndexRoute
   '/admin/don-hang/': typeof AdminDonHangIndexRoute
   '/admin/khach/': typeof AdminKhachIndexRoute
@@ -768,6 +813,7 @@ export interface FileRouteTypes {
     | '/huong-dan'
     | '/lien-he'
     | '/orders'
+    | '/q'
     | '/san-pham'
     | '/tra-cuu'
     | '/admin/anh'
@@ -811,6 +857,7 @@ export interface FileRouteTypes {
     | '/admin/thuong'
     | '/admin/tin-mau'
     | '/admin/vi'
+    | '/admin/viec'
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/orders/create'
@@ -826,9 +873,12 @@ export interface FileRouteTypes {
     | '/api/public/cleanup-files'
     | '/api/public/meta-webhook'
     | '/api/public/sepay'
+    | '/api/public/staff-photo'
     | '/api/public/studiobase-webhook'
     | '/api/public/upload'
     | '/api/staff/packing-photo'
+    | '/api/staff/task-photo'
+    | '/q/don/$token'
     | '/admin/album/'
     | '/admin/don-hang/'
     | '/admin/khach/'
@@ -851,6 +901,7 @@ export interface FileRouteTypes {
     | '/huong-dan'
     | '/lien-he'
     | '/orders'
+    | '/q'
     | '/san-pham'
     | '/tra-cuu'
     | '/admin/anh'
@@ -894,6 +945,7 @@ export interface FileRouteTypes {
     | '/admin/thuong'
     | '/admin/tin-mau'
     | '/admin/vi'
+    | '/admin/viec'
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/orders/create'
@@ -909,9 +961,12 @@ export interface FileRouteTypes {
     | '/api/public/cleanup-files'
     | '/api/public/meta-webhook'
     | '/api/public/sepay'
+    | '/api/public/staff-photo'
     | '/api/public/studiobase-webhook'
     | '/api/public/upload'
     | '/api/staff/packing-photo'
+    | '/api/staff/task-photo'
+    | '/q/don/$token'
     | '/admin/album'
     | '/admin/don-hang'
     | '/admin/khach'
@@ -935,6 +990,7 @@ export interface FileRouteTypes {
     | '/huong-dan'
     | '/lien-he'
     | '/orders'
+    | '/q'
     | '/san-pham'
     | '/tra-cuu'
     | '/admin/anh'
@@ -978,6 +1034,7 @@ export interface FileRouteTypes {
     | '/admin/thuong'
     | '/admin/tin-mau'
     | '/admin/vi'
+    | '/admin/viec'
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/orders/create'
@@ -993,9 +1050,12 @@ export interface FileRouteTypes {
     | '/api/public/cleanup-files'
     | '/api/public/meta-webhook'
     | '/api/public/sepay'
+    | '/api/public/staff-photo'
     | '/api/public/studiobase-webhook'
     | '/api/public/upload'
     | '/api/staff/packing-photo'
+    | '/api/staff/task-photo'
+    | '/q_/don/$token'
     | '/admin/album/'
     | '/admin/don-hang/'
     | '/admin/khach/'
@@ -1020,6 +1080,7 @@ export interface RootRouteChildren {
   HuongDanRoute: typeof HuongDanRoute
   LienHeRoute: typeof LienHeRoute
   OrdersRoute: typeof OrdersRouteWithChildren
+  QRoute: typeof QRoute
   SanPhamRoute: typeof SanPhamRoute
   TraCuuRoute: typeof TraCuuRoute
   DanhGiaTokenRoute: typeof DanhGiaTokenRoute
@@ -1030,9 +1091,12 @@ export interface RootRouteChildren {
   ApiPublicCleanupFilesRoute: typeof ApiPublicCleanupFilesRoute
   ApiPublicMetaWebhookRoute: typeof ApiPublicMetaWebhookRoute
   ApiPublicSepayRoute: typeof ApiPublicSepayRoute
+  ApiPublicStaffPhotoRoute: typeof ApiPublicStaffPhotoRoute
   ApiPublicStudiobaseWebhookRoute: typeof ApiPublicStudiobaseWebhookRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
   ApiStaffPackingPhotoRoute: typeof ApiStaffPackingPhotoRoute
+  ApiStaffTaskPhotoRoute: typeof ApiStaffTaskPhotoRoute
+  QDonTokenRoute: typeof QDonTokenRoute
   ApiAdminDriveCallbackRoute: typeof ApiAdminDriveCallbackRoute
   ApiAdminDriveStartRoute: typeof ApiAdminDriveStartRoute
   ApiAdminMetaCallbackRoute: typeof ApiAdminMetaCallbackRoute
@@ -1095,6 +1159,13 @@ declare module '@tanstack/react-router' {
       path: '/orders'
       fullPath: '/orders'
       preLoaderRoute: typeof OrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/q': {
+      id: '/q'
+      path: '/q'
+      fullPath: '/q'
+      preLoaderRoute: typeof QRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/san-pham': {
@@ -1405,6 +1476,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminViRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/viec': {
+      id: '/admin/viec'
+      path: '/viec'
+      fullPath: '/admin/viec'
+      preLoaderRoute: typeof AdminViecRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/danh-gia/$token': {
       id: '/danh-gia/$token'
       path: '/danh-gia/$token'
@@ -1524,6 +1602,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSepayRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/staff-photo': {
+      id: '/api/public/staff-photo'
+      path: '/api/public/staff-photo'
+      fullPath: '/api/public/staff-photo'
+      preLoaderRoute: typeof ApiPublicStaffPhotoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/studiobase-webhook': {
       id: '/api/public/studiobase-webhook'
       path: '/api/public/studiobase-webhook'
@@ -1543,6 +1628,20 @@ declare module '@tanstack/react-router' {
       path: '/api/staff/packing-photo'
       fullPath: '/api/staff/packing-photo'
       preLoaderRoute: typeof ApiStaffPackingPhotoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/staff/task-photo': {
+      id: '/api/staff/task-photo'
+      path: '/api/staff/task-photo'
+      fullPath: '/api/staff/task-photo'
+      preLoaderRoute: typeof ApiStaffTaskPhotoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/q_/don/$token': {
+      id: '/q_/don/$token'
+      path: '/q/don/$token'
+      fullPath: '/q/don/$token'
+      preLoaderRoute: typeof QDonTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/drive/callback': {
@@ -1667,6 +1766,7 @@ interface AdminRouteChildren {
   AdminThuongRoute: typeof AdminThuongRoute
   AdminTinMauRoute: typeof AdminTinMauRoute
   AdminViRoute: typeof AdminViRoute
+  AdminViecRoute: typeof AdminViecRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminAlbumIdRoute: typeof AdminAlbumIdRoute
   AdminDonHangCodeRoute: typeof AdminDonHangCodeRoute
@@ -1720,6 +1820,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminThuongRoute: AdminThuongRoute,
   AdminTinMauRoute: AdminTinMauRoute,
   AdminViRoute: AdminViRoute,
+  AdminViecRoute: AdminViecRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminAlbumIdRoute: AdminAlbumIdRoute,
   AdminDonHangCodeRoute: AdminDonHangCodeRoute,
@@ -1752,6 +1853,7 @@ const rootRouteChildren: RootRouteChildren = {
   HuongDanRoute: HuongDanRoute,
   LienHeRoute: LienHeRoute,
   OrdersRoute: OrdersRouteWithChildren,
+  QRoute: QRoute,
   SanPhamRoute: SanPhamRoute,
   TraCuuRoute: TraCuuRoute,
   DanhGiaTokenRoute: DanhGiaTokenRoute,
@@ -1762,9 +1864,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCleanupFilesRoute: ApiPublicCleanupFilesRoute,
   ApiPublicMetaWebhookRoute: ApiPublicMetaWebhookRoute,
   ApiPublicSepayRoute: ApiPublicSepayRoute,
+  ApiPublicStaffPhotoRoute: ApiPublicStaffPhotoRoute,
   ApiPublicStudiobaseWebhookRoute: ApiPublicStudiobaseWebhookRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
   ApiStaffPackingPhotoRoute: ApiStaffPackingPhotoRoute,
+  ApiStaffTaskPhotoRoute: ApiStaffTaskPhotoRoute,
+  QDonTokenRoute: QDonTokenRoute,
   ApiAdminDriveCallbackRoute: ApiAdminDriveCallbackRoute,
   ApiAdminDriveStartRoute: ApiAdminDriveStartRoute,
   ApiAdminMetaCallbackRoute: ApiAdminMetaCallbackRoute,

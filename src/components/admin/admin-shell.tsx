@@ -78,6 +78,7 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin/kho": Package,
   "/admin/anh": Image,
   "/admin/cham-cong": Clock,
+  "/admin/viec": ClipboardList,
   "/admin/nhan-vien": UserCog,
   "/admin/luong": Receipt,
   "/admin/tai-khoan": UserRound,

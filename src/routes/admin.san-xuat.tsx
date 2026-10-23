@@ -43,7 +43,7 @@ function ProductionPage() {
     <div className="space-y-4">
       <PageToolbar
         title="Lệnh sản xuất"
-        hint="Đơn đang in, đóng gói hoặc chờ giao. Bấm mã để chuyển bước."
+        hint="Đơn đang in, đóng gói hoặc chờ giao. Mã QR gửi ảnh thiết kế in trên phiếu K80."
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm mã, khách, hàng…"

@@ -1,4 +1,5 @@
 import { DEFAULT_REMIND_MESSAGE } from "./crm.ts";
+import { ensureChecklistTasks } from "./checklists.ts";
 import { applyDeskSheetCosts, inkBottles } from "./desk-supply.ts";
 import { catalogPrices, DESK_PRODUCT_DESCRIPTION, DESK_PRODUCT_NAME, MIN_STOCK_20261022, stampSheetCosts } from "./price-import.ts";
 import { formulaQty } from "./calc.ts";
@@ -72,6 +73,7 @@ export const DEFAULT_SETTINGS: Settings = {
   menuLinks20261022: true,
   taskMenu20261023: true,
   deskBom20261023: true,
+  checklist20261023: true,
   platformFeeNote:
     "Hoạch toán sàn: 27% + 11.000đ/đơn. Bảng phí từng hạng mục trong file Phi-san ghi chưa xác minh, chỉ để đối chiếu.",
   showAnhThe: false,
@@ -492,7 +494,7 @@ export async function buildSeed(): Promise<ShopState> {
     totpSecret: null,
     totpPendingSecret: null,
   };
-  return {
+  const seeded: ShopState = {
     version: 1,
     settings,
     staff: [
@@ -525,7 +527,11 @@ export async function buildSeed(): Promise<ShopState> {
     roleModules: DEFAULT_ROLE_MODULES.map((row) => ({ role: row.role, modules: [...row.modules] })),
     packages: [],
     sepaySeen: [],
+    tasks: [],
+    taskChecks: [],
   };
+  ensureChecklistTasks(seeded);
+  return seeded;
 }
 
 export function recalcBoms(state: ShopState): number {
