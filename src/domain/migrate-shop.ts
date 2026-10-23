@@ -14,6 +14,7 @@ import {
   MIN_STOCK_20261022,
 } from "./price-import.ts";
 import { repairMojibake } from "./text-repair.ts";
+import { tiktokPriceFor } from "./tiktok-price.ts";
 import type { BomLine, ChannelPrice, Material, NotifyPrefs, Order, Role, RoleModules, SePayConfig, ServicePackage, Settings, Sku } from "./types.ts";
 
 const LEGACY_ANH_THO = "Miễn phí khôi phục, thay áo, đổi nền. Không giới hạn số lần sửa.";
@@ -184,7 +185,30 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (ensureOrgCollections(state)) changed = true;
   if (ensureMoHome(state)) changed = true;
   if (ensureWaste(state as Parameters<typeof ensureWaste>[0])) changed = true;
+  if (applyTiktokPrices(state)) changed = true;
   return changed;
+}
+
+/** Một lần: giá khách trả = giá sau giảm TikTok 23/10. Không đụng Mơ Home, số lượng, giá vốn. */
+function applyTiktokPrices(state: Migratable): boolean {
+  const settings = state.settings as Settings;
+  if (settings.tiktokPrice20261023) return false;
+  if (!state.prices?.length) return false;
+  const skuById = new Map((state.skus ?? []).map((sku) => [sku.id, sku.code]));
+  const rows = masterByCode();
+  for (const price of state.prices) {
+    if (price.channel === "mo_home") continue;
+    const code = skuById.get(price.skuId) ?? price.skuId;
+    if (!tiktokPriceFor(code)) continue;
+    const next = channelPriceFor({ id: price.skuId, code }, price.channel, rows.get(code));
+    price.price = next.price;
+    price.status = next.status;
+    price.note = next.note;
+    if (next.listPrice != null) price.listPrice = next.listPrice;
+    else delete price.listPrice;
+  }
+  settings.tiktokPrice20261023 = true;
+  return true;
 }
 
 function repairStoredText(state: Migratable): boolean {

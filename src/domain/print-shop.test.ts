@@ -118,9 +118,10 @@ test("nhận tại tiệm vào bảng giao; khách đã nhận không vượt c�
     }),
     null,
   );
-  const desk = readFileSync(new URL("../routes/admin.giao-hang.tsx", import.meta.url), "utf8");
-  assert.match(desk, /Nhận tại tiệm/);
+  const desk = readFileSync(new URL("../routes/admin.don-hang.index.tsx", import.meta.url), "utf8");
+  assert.match(desk, /Lấy tại xưởng/);
   assert.match(desk, /Khách đã nhận/);
+  assert.match(desk, /Đã giao/);
   assert.equal(desk.includes("ownerOverride"), false);
   const bonus = readFileSync(new URL("../routes/admin.thuong.tsx", import.meta.url), "utf8");
   assert.match(bonus, /Sản xuất không có thưởng sản phẩm/);

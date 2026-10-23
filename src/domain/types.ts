@@ -140,6 +140,8 @@ export type Settings = {
   publicHours: string;
   /** Đã nhập bảng giá 22/10 một lần. Không chạy lại. */
   catalogImport20261022?: boolean;
+  /** Đã ghi giá khách trả theo bảng TikTok 23/10 một lần. Không chạy lại. */
+  tiktokPrice20261023?: boolean;
   /** Đề xuất lương, KPI, hoa hồng. Khi pendingOwnerApproval = false thì số đã vào kpiTargets / lương / hoa hồng. */
   hrDraft?: HrDraft;
   /** Đã chép đề xuất nhân sự vào số đang dùng. Không chạy lại. */

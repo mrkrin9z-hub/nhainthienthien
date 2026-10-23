@@ -157,6 +157,21 @@ export const reviseOrder = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const setFulfillment = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        orderId: z.string().uuid(),
+        fulfillment: z.enum(["pickup", "delivery"]),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { setOrderFulfillment } = await import("@/server/service");
+    await setOrderFulfillment(await actor(), data);
+    return { ok: true };
+  });
+
 export const changeStatus = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z

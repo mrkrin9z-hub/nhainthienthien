@@ -1372,6 +1372,21 @@ export async function reviseOrder(
   });
 }
 
+export async function setOrderFulfillment(actor: Actor, input: { orderId: string; fulfillment: "pickup" | "delivery" }) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === input.orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    if (actor.role === "sale" && order.channel === "mo_home") throw new Error("Đơn Mơ Home chỉ chủ sửa.");
+    if (order.fulfillment === input.fulfillment) return;
+    const before = order.fulfillment;
+    order.fulfillment = input.fulfillment;
+    if (input.fulfillment === "pickup") order.address = "";
+    order.updatedAt = nowIso();
+    audit(state, actor.id, "order.fulfillment", order.id, { fulfillment: before }, { fulfillment: order.fulfillment });
+  });
+}
+
 export async function setOrderStatus(
   actor: Actor,
   input: { orderId: string; status: OrderStatus; note: string; ownerOverride?: boolean },

@@ -72,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   zaloDefaultMigrated: true,
   publicHours: "08:00–18:00",
   catalogImport20261022: true,
+  tiktokPrice20261023: true,
   hrApproved20261022: true,
   menuLinks20261022: true,
   taskMenu20261023: true,
