@@ -76,6 +76,7 @@ function ReportBody() {
             <Stat label="Lãi gộp" value={data.incomplete ? "Chưa đủ giá vốn" : formatMaybe(data.gross)} />
             <Stat label="Chi phí cố định" value={formatMaybe(data.costBasis)} />
             <Stat label="Chi phí phát sinh" value={formatMaybe(data.extraSum)} />
+            <Stat label="Hao hụt" value={formatMaybe(data.wasteCost)} />
             <Stat label="Lãi ròng" value={data.net === null ? "Chưa đủ số" : formatMaybe(data.net)} />
             <Stat label="Giá trị đơn trung bình" value={data.averageOrder === null ? "—" : formatMaybe(data.averageOrder)} />
             <Stat label="Tỉ lệ hủy" value={data.cancelRate === null ? "—" : `${data.cancelRate}% (${data.cancelled}/${data.placed})`} />
@@ -100,7 +101,7 @@ function ReportBody() {
           ) : null}
           <section className="glass-card rounded-3xl p-4">
             <h2 className="font-bold text-primary">Chi phí phát sinh tháng {month}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Khoản này trừ riêng, không gộp vào chi phí cố định. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Khoản này trừ riêng, không gộp vào chi phí cố định. Lãi ròng = lãi gộp − chi phí cố định − chi phí phát sinh − hao hụt.</p>
             <ul className="mt-2 space-y-1 text-sm">
               {data.extras.map((row) => (
                 <li key={`${row.name}-${row.amount}-${row.note}`}>
@@ -111,6 +112,26 @@ function ReportBody() {
               {data.extras.length === 0 ? <li>Tháng này chưa ghi chi phí phát sinh (0đ).</li> : null}
             </ul>
             <p className="mt-2 font-semibold">Cộng chi phí phát sinh: {formatMaybe(data.extraSum)}</p>
+          </section>
+          <section className="glass-card rounded-3xl p-4">
+            <h2 className="font-bold text-primary">Hao hụt</h2>
+            <p className="mt-1 text-sm">
+              {data.wasteLines} phiếu / {data.placed} đơn
+              {data.wasteRate === null ? "" : ` · ${data.wasteRate}% doanh thu`}
+            </p>
+            {data.wasteAlert ? (
+              <p className="mt-1 text-sm font-semibold text-destructive">
+                Vượt ngưỡng {data.wasteThreshold}%.
+              </p>
+            ) : null}
+            {data.wasteUnknown > 0 ? <p className="mt-1 text-sm">{data.wasteUnknown} phiếu chưa có giá mua.</p> : null}
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <WasteLines title="Theo ngày" rows={data.wasteByDay} />
+              <WasteLines title="Theo vật tư" rows={data.wasteByMaterial} />
+              <WasteLines title="Theo lý do" rows={data.wasteByReason} />
+              <WasteLines title="Theo người" rows={data.wasteByPerson} />
+              <WasteLines title="Theo kênh" rows={data.wasteByChannel} />
+            </div>
           </section>
           <section className="glass-card rounded-3xl p-4">
             <h2 className="font-bold text-primary">Theo {grain === "day" ? "ngày" : grain === "week" ? "tuần" : "tháng"}</h2>
@@ -172,6 +193,22 @@ function ReportBody() {
           </section>
         </>
       ) : null}
+    </div>
+  );
+}
+
+function WasteLines({ title, rows }: { title: string; rows: { key: string; label: string; lines: number; qty: number; cost: number }[] }) {
+  return (
+    <div>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <ul className="mt-1 text-sm">
+        {rows.slice(0, 6).map((row) => (
+          <li key={row.key}>
+            {row.label}: {row.lines} · {row.qty} · {formatMaybe(row.cost)}
+          </li>
+        ))}
+        {rows.length === 0 ? <li className="text-muted-foreground">Chưa có.</li> : null}
+      </ul>
     </div>
   );
 }

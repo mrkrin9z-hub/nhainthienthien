@@ -14,7 +14,7 @@ test("menu đủ nhóm việc hằng ngày và ẩn garment/tools", () => {
   const money = ADMIN_MODULE_GROUPS.find((group) => group.title === "Thu chi")?.items.map((item) => item.label) ?? [];
   assert.deepEqual(money, ["Nhập thu", "Chuyển nộp", "Nhập chi", "Duyệt chi", "Công nợ"]);
   const stock = ADMIN_MODULE_GROUPS.find((group) => group.title === "Kho")?.items.map((item) => item.label) ?? [];
-  assert.deepEqual(stock, ["Tồn kho sản phẩm", "Nhập sản phẩm", "Nhập vật tư", "Tồn kho vật tư"]);
+  assert.deepEqual(stock, ["Tồn kho sản phẩm", "Nhập sản phẩm", "Nhập vật tư", "Tồn kho vật tư", "Báo hỏng"]);
   assert.deepEqual([...MANAGE_SKIP].sort(), ["/manage/garments", "/manage/tools"].sort());
 });
 

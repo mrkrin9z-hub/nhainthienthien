@@ -99,6 +99,8 @@ export type Settings = {
   marginYellowPercent: number;
   marginRedPercent: number;
   wasteRate: number;
+  /** Cảnh báo khi hao hụt vượt % doanh thu. Trống = không cảnh báo. */
+  wasteAlertPercent?: number | null;
   tapeOrdersPerRoll: number;
   magnetPiecesPerSheet: number;
   ppRollWidthCm: number;
@@ -547,6 +549,33 @@ export type Movement = {
   note: string;
   /** Kênh của đơn khi trừ hoặc hoàn. Thiếu với phiếu cũ và phiếu nhập kho. */
   channel?: Channel;
+  /** Phiếu hao hụt gắn với dòng trừ này. */
+  wasteId?: string;
+};
+
+export type WasteReason = "in_loi" | "lech_vien" | "bong_mang" | "rach" | "roi_vo" | "khac" | "chua_ro";
+export type WasteStatus = "pending" | "confirmed" | "approved" | "void";
+
+export type WasteReport = {
+  id: string;
+  at: string;
+  /** Ngày lịch Việt Nam yyyy-mm-dd. */
+  day: string;
+  materialId: string;
+  /** Số dương đã trừ. */
+  qty: number;
+  reason: WasteReason;
+  orderId: string | null;
+  channel?: Channel;
+  by: string | null;
+  note: string;
+  photoId: string | null;
+  movementId: string;
+  status: WasteStatus;
+  confirmedAt?: string | null;
+  confirmedBy?: string | null;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
 };
 
 export type StockCount = {
@@ -656,6 +685,10 @@ export type ShopState = {
   reprints: Reprint[];
   movements: Movement[];
   counts: StockCount[];
+  /** Phiếu báo hỏng / hao hụt. Thiếu trên sổ cũ. */
+  wasteReports?: WasteReport[];
+  /** Ảnh đính kèm phiếu hỏng. */
+  wastePhotos?: OrderFile[];
   punches: Punch[];
   leaves: Leave[];
   expenses: Expense[];

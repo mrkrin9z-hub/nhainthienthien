@@ -1,5 +1,6 @@
 import { fixedCostsApply, quoteSku, vnMonth, vnYmd } from "./calc.ts";
 import { laborBill, orderInScope, reportScopeLabel, type ReportScope } from "./mohome.ts";
+import { wasteMonth, type WasteSlice } from "./waste.ts";
 import { fixedRows } from "./views.ts";
 import type { Channel, Order, ShopState } from "./types.ts";
 import { CHANNEL_LABEL } from "./types.ts";
@@ -38,6 +39,17 @@ export type BusinessReport = {
   extraSum: number;
   extras: { name: string; amount: number; note: string }[];
   net: number | null;
+  wasteCost: number;
+  wasteUnknown: number;
+  wasteLines: number;
+  wasteRate: number | null;
+  wasteAlert: boolean;
+  wasteThreshold: number | null;
+  wasteByDay: WasteSlice[];
+  wasteByMaterial: WasteSlice[];
+  wasteByReason: WasteSlice[];
+  wasteByPerson: WasteSlice[];
+  wasteByChannel: WasteSlice[];
   breakEvenPercent: number | null;
   cancelRate: number | null;
   cancelled: number;
@@ -160,6 +172,7 @@ export function businessReport(state: ShopState, month: string, grain: ReportGra
   const extrasShown = shopScope ? extras : [];
   const extrasCharged = shopScope ? extraSum : 0;
   const roundedRevenue = Math.round(revenue);
+  const waste = wasteMonth(state, month, scope, roundedRevenue);
   return {
     month,
     grain,
@@ -180,7 +193,18 @@ export function businessReport(state: ShopState, month: string, grain: ReportGra
     fixed,
     extraSum: extrasCharged,
     extras: extrasShown,
-    net: knownGross === null ? null : knownGross - bill.charged - extrasCharged,
+    net: knownGross === null ? null : knownGross - bill.charged - extrasCharged - waste.wasteCost,
+    wasteCost: waste.wasteCost,
+    wasteUnknown: waste.wasteUnknown,
+    wasteLines: waste.wasteLines,
+    wasteRate: waste.wasteRate,
+    wasteAlert: waste.wasteAlert,
+    wasteThreshold: waste.wasteThreshold,
+    wasteByDay: waste.byDay,
+    wasteByMaterial: waste.byMaterial,
+    wasteByReason: waste.byReason,
+    wasteByPerson: waste.byPerson,
+    wasteByChannel: waste.byChannel,
     breakEvenPercent:
       scope === "nha_in" && state.settings.breakevenMonth > 0 ? Math.round((revenue / state.settings.breakevenMonth) * 1000) / 10 : null,
     cancelRate: placedOrders.length ? Math.round((cancelled / placedOrders.length) * 1000) / 10 : null,

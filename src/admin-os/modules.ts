@@ -69,6 +69,7 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
       { to: "/admin/san-pham", label: "Nhập sản phẩm", roles: ["owner"], search: { m: "nhap" }, mode: "live" },
       { to: "/admin/kho", label: "Nhập vật tư", roles: ["owner", "sale"], search: { m: "nhap" }, printShopOnly: true, mode: "live" },
       { to: "/admin/kho", label: "Tồn kho vật tư", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" },
+      { to: "/admin/kho", label: "Báo hỏng", roles: ["owner", "sale", "production"], search: { m: "hong" }, printShopOnly: true, mode: "live" },
     ],
   },
   {

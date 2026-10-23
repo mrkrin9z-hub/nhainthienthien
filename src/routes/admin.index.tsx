@@ -184,7 +184,7 @@ function DashboardPage() {
           ) : (
             <>
               <Card label="Lãi gộp tháng" value={formatMaybe(data.gross)} hint="Giá bán trừ vật tư, mực, phí kênh" icon={TrendingUp} tone="bg-teal-500/10 text-teal-700" />
-              <Card label="Lợi nhuận tháng" value={formatMaybe(data.profit)} hint={data.beforeOpen ? "Chưa trừ định phí vì tiệm chưa khai trương." : "Lãi gộp trừ định phí và chi phát sinh"} icon={PiggyBank} tone="bg-violet-500/10 text-violet-700" />
+              <Card label="Lợi nhuận tháng" value={formatMaybe(data.profit)} hint={data.beforeOpen ? `Chưa trừ định phí vì tiệm chưa khai trương. Hao hụt ${formatMaybe(data.wasteCost)}.` : `Lãi gộp trừ định phí, chi phát sinh và hao hụt ${formatMaybe(data.wasteCost)}.`} icon={PiggyBank} tone="bg-violet-500/10 text-violet-700" />
             </>
           )}
         </section>

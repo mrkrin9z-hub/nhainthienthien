@@ -5,6 +5,7 @@ import { materialForecast } from "./forecast.ts";
 import { depositEvents, remainOf } from "./money.ts";
 import { bankLabel, deskAlerts, hasPackingPhoto, itemChangeNote, transferQrUrl } from "./print-shop.ts";
 import { onDeliveryDesk, orderShipping } from "./shipping.ts";
+import { wasteMonth } from "./waste.ts";
 import type { Order, OrderStatus, Role, ShopState } from "./types.ts";
 import { CHANNEL_LABEL, STATUS_LABEL, STATUS_REPLY } from "./types.ts";
 
@@ -176,6 +177,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
   const workingDays = state.settings.workingDays || 26;
   const dayTarget = workingDays > 0 ? Math.round(state.settings.breakevenMonth / workingDays) : state.settings.breakevenDay;
   const fixedCharged = beforeOpen ? 0 : fixed;
+  const waste = wasteMonth(state, clock.month, "nha_in", revenueMonth);
   return {
     role: actor.role,
     name: actor.name,
@@ -197,7 +199,9 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     grossIncomplete,
     fixed,
     fixedCharged,
-    profit: grossIncomplete ? null : Math.round(gross - fixedCharged - extraTotal(state, clock.month)),
+    wasteCost: waste.wasteCost,
+    wasteUnknown: waste.wasteUnknown,
+    profit: grossIncomplete ? null : Math.round(gross - fixedCharged - extraTotal(state, clock.month) - waste.wasteCost),
     orders: visible.slice(0, 12).map((order) => orderSummary(state, order, actor.role)),
   };
 }
