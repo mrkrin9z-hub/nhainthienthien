@@ -80,6 +80,7 @@ export const DEFAULT_SETTINGS: Settings = {
   taskMenu20261023: true,
   deskBom20261023: true,
   groupSupply20261024: true,
+  inkMl20261024: true,
   checklist20261023: true,
   platformFeeNote:
     "Hoạch toán sàn: 27% + 11.000đ/đơn. Bảng phí từng hạng mục trong file Phi-san ghi chưa xác minh, chỉ để đối chiếu.",

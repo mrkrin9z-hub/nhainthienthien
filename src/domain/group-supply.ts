@@ -13,9 +13,12 @@ export const SUPPLY_SCALE_LABEL: Record<SupplyScale, string> = {
   tape: "Cuộn băng keo chia theo đơn",
 };
 
+type SupplyMaterial = { id: string; unit: string; packSize: number | null; stock?: number; packPrice?: number | null; buyLabel?: string };
+
 type SupplyState = {
   boms: BomLine[];
   settings: Settings;
+  materials?: SupplyMaterial[];
   groupSupplies?: GroupSupply[];
   sizeOverrides?: GroupSizeOverride[];
 };
@@ -101,6 +104,22 @@ export function ensureGroupSupplies(state: SupplyState & { settings: Settings })
   return true;
 }
 
+/** Lọ mực tồn 0, chưa có giá: chuyển đơn vị sang ml. Không đụng lọ đã có tồn hoặc đã có giá. */
+export function ensureInkMillilitres(state: SupplyState): boolean {
+  if (state.settings.inkMl20261024) return false;
+  for (const material of state.materials ?? []) {
+    if (!material.id.startsWith("muc-")) continue;
+    const empty = material.stock === 0 && material.packPrice == null && (material.packSize === 1 || material.packSize == null);
+    if (material.unit === "lọ" && empty) {
+      material.unit = "ml";
+      material.packSize = null;
+      material.buyLabel = "một lọ — quy cách là số ml trong lọ";
+    }
+  }
+  state.settings.inkMl20261024 = true;
+  return true;
+}
+
 /** size_sheet lưu tiền tố (`go`), tấm kho là `go-13x18`. Chọn nhầm một tấm thì cắt khổ đi. */
 export function sizeSheetMaterialId(materialId: string): string {
   return materialId.trim().replace(/-\d+x\d+$/i, "");
@@ -141,7 +160,13 @@ function rollWidth(ruleRow: GroupSupply, settings: Settings): number {
   return ruleRow.materialId === "mang" ? settings.filmRollWidthCm : settings.ppRollWidthCm;
 }
 
-function scaledQty(ruleRow: GroupSupply, sku: Sku, settings: Settings): { materialId: string; qty: number | null; scope: BomLine["scope"] } {
+function areaStockQty(ml: number, materialId: string, materials: SupplyMaterial[] | undefined): number | null {
+  const material = materials?.find((item) => item.id === materialId);
+  if (!material || /ml/i.test(material.unit)) return ml;
+  return null;
+}
+
+function scaledQty(ruleRow: GroupSupply, sku: Sku, settings: Settings, materials: SupplyMaterial[] | undefined): { materialId: string; qty: number | null; scope: BomLine["scope"] } {
   const width = sku.widthCm;
   const height = sku.heightCm;
   const prefix = ruleRow.scale === "size_sheet" ? sizeSheetMaterialId(ruleRow.materialId) : ruleRow.materialId;
@@ -159,7 +184,7 @@ function scaledQty(ruleRow: GroupSupply, sku: Sku, settings: Settings): { materi
   if (ruleRow.scale === "wrap_m2") return { materialId, qty: wrapM2(width, height), scope: "parcel" };
   if (ruleRow.scale === "area_ml") {
     const ml = ruleRow.qty === null ? null : round4(((width * height) / 10000) * ruleRow.qty);
-    return { materialId, qty: ml, scope: "sheet" };
+    return { materialId, qty: ml === null ? null : areaStockQty(ml, materialId, materials), scope: "sheet" };
   }
   const pieces = magnetPiecesOnSheet(width, height, settings.magnetPiecesPerSheet);
   return { materialId, qty: pieces ? round4((ruleRow.qty ?? 1) / pieces) : null, scope: "sheet" };
@@ -176,7 +201,7 @@ export function linesForSku(state: SupplyState, sku: Sku): BomLine[] {
 
   const lines: BomLine[] = [];
   for (const ruleRow of rules) {
-    const scaled = scaledQty(ruleRow, sku, state.settings);
+    const scaled = scaledQty(ruleRow, sku, state.settings, state.materials);
     const override = overrides.find((item) => item.materialId === scaled.materialId && item.phase === ruleRow.phase);
     const qty = override ? override.qty : scaled.qty;
     if (qty === 0) continue;

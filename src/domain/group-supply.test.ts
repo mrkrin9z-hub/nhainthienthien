@@ -109,6 +109,52 @@ test("tạo nhóm, tạo sản phẩm theo khổ, bán trừ gỗ giấy gương
   assert.equal(report.gross !== null, true);
 });
 
+test("mực tính lọ chưa có ml thì không trừ kho", () => {
+  const settings = { ...DEFAULT_SETTINGS, wasteRate: 0 };
+  const sku: Sku = {
+    id: "AG-13x18-C1",
+    code: "AG-13x18-C1",
+    groupId: "anh-go",
+    name: "13×18",
+    size: "13x18",
+    widthCm: 13,
+    heightCm: 18,
+    sheets: 1,
+    piecesPerPack: null,
+    sort: 1,
+  };
+  const state = {
+    settings,
+    materials: [material("muc-1", "Mực màu 1", "lọ", 1, 0, 4)],
+    boms: [],
+    groupSupplies: [{ id: "muc", groupId: "anh-go", materialId: "muc-1", phase: "print", scale: "area_ml", qty: 8 }],
+    sizeOverrides: [],
+    skus: [sku],
+    movements: [],
+    orders: [],
+  } as unknown as ShopState;
+  assert.equal(linesForSku(state, sku).find((line) => line.materialId === "muc-1")?.qty ?? null, null);
+  const order = {
+    id: "o2",
+    code: "TT-INK",
+    channel: "tai_tiem",
+    fulfillment: "pickup",
+    items: [{ skuId: sku.id, quantity: 1, lineTotal: 10000, name: sku.name }],
+    printDeducted: false,
+    packDeducted: false,
+    stockWarning: "",
+    status: "nhan_don",
+    isTest: false,
+    createdAt: "2026-10-24T02:00:00.000Z",
+    updatedAt: "2026-10-24T02:00:00.000Z",
+    completedAt: null,
+    total: 10000,
+  } as Order;
+  state.orders.push(order);
+  syncOrderStock(state, order, "in", "owner");
+  assert.equal(state.materials.find((row) => row.id === "muc-1")?.stock, 4);
+});
+
 test("tấm theo khổ hiện tiền tố gỗ, không liệt từng khổ", () => {
   const materials = [
     { id: "go-13x18", name: "Tấm gỗ 13x18" },

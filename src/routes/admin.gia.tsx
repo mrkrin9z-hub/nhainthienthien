@@ -104,7 +104,7 @@ function PricePage() {
                 <DialogTitle>Cài đặt giá</DialogTitle>
               </DialogHeader>
               <ShelfTools groupId={excelGroup} channel={displayChannel === "mo_home" ? "tai_tiem" : displayChannel} />
-              <p className="text-sm text-muted-foreground">Giá vốn và phí kênh nằm ở Cài đặt chi phí. Tạo khổ giá vẫn mở từ nút + Tạo.</p>
+              <p className="text-sm text-muted-foreground">Giá vốn tính từ định mức nhóm × khổ và giá mua vật tư mới nhất. Phí kênh nằm ở Cài đặt chi phí.</p>
             </DialogContent>
           </Dialog>
         </>
@@ -140,7 +140,7 @@ function PricePage() {
       </div>
       {(board.data?.rows.length ?? 0) === 0 && !board.isLoading ? (
         <p className="rounded-2xl bg-card px-4 py-3 text-sm">
-          Nhóm này chưa có mã. Cần bảng giá: mã, tên, nhóm (ép gỗ lụa, khung gỗ, khung nhôm hoặc album photobook), khổ cm, số tấm, giá bán nội bộ, vốn vật tư, và định mức nếu khác hàng Nhà In.
+          Nhóm này chưa có mã. Bấm + Tạo, chọn nhóm và khổ. Vật tư lấy từ định mức của nhóm.
         </p>
       ) : null}
       {(board.data?.warnings ?? []).length > 0 ? (
@@ -788,7 +788,7 @@ function GroupSupplyDialog({ open, onOpenChange }: { open: boolean; onOpenChange
           <DialogTitle>Nhóm sản phẩm</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Chọn vật tư nhóm dùng và cách tính theo khổ. Sản phẩm chỉ cần nhóm và khổ. Combo là số tấm nhân khổ đó.
+          Chọn vật tư nhóm dùng và cách tính theo khổ. Sản phẩm chỉ cần nhóm và khổ. Combo là số tấm nhân khổ đó. Mực là ml trên mỗi m²; quy cách lọ là số ml.
         </p>
         <div className="flex flex-wrap gap-2">
           <Input className="min-h-11 max-w-xs" value={name} placeholder="Tên nhóm, ví dụ Ảnh gỗ" aria-label="Tên nhóm sản phẩm" onChange={(event) => setName(event.target.value)} />

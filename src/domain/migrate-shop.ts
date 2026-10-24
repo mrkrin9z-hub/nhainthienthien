@@ -2,7 +2,7 @@ import { ensureChecklistTasks } from "./checklists.ts";
 import { ensureMoHome } from "./mohome.ts";
 import { ensureWaste } from "./waste.ts";
 import { applyDeskSheetCosts, applyDeskSupplies } from "./desk-supply.ts";
-import { ensureGroupSupplies } from "./group-supply.ts";
+import { ensureGroupSupplies, ensureInkMillilitres } from "./group-supply.ts";
 import { ensureOrgCollections } from "./org-desk.ts";
 import {
   applyApprovedHr,
@@ -187,6 +187,7 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (grantTaskMenu(state)) changed = true;
   if (applyDeskSupplies(state as unknown as Parameters<typeof applyDeskSupplies>[0])) changed = true;
   if (ensureGroupSupplies(state as unknown as Parameters<typeof ensureGroupSupplies>[0])) changed = true;
+  if (ensureInkMillilitres(state as unknown as Parameters<typeof ensureInkMillilitres>[0])) changed = true;
   if (ensureChecklistTasks(state)) changed = true;
   if (ensureOrgCollections(state)) changed = true;
   if (ensureMoHome(state)) changed = true;

@@ -594,7 +594,7 @@ test("gỗ TG, nam châm theo khổ và 9 lọ mực", async () => {
 
   const inks = state.materials.filter((row) => row.id.startsWith("muc"));
   assert.deepEqual(inks.map((row) => row.id), ["muc-1", "muc-2", "muc-3", "muc-4", "muc-5", "muc-6", "muc-7", "muc-8", "muc-9"]);
-  assert.ok(inks.every((row) => row.packPrice === null && row.unit === "lọ" && row.name.startsWith("Mực màu")));
+  assert.ok(inks.every((row) => row.packPrice === null && row.unit === "ml" && row.packSize === null && row.name.startsWith("Mực màu")));
   assert.equal(state.materials.some((row) => row.id === "muc"), false);
 
   assert.equal(stockLabel({ stock: -1, minStock: 2, openingCounted: false }), "Tồn âm");

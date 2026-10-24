@@ -1947,6 +1947,9 @@ export async function stockIn(
   await mutate(async (state) => {
     const material = state.materials.find((item) => item.id === input.materialId);
     if (!material) throw new Error("Không thấy vật tư.");
+    if (material.id.startsWith("muc-") && material.unit === "ml" && !(material.packSize && material.packSize > 1)) {
+      throw new Error("Điền số ml trong một lọ mực trước khi nhập kho.");
+    }
     const qty = material.packSize ? input.packs * material.packSize : input.packs;
     material.stock = Math.round((material.stock + qty) * 10000) / 10000;
     if (input.supplier.trim()) material.supplier = input.supplier.trim();
@@ -1980,6 +1983,9 @@ export async function stockInMany(
     for (const line of lines) {
       const material = state.materials.find((item) => item.id === line.materialId);
       if (!material) throw new Error("Không thấy vật tư.");
+      if (material.id.startsWith("muc-") && material.unit === "ml" && !(material.packSize && material.packSize > 1)) {
+        throw new Error("Điền số ml trong một lọ mực trước khi nhập kho.");
+      }
       const qty = material.packSize ? line.packs * material.packSize : line.packs;
       material.stock = Math.round((material.stock + qty) * 10000) / 10000;
       if (input.supplier.trim()) material.supplier = input.supplier.trim();
