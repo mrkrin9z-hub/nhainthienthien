@@ -52,13 +52,19 @@ function ProductionPage() {
 
   async function move(orderId: string, status: "nhan_don" | "thiet_ke" | "cho_duyet" | "in" | "dong_goi" | "giao" | "xong") {
     setBusy(orderId);
+    const previous = client.getQueryData<typeof orders.data>(["orders"]);
+    client.setQueryData(["orders"], (current: typeof orders.data) => {
+      if (!current) return current;
+      return { ...current, orders: current.orders.map((order) => (order.id === orderId ? { ...order, status } : order)) };
+    });
     try {
       await changeStatus({ data: { orderId, status, note: "" } });
-      await client.invalidateQueries({ queryKey: ["orders"] });
     } catch (error) {
+      if (previous) client.setQueryData(["orders"], previous);
       toast.error((error as Error).message);
     } finally {
       setBusy(null);
+      await client.invalidateQueries({ queryKey: ["orders"] });
     }
   }
 

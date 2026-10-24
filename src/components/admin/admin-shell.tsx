@@ -327,7 +327,10 @@ const GROUP_ICONS: Record<string, typeof LayoutDashboard> = {
   "Tổng quan": LayoutDashboard,
   "Đơn hàng": ClipboardList,
   "Sản xuất": ClipboardList,
-  "Sản phẩm & giá": Tags,
+  "Sản phẩm": Tags,
+  "Tiền": HandCoins,
+  "Thống kê báo cáo": BarChart3,
+  "Thống kê khách hàng": Users,
   "Kho vật tư": Package,
   "Nhân sự": Users,
   "Cài đặt": Settings,
@@ -337,7 +340,7 @@ function groupTile(title: string | undefined): string {
   if (title === "Nhân sự") return "bg-[#ffedd5] text-[#ea580c]";
   if (title === "Kho vật tư") return "bg-[#ccfbf1] text-[#0f766e]";
   if (title === "Cài đặt") return "bg-[#f1f5f9] text-[#475569]";
-  if (title === "Sản phẩm & giá") return "bg-[#fef3c7] text-[#b45309]";
+  if (title === "Sản phẩm") return "bg-[#fef3c7] text-[#b45309]";
   if (title === "Sản xuất") return "bg-[#ede9fe] text-[#6d28d9]";
   return "bg-[#e0eefe] text-[#2563eb]";
 }

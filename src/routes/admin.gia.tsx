@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { ListPager, useListPage } from "@/components/admin/list-page";
@@ -12,7 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { formatMaybe, formatVnd } from "@/lib/brand";
-import { cloneShelf, createPriceSize, getBom, getMe, getPriceBoard, importPriceSheet, pullCatalog, runQuote, runRecalc, saveBomQty, savePieces, savePrice, setSkuSold } from "@/lib/admin.functions";
+import { cloneShelf, createPriceSize, createProductGroup, getGroupSupply, getMe, getPriceBoard, importPriceSheet, pullCatalog, runQuote, saveGroupSupply, savePieces, savePrice, setSkuSold } from "@/lib/admin.functions";
+import { SUPPLY_SCALE_LABEL } from "@/domain/group-supply";
+import { SUPPLY_SCALES, type SupplyScale } from "@/domain/types";
 import { DESK_CHANNEL_LABEL } from "@/domain/order-desk";
 import { isMoHomeGroup } from "@/domain/mohome";
 import { CHANNEL_LABEL, CHANNELS, type Channel } from "@/domain/types";
@@ -35,6 +37,7 @@ function PricePage() {
   });
   const owner = me.data?.role === "owner";
   const [createOpen, setCreateOpen] = useState(false);
+  const [groupOpen, setGroupOpen] = useState(false);
   const [excelOpen, setExcelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -59,7 +62,7 @@ function PricePage() {
     <div className="space-y-4 bg-slate-50">
       <PageToolbar
         title="Sản phẩm"
-        hint="Một bảng cho mọi nhóm và kênh. Giá Mơ Home không lấy từ giá tại tiệm."
+        hint="Giá bán nằm trên từng sản phẩm. Vật tư tính theo nhóm và khổ. * là còn vật tư chưa có giá mua."
         actions={
           owner ? (
             <>
@@ -70,6 +73,9 @@ function PricePage() {
                 <Settings className="mr-1 size-4" />
                 Cài đặt
               </Button>
+              <Button variant="outline" className="min-h-10 rounded-xl bg-white" onClick={() => setGroupOpen(true)}>
+                Nhóm sản phẩm
+              </Button>
               <Button className="min-h-10 rounded-xl bg-blue-600 hover:bg-blue-700" onClick={() => setCreateOpen(true)}>
                 + Tạo
               </Button>
@@ -79,6 +85,7 @@ function PricePage() {
       />
       {owner ? (
         <>
+          <GroupSupplyDialog open={groupOpen} onOpenChange={setGroupOpen} />
           <CreatePriceDialog
             groups={board.data?.groups ?? []}
             groupId={excelGroup}
@@ -154,7 +161,8 @@ function PricePage() {
               <th className="px-3 py-3">Nhóm SP</th>
               <th className="px-3 py-3">Kênh</th>
               <th className="px-3 py-3 text-right">Giá</th>
-              <th className="px-3 py-3 text-right">Tồn kho</th>
+              <th className="px-3 py-3 text-right">Giá vốn</th>
+              <th className="px-3 py-3 text-right">Lãi</th>
               <th className="px-3 py-3">Trạng thái</th>
               <th className="px-3 py-3" />
             </tr>
@@ -174,8 +182,6 @@ function PricePage() {
         </table>
         {inStock ? <p className="px-4 py-8 text-center text-sm text-slate-500">Chưa có tồn thành phẩm. Hàng in theo đơn, vật tư nằm ở Kho.</p> : null}
       </div>
-      {owner ? <Calculator skus={board.data?.rows ?? []} /> : <p className="text-sm text-muted-foreground">Máy tính giá vốn và lãi chỉ chủ xem.</p>}
-      {owner ? <BomEditor skus={board.data?.rows ?? []} /> : null}
     </div>
   );
 }
@@ -269,7 +275,7 @@ function PriceRow({
     piecesPerPack: number | null;
     sheetCost?: number | null;
     soldOn?: Channel[];
-    prices: Record<string, { price: number | null; listPrice?: number | null; status: string; note: string; profit?: number | null; marginPercent?: number | null; sold?: boolean }>;
+    prices: Record<string, { price: number | null; listPrice?: number | null; status: string; note: string; profit?: number | null; marginPercent?: number | null; cost?: number | null; costKnown?: number; costIncomplete?: boolean; sold?: boolean }>;
   };
   channel: Channel;
   groupName: string;
@@ -285,6 +291,7 @@ function PriceRow({
   const [pieces, setPieces] = useState("");
   const [sold, setSold] = useState(Boolean(cell.sold));
   const [saving, setSaving] = useState(false);
+  const [quote, setQuote] = useState<Awaited<ReturnType<typeof runQuote>> | null>(null);
   const pack = row.code.endsWith("-GOI");
 
   function begin() {
@@ -293,7 +300,13 @@ function PriceRow({
     setNote(cell.note);
     setPieces(row.piecesPerPack === null ? "" : String(row.piecesPerPack));
     setSold(Boolean(cell.sold));
+    setQuote(null);
     setOpen(true);
+    if (owner) {
+      void runQuote({ data: { skuId: row.skuId, channel, price: null, affiliate: false } })
+        .then(setQuote)
+        .catch(() => setQuote(null));
+    }
   }
 
   async function toggleSold(next: boolean) {
@@ -354,7 +367,10 @@ function PriceRow({
         </div>
       </td>
       <td className="px-3 py-3 text-right font-semibold tabular-nums">{cell.price === null ? "—" : formatVnd(cell.price)}</td>
-      <td className="px-3 py-3 text-right text-slate-400">—</td>
+      <td className="px-3 py-3 text-right tabular-nums">
+        {cell.costIncomplete ? (cell.costKnown ? `${formatVnd(cell.costKnown)}*` : "Chưa đủ giá") : cell.cost == null ? "—" : formatVnd(cell.cost)}
+      </td>
+      <td className="px-3 py-3 text-right tabular-nums">{cell.marginPercent == null ? "—" : `${cell.marginPercent}%`}</td>
       <td className="px-3 py-3">
         <Switch checked={Boolean(cell.sold)} disabled={!owner} aria-label={`Trạng thái ${row.code}`} onCheckedChange={(next) => void toggleSold(next)} />
       </td>
@@ -407,6 +423,16 @@ function PriceRow({
                 <Input className="mt-1 min-h-11" inputMode="numeric" value={pieces} placeholder="Chưa có" onChange={(e) => setPieces(e.target.value.replace(/[^\d]/g, ""))} />
               </label>
             ) : null}
+            <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm">
+              <p className="font-semibold">Giá vốn {quote?.materialIncomplete ? "(chưa đủ giá mua)" : ""}: {quote ? formatMaybe(quote.material ?? quote.materialKnown) : "Đang tính…"}</p>
+              <p>Lãi: {quote?.profit == null ? "Chưa đủ số" : `${formatMaybe(quote.profit)} (${quote.marginPercent}%)`}</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                {(quote?.lines ?? []).filter((line) => line.detail !== `${""}`).slice(0, 12).map((line) => (
+                  <li key={`${line.name}-${line.detail}`}>{line.name}: {line.amount == null ? "chưa có giá" : formatMaybe(line.amount)} · {line.detail}</li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-muted-foreground">Định mức sửa ở Nhóm sản phẩm, không nhập lại từng mã.</p>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" className="min-h-11" disabled={saving} onClick={() => void save()}>
@@ -661,147 +687,60 @@ function ExcelPriceDialog({
   );
 }
 
-function Calculator({ skus }: { skus: { skuId: string; code: string; name: string }[] }) {
-  const [skuId, setSkuId] = useState("");
-  const [channel, setChannel] = useState<Channel>("tiktok");
-  useEffect(() => {
-    if (!skus.some((sku) => sku.skuId === skuId)) setSkuId(skus[0]?.skuId ?? "");
-  }, [skus, skuId]);
-  const [price, setPrice] = useState("");
-  const [affiliate, setAffiliate] = useState(false);
-  const [result, setResult] = useState<Awaited<ReturnType<typeof runQuote>> | null>(null);
+type DraftRule = { materialId: string; phase: "print" | "pack"; scale: SupplyScale; qty: string; rollWidthCm: string };
+type DraftOverride = { size: string; materialId: string; phase: "print" | "pack"; qty: string };
 
-  async function run() {
-    if (!skuId) return;
-    try {
-      const quote = await runQuote({
-        data: { skuId, channel, price: price.trim() === "" ? null : Number(price), affiliate },
-      });
-      setResult(quote);
-    } catch (error) {
-      toast.error((error as Error).message);
-    }
+function blankRule(): DraftRule {
+  return { materialId: "", phase: "print", scale: "per_sheet", qty: "1", rollWidthCm: "" };
+}
+
+function GroupSupplyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const queryClient = useQueryClient();
+  const board = useQuery({ queryKey: ["group-supply"], queryFn: () => getGroupSupply(), enabled: open });
+  const [groupId, setGroupId] = useState("");
+  const [name, setName] = useState("");
+  const [rules, setRules] = useState<DraftRule[]>([]);
+  const [overrides, setOverrides] = useState<DraftOverride[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  function load(id: string) {
+    setGroupId(id);
+    const data = board.data;
+    if (!data) return;
+    setRules(
+      data.rules
+        .filter((rule) => rule.groupId === id)
+        .map((rule) => ({
+          materialId: rule.materialId,
+          phase: rule.phase,
+          scale: rule.scale,
+          qty: rule.qty === null ? "" : String(rule.qty),
+          rollWidthCm: rule.rollWidthCm ? String(rule.rollWidthCm) : "",
+        })),
+    );
+    setOverrides(
+      data.overrides
+        .filter((row) => row.groupId === id)
+        .map((row) => ({
+          size: row.size,
+          materialId: row.materialId,
+          phase: row.phase,
+          qty: row.qty === null ? "" : String(row.qty),
+        })),
+    );
   }
 
-  const tone =
-    result?.tone === "red" ? "bg-destructive/15" : result?.tone === "yellow" ? "bg-accent/30" : result?.tone === "ok" ? "bg-emerald-100" : "bg-card";
-
-  return (
-    <section className="glass-card rounded-3xl p-5">
-      <h2 className="text-lg font-bold text-primary">Máy tính giá</h2>
-      <p className="text-sm text-muted-foreground">Lãi gộp = giá bán − vật tư − mực − phí kênh. Chưa đủ số thì không hiện lãi.</p>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <label className="text-sm font-semibold">
-          Sản phẩm
-          <select className="mt-1 min-h-12 w-full rounded-xl border bg-background px-3" value={skuId} onChange={(e) => setSkuId(e.target.value)}>
-            {skus.map((sku) => (
-              <option key={sku.skuId} value={sku.skuId}>
-                {sku.code} · {sku.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm font-semibold">
-          Kênh
-          <select className="mt-1 min-h-12 w-full rounded-xl border bg-background px-3" value={channel} onChange={(e) => setChannel(e.target.value as Channel)}>
-            {CHANNELS.map((item) => (
-              <option key={item} value={item}>
-                {CHANNEL_LABEL[item]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm font-semibold">
-          Giá bán (để trống = lấy bảng giá)
-          <Input className="mt-1 min-h-12" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
-        </label>
-        <label className="flex min-h-12 items-center gap-2 text-sm font-semibold">
-          <input type="checkbox" checked={affiliate} onChange={(e) => setAffiliate(e.target.checked)} />
-          Có affiliate 10%
-        </label>
-      </div>
-      <Button className="mt-3 min-h-12 bg-accent text-accent-foreground" onClick={run}>
-        Tính lãi gộp
-      </Button>
-      {result ? (
-        <div className={`mt-4 rounded-2xl p-4 ${tone}`}>
-          <p className="text-sm">Giá bán: {formatMaybe(result.price)}</p>
-          <p className="text-sm">Vật tư: {result.materialIncomplete ? "Chưa đủ số" : formatMaybe(result.material)}</p>
-          <p className="text-sm">Mực: {formatMaybe(result.ink)}</p>
-          <p className="text-sm">Phí kênh: {result.feesIncomplete ? "Chưa đủ số" : formatMaybe(result.fees)}</p>
-          {result.shippingUnknown ? <p className="text-sm font-semibold">Phí ship Facebook chưa có số, chưa trừ vào lãi.</p> : null}
-          <p className="mt-2 text-xl font-extrabold">
-            {result.tone === "red" ? "LỖ · " : result.tone === "yellow" ? "Lãi thấp · " : ""}
-            {result.profit === null ? "Chưa đủ số để tính lãi" : `${formatMaybe(result.profit)} (${result.marginPercent}%)`}
-          </p>
-          <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-            {result.lines.map((line, index) => (
-              <li key={`${line.name}-${index}`}>
-                {line.name}: {line.amount === null ? "chưa có số" : formatMaybe(line.amount)} · {line.detail}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function BomEditor({ skus }: { skus: { skuId: string; code: string }[] }) {
-  const [skuId, setSkuId] = useState("");
-  const queryClient = useQueryClient();
-  const bom = useQuery({
-    queryKey: ["bom", skuId],
-    queryFn: () => getBom({ data: { skuId } }),
-    enabled: Boolean(skuId),
-  });
-
-  return (
-    <section className="glass-card rounded-3xl p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-primary">Định mức vật tư</h2>
-        <Button
-          variant="outline"
-          className="min-h-11"
-          onClick={async () => {
-            const result = await runRecalc();
-            toast.success(`Đã tính lại ${result.changed} dòng định mức`);
-            await queryClient.invalidateQueries({ queryKey: ["bom"] });
-          }}
-        >
-          Tính lại từ công thức
-        </Button>
-      </div>
-      <Label className="mt-3 block">SKU</Label>
-      <select className="mt-1 min-h-12 w-full rounded-xl border bg-background px-3" value={skuId} onChange={(e) => setSkuId(e.target.value)}>
-        <option value="">Chọn mã</option>
-        {skus.map((sku) => (
-          <option key={sku.skuId} value={sku.skuId}>
-            {sku.code}
-          </option>
-        ))}
-      </select>
-      <ul className="mt-3 space-y-2">
-        {(bom.data ?? []).map((line) => (
-          <BomLine key={line.id} line={line} />
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function BomLine({ line }: { line: { id: string; materialName: string; unit: string; qty: number | null; phase: string; scope: string } }) {
-  const [open, setOpen] = useState(false);
-  const [qty, setQty] = useState("");
-  const [saving, setSaving] = useState(false);
-  const where = `${line.phase === "print" ? "Khi in" : "Khi đóng gói"} · ${line.scope === "sheet" ? "mỗi tấm" : "mỗi kiện"}`;
-
-  async function save() {
+  async function createGroup() {
     setSaving(true);
     try {
-      await saveBomQty({ data: { bomId: line.id, qty: qty.trim() === "" ? null : Number(qty) } });
-      toast.success("Đã lưu định mức");
-      setOpen(false);
+      const created = await createProductGroup({ data: { name } });
+      toast.success(`Đã tạo nhóm ${created.name}`);
+      setName("");
+      await queryClient.invalidateQueries({ queryKey: ["group-supply"] });
+      await queryClient.invalidateQueries({ queryKey: ["prices"] });
+      setGroupId(created.id);
+      setRules([]);
+      setOverrides([]);
     } catch (error) {
       toast.error((error as Error).message);
     } finally {
@@ -809,43 +748,116 @@ function BomLine({ line }: { line: { id: string; materialName: string; unit: str
     }
   }
 
+  async function save() {
+    if (!groupId) return;
+    setSaving(true);
+    try {
+      const numberOrNull = (value: string) => (value.trim() === "" ? null : Number(value));
+      await saveGroupSupply({
+        data: {
+          groupId,
+          rules: rules
+            .filter((rule) => rule.materialId)
+            .map((rule) => ({
+              materialId: rule.materialId,
+              phase: rule.phase,
+              scale: rule.scale,
+              qty: numberOrNull(rule.qty),
+              rollWidthCm: numberOrNull(rule.rollWidthCm),
+            })),
+          overrides: overrides
+            .filter((row) => row.size.trim() && row.materialId)
+            .map((row) => ({ size: row.size.trim(), materialId: row.materialId, phase: row.phase, qty: numberOrNull(row.qty) })),
+        },
+      });
+      toast.success("Đã lưu định mức nhóm");
+      await queryClient.invalidateQueries({ queryKey: ["group-supply"] });
+      await queryClient.invalidateQueries({ queryKey: ["prices"] });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const materials = board.data?.materials ?? [];
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-background px-3 py-2 text-sm">
-      <div>
-        <p className="font-semibold">{line.materialName}</p>
-        <p className="text-muted-foreground">{where}</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="font-semibold">{line.qty === null ? "Chưa có" : `${line.qty} ${line.unit}`}</span>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            setQty(line.qty === null ? "" : String(line.qty));
-            setOpen(true);
-          }}
-        >
-          Sửa
-        </Button>
-      </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Sửa định mức · {line.materialName}</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">{where}</p>
-          <label className="block text-sm font-semibold">
-            Số lượng ({line.unit})
-            <Input className="mt-1 min-h-11" value={qty} placeholder="Chưa có" onChange={(e) => setQty(e.target.value)} />
-          </label>
-          <DialogFooter>
-            <Button type="button" className="min-h-11" disabled={saving} onClick={() => void save()}>
-              {saving ? "Đang lưu…" : "Lưu định mức"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </li>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Nhóm sản phẩm</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Chọn vật tư nhóm dùng và cách tính theo khổ. Sản phẩm chỉ cần nhóm và khổ. Combo là số tấm nhân khổ đó.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Input className="min-h-11 max-w-xs" value={name} placeholder="Tên nhóm, ví dụ Ảnh gỗ" aria-label="Tên nhóm sản phẩm" onChange={(event) => setName(event.target.value)} />
+          <Button type="button" variant="outline" className="min-h-11" disabled={saving || name.trim().length < 2} onClick={() => void createGroup()}>
+            Tạo nhóm
+          </Button>
+        </div>
+        <label className="block text-sm font-semibold">
+          Nhóm
+          <select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3" aria-label="Chọn nhóm sản phẩm" value={groupId} onChange={(event) => load(event.target.value)}>
+            <option value="">Chọn nhóm</option>
+            {(board.data?.groups ?? []).map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {groupId ? (
+          <>
+            <div className="space-y-2">
+              {rules.map((rule, index) => (
+                <div key={`${rule.materialId}-${index}`} className="grid gap-2 rounded-xl border p-2 md:grid-cols-5">
+                  <select className="min-h-11 rounded-md border bg-background px-2 text-sm" aria-label={`Vật tư ${index + 1}`} value={rule.materialId} onChange={(event) => setRules((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, materialId: event.target.value } : item)))}>
+                    <option value="">Vật tư</option>
+                    {materials.map((material) => (
+                      <option key={material.id} value={material.id}>{material.name}</option>
+                    ))}
+                  </select>
+                  <select className="min-h-11 rounded-md border bg-background px-2 text-sm" aria-label={`Cách tính ${index + 1}`} value={rule.scale} onChange={(event) => setRules((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, scale: event.target.value as SupplyScale } : item)))}>
+                    {SUPPLY_SCALES.map((scale) => (
+                      <option key={scale} value={scale}>{SUPPLY_SCALE_LABEL[scale]}</option>
+                    ))}
+                  </select>
+                  <select className="min-h-11 rounded-md border bg-background px-2 text-sm" aria-label={`Lúc dùng ${index + 1}`} value={rule.phase} onChange={(event) => setRules((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, phase: event.target.value as "print" | "pack" } : item)))}>
+                    <option value="print">Khi in</option>
+                    <option value="pack">Khi đóng gói</option>
+                  </select>
+                  <Input className="min-h-11" inputMode="decimal" aria-label={`Số lượng ${index + 1}`} value={rule.qty} placeholder="Số lượng" onChange={(event) => setRules((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, qty: event.target.value } : item)))} />
+                  <Button type="button" variant="outline" className="min-h-11" onClick={() => setRules((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}>Xóa</Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" className="min-h-11" onClick={() => setRules((rows) => [...rows, blankRule()])}>Thêm vật tư</Button>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Ngoại lệ theo khổ</p>
+              {overrides.map((row, index) => (
+                <div key={`${row.size}-${index}`} className="grid gap-2 md:grid-cols-4">
+                  <Input className="min-h-11" aria-label={`Khổ ${index + 1}`} value={row.size} placeholder="13x18" onChange={(event) => setOverrides((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, size: event.target.value } : item)))} />
+                  <select className="min-h-11 rounded-md border bg-background px-2 text-sm" aria-label={`Vật tư ngoại lệ ${index + 1}`} value={row.materialId} onChange={(event) => setOverrides((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, materialId: event.target.value } : item)))}>
+                    <option value="">Vật tư</option>
+                    {materials.map((material) => (
+                      <option key={material.id} value={material.id}>{material.name}</option>
+                    ))}
+                  </select>
+                  <Input className="min-h-11" inputMode="decimal" aria-label={`Số ngoại lệ ${index + 1}`} value={row.qty} placeholder="Số / tấm" onChange={(event) => setOverrides((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, qty: event.target.value } : item)))} />
+                  <Button type="button" variant="outline" className="min-h-11" onClick={() => setOverrides((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}>Xóa</Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" className="min-h-11" onClick={() => setOverrides((rows) => [...rows, { size: "", materialId: "", phase: "print", qty: "1" }])}>Thêm ngoại lệ</Button>
+            </div>
+            <DialogFooter>
+              <Button type="button" className="min-h-11" disabled={saving} onClick={() => void save()}>
+                {saving ? "Đang lưu…" : "Lưu định mức"}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }

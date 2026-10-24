@@ -20,12 +20,6 @@ export function tabsFor(pathname: string, search: Record<string, unknown>, role:
     ];
     return items.map((item) => ({ ...item, active: onPath(pathname, item.to) }));
   }
-  if (onPath(pathname, "/admin/gia") || onPath(pathname, "/admin/san-pham")) {
-    return [
-      { key: "gia", to: "/admin/gia", label: "Bảng giá", search: { m: "bang-gia" }, active: onPath(pathname, "/admin/gia") && panel === "bang-gia" },
-      { key: "sp", to: "/admin/san-pham", label: "Sản phẩm", search: { m: "" }, active: onPath(pathname, "/admin/san-pham") && panel !== "nhap" },
-    ];
-  }
   if (onPath(pathname, "/admin/kho")) {
     const stock = [
       { key: "ton", to: "/admin/kho", label: "Tồn", search: { m: "ton" }, active: panel === "ton" },

@@ -85,7 +85,11 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   const modules = readFileSync(new URL("../admin-os/modules.ts", import.meta.url), "utf8");
   assert.match(modules, /label: "Đơn hàng"/);
   assert.match(modules, /label: "Tổng quan"/);
-  assert.match(modules, /label: "Sản phẩm & giá"/);
+  assert.match(modules, /label: "Sản phẩm"/);
+  assert.match(modules, /label: "Thống kê báo cáo"/);
+  assert.match(modules, /label: "Thống kê khách hàng"/);
+  assert.doesNotMatch(modules, /label: "Bảng giá"/);
+  assert.doesNotMatch(modules, /label: "Sản phẩm & giá"/);
   assert.doesNotMatch(modules, /label: "Nhận đơn"/);
   assert.doesNotMatch(modules, /label: "In đơn \(K80\)"/);
   assert.doesNotMatch(modules, /to: "\/admin\/in-don"/);

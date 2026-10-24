@@ -1,4 +1,5 @@
 import { statusRank, stockNeeds } from "./calc.ts";
+import { linesForSku } from "./group-supply.ts";
 import type { Order, OrderStatus, ShopState } from "./types.ts";
 
 const PRINT_OUT = "Trừ kho khi vào bước in";
@@ -23,13 +24,14 @@ function netTaken(state: ShopState, orderId: string, phase: "print" | "pack"): M
 }
 
 function take(state: ShopState, order: Order, phase: "print" | "pack", by: string | null) {
+  const lines = order.items.map((item) => {
+    const sku = state.skus.find((row) => row.id === item.skuId);
+    if (!sku) throw new Error("Không thấy quy cách của đơn.");
+    return { sku, quantity: item.quantity };
+  });
   const { needs, missing } = stockNeeds(
-    order.items.map((item) => {
-      const sku = state.skus.find((row) => row.id === item.skuId);
-      if (!sku) throw new Error("Không thấy quy cách của đơn.");
-      return { sku, quantity: item.quantity };
-    }),
-    state.boms,
+    lines,
+    lines.flatMap((line) => linesForSku(state, line.sku)),
     phase,
   );
   const names: string[] = [];

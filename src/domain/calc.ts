@@ -106,7 +106,7 @@ export function materialCost(
   sku: Sku,
   boms: BomLine[],
   materials: Material[],
-): { lines: CostLine[]; total: number | null; incomplete: boolean } {
+): { lines: CostLine[]; total: number | null; known: number; incomplete: boolean } {
   const lines: CostLine[] = [];
   let total = 0;
   let incomplete = false;
@@ -140,7 +140,7 @@ export function materialCost(
       detail: `${qty} ${material.unit}`,
     });
   }
-  return { lines, total: incomplete ? null : money(total), incomplete };
+  return { lines, total: incomplete ? null : money(total), known: money(total), incomplete };
 }
 
 export function feeLines(
@@ -200,6 +200,8 @@ export function feeLines(
 export type Quote = {
   price: number | null;
   material: number | null;
+  /** Tổng các dòng đã có đơn giá, kể cả khi còn dòng thiếu giá. */
+  materialKnown: number;
   materialIncomplete: boolean;
   ink: number | null;
   fees: number | null;
@@ -226,6 +228,7 @@ export function quoteSku(input: {
     return {
       price: null,
       material: material.total,
+      materialKnown: material.known,
       materialIncomplete: material.incomplete,
       ink: null,
       fees: null,
@@ -237,8 +240,9 @@ export function quoteSku(input: {
       lines,
     };
   }
-  const ink = (input.price * input.settings.inkPercent) / 100;
-  lines.push({ name: "Mực", amount: ink, detail: `${input.settings.inkPercent}% giá bán` });
+  const inkFromBom = material.lines.some((line) => /mực/i.test(line.name));
+  const ink = inkFromBom ? 0 : (input.price * input.settings.inkPercent) / 100;
+  if (!inkFromBom) lines.push({ name: "Mực", amount: ink, detail: `${input.settings.inkPercent}% giá bán` });
   const fees = feeLines(input.channel, input.price, input.settings, input.affiliate);
   lines.push(...fees);
   const shippingUnknown = fees.some((f) => f.name.startsWith("Phí ship") && f.amount === null);
@@ -257,6 +261,7 @@ export function quoteSku(input: {
   return {
     price: input.price,
     material: material.total,
+    materialKnown: material.known,
     materialIncomplete: material.incomplete,
     ink,
     fees: feesIncomplete ? null : feeSum,

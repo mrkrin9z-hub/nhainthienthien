@@ -156,6 +156,8 @@ export type Settings = {
   deskBom20261023?: boolean;
   /** Đã đổ checklist sheet vào sổ việc. */
   checklist20261023?: boolean;
+  /** Đã gắn định mức theo nhóm sản phẩm. Sửa nhóm sau mốc này không bị ghi đè. */
+  groupSupply20261024?: boolean;
   checklistGuides20261024?: boolean;
   /** SHA-256 của mã PIN 4 số. Không gửi ra trình duyệt. */
   staffPinHash?: string;
@@ -402,6 +404,34 @@ export type BomLine = {
   scope: BomScope;
   qty: number | null;
   formula: string;
+};
+
+/** Cách số lượng vật tư của nhóm nhân theo khổ sản phẩm. */
+export const SUPPLY_SCALES = ["per_sheet", "per_parcel", "size_sheet", "roll_m", "edge_m", "wrap_m2", "area_ml", "magnet", "tape"] as const;
+export type SupplyScale = (typeof SUPPLY_SCALES)[number];
+
+/** Vật tư một nhóm tiêu hao. Sản phẩm mới chỉ cần nhóm và khổ, không chép định mức từng mã. */
+export type GroupSupply = {
+  id: string;
+  groupId: string;
+  /** Mã vật tư. scale size_sheet thì đây là tiền tố, tấm thật là `{materialId}-{khổ}`. */
+  materialId: string;
+  phase: BomPhase;
+  scale: SupplyScale;
+  /** per_sheet / per_parcel: số lượng. area_ml: ml trên mỗi m². Các scale còn lại bỏ qua hoặc để 1. */
+  qty: number | null;
+  /** Khổ cuộn cm cho roll_m. Trống thì lấy khổ cuộn trong cài đặt. */
+  rollWidthCm?: number | null;
+};
+
+/** Định mức riêng một khổ, thay số tính từ nhóm. qty 0 = khổ này không dùng vật tư đó. */
+export type GroupSizeOverride = {
+  id: string;
+  groupId: string;
+  size: string;
+  materialId: string;
+  phase: BomPhase;
+  qty: number | null;
 };
 
 export type Customer = {
@@ -707,6 +737,10 @@ export type ShopState = {
   prices: ChannelPrice[];
   materials: Material[];
   boms: BomLine[];
+  /** Định mức theo nhóm. Thiếu trên sổ cũ cho đến khi migration gắn. */
+  groupSupplies?: GroupSupply[];
+  /** Ngoại lệ theo khổ trong nhóm. */
+  sizeOverrides?: GroupSizeOverride[];
   customers: Customer[];
   orders: Order[];
   albums?: PhotoAlbum[];

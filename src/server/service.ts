@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { visibleToRole } from "@/domain/access";
+import { linesForSku } from "@/domain/group-supply";
 import { auditActionLabel, auditDay, describeAudit, type AuditShop } from "@/domain/audit-text";
 import {
   comboPriceError,
@@ -17,7 +18,6 @@ import {
   isMergedWoodAlias,
   priceOf,
   quoteSku,
-  sheetMargin,
   isProductionStep,
   statusChangeError,
   vnParts,
@@ -1218,7 +1218,7 @@ async function pullDueQuiet(actor: Actor) {
 }
 
 export async function dashboard(actor: Actor) {
-  await pullDueQuiet(actor);
+  void pullDueQuiet(actor);
   return visibleToRole(actor.role, buildDashboard(await readState(), actor));
 }
 
@@ -1228,7 +1228,7 @@ export async function navBadges(actor: Actor) {
 }
 
 export async function listOrders(actor: Actor) {
-  await pullDueQuiet(actor);
+  void pullDueQuiet(actor);
   const state = await readState();
   return visibleToRole(actor.role, {
     orders: state.orders
@@ -1820,8 +1820,9 @@ export async function priceBoard(actor: Actor, groupId?: string) {
         CHANNELS.map((channel) => {
           const row = priceOf(state.prices, sku.id, channel);
           const price = row?.price ?? null;
-          const margin = sheetMargin(channel, price, sku.sheetCost ?? null, state.settings);
-          return [channel, { price, listPrice: row?.listPrice ?? null, status: row?.status ?? "nhap", note: row?.note ?? "", profit: margin.profit, marginPercent: margin.marginPercent, sold: skuSoldOn(sku, channel) }];
+          const boms = linesForSku(state, sku);
+          const margin = quoteSku({ sku, price, channel, settings: state.settings, boms, materials: state.materials, affiliate: false });
+          return [channel, { price, listPrice: row?.listPrice ?? null, status: row?.status ?? "nhap", note: row?.note ?? "", profit: margin.profit, marginPercent: margin.marginPercent, cost: margin.material, costKnown: margin.materialKnown, costIncomplete: margin.materialIncomplete, sold: skuSoldOn(sku, channel) }];
         }),
       ),
     })),
@@ -1927,7 +1928,7 @@ export async function quote(actor: Actor, input: { skuId: string; channel: Chann
     price,
     channel: input.channel,
     settings: state.settings,
-    boms: state.boms,
+    boms: linesForSku(state, sku),
     materials: state.materials,
     affiliate: input.affiliate,
   });
@@ -2040,6 +2041,84 @@ export async function updateMaterial(
     if (input.code !== undefined) material.code = input.code.trim();
     audit(state, actor.id, "material.update", material.id, before, input);
   });
+}
+
+export async function createProductGroup(actor: Actor, input: { name: string }) {
+  assertRole(actor, ["owner"]);
+  const name = input.name.trim();
+  if (name.length < 2) throw new Error("Tên nhóm cần ít nhất 2 ký tự.");
+  return mutate(async (state) => {
+    const { slugifyProductName, uniqueKey } = await import("@/domain/web-product");
+    const id = uniqueKey(slugifyProductName(name) || "nhom", new Set(state.groups.map((group) => group.id)));
+    state.groups.push({
+      id,
+      name,
+      slug: id,
+      category: name,
+      description: "",
+      turnaround: "",
+      sort: state.groups.length + 1,
+      gate: null,
+    });
+    audit(state, actor.id, "group.create", id, null, { name });
+    return { id, name };
+  });
+}
+
+export async function saveGroupSupply(
+  actor: Actor,
+  input: {
+    groupId: string;
+    rules: { materialId: string; phase: "print" | "pack"; scale: import("@/domain/types").SupplyScale; qty: number | null; rollWidthCm: number | null }[];
+    overrides: { size: string; materialId: string; phase: "print" | "pack"; qty: number | null }[];
+  },
+) {
+  assertRole(actor, ["owner"]);
+  await mutate(async (state) => {
+    const group = state.groups.find((item) => item.id === input.groupId);
+    if (!group) throw new Error("Không thấy nhóm sản phẩm.");
+    const { SUPPLY_SCALES } = await import("@/domain/types");
+    state.groupSupplies = (state.groupSupplies ?? []).filter((item) => item.groupId !== group.id);
+    state.sizeOverrides = (state.sizeOverrides ?? []).filter((item) => item.groupId !== group.id);
+    for (const rule of input.rules) {
+      if (!rule.materialId.trim()) continue;
+      if (!SUPPLY_SCALES.includes(rule.scale)) throw new Error("Cách tính định mức không hợp lệ.");
+      state.groupSupplies.push({
+        id: `${group.id}:${rule.materialId}:${rule.phase}:${rule.scale}`,
+        groupId: group.id,
+        materialId: rule.materialId.trim(),
+        phase: rule.phase,
+        scale: rule.scale,
+        qty: rule.qty,
+        rollWidthCm: rule.rollWidthCm,
+      });
+    }
+    for (const row of input.overrides) {
+      const size = row.size.trim();
+      if (!size || !row.materialId.trim()) continue;
+      state.sizeOverrides.push({
+        id: `${group.id}:${size}:${row.materialId}:${row.phase}`,
+        groupId: group.id,
+        size,
+        materialId: row.materialId.trim(),
+        phase: row.phase,
+        qty: row.qty,
+      });
+    }
+    state.settings.groupSupply20261024 = true;
+    audit(state, actor.id, "group.supply", group.id, null, { rules: input.rules.length, overrides: input.overrides.length });
+  });
+}
+
+export async function groupSupplyBoard(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  return {
+    groups: state.groups.map((group) => ({ id: group.id, name: group.name })),
+    materials: state.materials.map((material) => ({ id: material.id, name: material.name, unit: material.unit })),
+    rules: state.groupSupplies ?? [],
+    overrides: state.sizeOverrides ?? [],
+  };
 }
 
 export async function updateBom(actor: Actor, input: { bomId: string; qty: number | null }) {
