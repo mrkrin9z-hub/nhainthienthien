@@ -2,7 +2,8 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Printer, Plus, Truck } from "lucide-react";
+import { Printer, Plus, Truck, Upload } from "lucide-react";
+import { OrderImportDialog } from "@/components/admin/order-import-dialog";
 
 import { ListPager, useListPage } from "@/components/admin/list-page";
 import { PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
@@ -84,6 +85,7 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
   const [alert, setAlert] = useState<DeskAlertId | "">("");
   const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   useEffect(() => setText(q), [q]);
 
   const production = me.data?.role === "production";
@@ -91,9 +93,10 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
   const cards = useMemo(() => deskAlerts(rows), [rows]);
   const carriers = [...new Set(rows.map((row) => row.carrier.trim()).filter(Boolean))].sort();
   const channels = (["tai_tiem", "facebook", "tiktok", "shopee", "mo_home"] as Channel[]).filter((id) => me.data?.role === "sale" ? id !== "mo_home" : true);
+  const tab = (DESK_TABS.find((item) => item.id === status)?.id ?? "can_lam") as DeskTab;
 
   const shown = rows.filter((order) => {
-    if (status !== "all" && order.deskTab !== status) return false;
+    if (order.deskTab !== tab) return false;
     if (channel !== "all" && order.channel !== channel) return false;
     if (ship !== "all" && order.shipMode !== ship) return false;
     if (label === "da_in" && !order.labelPrintedAt) return false;
@@ -107,8 +110,6 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
   });
   const list = useListPage(shown, `${status}|${channel}|${ship}|${label}|${carrier}|${alert}|${text}`);
   const pageRows = list.slice;
-  const tab = (DESK_TABS.find((item) => item.id === status)?.id ?? "all") as DeskTab;
-  const note = deskTabMeta(tab);
 
   function toggle(id: string) {
     setPicked((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
@@ -187,7 +188,7 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
     <div className="space-y-3">
       <PageToolbar
         title="Đơn hàng"
-        hint="Một sổ cho TikTok, Shopee, bán lẻ và Facebook. Nhập tay, chưa nối API."
+        hint="Khách lẻ nhập tay. TikTok và Shopee nhập từ file xuất của sàn."
         search={text}
         onSearch={setText}
         searchPlaceholder="Tìm mã đơn, mã sàn, SKU, vận đơn…"
@@ -200,7 +201,10 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
                 <ToolbarButton label="Đánh dấu đã gửi" icon={Truck} onClick={() => void markShipped(selected)} />
               </>
             ) : production ? null : (
-              <ToolbarLink label="Tạo đơn" icon={Plus} primary to="/orders/create" />
+              <>
+                <ToolbarLink label="Khách lẻ" icon={Plus} primary to="/orders/create" />
+                <ToolbarButton label="Nhập sàn" icon={Upload} onClick={() => setImportOpen(true)} />
+              </>
             )}
             {production ? null : (
               <button
@@ -224,8 +228,10 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
         }
       />
 
+      <OrderImportDialog open={importOpen} onOpenChange={setImportOpen} />
+
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {cards.map((card) => (
+        {cards.filter((card) => card.id === "ship_24h" || card.id === "overdue_ship").map((card) => (
           <button
             key={card.id}
             type="button"
@@ -241,7 +247,7 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
 
       <div className="flex gap-1 overflow-x-auto border-b">
         {DESK_TABS.map((item) => {
-          const count = item.id === "all" ? rows.length : rows.filter((order) => order.deskTab === item.id).length;
+          const count = rows.filter((order) => order.deskTab === item.id).length;
           const active = tab === item.id;
           return (
             <button
@@ -256,8 +262,6 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
           );
         })}
       </div>
-      <p className="text-xs text-muted-foreground">Shopee gọi là {note.shopee}. TikTok gọi là {note.tiktok}.</p>
-
       <div className="flex flex-wrap items-center gap-2">
         {channels.map((id) => (
           <button

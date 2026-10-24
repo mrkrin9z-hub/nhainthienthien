@@ -102,6 +102,7 @@ export const orderUploadLink = createServerFn({ method: "POST" })
 const itemSchema = z.object({
   skuId: z.string().min(2),
   quantity: z.number().int().min(1).max(500),
+  variant: z.string().max(80).optional().default(""),
   unitPrice: z.number().int().min(0).nullable().optional(),
   priceReason: z.string().max(300).optional(),
 });

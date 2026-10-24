@@ -35,6 +35,7 @@ type Line = {
   quantity: number;
   unitPrice: string;
   priceTouched: boolean;
+  variant: string;
 };
 
 export type DeskSave = {
@@ -55,11 +56,11 @@ export type DeskSave = {
   paymentMethod?: PaymentMethod;
   netAmount?: number | null;
   designFileUrl?: string | null;
-  items?: { skuId: string; quantity: number; unitPrice?: number; priceReason?: string }[];
+  items?: { skuId: string; quantity: number; variant?: string; unitPrice?: number; priceReason?: string }[];
 };
 
 function blankLine(): Line {
-  return { key: crypto.randomUUID(), skuId: "", query: "", quantity: 1, unitPrice: "", priceTouched: false };
+  return { key: crypto.randomUUID(), skuId: "", query: "", quantity: 1, unitPrice: "", priceTouched: false, variant: "" };
 }
 
 function localIso(value: string): string | null {
@@ -81,6 +82,7 @@ export function OrderDesk({
   lockNote,
   catalog,
   channelOptions,
+  retail = false,
   initial,
   paidSoFar,
   payments = [],
@@ -95,6 +97,8 @@ export function OrderDesk({
   lockNote: string;
   catalog: DeskSku[];
   channelOptions?: { id: Channel; label: string }[];
+  /** Khách lẻ: form ngắn. TikTok và Shopee không tạo tay. */
+  retail?: boolean;
   initial: {
     channel: Channel;
     fullName: string;
@@ -106,7 +110,7 @@ export function OrderDesk({
     marketplaceCode: string;
     discount?: number | null;
     customerShip?: number | null;
-    lines: { key: string; skuId: string; quantity: number; unitPrice: string }[];
+    lines: { key: string; skuId: string; quantity: number; unitPrice: string; variant?: string }[];
   };
   paidSoFar: number;
   payments?: { at: string; amount: number; method: string; byName: string }[];
@@ -132,7 +136,7 @@ export function OrderDesk({
   const [designFileUrl, setDesignFileUrl] = useState("");
   const [lines, setLines] = useState<Line[]>(
     initial.lines.length
-      ? initial.lines.map((line) => ({ ...line, query: "", priceTouched: line.unitPrice !== "" }))
+      ? initial.lines.map((line) => ({ ...line, query: "", priceTouched: line.unitPrice !== "", variant: line.variant ?? "" }))
       : mode === "create"
         ? []
         : [blankLine()],
@@ -149,9 +153,15 @@ export function OrderDesk({
     enabled: mode === "create" && fullName.trim().length >= 2,
   });
 
-  const channelList = channelOptions?.length
-    ? channelOptions
-    : (Object.keys(CHANNEL_LABEL) as Channel[]).map((id) => ({ id, label: CHANNEL_LABEL[id] }));
+  const compact = retail && mode === "create";
+  const channelList = compact
+    ? [
+        { id: "tai_tiem" as const, label: "Trực tiếp" },
+        { id: "facebook" as const, label: "Facebook" },
+      ]
+    : channelOptions?.length
+      ? channelOptions
+      : (Object.keys(CHANNEL_LABEL) as Channel[]).map((id) => ({ id, label: CHANNEL_LABEL[id] }));
   const sellable = useMemo(
     () => catalog.filter((sku) => skuSoldOn(sku, channel)),
     [catalog, channel],
@@ -200,6 +210,7 @@ export function OrderDesk({
             quantity: 1,
             unitPrice: listed === null ? "" : String(listed),
             priceTouched: false,
+            variant: "",
           } satisfies Line;
         }),
       ];
@@ -226,6 +237,7 @@ export function OrderDesk({
       .map((line) => ({
         skuId: line.skuId,
         quantity: line.quantity,
+        variant: line.variant.trim(),
         ...(line.unit !== null ? { unitPrice: line.unit, ...(line.priceTouched ? { priceReason } : {}) } : {}),
       }));
     if (!itemsLocked && !items.length) {
@@ -297,9 +309,18 @@ export function OrderDesk({
               {isMarketplace(channel) ? (
                 <Input className="min-h-11" value="Nhãn sàn" readOnly />
               ) : (
-                <select className={control} value={fulfillment} disabled={fieldsLocked} onChange={(event) => setFulfillment(event.target.value as "pickup" | "delivery")}>
+                <select
+                  className={control}
+                  value={fulfillment}
+                  disabled={fieldsLocked}
+                  onChange={(event) => {
+                    const next = event.target.value as "pickup" | "delivery";
+                    setFulfillment(next);
+                    if (next === "pickup") setAddress("");
+                  }}
+                >
                   <option value="pickup">Lấy tại xưởng</option>
-                  <option value="delivery">Tự giao</option>
+                  <option value="delivery">{compact ? "Giao" : "Tự giao"}</option>
                 </select>
               )}
             </Field>
@@ -349,11 +370,13 @@ export function OrderDesk({
             <Field label="Số điện thoại" required icon={<Phone className="size-3.5" />}>
               <Input className="min-h-11" value={phone} required disabled={fieldsLocked} inputMode="tel" autoComplete="tel" onChange={(event) => setPhone(event.target.value)} />
             </Field>
+            {compact && fulfillment !== "delivery" ? null : (
             <div className="md:col-span-2">
               <Field label="Địa chỉ" icon={<MapPin className="size-3.5" />}>
                 <Input className="min-h-11" value={address} disabled={fieldsLocked} required={fulfillment === "delivery" && !fieldsLocked} onChange={(event) => setAddress(event.target.value)} />
               </Field>
             </div>
+            )}
             {channel === "tiktok" || channel === "shopee" ? (
               <Field label="Mã đơn sàn">
                 <Input className="min-h-11" value={marketplaceCode} disabled={mode === "edit" || fieldsLocked} onChange={(event) => setMarketplaceCode(event.target.value)} />
@@ -403,6 +426,7 @@ export function OrderDesk({
                   onSku={(skuId) => chooseSku(line.key, skuId)}
                   onQty={(quantity) => patchLine(line.key, { quantity })}
                   onPrice={(unitPrice) => patchLine(line.key, { unitPrice, priceTouched: true })}
+                  onVariant={compact ? (variant) => patchLine(line.key, { variant }) : undefined}
                   onRemove={() => setLines((current) => current.filter((item) => item.key !== line.key))}
                 />
               ))}
@@ -421,9 +445,9 @@ export function OrderDesk({
       </div>
 
       <aside className="space-y-4 xl:sticky xl:top-4">
-        <section className={card}>
+        <MaybeDetails compact={compact}>
           <h2 className="text-base font-bold">Lịch trình đơn hàng</h2>
-          <Field label="Ngày hẹn giao / nhận" required={mode === "create"}>
+          <Field label="Ngày hẹn giao / nhận" required={mode === "create" && !compact}>
             <Input className="min-h-11" type="date" min={vnYmd()} value={dueDate} disabled={fieldsLocked} onChange={(event) => setDueDate(event.target.value)} />
           </Field>
           <p className="text-xs text-muted-foreground">
@@ -453,7 +477,7 @@ export function OrderDesk({
               </Field>
             </div>
           ) : null}
-        </section>
+        </MaybeDetails>
 
         <section className={card}>
           <h2 className="text-base font-bold">Tổng thanh toán</h2>
@@ -462,14 +486,18 @@ export function OrderDesk({
               <span className="text-muted-foreground">Tổng thanh toán</span>
               <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(goods)}</span>
             </div>
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">Giảm giá</span>
-              <Input className="h-9 w-32 text-right" inputMode="numeric" value={discount} disabled={fieldsLocked} placeholder="Để trống" aria-label="Giảm giá" onChange={(event) => setDiscount(event.target.value.replace(/[^\d]/g, ""))} />
-            </label>
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">Phí giao khách trả</span>
-              <Input className="h-9 w-32 text-right" inputMode="numeric" value={customerShip} disabled={fieldsLocked} placeholder="Để trống" aria-label="Phí giao khách trả" onChange={(event) => setCustomerShip(event.target.value.replace(/[^\d]/g, ""))} />
-            </label>
+            {compact ? null : (
+              <>
+                <label className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Giảm giá</span>
+                  <Input className="h-9 w-32 text-right" inputMode="numeric" value={discount} disabled={fieldsLocked} placeholder="Để trống" aria-label="Giảm giá" onChange={(event) => setDiscount(event.target.value.replace(/[^\d]/g, ""))} />
+                </label>
+                <label className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Phí giao khách trả</span>
+                  <Input className="h-9 w-32 text-right" inputMode="numeric" value={customerShip} disabled={fieldsLocked} placeholder="Để trống" aria-label="Phí giao khách trả" onChange={(event) => setCustomerShip(event.target.value.replace(/[^\d]/g, ""))} />
+                </label>
+              </>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Đã thanh toán</span>
               <span className="font-medium">{formatVnd(paid)}</span>
@@ -502,7 +530,7 @@ export function OrderDesk({
               <span className="font-semibold">{remain === null ? "—" : formatVnd(Math.abs(remain))}</span>
             </div>
           </div>
-          {mode === "create" ? (
+          {compact ? null : mode === "create" ? (
             <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
               <p className="text-sm font-medium">Thanh toán lần 1</p>
               <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn.</p>
@@ -558,19 +586,31 @@ export function OrderDesk({
               </Button>
             </div>
           )}
-          <p className="text-[11px] text-muted-foreground">
-            {fieldsLocked
-              ? "Đơn sàn không thu thêm và không sửa giá trên web."
-              : channel === "facebook"
-                ? "Đơn Facebook có thể cần cọc trước khi in."
-                : "Cọc có thể để trống, ghi thêm được sau khi mở đơn."}
-          </p>
+          {compact ? null : (
+            <p className="text-[11px] text-muted-foreground">
+              {fieldsLocked
+                ? "Đơn sàn không thu thêm và không sửa giá trên web."
+                : channel === "facebook"
+                  ? "Đơn Facebook có thể cần cọc trước khi in."
+                  : "Cọc có thể để trống, ghi thêm được sau khi mở đơn."}
+            </p>
+          )}
           <Button type="submit" className="min-h-12 w-full text-base font-bold" disabled={saving || fieldsLocked}>
             {saving ? "Đang lưu..." : mode === "create" ? "Lưu đơn hàng" : "Cập nhật"}
           </Button>
         </section>
       </aside>
     </form>
+  );
+}
+
+function MaybeDetails({ compact, children }: { compact: boolean; children: ReactNode }) {
+  if (!compact) return <section className={card}>{children}</section>;
+  return (
+    <details className={card}>
+      <summary className="cursor-pointer text-sm font-semibold">Thêm</summary>
+      <div className="mt-3 space-y-3">{children}</div>
+    </details>
   );
 }
 
@@ -598,6 +638,7 @@ function ProductLine({
   onSku,
   onQty,
   onPrice,
+  onVariant,
   onRemove,
 }: {
   index: number;
@@ -610,6 +651,7 @@ function ProductLine({
   onSku: (skuId: string) => void;
   onQty: (quantity: number) => void;
   onPrice: (unitPrice: string) => void;
+  onVariant?: (variant: string) => void;
   onRemove: () => void;
 }) {
   const query = line.query.trim().toLowerCase();
@@ -655,6 +697,11 @@ function ProductLine({
         </Field>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+        {onVariant ? (
+          <Field label="Mẫu">
+            <Input className="min-h-11" value={line.variant} disabled={locked} placeholder="Phân loại, màu, khổ" aria-label={`Mẫu dòng ${index + 1}`} onChange={(event) => onVariant(event.target.value)} />
+          </Field>
+        ) : null}
         <Field label="Đơn giá">
           {owner && !locked ? (
             <Input

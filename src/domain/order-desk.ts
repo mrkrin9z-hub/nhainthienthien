@@ -1,22 +1,18 @@
 import { feeLines } from "./calc.ts";
 import type { Channel, Settings } from "./types.ts";
 
-/** Tab sổ đơn. Tên là cách shop gọi. Cột Shopee và TikTok là tên trên từng sàn. */
+/** Bốn tab làm việc. Trả hàng nằm ở Cần làm. Giao lỗi vẫn ở Đang giao. Xong và hủy chung một tab. */
 export const DESK_TABS = [
-  { id: "all", label: "Tất cả", shopee: "Tất cả", tiktok: "Tất cả" },
-  { id: "cho_xu_ly", label: "Chờ xử lý", shopee: "Chờ xác nhận", tiktok: "Chờ xử lý" },
-  { id: "can_gui", label: "Cần gửi", shopee: "Chờ lấy hàng", tiktok: "Cần gửi" },
-  { id: "dang_giao", label: "Đang giao", shopee: "Đang giao", tiktok: "Đã gửi" },
-  { id: "da_giao", label: "Đã giao", shopee: "Đã giao", tiktok: "Đã hoàn tất" },
-  { id: "huy", label: "Đơn hủy", shopee: "Đơn hủy", tiktok: "Đã hủy" },
-  { id: "giao_that_bai", label: "Giao không thành công", shopee: "Giao thất bại", tiktok: "Giao không thành công" },
-  { id: "tra_hang", label: "Trả hàng / Hoàn tiền", shopee: "Trả hàng/Hoàn tiền", tiktok: "Yêu cầu trả hàng" },
+  { id: "can_lam", label: "Cần làm" },
+  { id: "can_gui", label: "Cần gửi" },
+  { id: "dang_giao", label: "Đang giao" },
+  { id: "xong_huy", label: "Xong/Hủy" },
 ] as const;
 
 export type DeskTab = (typeof DESK_TABS)[number]["id"];
 
 export const DESK_CHANNEL_LABEL: Record<Channel, string> = {
-  tai_tiem: "Bán lẻ",
+  tai_tiem: "Trực tiếp",
   facebook: "Facebook",
   tiktok: "TikTok",
   shopee: "Shopee",
@@ -38,14 +34,12 @@ const PROCESSING = new Set(["draft_upload", "upload_error", "nhan_don", "thiet_k
 const TO_SHIP = new Set(["in", "dong_goi"]);
 
 export function deskTabOf(order: { status: string; deskIssue?: string | null }): DeskTab {
-  if (order.deskIssue === "tra_hang") return "tra_hang";
-  if (order.deskIssue === "giao_that_bai") return "giao_that_bai";
-  if (order.status === "huy") return "huy";
-  if (order.status === "xong") return "da_giao";
-  if (order.status === "giao") return "dang_giao";
+  if (order.status === "huy" || order.status === "xong") return "xong_huy";
+  if (order.deskIssue === "tra_hang") return "can_lam";
+  if (order.status === "giao" || order.deskIssue === "giao_that_bai") return "dang_giao";
   if (TO_SHIP.has(order.status)) return "can_gui";
-  if (PROCESSING.has(order.status) || order.status) return "cho_xu_ly";
-  return "cho_xu_ly";
+  if (PROCESSING.has(order.status) || order.status) return "can_lam";
+  return "can_lam";
 }
 
 export function deskTabMeta(id: DeskTab) {
@@ -137,7 +131,7 @@ export function deskAlerts(orders: AlertOrder[], now = Date.now()): DeskAlert[] 
       match: (order) => {
         const tab = deskTabOf(order);
         const hours = hoursUntil(order.shipBy, now);
-        return (tab === "cho_xu_ly" || tab === "can_gui") && hours != null && hours >= 0 && hours <= 24;
+        return (tab === "can_lam" || tab === "can_gui") && hours != null && hours >= 0 && hours <= 24;
       },
     },
     {
@@ -146,7 +140,7 @@ export function deskAlerts(orders: AlertOrder[], now = Date.now()): DeskAlert[] 
       match: (order) => {
         const tab = deskTabOf(order);
         const hours = hoursUntil(order.autoCancelAt, now);
-        return tab !== "huy" && tab !== "da_giao" && hours != null && hours >= 0 && hours <= 24;
+        return tab !== "xong_huy" && hours != null && hours >= 0 && hours <= 24;
       },
     },
     {
@@ -155,7 +149,7 @@ export function deskAlerts(orders: AlertOrder[], now = Date.now()): DeskAlert[] 
       match: (order) => {
         const tab = deskTabOf(order);
         const hours = hoursUntil(order.shipBy, now);
-        return (tab === "cho_xu_ly" || tab === "can_gui") && hours != null && hours < 0;
+        return (tab === "can_lam" || tab === "can_gui") && hours != null && hours < 0;
       },
     },
     { id: "cancelled", label: "Hủy", match: (order) => order.status === "huy" },

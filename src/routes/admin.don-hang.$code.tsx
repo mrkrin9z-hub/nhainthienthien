@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { OrderCommercePanel } from "@/components/admin/order-commerce";
 import { OrderDesk, type DeskSku } from "@/components/admin/order-desk";
-import { OrderQrDialog } from "@/components/admin/order-qr-dialog";
+import { OrderQrDialog, OrderUploadCard } from "@/components/admin/order-qr-dialog";
 import { WaybillBox } from "@/components/admin/waybill-box";
 import { canPreviewPhoto, PhotoViewer, saveStaffFile, saveStaffFiles, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,7 @@ function OrderDetailPage() {
           </DropdownMenu>
         </div>
       </div>
+      <OrderUploadCard orderId={data.id} code={data.code} cancelled={data.status === "huy"} />
       <p className="break-words text-sm">
         {data.customerName} · {data.phone} · {channelLabelOf(data.channel, data.channelLabel)} · {statusLabelOf(data.status, data.statusLabel)}
         {data.recipientName && data.recipientName !== data.customerName ? ` · Người nhận: ${data.recipientName}` : ""}

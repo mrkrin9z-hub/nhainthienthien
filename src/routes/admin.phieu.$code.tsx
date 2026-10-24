@@ -107,7 +107,7 @@ function SlipBody() {
         ))}
       </div>
       {loai === "sx" ? (
-        <ProductionSlip data={data} when={when} />
+        <ProductionSlip data={data} when={when} qr={qr} />
       ) : paper === "k80" ? (
         <K80Slip sheetRef={sheetRef} pageHeight={k80Height} data={data} when={when} where={where} qr={qr} />
       ) : (
@@ -272,7 +272,7 @@ function OfficeSlip({
   );
 }
 
-function ProductionSlip({ data, when }: { data: SlipData; when: string }) {
+function ProductionSlip({ data, when, qr }: { data: SlipData; when: string; qr: string | null }) {
   return (
     <article className="slip-sheet mx-auto box-border w-[72mm] bg-white p-2 text-[12px] leading-snug text-black shadow">
       <header className="border-b border-black pb-2 text-center">
@@ -292,6 +292,10 @@ function ProductionSlip({ data, when }: { data: SlipData; when: string }) {
         ))}
       </ul>
       {data.customerNote ? <p className="mt-2">Ghi chú: {data.customerNote}</p> : null}
+      <div className="mt-2 text-center">
+        {qr ? <img src={qr} alt={`Mã gửi ảnh thiết kế ${data.code}`} className="mx-auto h-24 w-24" /> : null}
+        <p className="text-[11px] font-semibold">Khách gửi ảnh</p>
+      </div>
     </article>
   );
 }

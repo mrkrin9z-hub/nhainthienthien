@@ -4,7 +4,7 @@ import { OrderManager } from "@/components/admin/order-manager";
 
 export const Route = createFileRoute("/admin/don-hang/")({
   validateSearch: (search: Record<string, unknown>): { status: string; q: string } => ({
-    status: typeof search.status === "string" && search.status ? search.status : "all",
+    status: typeof search.status === "string" && search.status ? search.status : "can_lam",
     q: typeof search.q === "string" ? search.q : "",
   }),
   component: OrdersPage,

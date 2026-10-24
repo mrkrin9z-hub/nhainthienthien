@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { planMarketplaceImport } from "./marketplace.ts";
+import { parseMarketplaceTable, planMarketplaceImport } from "./marketplace.ts";
 import {
   expireAtFromApi,
   linesFromShopeeOrders,
@@ -116,4 +116,28 @@ test("đơn Shopee lấy model_sku và bỏ đơn đang hủy", () => {
   const link = parseTiktokLink(JSON.stringify({ accessToken: "a", refreshToken: "b", shopCipher: "c", shopId: "1", expireAt: 5, pulledAt: 9 }));
   assert.equal(link?.shopCipher, "c");
   assert.equal(link?.pulledAt, 9);
+});
+
+test("nhập lại cùng mã sàn thì cập nhật hạn gửi và SKU, không tạo đơn mới", () => {
+  const lines = parseMarketplaceTable([
+    ["Order ID", "Seller SKU", "Variation", "Quantity", "SKU Subtotal After Discount", "Order Amount", "Order Status", "Shipping Provider Name", "Tracking ID", "Payment Method", "Ship By", "Recipient"],
+    ["576461413038785752", "TG-13x18-C1", "13x18", "1", "37000", "37000", "To Ship", "J&T", "JT123", "COD", "2026-10-25 18:00", "Lan"],
+  ]);
+  assert.equal(lines[0]?.shipBy?.slice(0, 10), "2026-10-25");
+  assert.equal(lines[0]?.variation, "13x18");
+  const plan = planMarketplaceImport({
+    lines,
+    maps: [],
+    existingIds: ["576461413038785752"],
+    skus: [{ id: "sku-tg", code: "TG-13x18-C1" }],
+  });
+  assert.equal(plan.orders.length, 0);
+  assert.deepEqual(plan.duplicates, ["576461413038785752"]);
+  assert.equal(plan.updates.length, 1);
+  assert.equal(plan.updates[0]?.items[0]?.skuId, "sku-tg");
+  assert.equal(plan.updates[0]?.items[0]?.externalSku, "TG-13x18-C1");
+  assert.equal(plan.updates[0]?.items[0]?.variation, "13x18");
+  assert.equal(plan.updates[0]?.tracking, "JT123");
+  assert.equal(plan.updates[0]?.carrier, "J&T");
+  assert.equal(plan.updates[0]?.cancel, false);
 });

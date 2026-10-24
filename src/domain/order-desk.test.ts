@@ -5,19 +5,19 @@ import { applyStoreMigrations } from "./migrate-shop.ts";
 import { applyOrderDesk, deskAlerts, deskTabMeta, deskTabOf, estimateNet, maskBuyer, shipModeOf } from "./order-desk.ts";
 import { DEFAULT_SETTINGS } from "./seed.ts";
 
-test("tab sổ đơn map Shopee và TikTok, không nhảy bước xưởng", () => {
-  assert.equal(deskTabOf({ status: "nhan_don" }), "cho_xu_ly");
-  assert.equal(deskTabOf({ status: "thiet_ke" }), "cho_xu_ly");
+test("bốn tab làm việc, không nhảy bước xưởng", () => {
+  assert.equal(deskTabOf({ status: "nhan_don" }), "can_lam");
+  assert.equal(deskTabOf({ status: "thiet_ke" }), "can_lam");
   assert.equal(deskTabOf({ status: "dong_goi" }), "can_gui");
   assert.equal(deskTabOf({ status: "giao" }), "dang_giao");
-  assert.equal(deskTabOf({ status: "xong" }), "da_giao");
-  assert.equal(deskTabOf({ status: "huy" }), "huy");
-  assert.equal(deskTabOf({ status: "giao", deskIssue: "giao_that_bai" }), "giao_that_bai");
-  assert.equal(deskTabOf({ status: "xong", deskIssue: "tra_hang" }), "tra_hang");
-  assert.equal(deskTabMeta("can_gui").shopee, "Chờ lấy hàng");
-  assert.equal(deskTabMeta("can_gui").tiktok, "Cần gửi");
-  assert.equal(deskTabMeta("da_giao").tiktok, "Đã hoàn tất");
-  assert.equal(deskTabMeta("cho_xu_ly").shopee, "Chờ xác nhận");
+  assert.equal(deskTabOf({ status: "xong" }), "xong_huy");
+  assert.equal(deskTabOf({ status: "huy" }), "xong_huy");
+  assert.equal(deskTabOf({ status: "giao", deskIssue: "giao_that_bai" }), "dang_giao");
+  assert.equal(deskTabOf({ status: "nhan_don", deskIssue: "tra_hang" }), "can_lam");
+  assert.equal(deskTabOf({ status: "xong", deskIssue: "tra_hang" }), "xong_huy");
+  assert.equal(deskTabMeta("can_lam").label, "Cần làm");
+  assert.equal(deskTabMeta("can_gui").label, "Cần gửi");
+  assert.equal(deskTabMeta("xong_huy").label, "Xong/Hủy");
   assert.equal(shipModeOf({ channel: "tiktok", fulfillment: "delivery" }), "san");
   assert.equal(shipModeOf({ channel: "tai_tiem", fulfillment: "pickup" }), "pickup");
   assert.equal(shipModeOf({ channel: "facebook", fulfillment: "delivery" }), "tu_giao");
