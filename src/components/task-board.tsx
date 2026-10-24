@@ -42,7 +42,13 @@ export function TaskBoard({
                 {task.draft ? " · chỉ tiêu nháp" : ""}
                 {task.fileCount ? ` · ${task.fileCount} ảnh` : ""}
               </p>
-              {task.detail ? <p className="text-sm leading-snug">{task.detail}</p> : null}
+              {task.detail ? <p className="text-sm leading-snug whitespace-pre-line">{task.detail}</p> : null}
+              {task.note ? <p className="text-sm leading-snug whitespace-pre-line text-muted-foreground">{task.note}</p> : null}
+              {task.link ? (
+                <a href={task.link} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
+                  Mở tài liệu
+                </a>
+              ) : null}
               {photoSrc && task.fileIds.length ? (
                 <div className="flex gap-2 overflow-x-auto">
                   {task.fileIds.slice(0, 4).map((id) => (

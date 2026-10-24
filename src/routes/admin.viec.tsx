@@ -5,19 +5,21 @@ import { useMemo, useState } from "react";
 import { PageToolbar } from "@/components/admin/page-toolbar";
 import { staffThumb } from "@/components/photo-thumb";
 import { TaskBoard } from "@/components/task-board";
-import { LIST_LABEL, type ChecklistListId, type TaskCard } from "@/domain/checklists";
+import { LIST_LABEL, TASK_DOCS, type ChecklistListId, type TaskCard } from "@/domain/checklists";
 import { loadChecklist, saveChecklistStatus } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/viec")({
   component: ChecklistPage,
 });
 
-const CHIPS: { id: ChecklistListId | "hom_nay" | "thieu"; label: string }[] = [
+const CHIPS: { id: ChecklistListId | "hom_nay" | "thieu" | "can_chup" | "quay_video"; label: string }[] = [
   { id: "hom_nay", label: "Hôm nay" },
   { id: "sale_tuan", label: "Tuần" },
   { id: "setup", label: "Setup" },
   { id: "khai_truong", label: "Khai trương" },
   { id: "chot", label: "24 việc" },
+  { id: "can_chup", label: "Cần chụp" },
+  { id: "quay_video", label: "Quay video" },
   { id: "anh", label: "Ảnh" },
   { id: "dao_tao", label: "Đào tạo" },
   { id: "thieu", label: "Sheet còn thiếu" },
@@ -35,10 +37,12 @@ function ChecklistPage() {
     const needle = q.trim().toLowerCase();
     const filtered = rows.filter((card) => {
       if (list === "thieu") return false;
+      if (list === "can_chup") return card.section === "Cần chụp";
+      if (list === "quay_video") return card.section === "Quay video";
       if (list === "hom_nay" && card.list !== "sale_ngay" && card.list !== "sop") return false;
       if (list !== "hom_nay" && list !== "thieu" && card.list !== list) return false;
       if (!needle) return true;
-      return `${card.title} ${card.owner} ${card.detail}`.toLowerCase().includes(needle);
+      return `${card.title} ${card.owner} ${card.detail} ${card.note} ${card.link}`.toLowerCase().includes(needle);
     });
     return filtered;
   }, [data.data?.cards, list, q]);
@@ -89,6 +93,13 @@ function ChecklistPage() {
         {data.data?.pinSet ? "Đã có mã PIN điện thoại." : "Chưa có PIN. Đặt 4 số ở Cài đặt → Cửa hàng."}{" "}
         {data.data?.drive ? "Ảnh điện thoại lên Google Drive." : "Drive chưa nối: ảnh điện thoại lưu trên máy chủ, tối đa 10MB."}
       </p>
+      <div className="flex flex-wrap gap-3 rounded-xl border bg-card p-3 text-sm">
+        {TASK_DOCS.map((doc) => (
+          <a key={doc.href} href={doc.href} target="_blank" rel="noreferrer" className="font-semibold text-primary underline">
+            {doc.title}
+          </a>
+        ))}
+      </div>
       <div className="flex gap-2 overflow-x-auto">
         {CHIPS.map((chip) => (
           <button
