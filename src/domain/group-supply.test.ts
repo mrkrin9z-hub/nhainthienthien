@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { quoteSku, rollMeters } from "./calc.ts";
-import { linesForSku } from "./group-supply.ts";
+import { linesForSku, materialOptionsForScale, sizeSheetMaterialId } from "./group-supply.ts";
 import { businessReport } from "./report.ts";
 import { DEFAULT_SETTINGS } from "./seed.ts";
 import { syncOrderStock } from "./stock.ts";
@@ -107,4 +107,19 @@ test("tạo nhóm, tạo sản phẩm theo khổ, bán trừ gỗ giấy gương
   assert.equal(report.orderCount, 1);
   assert.equal(report.incomplete, false);
   assert.equal(report.gross !== null, true);
+});
+
+test("tấm theo khổ hiện tiền tố gỗ, không liệt từng khổ", () => {
+  const materials = [
+    { id: "go-13x18", name: "Tấm gỗ 13x18" },
+    { id: "go-20x30", name: "Tấm gỗ 20x30" },
+    { id: "giay-pp", name: "Giấy PP" },
+  ];
+  assert.equal(sizeSheetMaterialId("go-13x18"), "go");
+  assert.equal(sizeSheetMaterialId("go"), "go");
+  const wood = materialOptionsForScale(materials, "size_sheet", "go");
+  assert.deepEqual(wood, [{ id: "go", name: "Gỗ (tấm theo khổ)" }]);
+  const paper = materialOptionsForScale(materials, "roll_m", "giay-pp");
+  assert.equal(paper.some((item) => item.id === "giay-pp"), true);
+  assert.equal(paper.some((item) => item.id === "go-13x18"), true);
 });

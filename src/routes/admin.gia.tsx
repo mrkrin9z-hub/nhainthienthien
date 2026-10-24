@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { formatMaybe, formatVnd } from "@/lib/brand";
 import { cloneShelf, createPriceSize, createProductGroup, getGroupSupply, getMe, getPriceBoard, importPriceSheet, pullCatalog, runQuote, saveGroupSupply, savePieces, savePrice, setSkuSold } from "@/lib/admin.functions";
-import { SUPPLY_SCALE_LABEL } from "@/domain/group-supply";
+import { SUPPLY_SCALE_LABEL, materialOptionsForScale, scaleQtyIsAutomatic } from "@/domain/group-supply";
 import { SUPPLY_SCALES, type SupplyScale } from "@/domain/types";
 import { DESK_CHANNEL_LABEL } from "@/domain/order-desk";
 import { isMoHomeGroup } from "@/domain/mohome";
@@ -814,11 +814,11 @@ function GroupSupplyDialog({ open, onOpenChange }: { open: boolean; onOpenChange
                 <div key={`${rule.materialId}-${index}`} className="grid gap-2 rounded-xl border p-2 md:grid-cols-5">
                   <select className="min-h-11 rounded-md border bg-background px-2 text-sm" aria-label={`Vật tư ${index + 1}`} value={rule.materialId} onChange={(event) => setRules((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, materialId: event.target.value } : item)))}>
                     <option value="">Vật tư</option>
-                    {materials.map((material) => (
+                    {materialOptionsForScale(materials, rule.scale, rule.materialId).map((material) => (
                       <option key={material.id} value={material.id}>{material.name}</option>
                     ))}
                   </select>
-                  <select className="min-h-11 rounded-md border bg-background px-2 text-sm" aria-label={`Cách tính ${index + 1}`} value={rule.scale} onChange={(event) => setRules((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, scale: event.target.value as SupplyScale } : item)))}>
+                  <select className="min-h-11 rounded-md border bg-background px-2 text-sm" aria-label={`Cách tính ${index + 1}`} value={rule.scale} onChange={(event) => setRules((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, scale: event.target.value as SupplyScale, materialId: event.target.value === "size_sheet" ? item.materialId.replace(/-\d+x\d+$/i, "") : item.materialId } : item)))}>
                     {SUPPLY_SCALES.map((scale) => (
                       <option key={scale} value={scale}>{SUPPLY_SCALE_LABEL[scale]}</option>
                     ))}
@@ -827,7 +827,7 @@ function GroupSupplyDialog({ open, onOpenChange }: { open: boolean; onOpenChange
                     <option value="print">Khi in</option>
                     <option value="pack">Khi đóng gói</option>
                   </select>
-                  <Input className="min-h-11" inputMode="decimal" aria-label={`Số lượng ${index + 1}`} value={rule.qty} placeholder="Số lượng" onChange={(event) => setRules((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, qty: event.target.value } : item)))} />
+                  <Input className="min-h-11" inputMode="decimal" aria-label={`Số lượng ${index + 1}`} disabled={scaleQtyIsAutomatic(rule.scale)} value={scaleQtyIsAutomatic(rule.scale) ? "" : rule.qty} placeholder={rule.scale === "area_ml" ? "ml / m²" : scaleQtyIsAutomatic(rule.scale) ? "Tự tính theo khổ" : "Số lượng"} onChange={(event) => setRules((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, qty: event.target.value } : item)))} />
                   <Button type="button" variant="outline" className="min-h-11" onClick={() => setRules((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}>Xóa</Button>
                 </div>
               ))}

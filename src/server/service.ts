@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import { visibleToRole } from "@/domain/access";
-import { linesForSku } from "@/domain/group-supply";
+import { linesForSku, sizeSheetMaterialId } from "@/domain/group-supply";
 import { auditActionLabel, auditDay, describeAudit, type AuditShop } from "@/domain/audit-text";
 import {
   comboPriceError,
@@ -2083,10 +2083,11 @@ export async function saveGroupSupply(
     for (const rule of input.rules) {
       if (!rule.materialId.trim()) continue;
       if (!SUPPLY_SCALES.includes(rule.scale)) throw new Error("Cách tính định mức không hợp lệ.");
+      const materialId = rule.scale === "size_sheet" ? sizeSheetMaterialId(rule.materialId) : rule.materialId.trim();
       state.groupSupplies.push({
-        id: `${group.id}:${rule.materialId}:${rule.phase}:${rule.scale}`,
+        id: `${group.id}:${materialId}:${rule.phase}:${rule.scale}`,
         groupId: group.id,
-        materialId: rule.materialId.trim(),
+        materialId,
         phase: rule.phase,
         scale: rule.scale,
         qty: rule.qty,

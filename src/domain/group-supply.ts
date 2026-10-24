@@ -101,6 +101,41 @@ export function ensureGroupSupplies(state: SupplyState & { settings: Settings })
   return true;
 }
 
+/** size_sheet lưu tiền tố (`go`), tấm kho là `go-13x18`. Chọn nhầm một tấm thì cắt khổ đi. */
+export function sizeSheetMaterialId(materialId: string): string {
+  return materialId.trim().replace(/-\d+x\d+$/i, "");
+}
+
+const AUTO_SCALES = new Set<SupplyScale>(["roll_m", "edge_m", "wrap_m2"]);
+
+export function scaleQtyIsAutomatic(scale: SupplyScale): boolean {
+  return AUTO_SCALES.has(scale);
+}
+
+/** Danh sách vật tư trong form nhóm. Tấm theo khổ chỉ hiện tiền tố, không hiện từng khổ. */
+export function materialOptionsForScale(
+  materials: { id: string; name: string }[],
+  scale: SupplyScale,
+  currentId: string,
+): { id: string; name: string }[] {
+  if (scale === "size_sheet") {
+    const prefixes = new Map<string, string>();
+    const label = (prefix: string) => (prefix === "go" ? "Gỗ (tấm theo khổ)" : `${prefix} (tấm theo khổ)`);
+    for (const material of materials) {
+      const prefix = material.id.match(/^(.*)-\d+x\d+$/i)?.[1];
+      if (prefix && !prefixes.has(prefix)) prefixes.set(prefix, label(prefix));
+    }
+    const current = sizeSheetMaterialId(currentId);
+    if (current && !prefixes.has(current)) prefixes.set(current, label(current));
+    return [...prefixes].map(([id, name]) => ({ id, name }));
+  }
+  const options = materials.map((material) => ({ id: material.id, name: material.name }));
+  if (currentId && !options.some((item) => item.id === currentId)) {
+    options.unshift({ id: currentId, name: currentId === "go" ? "Gỗ (tấm theo khổ)" : currentId });
+  }
+  return options;
+}
+
 function rollWidth(ruleRow: GroupSupply, settings: Settings): number {
   if (ruleRow.rollWidthCm && ruleRow.rollWidthCm > 0) return ruleRow.rollWidthCm;
   return ruleRow.materialId === "mang" ? settings.filmRollWidthCm : settings.ppRollWidthCm;
@@ -109,7 +144,8 @@ function rollWidth(ruleRow: GroupSupply, settings: Settings): number {
 function scaledQty(ruleRow: GroupSupply, sku: Sku, settings: Settings): { materialId: string; qty: number | null; scope: BomLine["scope"] } {
   const width = sku.widthCm;
   const height = sku.heightCm;
-  const materialId = ruleRow.scale === "size_sheet" && sku.size ? `${ruleRow.materialId}-${sku.size}` : ruleRow.materialId;
+  const prefix = ruleRow.scale === "size_sheet" ? sizeSheetMaterialId(ruleRow.materialId) : ruleRow.materialId;
+  const materialId = ruleRow.scale === "size_sheet" && sku.size ? `${prefix}-${sku.size}` : prefix;
   if (ruleRow.scale === "per_sheet" || ruleRow.scale === "size_sheet") {
     return { materialId, qty: ruleRow.qty, scope: "sheet" };
   }
