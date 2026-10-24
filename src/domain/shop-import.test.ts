@@ -25,11 +25,11 @@ test("lãi tính lại từ giá và vốn, không lấy cột lãi cũ", () => 
   const walk = sheetMargin("tai_tiem", 37000, 6757, settings);
   const facebook = sheetMargin("facebook", 37000, 6757, settings);
   const market = sheetMargin("tiktok", 37000, 6757, settings);
-  assert.equal(walk.profit, 27505);
-  assert.equal(facebook.profit, 15805);
-  assert.equal(market.profit, 7625);
+  assert.equal(walk.profit, 29133);
+  assert.equal(facebook.profit, 17433);
+  assert.equal(market.profit, 9253);
   const overridden = sheetMargin("tai_tiem", 35000, 6757, settings);
-  assert.equal(overridden.profit, 35000 - 6757 - Math.round(35000 * 0.044) - Math.round(35000 * 0.03));
+  assert.equal(overridden.profit, 35000 - 6757 - Math.round(35000 * 0.03));
 });
 
 test("sổ cũ được nhập một lần, sổ không có giá thì không đụng", async () => {

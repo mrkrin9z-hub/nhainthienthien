@@ -743,7 +743,7 @@ export const saveExpense = createServerFn({ method: "POST" })
         name: z.string(),
         amount: z.number(),
         note: z.string().optional().default(""),
-        category: z.enum(["mat_bang", "dien_nuoc", "vat_tu", "van_chuyen", "nhan_su", "sua_chua", "khac"]).optional(),
+        category: z.enum(["mat_bang", "dien_nuoc", "vat_tu", "muc_in", "van_chuyen", "nhan_su", "sua_chua", "khac"]).optional(),
         wallet: z.enum(["tien_mat", "chuyen_khoan"]).optional(),
         date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       })

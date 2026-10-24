@@ -25,7 +25,8 @@ test("cài đặt là hub nút truy cập; giá vốn trong chi phí; có kênh 
   assert.doesNotMatch(src, /id="zalo"/);
   assert.match(src, /showZalo: false/);
   assert.match(src, /COST_KEYS/);
-  assert.match(src, /inkPercent/);
+  assert.match(src, /Mực không tính vào giá vốn/);
+  assert.doesNotMatch(src, /Mực \(% giá bán\)/);
   assert.match(src, /FEE_KEYS/);
   assert.match(src, /tiktokFeePercent/);
 });
@@ -69,12 +70,13 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(form, /Cập nhật/);
   assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Thêm nhân viên/);
   assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Phân quyền/);
-  assert.match(readFileSync(new URL("../routes/admin.san-xuat.tsx", import.meta.url), "utf8"), /Lệnh sản xuất/);
+  assert.match(readFileSync(new URL("../components/admin/production-page.tsx", import.meta.url), "utf8"), /Lệnh sản xuất/);
   const money = readFileSync(new URL("../components/admin/sections.tsx", import.meta.url), "utf8");
   assert.match(money, /Thu tiền/);
   assert.match(money, /Chi phí/);
   assert.match(money, /Ví tiền/);
   assert.match(money, /Báo cáo chi/);
+  assert.match(readFileSync(new URL("../lib/admin.functions.ts", import.meta.url), "utf8"), /"vat_tu", "muc_in"/);
   assert.match(readFileSync(new URL("../routes/admin.chi-phi.tsx", import.meta.url), "utf8"), /Tạo khoản chi/);
   assert.match(readFileSync(new URL("../routes/admin.chi-phi.tsx", import.meta.url), "utf8"), /Danh sách chi phí/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Tạo giao dịch/);
@@ -145,7 +147,7 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../components/admin/order-manager.tsx", import.meta.url), "utf8"), /In bill/);
   assert.match(desk, /modulesForRole/);
   assert.match(readFileSync(new URL("../routes/admin.bao-cao-chi.tsx", import.meta.url), "utf8"), /Báo cáo chi phí/);
-  const prices = readFileSync(new URL("../routes/admin.gia.tsx", import.meta.url), "utf8");
+  const prices = readFileSync(new URL("../components/admin/price-page.tsx", import.meta.url), "utf8");
   assert.match(prices, /Tạo từ Excel/);
   assert.match(prices, /Tạo khổ giá/);
   assert.match(prices, /Sửa giá/);
@@ -153,10 +155,13 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../routes/admin.kho.tsx", import.meta.url), "utf8"), /cursor-pointer/);
   assert.match(readFileSync(new URL("../components/admin/list-page.tsx", import.meta.url), "utf8"), /Hiển thị/);
   assert.match(readFileSync(new URL("../components/admin/order-manager.tsx", import.meta.url), "utf8"), /ListPager/);
-  for (const file of ["admin.kho.tsx", "admin.gia.tsx", "admin.thu.tsx", "admin.chi-phi.tsx", "admin.san-pham.tsx", "admin.san-xuat.tsx", "admin.khach.index.tsx", "admin.khach.$id.tsx", "admin.cai-dat.tsx"]) {
-    assert.match(readFileSync(new URL(`../routes/${file}`, import.meta.url), "utf8"), /ListPager/);
+  for (const file of ["admin.kho.tsx", "admin.thu.tsx", "admin.chi-phi.tsx", "admin.san-pham.tsx", "admin.khach.index.tsx", "admin.khach.$id.tsx", "admin.cai-dat.tsx"]) {
+    assert.match(readFileSync(new URL(`../routes/${file}`, import.meta.url), "utf8"), /ListPager/, file);
   }
-  const dash = readFileSync(new URL("../routes/admin.index.tsx", import.meta.url), "utf8");
+  for (const file of ["../components/admin/price-page.tsx", "../components/admin/production-page.tsx"]) {
+    assert.match(readFileSync(new URL(file, import.meta.url), "utf8"), /ListPager/, file);
+  }
+  const dash = readFileSync(new URL("../components/admin/dashboard-page.tsx", import.meta.url), "utf8");
   assert.match(dash, /clockedInAt/);
   assert.match(dash, /Asia\/Ho_Chi_Minh/);
 });

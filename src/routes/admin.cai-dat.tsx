@@ -40,7 +40,7 @@ export const Route = createFileRoute("/admin/cai-dat")({
   component: SettingsPage,
 });
 
-const COST_KEYS = ["inkPercent", "marginYellowPercent", "marginRedPercent", "wasteRate", "wasteAlertPercent"] as const;
+const COST_KEYS = ["marginYellowPercent", "marginRedPercent", "wasteRate", "wasteAlertPercent"] as const;
 const FEE_KEYS = [
   "tiktokFeePercent",
   "tiktokExtraPercent",
@@ -86,7 +86,6 @@ const OPS_KEYS = [
 ] as const;
 
 const NUMBER_FIELDS: { key: string; label: string; nullable?: boolean }[] = [
-  { key: "inkPercent", label: "Mực (% giá bán)" },
   { key: "marginYellowPercent", label: "Ngưỡng vàng lãi gộp (%)" },
   { key: "marginRedPercent", label: "Ngưỡng đỏ (lãi dưới số này là LỖ)" },
   { key: "wasteRate", label: "Hao hụt giấy/màng (0.1 = 10%)" },
@@ -231,7 +230,7 @@ function SettingsBody() {
         <div className="space-y-4">
           <NumberGroup
             title="Giá vốn"
-            hint="Mực, hao hụt và ngưỡng lãi. Ô được phép trống thì để trống — hệ thống không tự bịa số."
+            hint="Hao hụt và ngưỡng lãi. Mực không tính vào giá vốn từng sản phẩm: nhập lọ hoặc chi mục Mực in thì vào lãi lỗ tháng."
             keys={COST_KEYS}
             values={values}
             onSave={(next) => saveNumbersAndStore(next)}

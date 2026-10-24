@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { quoteSku, rollMeters } from "./calc.ts";
-import { linesForSku, materialOptionsForScale, sizeSheetMaterialId } from "./group-supply.ts";
+import { ensureInkExpenseModel, linesForSku, materialOptionsForScale, sizeSheetMaterialId } from "./group-supply.ts";
+import { inkPurchaseExpense } from "./money.ts";
 import { businessReport } from "./report.ts";
 import { DEFAULT_SETTINGS } from "./seed.ts";
 import { syncOrderStock } from "./stock.ts";
@@ -12,7 +13,7 @@ function material(id: string, name: string, unit: string, packSize: number, pack
   return { id, name, buyLabel: unit, unit, packSize, packPrice, stock, minStock: null, supplier: "", pendingPrice: null };
 }
 
-test("tạo nhóm, tạo sản phẩm theo khổ, bán trừ gỗ giấy gương mực và hiện giá vốn", () => {
+test("tạo nhóm, tạo sản phẩm theo khổ, bán trừ gỗ giấy gương và không trừ mực", () => {
   const settings = { ...DEFAULT_SETTINGS, wasteRate: 0, walkinCommissionPercent: 0 };
   const supplies: GroupSupply[] = [
     { id: "go", groupId: "anh-go", materialId: "go", phase: "print", scale: "size_sheet", qty: 1 },
@@ -55,10 +56,9 @@ test("tạo nhóm, tạo sản phẩm theo khổ, bán trừ gỗ giấy gương
   assert.equal(lines.find((line) => line.materialId === "go-13x18")?.qty, 1);
   const paper = rollMeters(13, 18, 61, 0);
   const film = rollMeters(13, 18, 62, 0);
-  const ink = Math.round(((13 * 18) / 10000) * 10 * 10000) / 10000;
   assert.equal(lines.find((line) => line.materialId === "giay-pp")?.qty, paper);
   assert.equal(lines.find((line) => line.materialId === "mang")?.qty, film);
-  assert.equal(lines.find((line) => line.materialId === "muc-1")?.qty, ink);
+  assert.equal(lines.some((line) => line.materialId.startsWith("muc")), false);
   assert.equal(state.boms.length, 0);
 
   const order = {
@@ -84,7 +84,7 @@ test("tạo nhóm, tạo sản phẩm theo khổ, bán trừ gỗ giấy gương
   assert.equal(stock("go-13x18"), 8);
   assert.equal(stock("giay-pp"), Math.round((20 - (paper ?? 0) * 2) * 10000) / 10000);
   assert.equal(stock("mang"), Math.round((20 - (film ?? 0) * 2) * 10000) / 10000);
-  assert.equal(stock("muc-1"), Math.round((500 - ink * 2) * 10000) / 10000);
+  assert.equal(stock("muc-1"), 500);
 
   const quote = quoteSku({
     sku,
@@ -96,20 +96,47 @@ test("tạo nhóm, tạo sản phẩm theo khổ, bán trừ gỗ giấy gương
     affiliate: false,
   });
   assert.equal(quote.materialIncomplete, false);
+  assert.equal(quote.ink, 0);
+  assert.equal(quote.lines.some((line) => line.name.startsWith("Mực")), false);
   assert.ok((quote.material ?? 0) > 1900);
   assert.equal(quote.profit !== null, true);
   assert.equal(typeof quote.marginPercent, "number");
 
   order.status = "xong";
   order.completedAt = "2026-10-24T03:00:00.000Z";
-  const report = businessReport(state, "2026-10", "month", "tai_tiem");
+  const bought = inkPurchaseExpense({
+    materialName: "Mực màu 1",
+    packs: 1,
+    packPrice: 5000,
+    at: "2026-10-24T10:00:00.000Z",
+    by: "owner",
+  });
+  assert.ok(bought);
+  state.expenses.push({ ...bought, id: "ink-buy" });
+  state.expenses.push({
+    id: "ink-chi",
+    name: "Mực in tháng",
+    amount: 1000,
+    note: "",
+    at: "2026-10-24T11:00:00.000Z",
+    month: "2026-10",
+    category: "muc_in",
+    wallet: "tien_mat",
+    by: "owner",
+  });
+  const report = businessReport(state, "2026-10", "month", "nha_in");
   assert.equal(report.revenue, 100000);
   assert.equal(report.orderCount, 1);
   assert.equal(report.incomplete, false);
   assert.equal(report.gross !== null, true);
+  assert.equal(report.extraSum, 6000);
+  assert.deepEqual(
+    report.extras.map((row) => row.name),
+    ["Nhập Mực màu 1", "Mực in tháng"],
+  );
 });
 
-test("mực tính lọ chưa có ml thì không trừ kho", () => {
+test("bán không trừ mực dù nhóm còn dòng ml cũ", () => {
   const settings = { ...DEFAULT_SETTINGS, wasteRate: 0 };
   const sku: Sku = {
     id: "AG-13x18-C1",
@@ -153,6 +180,30 @@ test("mực tính lọ chưa có ml thì không trừ kho", () => {
   state.orders.push(order);
   syncOrderStock(state, order, "in", "owner");
   assert.equal(state.materials.find((row) => row.id === "muc-1")?.stock, 4);
+});
+
+test("mực đang tính ml về lọ và ra khỏi định mức, lọ đã đếm thì giữ", () => {
+  const state = {
+    settings: { ...DEFAULT_SETTINGS, inkExpense20261024: false },
+    materials: [
+      { id: "muc-1", name: "Mực màu 1", unit: "ml", packSize: null, buyLabel: "ml", stock: -0.1872, packPrice: null },
+      { id: "muc-2", name: "Mực màu 2", unit: "lọ", packSize: 1, buyLabel: "một lọ", stock: 3, packPrice: 120000 },
+    ],
+    boms: [{ id: "b", skuId: "s", materialId: "muc-1", phase: "print", scope: "sheet", qty: 0.2, formula: "group" }],
+    groupSupplies: [{ id: "g", groupId: "anh-go", materialId: "muc-1", phase: "print", scale: "area_ml", qty: 10 }],
+    sizeOverrides: [{ id: "o", groupId: "anh-go", size: "13x18", materialId: "muc-1", phase: "print", qty: 1 }],
+  };
+  assert.equal(ensureInkExpenseModel(state as never), true);
+  assert.equal(state.groupSupplies.length, 0);
+  assert.equal(state.sizeOverrides.length, 0);
+  assert.equal(state.boms.length, 0);
+  assert.equal(state.materials[0]?.unit, "lọ");
+  assert.equal(state.materials[0]?.packSize, 1);
+  assert.equal(state.materials[0]?.stock, 0);
+  assert.equal(state.materials[1]?.stock, 3);
+  assert.equal(state.materials[1]?.packPrice, 120000);
+  assert.equal(state.settings.inkExpense20261024, true);
+  assert.equal(ensureInkExpenseModel(state as never), false);
 });
 
 test("tấm theo khổ hiện tiền tố gỗ, không liệt từng khổ", () => {

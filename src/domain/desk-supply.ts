@@ -12,9 +12,9 @@ export function inkBottle(index: number): Material {
   return {
     id: `muc-${index}`,
     name: `Mực màu ${index}`,
-    buyLabel: "một lọ — quy cách là số ml trong lọ",
-    unit: "ml",
-    packSize: null,
+    buyLabel: "một lọ",
+    unit: "lọ",
+    packSize: 1,
     packPrice: null,
     stock: 0,
     minStock: INK_MIN,

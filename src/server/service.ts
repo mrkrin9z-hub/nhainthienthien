@@ -117,7 +117,7 @@ import type {
 import { CHANNEL_LABEL, CHANNELS, MESSAGE_TEMPLATE_KINDS, ROLE_LABEL, STATUS_LABEL } from "@/domain/types";
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
-import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, handoverError, holderBalances, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
+import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, handoverError, holderBalances, inkPurchaseExpense, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
 import { buildDashboard, customerName, extraTotal, fixedRows, inventoryView, navCounts, orderDetail, orderSummary } from "@/domain/views";
 import { getRequest } from "@tanstack/react-start/server";
 
@@ -1947,9 +1947,6 @@ export async function stockIn(
   await mutate(async (state) => {
     const material = state.materials.find((item) => item.id === input.materialId);
     if (!material) throw new Error("Không thấy vật tư.");
-    if (material.id.startsWith("muc-") && material.unit === "ml" && !(material.packSize && material.packSize > 1)) {
-      throw new Error("Điền số ml trong một lọ mực trước khi nhập kho.");
-    }
     const qty = material.packSize ? input.packs * material.packSize : input.packs;
     material.stock = Math.round((material.stock + qty) * 10000) / 10000;
     if (input.supplier.trim()) material.supplier = input.supplier.trim();
@@ -1957,6 +1954,15 @@ export async function stockIn(
       if (actor.role === "owner") material.packPrice = input.packPrice;
       else material.pendingPrice = input.packPrice;
     }
+    const inkExpense = inkPurchaseExpense({
+      materialName: material.name,
+      packs: input.packs,
+      packPrice: /^muc-[1-9]$/.test(material.id) ? input.packPrice : null,
+      at: nowIso(),
+      by: actor.id,
+      note: input.note,
+    });
+    if (inkExpense) state.expenses.unshift({ ...inkExpense, id: nid() });
     state.movements.unshift({
       id: nid(),
       at: nowIso(),
@@ -1983,9 +1989,6 @@ export async function stockInMany(
     for (const line of lines) {
       const material = state.materials.find((item) => item.id === line.materialId);
       if (!material) throw new Error("Không thấy vật tư.");
-      if (material.id.startsWith("muc-") && material.unit === "ml" && !(material.packSize && material.packSize > 1)) {
-        throw new Error("Điền số ml trong một lọ mực trước khi nhập kho.");
-      }
       const qty = material.packSize ? line.packs * material.packSize : line.packs;
       material.stock = Math.round((material.stock + qty) * 10000) / 10000;
       if (input.supplier.trim()) material.supplier = input.supplier.trim();
@@ -1993,6 +1996,15 @@ export async function stockInMany(
         if (actor.role === "owner") material.packPrice = line.packPrice;
         else material.pendingPrice = line.packPrice;
       }
+      const inkExpense = inkPurchaseExpense({
+        materialName: material.name,
+        packs: line.packs,
+        packPrice: /^muc-[1-9]$/.test(material.id) ? line.packPrice : null,
+        at: nowIso(),
+        by: actor.id,
+        note: input.note,
+      });
+      if (inkExpense) state.expenses.unshift({ ...inkExpense, id: nid() });
       state.movements.unshift({
         id: nid(),
         at: nowIso(),
@@ -2087,7 +2099,7 @@ export async function saveGroupSupply(
     state.groupSupplies = (state.groupSupplies ?? []).filter((item) => item.groupId !== group.id);
     state.sizeOverrides = (state.sizeOverrides ?? []).filter((item) => item.groupId !== group.id);
     for (const rule of input.rules) {
-      if (!rule.materialId.trim()) continue;
+      if (!rule.materialId.trim() || rule.materialId.startsWith("muc-") || rule.scale === "area_ml") continue;
       if (!SUPPLY_SCALES.includes(rule.scale)) throw new Error("Cách tính định mức không hợp lệ.");
       const materialId = rule.scale === "size_sheet" ? sizeSheetMaterialId(rule.materialId) : rule.materialId.trim();
       state.groupSupplies.push({
@@ -2102,7 +2114,7 @@ export async function saveGroupSupply(
     }
     for (const row of input.overrides) {
       const size = row.size.trim();
-      if (!size || !row.materialId.trim()) continue;
+      if (!size || !row.materialId.trim() || row.materialId.startsWith("muc-")) continue;
       state.sizeOverrides.push({
         id: `${group.id}:${size}:${row.materialId}:${row.phase}`,
         groupId: group.id,
@@ -2541,7 +2553,7 @@ export async function lockPayroll(actor: Actor, month: string) {
 export async function profitReport(actor: Actor, month: string) {
   assertRole(actor, ["owner"]);
   const state = await readState();
-  const orders = state.orders.filter((order) => order.status === "xong" && order.channel !== "mo_home" && vnMonth(order.completedAt) === month);
+  const orders = state.orders.filter((order) => order.status === "xong" && !order.isTest && order.channel !== "mo_home" && vnMonth(order.completedAt) === month);
   const revenue = orders.reduce((sum, order) => sum + (order.total ?? 0), 0);
   let gross = 0;
   let incomplete = false;
@@ -2569,7 +2581,7 @@ export async function profitReport(actor: Actor, month: string) {
         price: item.lineTotal,
         channel: order.channel,
         settings: state.settings,
-        boms: state.boms,
+        boms: linesForSku(state, sku),
         materials: state.materials,
         affiliate: false,
       });
@@ -2585,7 +2597,7 @@ export async function profitReport(actor: Actor, month: string) {
   const waste = wasteMonth(state, month, "nha_in", revenue);
   const prevKey = previousMonth(month);
   const previousRevenue = state.orders
-    .filter((order) => order.status === "xong" && order.channel !== "mo_home" && vnMonth(order.completedAt) === prevKey)
+    .filter((order) => order.status === "xong" && !order.isTest && order.channel !== "mo_home" && vnMonth(order.completedAt) === prevKey)
     .reduce((sum, order) => sum + (order.total ?? 0), 0);
   const previousWaste = wasteMonth(state, prevKey, "nha_in", previousRevenue);
   const compare = wasteMonthCompare(waste, previousWaste, prevKey);

@@ -8,7 +8,7 @@ export const SUPPLY_SCALE_LABEL: Record<SupplyScale, string> = {
   roll_m: "Mét cuộn theo khổ",
   edge_m: "Mét viền theo chu vi",
   wrap_m2: "m² bọc theo khổ",
-  area_ml: "ml theo m² (mực)",
+  area_ml: "ml theo m² (không dùng cho mực)",
   magnet: "Tấm nam châm chia theo khổ",
   tape: "Cuộn băng keo chia theo đơn",
 };
@@ -26,9 +26,6 @@ type SupplyState = {
 const WOOD_GROUPS = ["anh_tho", "giay_khen", "tkb", "trang_guong"] as const;
 const DESK_SIZES = ["13x18", "15x21", "20x30"] as const;
 const WALL_SIZES = ["30x45", "40x60", "50x75", "60x90"] as const;
-
-/** ml mực trên 1 m² khi chưa đo lại. Admin sửa trên nhóm. */
-const SEEDED_INK_ML_PER_M2 = 8;
 
 function rule(groupId: string, materialId: string, phase: GroupSupply["phase"], scale: SupplyScale, qty: number | null, rollWidthCm?: number): GroupSupply {
   return {
@@ -56,7 +53,6 @@ function printSurface(groupId: string, paperId: string, film: boolean, rollWidth
   return [
     rule(groupId, paperId, "print", "roll_m", null, rollWidthCm),
     ...(film ? [rule(groupId, "mang", "print", "roll_m", null, filmWidthCm)] : []),
-    rule(groupId, "muc-1", "print", "area_ml", SEEDED_INK_ML_PER_M2),
   ];
 }
 
@@ -72,7 +68,6 @@ export function defaultGroupSupplies(settings: Pick<Settings, "ppRollWidthCm" | 
     rows.push(...packRules(groupId));
   }
   rows.push(rule("nam_cham_xe", "nam-cham", "print", "magnet", 1));
-  rows.push(...printSurface("nam_cham_xe", "giay-pp", false, paper, film).filter((item) => item.materialId === "muc-1"));
   rows.push(...packRules("nam_cham_xe"));
   rows.push(rule("nam_cham_tu", "nam-cham", "print", "magnet", 1));
   rows.push(...printSurface("nam_cham_tu", "giay-pp", true, paper, film));
@@ -101,6 +96,34 @@ export function ensureGroupSupplies(state: SupplyState & { settings: Settings })
   state.groupSupplies = defaultGroupSupplies(state.settings);
   state.sizeOverrides = defaultSizeOverrides();
   state.settings.groupSupply20261024 = true;
+  return true;
+}
+
+export function isInkMaterial(materialId: string): boolean {
+  return /^muc-[1-9]$/.test(materialId);
+}
+
+/** Mực không vào định mức. Tồn đếm theo lọ; ml đã trừ theo bản in không phải số lọ. */
+export function ensureInkExpenseModel(state: SupplyState & { boms?: BomLine[] }): boolean {
+  if (state.settings.inkExpense20261024) return false;
+  if (state.groupSupplies) {
+    state.groupSupplies = state.groupSupplies.filter((item) => !isInkMaterial(item.materialId) && item.scale !== "area_ml");
+  }
+  if (state.sizeOverrides) {
+    state.sizeOverrides = state.sizeOverrides.filter((item) => !isInkMaterial(item.materialId));
+  }
+  if (state.boms) {
+    state.boms = state.boms.filter((item) => !isInkMaterial(item.materialId));
+  }
+  for (const material of state.materials ?? []) {
+    if (!isInkMaterial(material.id)) continue;
+    const countedAsMl = material.unit === "ml";
+    material.unit = "lọ";
+    material.packSize = 1;
+    material.buyLabel = "một lọ";
+    if (countedAsMl) material.stock = 0;
+  }
+  state.settings.inkExpense20261024 = true;
   return true;
 }
 
@@ -137,10 +160,11 @@ export function materialOptionsForScale(
   scale: SupplyScale,
   currentId: string,
 ): { id: string; name: string }[] {
+  const shelf = materials.filter((material) => !isInkMaterial(material.id));
   if (scale === "size_sheet") {
     const prefixes = new Map<string, string>();
     const label = (prefix: string) => (prefix === "go" ? "Gỗ (tấm theo khổ)" : `${prefix} (tấm theo khổ)`);
-    for (const material of materials) {
+    for (const material of shelf) {
       const prefix = material.id.match(/^(.*)-\d+x\d+$/i)?.[1];
       if (prefix && !prefixes.has(prefix)) prefixes.set(prefix, label(prefix));
     }
@@ -148,8 +172,8 @@ export function materialOptionsForScale(
     if (current && !prefixes.has(current)) prefixes.set(current, label(current));
     return [...prefixes].map(([id, name]) => ({ id, name }));
   }
-  const options = materials.map((material) => ({ id: material.id, name: material.name }));
-  if (currentId && !options.some((item) => item.id === currentId)) {
+  const options = shelf.map((material) => ({ id: material.id, name: material.name }));
+  if (currentId && !isInkMaterial(currentId) && !options.some((item) => item.id === currentId)) {
     options.unshift({ id: currentId, name: currentId === "go" ? "Gỗ (tấm theo khổ)" : currentId });
   }
   return options;
@@ -201,6 +225,7 @@ export function linesForSku(state: SupplyState, sku: Sku): BomLine[] {
 
   const lines: BomLine[] = [];
   for (const ruleRow of rules) {
+    if (isInkMaterial(ruleRow.materialId) || ruleRow.scale === "area_ml") continue;
     const scaled = scaledQty(ruleRow, sku, state.settings, state.materials);
     const override = overrides.find((item) => item.materialId === scaled.materialId && item.phase === ruleRow.phase);
     const qty = override ? override.qty : scaled.qty;
@@ -216,6 +241,7 @@ export function linesForSku(state: SupplyState, sku: Sku): BomLine[] {
     });
   }
   for (const override of overrides) {
+    if (isInkMaterial(override.materialId)) continue;
     if (override.qty === 0 || override.qty === null) continue;
     if (lines.some((line) => line.materialId === override.materialId && line.phase === override.phase)) continue;
     lines.push({

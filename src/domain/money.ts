@@ -15,6 +15,7 @@ export const EXPENSE_CATEGORIES = [
   { id: "mat_bang", label: "Mặt bằng" },
   { id: "dien_nuoc", label: "Điện nước" },
   { id: "vat_tu", label: "Vật tư" },
+  { id: "muc_in", label: "Mực in" },
   { id: "van_chuyen", label: "Vận chuyển" },
   { id: "nhan_su", label: "Nhân sự" },
   { id: "sua_chua", label: "Sửa chữa" },
@@ -29,6 +30,29 @@ export function walletLabel(id: string): string {
 
 export function categoryLabel(id: string): string {
   return EXPENSE_CATEGORIES.find((item) => item.id === id)?.label ?? (id ? id : "Khác");
+}
+
+/** Giá trên phiếu nhập mực là chi phí tháng đó. Không trừ ví — chi tiền mục Mực in mới trừ ví. */
+export function inkPurchaseExpense(input: {
+  materialName: string;
+  packs: number;
+  packPrice: number | null;
+  at: string;
+  by: string;
+  note?: string;
+}): Omit<CashExpense, "id"> | null {
+  if (input.packPrice === null || !(input.packs > 0)) return null;
+  const amount = Math.round(input.packs * input.packPrice);
+  if (!(amount > 0)) return null;
+  return {
+    name: `Nhập ${input.materialName}`,
+    amount,
+    note: input.note?.trim() || `${input.packs} lọ`,
+    at: input.at,
+    month: vnMonth(input.at),
+    category: "muc_in",
+    by: input.by,
+  };
 }
 
 export function walletOfMethod(method: string): WalletId {

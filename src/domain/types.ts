@@ -160,6 +160,8 @@ export type Settings = {
   groupSupply20261024?: boolean;
   /** Mực tồn theo ml. Lọ chưa có số ml thì không trừ kho. */
   inkMl20261024?: boolean;
+  /** Mực là chi phí tháng, tồn theo lọ, không trừ theo bản in. */
+  inkExpense20261024?: boolean;
   checklistGuides20261024?: boolean;
   /** SHA-256 của mã PIN 4 số. Không gửi ra trình duyệt. */
   staffPinHash?: string;

@@ -240,9 +240,7 @@ export function quoteSku(input: {
       lines,
     };
   }
-  const inkFromBom = material.lines.some((line) => /mực/i.test(line.name));
-  const ink = inkFromBom ? 0 : (input.price * input.settings.inkPercent) / 100;
-  if (!inkFromBom) lines.push({ name: "Mực", amount: ink, detail: `${input.settings.inkPercent}% giá bán` });
+  const ink = 0;
   const fees = feeLines(input.channel, input.price, input.settings, input.affiliate);
   lines.push(...fees);
   const shippingUnknown = fees.some((f) => f.name.startsWith("Phí ship") && f.amount === null);
@@ -282,12 +280,11 @@ export function sheetMargin(
   settings: Settings,
 ): { profit: number | null; marginPercent: number | null } {
   if (price === null || sheetCost === null) return { profit: null, marginPercent: null };
-  const ink = (price * settings.inkPercent) / 100;
   const fees = feeLines(channel, price, settings, false);
   const known = fees.filter((fee) => !(fee.name.startsWith("Phí ship") && fee.amount === null));
   if (known.some((fee) => fee.amount === null)) return { profit: null, marginPercent: null };
   const feeSum = known.reduce((sum, fee) => sum + (fee.amount ?? 0), 0);
-  const profit = money(price - sheetCost - ink - feeSum);
+  const profit = money(price - sheetCost - feeSum);
   return {
     profit,
     marginPercent: price === 0 ? null : Math.round((profit / price) * 1000) / 10,

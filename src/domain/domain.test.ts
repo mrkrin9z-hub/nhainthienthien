@@ -25,6 +25,7 @@ import { crc32, zipNames, zipStored } from "./zip-store.ts";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginLocked } from "./login-limit.ts";
 import { vnBackupDay } from "./guard.ts";
 import { publicContact } from "./public-contact.ts";
+import { linesForSku } from "./group-supply.ts";
 import { applyStoreMigrations } from "./migrate-shop.ts";
 import { buildSeed, DEFAULT_SETTINGS, hashPassword, PBKDF2_ITERATIONS, verifyPassword } from "./seed.ts";
 import { navCounts, stockLabel } from "./views.ts";
@@ -183,7 +184,7 @@ test("máy tính giá: lỗ thì đỏ, dưới 30% thì vàng, thiếu số th�
   ];
   const loss = quoteSku({ sku, price: 1000, channel: "tai_tiem", settings: DEFAULT_SETTINGS, boms, materials, affiliate: false });
   assert.equal(loss.tone, "red");
-  const low = quoteSku({ sku, price: 150000, channel: "tai_tiem", settings: DEFAULT_SETTINGS, boms, materials, affiliate: false });
+  const low = quoteSku({ sku, price: 140000, channel: "tai_tiem", settings: DEFAULT_SETTINGS, boms, materials, affiliate: false });
   assert.equal(low.tone, "yellow");
   assert.ok((low.marginPercent ?? 100) < 30 && (low.profit ?? 0) > 0);
   const missing = quoteSku({ sku, price: null, channel: "tai_tiem", settings: DEFAULT_SETTINGS, boms, materials, affiliate: false });
@@ -566,9 +567,23 @@ test("gỗ TG, nam châm theo khổ và 9 lọ mực", async () => {
   assert.equal(gloss.sheetCost, 6757 + 1900);
   const before = sheetMargin("tai_tiem", 35000, 6757, settings);
   const after = sheetMargin("tai_tiem", 35000, gloss.sheetCost ?? null, settings);
-  assert.equal(before.profit, 25653);
-  assert.equal(after.profit, 23753);
-  assert.equal(after.marginPercent, 67.9);
+  assert.equal(before.profit, 27193);
+  assert.equal(after.profit, 25293);
+  assert.equal(after.marginPercent, 72.3);
+  const glossLines = linesForSku(state, gloss);
+  assert.equal(glossLines.some((line) => line.materialId.startsWith("muc")), false);
+  const glossQuote = quoteSku({
+    sku: gloss,
+    price: 37000,
+    channel: "tai_tiem",
+    settings,
+    boms: glossLines,
+    materials: state.materials,
+    affiliate: false,
+  });
+  assert.equal(glossQuote.materialIncomplete, false);
+  assert.equal(glossQuote.ink, 0);
+  assert.equal(typeof glossQuote.profit, "number");
   assert.equal(state.boms.some((row) => row.skuId === "TG-13x18-C4" && row.materialId === "go-13x18" && row.qty === 1), true);
   assert.equal(state.skus.find((sku) => sku.code === "TG-13x18-C4")?.sheetCost, 21592 + 1900 * 4);
   assert.equal(state.prices.find((row) => row.skuId === "TG-13x18-C1" && row.channel === "tai_tiem")?.price, 37000);
@@ -594,7 +609,7 @@ test("gỗ TG, nam châm theo khổ và 9 lọ mực", async () => {
 
   const inks = state.materials.filter((row) => row.id.startsWith("muc"));
   assert.deepEqual(inks.map((row) => row.id), ["muc-1", "muc-2", "muc-3", "muc-4", "muc-5", "muc-6", "muc-7", "muc-8", "muc-9"]);
-  assert.ok(inks.every((row) => row.packPrice === null && row.unit === "ml" && row.packSize === null && row.name.startsWith("Mực màu")));
+  assert.ok(inks.every((row) => row.packPrice === null && row.unit === "lọ" && row.packSize === 1 && row.name.startsWith("Mực màu")));
   assert.equal(state.materials.some((row) => row.id === "muc"), false);
 
   assert.equal(stockLabel({ stock: -1, minStock: 2, openingCounted: false }), "Tồn âm");
@@ -639,6 +654,10 @@ test("gỗ TG, nam châm theo khổ và 9 lọ mực", async () => {
   assert.equal(restored?.qty, 0.05);
   assert.equal(legacy.prices.find((row) => row.skuId === "NX-12x25-C1" && row.channel === "tai_tiem")?.price, 65000);
   assert.equal(legacy.materials.some((row) => row.id === "muc"), false);
-  assert.ok(legacy.materials.filter((row) => row.id.startsWith("muc-")).every((row) => row.stock === 0 && row.packPrice === null));
+  assert.ok(
+    legacy.materials
+      .filter((row) => row.id.startsWith("muc-"))
+      .every((row) => row.stock === 0 && row.packPrice === null && row.unit === "lọ" && row.packSize === 1),
+  );
   assert.equal(applyStoreMigrations(legacy), false);
 });

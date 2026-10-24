@@ -58,7 +58,7 @@ export function PricePage() {
     <div className="space-y-4 bg-slate-50">
       <PageToolbar
         title="Sản phẩm"
-        hint="Giá bán nằm trên từng sản phẩm. Vật tư tính theo nhóm và khổ. * là còn vật tư chưa có giá mua."
+        hint="Giá bán nằm trên từng sản phẩm. Vật tư tính theo nhóm và khổ. Mực không vào giá vốn. * là còn vật tư chưa có giá mua."
         actions={
           owner ? (
             <>
@@ -784,7 +784,7 @@ function GroupSupplyDialog({ open, onOpenChange }: { open: boolean; onOpenChange
           <DialogTitle>Nhóm sản phẩm</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Chọn vật tư nhóm dùng và cách tính theo khổ. Sản phẩm chỉ cần nhóm và khổ. Combo là số tấm nhân khổ đó. Mực là ml trên mỗi m²; quy cách lọ là số ml.
+          Chọn vật tư nhóm dùng và cách tính theo khổ. Sản phẩm chỉ cần nhóm và khổ. Combo là số tấm nhân khổ đó. Mực không chọn ở đây: mua lọ thì ghi phiếu nhập hoặc chi mục Mực in.
         </p>
         <div className="flex flex-wrap gap-2">
           <Input className="min-h-11 max-w-xs" value={name} placeholder="Tên nhóm, ví dụ Ảnh gỗ" aria-label="Tên nhóm sản phẩm" onChange={(event) => setName(event.target.value)} />
@@ -815,7 +815,7 @@ function GroupSupplyDialog({ open, onOpenChange }: { open: boolean; onOpenChange
                     ))}
                   </select>
                   <select className="min-h-11 rounded-md border bg-background px-2 text-sm" aria-label={`Cách tính ${index + 1}`} value={rule.scale} onChange={(event) => setRules((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, scale: event.target.value as SupplyScale, materialId: event.target.value === "size_sheet" ? item.materialId.replace(/-\d+x\d+$/i, "") : item.materialId } : item)))}>
-                    {SUPPLY_SCALES.map((scale) => (
+                    {SUPPLY_SCALES.filter((scale) => scale !== "area_ml").map((scale) => (
                       <option key={scale} value={scale}>{SUPPLY_SCALE_LABEL[scale]}</option>
                     ))}
                   </select>
@@ -836,7 +836,7 @@ function GroupSupplyDialog({ open, onOpenChange }: { open: boolean; onOpenChange
                   <Input className="min-h-11" aria-label={`Khổ ${index + 1}`} value={row.size} placeholder="13x18" onChange={(event) => setOverrides((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, size: event.target.value } : item)))} />
                   <select className="min-h-11 rounded-md border bg-background px-2 text-sm" aria-label={`Vật tư ngoại lệ ${index + 1}`} value={row.materialId} onChange={(event) => setOverrides((rows) => rows.map((item, rowIndex) => (rowIndex === index ? { ...item, materialId: event.target.value } : item)))}>
                     <option value="">Vật tư</option>
-                    {materials.map((material) => (
+                    {materials.filter((material) => !material.id.startsWith("muc-")).map((material) => (
                       <option key={material.id} value={material.id}>{material.name}</option>
                     ))}
                   </select>
