@@ -156,6 +156,7 @@ export type Settings = {
   deskBom20261023?: boolean;
   /** Đã đổ checklist sheet vào sổ việc. */
   checklist20261023?: boolean;
+  checklistGuides20261024?: boolean;
   /** SHA-256 của mã PIN 4 số. Không gửi ra trình duyệt. */
   staffPinHash?: string;
   /** Phí sàn để đối chiếu. Không thay mức 27% + 11.000đ. */

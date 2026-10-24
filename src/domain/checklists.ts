@@ -22,6 +22,14 @@ export const LIST_LABEL: Record<ChecklistListId, string> = {
   dao_tao: "Đào tạo",
 };
 
+export const PHOTO_GUIDE_URL = "https://drive.google.com/file/d/10s9AdkzMF9zLqZqLSwCBrRUyodvnm2Is/view";
+export const VIDEO_GUIDE_URL = "https://drive.google.com/file/d/1F6cDFHSLaOw3F3PRZ6CFB0kxYXF29FGQ/view";
+
+export const TASK_DOCS = [
+  { title: "Hướng dẫn chụp ảnh", href: PHOTO_GUIDE_URL },
+  { title: "Hướng dẫn quay video", href: VIDEO_GUIDE_URL },
+] as const;
+
 export const SHOP_RULES = [
   "Không in khi khách chưa duyệt bản xem trước.",
   "Không hủy đơn vì làm không kịp. Báo chủ.",
@@ -75,6 +83,7 @@ export type TaskCard = {
   photo: boolean;
   draft: boolean;
   note: string;
+  link: string;
   fileCount: number;
   fileIds: string[];
 };
@@ -82,7 +91,7 @@ export type TaskCard = {
 type TaskState = {
   tasks?: ShopState["tasks"];
   taskChecks?: ShopState["taskChecks"];
-  settings: { fixedCosts?: unknown; checklist20261023?: boolean };
+  settings: { fixedCosts?: unknown; checklist20261023?: boolean; checklistGuides20261024?: boolean };
   roleModules?: { role: string; modules: string[] }[];
 };
 
@@ -117,6 +126,8 @@ export function checklistCards(state: { tasks?: ShopState["tasks"]; taskChecks?:
     const period = periodFor(template, ymd);
     const saved = template.repeat === "once" ? once.get(template.id) : checks.find((row) => row.taskId === template.id && row.period === period);
     const files = filesOf(saved?.files);
+    const link = template.link;
+    const savedNote = saved?.note || template.note;
     return {
       id: template.id,
       list: template.list,
@@ -132,7 +143,8 @@ export function checklistCards(state: { tasks?: ShopState["tasks"]; taskChecks?:
       status: saved?.status ?? (template.repeat === "once" ? template.sheetStatus : "chua_lam"),
       photo: template.photo,
       draft: template.draft,
-      note: saved?.note || template.note,
+      note: link && savedNote.trim() === link ? "" : savedNote,
+      link,
       fileCount: files.length,
       fileIds: files.map((file) => file.id),
     };
@@ -238,6 +250,26 @@ export function ensureChecklistTasks(state: TaskState): boolean {
       updatedBy: null,
       files: [],
     });
+    changed = true;
+  }
+  if (state.settings.checklistGuides20261024 !== true) {
+    const doneNote = new Map([
+      ["anh-13", "Kho ảnh 23/10 đã có ảnh dùng được. Không chụp lại."],
+      ["anh-14", "Kho ảnh 23/10 đã có ảnh dùng được. Không chụp lại."],
+      ["anh-15", "Kho ảnh 23/10 đã có ảnh dùng được. Không chụp lại."],
+      ["anh-16", "Kho ảnh 23/10 đã có ảnh dùng được. Không chụp lại."],
+      ["anh-17", "Kho ảnh 23/10 đã có ảnh dùng được. Không chụp lại."],
+      ["anh-18", "Kho ảnh 23/10 đã có ảnh dùng được. Không chụp lại."],
+      ["anh-25", "Việc còn lại là nam châm tủ lạnh 6×9 trong nhóm Cần chụp."],
+    ]);
+    for (const [id, note] of doneNote) {
+      const row = tasks.find((item) => item.id === id);
+      if (!row || row.updatedBy || row.status !== "chua_lam") continue;
+      row.status = "xong";
+      row.note = note;
+      changed = true;
+    }
+    state.settings.checklistGuides20261024 = true;
     changed = true;
   }
   for (const row of state.roleModules ?? []) {
