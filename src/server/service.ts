@@ -648,6 +648,10 @@ async function ensureUploadToken(order: { accessToken: string; accessTokenHash: 
 export async function orderUploadLink(actor: Actor, orderId: string, rotate = false) {
   assertRole(actor, ["owner", "sale", "production"]);
   if (rotate && actor.role === "production") throw new Error("Chỉ chủ và sale đổi mã.");
+  const current = await readState();
+  const existing = current.orders.find((item) => item.id === orderId);
+  if (!existing) throw new Error("Không thấy đơn.");
+  if (uploadTokenShape(existing.accessToken) && !rotate) return { token: existing.accessToken, code: existing.code };
   return mutate(async (state) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) throw new Error("Không thấy đơn.");
