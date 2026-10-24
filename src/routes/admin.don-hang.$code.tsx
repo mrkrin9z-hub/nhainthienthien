@@ -176,6 +176,7 @@ function OrderDetailPage() {
                 key: item.id,
                 skuId: item.skuId,
                 quantity: item.quantity,
+                variant: item.variant || "",
                 unitPrice: item.unitPrice === null ? "" : String(item.unitPrice),
               })),
             }}

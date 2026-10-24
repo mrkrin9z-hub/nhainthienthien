@@ -527,6 +527,8 @@ export type Order = {
   stockWarning: string;
   accessTokenHash: string;
   accessToken: string;
+  /** Mã ngắn trên link /u và mã QR. Mã hex cũ vẫn mở được và chuyển sang link này. */
+  uploadSlug?: string;
   idempotencyKey: string | null;
   createdAt: string;
   updatedAt: string;

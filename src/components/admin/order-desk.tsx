@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Phone, Plus, Trash2, UserRound } from "lucide-react";
+import { MapPin, Minus, Phone, Plus, Trash2, UserRound } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -426,7 +426,7 @@ export function OrderDesk({
                   onSku={(skuId) => chooseSku(line.key, skuId)}
                   onQty={(quantity) => patchLine(line.key, { quantity })}
                   onPrice={(unitPrice) => patchLine(line.key, { unitPrice, priceTouched: true })}
-                  onVariant={compact ? (variant) => patchLine(line.key, { variant }) : undefined}
+                  onVariant={(variant) => patchLine(line.key, { variant })}
                   onRemove={() => setLines((current) => current.filter((item) => item.key !== line.key))}
                 />
               ))}
@@ -441,6 +441,22 @@ export function OrderDesk({
           {itemsLocked ? null : (
             <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} catalog={sellable} channel={channel} onConfirm={addSkus} />
           )}
+          <div className="space-y-2 border-t pt-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Tạm tính</span>
+              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(goods)}</span>
+            </div>
+            {fieldsLocked ? null : (
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Giảm giá</span>
+                <Input className="h-9 w-32 text-right" inputMode="numeric" value={discount} placeholder="0" aria-label="Giảm giá" onChange={(event) => setDiscount(event.target.value.replace(/[^\d]/g, ""))} />
+              </label>
+            )}
+            <div className="flex items-center justify-between border-t pt-2">
+              <span className="font-semibold">Tổng</span>
+              <span className="font-semibold">{goods === null ? "—" : formatVnd(Math.max(0, goods - (Number.isFinite(discountAmount) ? discountAmount : 0)))}</span>
+            </div>
+          </div>
         </section>
       </div>
 
@@ -484,19 +500,13 @@ export function OrderDesk({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tổng thanh toán</span>
-              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(goods)}</span>
+              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(Math.max(0, goods - (Number.isFinite(discountAmount) ? discountAmount : 0) + (Number.isFinite(shipAmount) ? shipAmount : 0)))}</span>
             </div>
             {compact ? null : (
-              <>
-                <label className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground">Giảm giá</span>
-                  <Input className="h-9 w-32 text-right" inputMode="numeric" value={discount} disabled={fieldsLocked} placeholder="Để trống" aria-label="Giảm giá" onChange={(event) => setDiscount(event.target.value.replace(/[^\d]/g, ""))} />
-                </label>
-                <label className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground">Phí giao khách trả</span>
-                  <Input className="h-9 w-32 text-right" inputMode="numeric" value={customerShip} disabled={fieldsLocked} placeholder="Để trống" aria-label="Phí giao khách trả" onChange={(event) => setCustomerShip(event.target.value.replace(/[^\d]/g, ""))} />
-                </label>
-              </>
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Phí giao khách trả</span>
+                <Input className="h-9 w-32 text-right" inputMode="numeric" value={customerShip} disabled={fieldsLocked} placeholder="Để trống" aria-label="Phí giao khách trả" onChange={(event) => setCustomerShip(event.target.value.replace(/[^\d]/g, ""))} />
+              </label>
             )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Đã thanh toán</span>
@@ -651,7 +661,7 @@ function ProductLine({
   onSku: (skuId: string) => void;
   onQty: (quantity: number) => void;
   onPrice: (unitPrice: string) => void;
-  onVariant?: (variant: string) => void;
+  onVariant: (variant: string) => void;
   onRemove: () => void;
 }) {
   const query = line.query.trim().toLowerCase();
@@ -669,19 +679,17 @@ function ProductLine({
 
   return (
     <div className="rounded-xl border p-3">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground">Dòng {index + 1}</p>
         {canRemove ? (
           <Button type="button" size="icon" variant="ghost" aria-label="Xóa dòng" onClick={onRemove}>
-            <Trash2 className="size-3" />
+            <Trash2 className="size-4" />
           </Button>
         ) : null}
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Field label="Tìm sản phẩm">
-          <Input className="min-h-11" placeholder="Tìm mã hoặc tên" value={line.query} disabled={locked} onChange={(event) => onQuery(event.target.value)} aria-label={`Tìm sản phẩm dòng ${index + 1}`} />
-        </Field>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_auto_7rem_6.5rem]">
         <Field label="Sản phẩm">
+          <Input className="mb-1 min-h-11" placeholder="Tìm mã hoặc tên" value={line.query} disabled={locked} onChange={(event) => onQuery(event.target.value)} aria-label={`Tìm sản phẩm dòng ${index + 1}`} />
           <select className={control} value={line.skuId} disabled={locked} aria-label={`Sản phẩm dòng ${index + 1}`} onChange={(event) => onSku(event.target.value)}>
             <option value="">Chọn sản phẩm</option>
             {[...groups.entries()].map(([name, items]) => (
@@ -695,13 +703,27 @@ function ProductLine({
             ))}
           </select>
         </Field>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
-        {onVariant ? (
-          <Field label="Mẫu">
-            <Input className="min-h-11" value={line.variant} disabled={locked} placeholder="Phân loại, màu, khổ" aria-label={`Mẫu dòng ${index + 1}`} onChange={(event) => onVariant(event.target.value)} />
-          </Field>
-        ) : null}
+        <Field label="Mẫu">
+          <Input className="min-h-11" value={line.variant} disabled={locked} placeholder="Phân loại" aria-label={`Mẫu dòng ${index + 1}`} onChange={(event) => onVariant(event.target.value)} />
+        </Field>
+        <Field label="Số lượng">
+          <div className="flex min-h-11 items-center">
+            <Button type="button" variant="outline" className="size-11 shrink-0" aria-label={`Giảm số lượng dòng ${index + 1}`} disabled={locked || line.quantity <= 1} onClick={() => onQty(line.quantity - 1)}>
+              <Minus className="size-4" />
+            </Button>
+            <Input
+              className="h-11 w-14 rounded-none border-x-0 text-center"
+              inputMode="numeric"
+              disabled={locked}
+              aria-label={`Số lượng dòng ${index + 1}`}
+              value={line.quantity}
+              onChange={(event) => onQty(Math.min(500, Math.max(1, Number(event.target.value.replace(/\D/g, "")) || 1)))}
+            />
+            <Button type="button" variant="outline" className="size-11 shrink-0" aria-label={`Tăng số lượng dòng ${index + 1}`} disabled={locked || line.quantity >= 500} onClick={() => onQty(line.quantity + 1)}>
+              <Plus className="size-4" />
+            </Button>
+          </div>
+        </Field>
         <Field label="Đơn giá">
           {owner && !locked ? (
             <Input
@@ -715,18 +737,6 @@ function ProductLine({
           ) : (
             <p className="flex min-h-11 items-center text-sm">{line.unit === null ? "Chưa có giá" : formatVnd(line.unit)}</p>
           )}
-        </Field>
-        <Field label="Số lượng">
-          <Input
-            className="min-h-11 text-center"
-            type="number"
-            min={1}
-            max={500}
-            disabled={locked}
-            aria-label={`Số lượng dòng ${index + 1}`}
-            value={line.quantity}
-            onChange={(event) => onQty(Math.min(500, Math.max(1, Number(event.target.value) || 1)))}
-          />
         </Field>
         <Field label="Thành tiền">
           <p className="flex min-h-11 items-center text-sm font-semibold">{line.sku ? formatMaybe(line.lineTotal) : "—"}</p>

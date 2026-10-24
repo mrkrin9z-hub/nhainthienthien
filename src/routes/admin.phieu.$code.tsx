@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { BRAND, formatMaybe } from "@/lib/brand";
+import { customerUploadPath } from "@/domain/order-upload";
 import { getOrderDetail, orderUploadLink } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/phieu/$code")({
@@ -38,7 +39,7 @@ function SlipBody() {
     queryFn: () => orderUploadLink({ data: { orderId: data!.id, rotate: false } }),
     enabled: Boolean(data?.id),
   });
-  const designUrl = upload.data?.token ? `${typeof window === "undefined" ? `https://${BRAND.website}` : window.location.origin}/q/don/${upload.data.token}` : "";
+  const designUrl = upload.data?.slug ? `${typeof window === "undefined" ? `https://${BRAND.website}` : window.location.origin}${customerUploadPath(upload.data.slug)}` : "";
 
   useEffect(() => {
     if (!designUrl) return;

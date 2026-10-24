@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { uploadTokenShape } from "@/domain/order-upload";
+import { uploadKeyShape } from "@/domain/order-upload";
 
 export const Route = createFileRoute("/api/public/order-photo/$token/$fileId")({
   server: {
     handlers: {
       GET: async ({ params, request }) => {
-        if (!uploadTokenShape(params.token)) return new Response("Không thấy ảnh.", { status: 404 });
+        if (!uploadKeyShape(params.token)) return new Response("Không thấy ảnh.", { status: 404 });
         const width = new URL(request.url).searchParams.get("view") === "1" ? 1600 : 480;
         try {
           const { publicOrderPhoto } = await import("@/server/service");

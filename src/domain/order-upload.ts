@@ -3,9 +3,31 @@ import { remainOf } from "./money.ts";
 /** Trang khách quét mã chung của tiệm. */
 export const SHARED_UPLOAD_PATH = "/gui-anh";
 
-/** Mã gắn vào đơn, 32 ký tự hex, đủ để đặt trong đường dẫn. */
+/** Mã gắn vào đơn, 32 ký tự hex. Link cũ vẫn nhận mã này. */
 export function uploadTokenShape(token: string): boolean {
   return /^[a-f0-9]{32}$/.test(token);
+}
+
+export const UPLOAD_SLUG_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+/** Mã ngắn khách thấy, 6–8 ký tự base62. */
+export function uploadSlugShape(value: string | null | undefined): value is string {
+  return typeof value === "string" && /^[0-9A-Za-z]{6,8}$/.test(value);
+}
+
+export function uploadKeyShape(value: string): boolean {
+  return uploadTokenShape(value) || uploadSlugShape(value);
+}
+
+/** 8 ký tự. Byte từ 248 trở lên bị bỏ để không lệch khi chia 62. */
+export function uploadSlugFromBytes(bytes: Uint8Array): string {
+  let slug = "";
+  for (const byte of bytes) {
+    if (byte >= 248) continue;
+    slug += UPLOAD_SLUG_ALPHABET[byte % 62]!;
+    if (slug.length === 8) return slug;
+  }
+  return slug;
 }
 
 /** Số dùng làm tên album. 84… đổi về đầu 0. */
@@ -26,10 +48,11 @@ export function photoLimitLabel(limit: number | null): string {
   return `mỗi ảnh tối đa ${Math.round(limit / (1024 * 1024))}MB`;
 }
 
-/** Đường dẫn khách mở khi quét mã của một đơn. */
+/** Đường dẫn khách mở khi quét mã của một đơn. Mã ngắn vào /u, mã hex cũ vào /gui-anh. */
 export function customerUploadPath(token: string): string {
-  if (!uploadTokenShape(token)) throw new Error("Mã gửi ảnh không hợp lệ.");
-  return `/gui-anh/${token}`;
+  if (uploadSlugShape(token)) return `/u/${token}`;
+  if (uploadTokenShape(token)) return `/gui-anh/${token}`;
+  throw new Error("Mã gửi ảnh không hợp lệ.");
 }
 
 export type PublicUploadPhoto = { id: string; name: string; createdAt: string; print: boolean; comment: string };

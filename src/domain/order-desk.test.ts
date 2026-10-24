@@ -2,8 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { applyStoreMigrations } from "./migrate-shop.ts";
-import { applyOrderDesk, deskAlerts, deskTabMeta, deskTabOf, estimateNet, maskBuyer, shipModeOf } from "./order-desk.ts";
+import { applyOrderDesk, deskAlerts, deskTabMeta, deskTabOf, estimateNet, listStatusChoices, maskBuyer, shipModeOf } from "./order-desk.ts";
 import { DEFAULT_SETTINGS } from "./seed.ts";
+
+test("danh sách chỉ đưa bước kế, không nhảy", () => {
+  assert.deepEqual(listStatusChoices({ status: "nhan_don", role: "owner", channel: "tai_tiem" }), ["thiet_ke", "huy"]);
+  assert.deepEqual(listStatusChoices({ status: "in", role: "owner", channel: "tai_tiem" }), ["cho_duyet", "dong_goi", "huy"]);
+  assert.equal(listStatusChoices({ status: "in", role: "owner", channel: "tai_tiem" }).includes("xong"), false);
+  assert.deepEqual(listStatusChoices({ status: "in", role: "production", channel: "tai_tiem" }), ["dong_goi"]);
+  assert.deepEqual(listStatusChoices({ status: "nhan_don", role: "production", channel: "facebook" }), []);
+  assert.deepEqual(listStatusChoices({ status: "dong_goi", role: "production", channel: "mo_home" }), ["in", "giao"]);
+  assert.deepEqual(listStatusChoices({ status: "xong", role: "sale", channel: "tai_tiem" }), []);
+  assert.deepEqual(listStatusChoices({ status: "xong", role: "owner", channel: "tai_tiem" }), ["giao"]);
+});
 
 test("bốn tab làm việc, không nhảy bước xưởng", () => {
   assert.equal(deskTabOf({ status: "nhan_don" }), "can_lam");

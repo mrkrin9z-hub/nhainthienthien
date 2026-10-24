@@ -1,5 +1,5 @@
-import { feeLines } from "./calc.ts";
-import type { Channel, Settings } from "./types.ts";
+import { feeLines, PRODUCTION_STEPS } from "./calc.ts";
+import type { Channel, OrderStatus, Settings } from "./types.ts";
 
 /** Bốn tab làm việc. Trả hàng nằm ở Cần làm. Giao lỗi vẫn ở Đang giao. Xong và hủy chung một tab. */
 export const DESK_TABS = [
@@ -40,6 +40,30 @@ export function deskTabOf(order: { status: string; deskIssue?: string | null }):
   if (TO_SHIP.has(order.status)) return "can_gui";
   if (PROCESSING.has(order.status) || order.status) return "can_lam";
   return "can_lam";
+}
+
+const FLOW: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
+
+/** Bước được chọn trên danh sách: chỉ kế trước, kế sau, hoặc hủy. Không nhảy bước. */
+export function listStatusChoices(input: {
+  status: string;
+  role: "owner" | "sale" | "production";
+  channel: string;
+}): OrderStatus[] {
+  const status = input.status as OrderStatus;
+  if (status === "xong") return input.role === "owner" ? ["giao"] : [];
+  if (status === "huy") return input.role === "owner" ? ["nhan_don"] : [];
+  if (status === "draft_upload" || status === "upload_error") {
+    return input.role === "production" ? [] : ["nhan_don", "huy"];
+  }
+  const index = FLOW.indexOf(status);
+  if (index < 0) return [];
+  const near = [FLOW[index - 1], FLOW[index + 1]].filter((item): item is OrderStatus => Boolean(item));
+  if (input.role === "production" && input.channel !== "mo_home") {
+    return near.filter((item) => (PRODUCTION_STEPS as readonly string[]).includes(item));
+  }
+  if (input.role === "production") return near;
+  return [...near, "huy"];
 }
 
 export function deskTabMeta(id: DeskTab) {

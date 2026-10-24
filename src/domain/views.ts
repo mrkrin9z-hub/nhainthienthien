@@ -48,6 +48,7 @@ export function orderSummary(state: ShopState, order: Order, role: Role) {
     isTest: Boolean(order.isTest),
     late: isLate(state, order),
     fileCount: order.files.filter((file) => !file.deletedAt && file.status === "complete").length,
+    customerPhotoCount: order.files.filter((file) => !file.deletedAt && file.status === "complete" && file.kind === "original").length,
     fulfillment: order.fulfillment,
     dueDate: order.dueDate,
     channelOrderId: order.channelOrderId || order.marketplaceCode || "",

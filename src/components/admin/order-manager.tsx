@@ -1,9 +1,12 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Printer, Plus, Truck, Upload } from "lucide-react";
 import { OrderImportDialog } from "@/components/admin/order-import-dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 import { ListPager, useListPage } from "@/components/admin/list-page";
 import { PageToolbar, ToolbarButton, ToolbarLink } from "@/components/admin/page-toolbar";
@@ -11,17 +14,15 @@ import {
   DESK_CHANNEL_LABEL,
   DESK_TABS,
   deskAlerts,
-  deskTabMeta,
+  listStatusChoices,
   matchesAlert,
-  paymentLabel,
-  shipModeLabel,
   type DeskAlertId,
   type DeskTab,
   type ShipMode,
 } from "@/domain/order-desk";
-import { changeStatus, downloadExcel, getMe, getOrders, markLabelsPrinted, setFulfillment } from "@/lib/admin.functions";
+import { STATUS_LABEL, type Channel, type OrderStatus } from "@/domain/types";
+import { changeStatus, downloadExcel, getMe, getOrders, markLabelsPrinted } from "@/lib/admin.functions";
 import { formatMaybe } from "@/lib/brand";
-import type { Channel } from "@/domain/types";
 
 type Item = {
   name: string;
@@ -53,6 +54,7 @@ type Row = {
   designFileUrl: string;
   labelPrintedAt: string | null;
   customerNote: string;
+  customerPhotoCount?: number;
   items: Item[];
 };
 
@@ -86,6 +88,8 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
   const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [pending, setPending] = useState<{ order: Row; status: OrderStatus } | null>(null);
+  const [reason, setReason] = useState("");
   useEffect(() => setText(q), [q]);
 
   const production = me.data?.role === "production";
@@ -156,11 +160,13 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
     await queryClient.invalidateQueries({ queryKey: ["nav-counts"] });
   }
 
-  async function choosePlace(order: Row, fulfillment: "pickup" | "delivery") {
+  async function applyStatus(order: Row, status: OrderStatus, note: string) {
     setBusy(order.id);
     try {
-      await setFulfillment({ data: { orderId: order.id, fulfillment } });
+      await changeStatus({ data: { orderId: order.id, status, note } });
+      toast.success(`${order.code}: ${STATUS_LABEL[status]}`);
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["nav-counts"] });
     } catch (error) {
       toast.error((error as Error).message);
     } finally {
@@ -168,18 +174,14 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
     }
   }
 
-  async function markDone(order: Row) {
-    setBusy(order.id);
-    try {
-      const noteText = order.shipMode === "pickup" ? "Khách đã nhận tại tiệm" : "Đã giao";
-      await changeStatus({ data: { orderId: order.id, status: "xong", note: noteText } });
-      toast.success(order.shipMode === "pickup" ? `${order.code}: khách đã nhận` : `${order.code}: đã giao`);
-      await queryClient.invalidateQueries({ queryKey: ["orders"] });
-    } catch (error) {
-      toast.error((error as Error).message);
-    } finally {
-      setBusy(null);
+  function requestStatus(order: Row, status: OrderStatus) {
+    if (status === order.status) return;
+    if (status === "huy" || order.status === "xong" || order.status === "huy") {
+      setReason("");
+      setPending({ order, status });
+      return;
     }
+    void applyStatus(order, status, "");
   }
 
   const selected = rows.filter((order) => picked.includes(order.id));
@@ -294,64 +296,100 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
 
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={pageRows.length} noun="đơn" onPage={list.setPage} />
 
-      <div className="space-y-2">
+      <div className="overflow-hidden rounded-md border bg-card">
         {pageRows.map((order) => {
           const late = hoursLeft(order.shipBy);
+          const open = order.deskTab === "can_lam" || order.deskTab === "can_gui";
+          const shipChip = !open || late == null ? null : late < 0 ? "Quá hạn gửi" : late <= 24 ? `Hạn ${vnTime(order.shipBy)}` : null;
+          const place = order.shipMode === "pickup" ? "Lấy tại xưởng" : order.shipMode === "tu_giao" ? "Giao" : "Nhãn sàn";
+          const photos = (order.customerPhotoCount ?? 0) > 0;
+          const first = order.items[0];
+          const product = first
+            ? `${first.name}${first.variant ? ` · ${first.variant}` : ""} · ×${first.quantity}${order.items.length > 1 ? ` +${order.items.length - 1}` : ""}`
+            : "Chưa có sản phẩm";
+          const choices = listStatusChoices({ status: order.status, role: me.data?.role === "production" ? "production" : me.data?.role === "sale" ? "sale" : "owner", channel: order.channel });
+          const current = (order.status in STATUS_LABEL ? order.status : "nhan_don") as OrderStatus;
           return (
-            <article key={order.id} className="rounded-md border bg-card p-3">
-              <div className="flex flex-wrap items-start gap-3">
-                <input type="checkbox" className="mt-1" aria-label={`Chọn ${order.code}`} checked={picked.includes(order.id)} onChange={() => toggle(order.id)} />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold">{DESK_CHANNEL_LABEL[order.channel]}</span>
-                    <Link to="/admin/don-hang/$code" params={{ code: order.code }} className="font-semibold text-primary">{order.code}</Link>
-                    {order.channelOrderId ? <span className="font-mono text-[12px] text-muted-foreground">{order.channelOrderId}</span> : null}
-                    <span className="text-[12px] text-muted-foreground">{order.deskTab ? deskTabMeta(order.deskTab).label : ""}</span>
-                    <span className="text-[12px] text-muted-foreground">{vnTime(order.createdAt)}</span>
-                  </div>
-                  <p className="text-sm">{order.buyerName}</p>
-                  <ul className="space-y-1 text-[13px]">
-                    {order.items.map((item, index) => (
-                      <li key={`${order.id}-${index}`}>
-                        <span className="font-medium">{item.sellerSku || item.skuCode}</span>
-                        {item.variant ? <span className="text-muted-foreground"> · {item.variant}</span> : null}
-                        <span className="text-muted-foreground"> · {item.name} · ×{item.quantity}</span>
-                        {item.unitPrice != null ? <span> · {formatMaybe(item.unitPrice)}</span> : null}
-                      </li>
-                    ))}
-                  </ul>
-                  {order.customerNote ? <p className="text-[12px] text-muted-foreground">Ghi chú: {order.customerNote}</p> : null}
-                  {order.designFileUrl ? <a className="text-[12px] font-semibold text-primary" href={order.designFileUrl} target="_blank" rel="noreferrer">Ảnh thiết kế</a> : null}
+            <div
+              key={order.id}
+              role="link"
+              tabIndex={0}
+              className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-2 border-b px-3 py-3 last:border-b-0 hover:bg-muted/40"
+              onClick={() => navigate({ to: "/admin/don-hang/$code", params: { code: order.code } })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") navigate({ to: "/admin/don-hang/$code", params: { code: order.code } });
+              }}
+            >
+              <input
+                type="checkbox"
+                className="size-4 shrink-0"
+                aria-label={`Chọn ${order.code}`}
+                checked={picked.includes(order.id)}
+                onClick={(event) => event.stopPropagation()}
+                onChange={() => toggle(order.id)}
+              />
+              <div className="min-w-0 flex-1 basis-[16rem]">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-semibold text-primary">{order.code}</span>
+                  <Chip>{DESK_CHANNEL_LABEL[order.channel]}</Chip>
+                  <Chip>{place}</Chip>
+                  {shipChip ? <Chip warn={late != null && late < 0}>{shipChip}</Chip> : null}
+                  <Chip>{photos ? "Có ảnh" : "Chưa có ảnh"}</Chip>
                 </div>
-                <div className="w-full space-y-1 text-[13px] sm:w-56">
-                  <p>Hạn gửi: {vnTime(order.shipBy)}{late != null && late < 0 ? <span className="ml-1 font-semibold text-destructive">Quá hạn</span> : null}</p>
-                  <p>Tự hủy: {vnTime(order.autoCancelAt)}</p>
-                  <p>{shipModeLabel(order.shipMode)}{order.carrier ? ` · ${order.carrier}` : ""}</p>
-                  <p className="font-mono text-[12px]">{order.tracking || "Chưa có vận đơn"}</p>
-                  {production ? null : <p>{paymentLabel(order.paymentMethod)} · {formatMaybe(order.total)}</p>}
-                  {production || order.netAmount == null ? null : <p className="text-muted-foreground">Thực nhận {formatMaybe(order.netAmount)}</p>}
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    <a className="inline-flex h-8 items-center rounded-md border px-2 text-[12px] font-semibold" href={`/admin/phieu/${encodeURIComponent(order.code)}`} target="_blank" rel="noreferrer">In bill</a>
-                    {order.shipMode === "san" ? <span className="inline-flex h-8 items-center text-[12px] text-muted-foreground">Nhãn sàn</span> : (
-                      <select className="h-8 rounded-md border bg-background px-2 text-[12px]" aria-label={`Nơi nhận ${order.code}`} value={order.fulfillment} disabled={busy === order.id} onChange={(event) => void choosePlace(order, event.target.value as "pickup" | "delivery")}>
-                        <option value="pickup">Lấy tại xưởng</option>
-                        <option value="delivery">Tự giao</option>
-                      </select>
-                    )}
-                    {order.status === "giao" ? (
-                      <button type="button" className="inline-flex h-8 items-center rounded-md bg-[#2563eb] px-2 text-[12px] font-semibold text-white disabled:opacity-50" disabled={busy === order.id} onClick={() => void markDone(order)}>
-                        {order.shipMode === "pickup" ? "Khách đã nhận" : "Đã giao"}
-                      </button>
-                    ) : null}
-                    <button type="button" className="text-[12px] font-semibold text-primary" onClick={() => navigate({ to: "/admin/don-hang/$code", params: { code: order.code } })}>Chi tiết</button>
-                  </div>
-                </div>
+                <p className="mt-1 truncate text-sm">
+                  <span className="font-medium">{order.buyerName}</span>
+                  <span className="text-muted-foreground"> · {product}</span>
+                  {production || order.total == null ? null : <span className="font-semibold"> · {formatMaybe(order.total)}</span>}
+                </p>
               </div>
-            </article>
+              <select
+                className="h-11 w-full rounded-md border bg-background px-2 text-sm font-semibold sm:w-40"
+                aria-label={`Trạng thái ${order.code}`}
+                value={current}
+                disabled={busy === order.id || choices.length === 0}
+                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => requestStatus(order, event.target.value as OrderStatus)}
+              >
+                <option value={current}>{statusOptionLabel(order, current)}</option>
+                {choices.filter((status) => status !== current).map((status) => (
+                  <option key={status} value={status}>{statusOptionLabel(order, status)}</option>
+                ))}
+              </select>
+            </div>
           );
         })}
-        {orders.data && shown.length === 0 ? <p className="text-sm text-muted-foreground">Không có đơn trong bộ lọc này.</p> : null}
+        {orders.data && shown.length === 0 ? <p className="px-3 py-6 text-sm text-muted-foreground">Không có đơn trong bộ lọc này.</p> : null}
       </div>
+      <Dialog open={pending != null} onOpenChange={(open) => { if (!open) setPending(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{pending ? `${pending.order.code} · ${STATUS_LABEL[pending.status]}` : "Đổi trạng thái"}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{pending?.status === "huy" ? "Hủy đơn cần ghi lý do." : "Mở lại đơn cần ghi lý do."}</p>
+          <Input value={reason} placeholder="Lý do" aria-label="Lý do đổi trạng thái" onChange={(event) => setReason(event.target.value)} />
+          <Button
+            type="button"
+            disabled={!reason.trim() || !pending}
+            onClick={() => {
+              if (!pending) return;
+              const next = pending;
+              setPending(null);
+              void applyStatus(next.order, next.status, reason.trim());
+            }}
+          >
+            Xác nhận
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function statusOptionLabel(order: Row, status: OrderStatus): string {
+  if (status === "xong") return order.shipMode === "pickup" ? "Khách đã nhận" : "Đã giao";
+  return STATUS_LABEL[status];
+}
+
+function Chip({ children, warn }: { children: string; warn?: boolean }) {
+  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${warn ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground"}`}>{children}</span>;
 }

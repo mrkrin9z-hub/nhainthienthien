@@ -28,7 +28,7 @@ import { orderCodePrefix, skuSoldOn, withChannelSold, type ReportScope } from "@
 import { applyStockCount, approveWaste, confirmWasteDay, editWaste, previousMonth, recordWaste, voidWaste, wasteDayStats, wasteDesk, wasteMonth, wasteMonthCompare, type EditWasteInput } from "@/domain/waste";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/images";
-import { albumPhone, photoTooBig, publicUploadCard, uploadTokenShape } from "@/domain/order-upload";
+import { albumPhone, photoTooBig, publicUploadCard, uploadKeyShape, uploadSlugFromBytes, uploadSlugShape, uploadTokenShape } from "@/domain/order-upload";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
 import { marketplaceEditLocked, orderRevisionBlock } from "@/domain/order-edit";
 import { fulfillmentFor, isMarketplace, paymentMethodFromText, type PaymentMethod, type ShipMode } from "@/domain/order-desk";
@@ -618,16 +618,18 @@ export async function createWebOrder(input: {
 
 async function orderByToken(state: ShopState, orderId: string, accessToken: string) {
   const order = state.orders.find((item) => item.id === orderId);
-  if (!order || !order.accessTokenHash || order.accessTokenHash !== (await sha256(accessToken))) {
-    throw new Error("Không có quyền với đơn hàng này.");
-  }
-  return order;
+  if (!order) throw new Error("Không có quyền với đơn hàng này.");
+  if (uploadSlugShape(accessToken) && order.uploadSlug === accessToken) return order;
+  if (order.accessTokenHash && order.accessTokenHash === (await sha256(accessToken))) return order;
+  throw new Error("Không có quyền với đơn hàng này.");
 }
 
 async function orderByUploadToken(state: ShopState, token: string) {
-  if (!uploadTokenShape(token)) throw new Error("Mã không còn dùng được.");
-  const hash = await sha256(token);
-  const order = state.orders.find((item) => item.accessTokenHash === hash);
+  if (!uploadKeyShape(token)) throw new Error("Mã không còn dùng được.");
+  const hash = uploadSlugShape(token) ? "" : await sha256(token);
+  const order = uploadSlugShape(token)
+    ? state.orders.find((item) => item.uploadSlug === token)
+    : state.orders.find((item) => item.accessTokenHash === hash);
   if (!order) throw new Error("Mã không còn dùng được.");
   if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
   return order;
@@ -637,11 +639,22 @@ function freshUploadToken(): string {
   return crypto.randomUUID().replaceAll("-", "");
 }
 
-async function ensureUploadToken(order: { accessToken: string; accessTokenHash: string }) {
-  if (uploadTokenShape(order.accessToken)) return;
-  const token = freshUploadToken();
-  order.accessToken = token;
-  order.accessTokenHash = await sha256(token);
+function mintUploadSlug(state: ShopState): string {
+  const taken = new Set(state.orders.map((order) => order.uploadSlug).filter((slug): slug is string => Boolean(slug)));
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const slug = uploadSlugFromBytes(crypto.getRandomValues(new Uint8Array(24)));
+    if (slug.length === 8 && !taken.has(slug)) return slug;
+  }
+  throw new Error("Không tạo được mã gửi ảnh.");
+}
+
+async function ensureUploadCredentials(state: ShopState, order: { accessToken: string; accessTokenHash: string; uploadSlug?: string }) {
+  if (!uploadTokenShape(order.accessToken)) {
+    const token = freshUploadToken();
+    order.accessToken = token;
+    order.accessTokenHash = await sha256(token);
+  }
+  if (!uploadSlugShape(order.uploadSlug)) order.uploadSlug = mintUploadSlug(state);
 }
 
 /** Mã QR của một đơn. Giữ mã cũ trừ khi chủ hoặc sale đổi mã. */
@@ -651,7 +664,9 @@ export async function orderUploadLink(actor: Actor, orderId: string, rotate = fa
   const current = await readState();
   const existing = current.orders.find((item) => item.id === orderId);
   if (!existing) throw new Error("Không thấy đơn.");
-  if (uploadTokenShape(existing.accessToken) && !rotate) return { token: existing.accessToken, code: existing.code };
+  if (!rotate && uploadTokenShape(existing.accessToken) && uploadSlugShape(existing.uploadSlug)) {
+    return { token: existing.accessToken, slug: existing.uploadSlug, code: existing.code };
+  }
   return mutate(async (state) => {
     const order = state.orders.find((item) => item.id === orderId);
     if (!order) throw new Error("Không thấy đơn.");
@@ -660,20 +675,32 @@ export async function orderUploadLink(actor: Actor, orderId: string, rotate = fa
       const token = freshUploadToken();
       order.accessToken = token;
       order.accessTokenHash = await sha256(token);
+      order.uploadSlug = "";
       order.updatedAt = nowIso();
       audit(state, actor.id, "order.upload_link", order.id, null, { code: order.code, rotated: rotate && !creating });
     }
-    return { token: order.accessToken, code: order.code };
+    if (!uploadSlugShape(order.uploadSlug)) order.uploadSlug = mintUploadSlug(state);
+    return { token: order.accessToken, slug: order.uploadSlug, code: order.code };
   });
 }
 
 /** Thẻ khách thấy khi mở mã của đơn: người đặt, sản phẩm, ảnh gốc đã gửi. */
 export async function publicUploadTarget(token: string) {
-  const state = await readState();
-  const order = await orderByUploadToken(state, token);
+  let state = await readState();
+  let order = await orderByUploadToken(state, token);
+  if (!uploadSlugShape(order.uploadSlug)) {
+    await mutate(async (draft) => {
+      const row = draft.orders.find((item) => item.id === order.id);
+      if (!row || uploadSlugShape(row.uploadSlug)) return;
+      await ensureUploadCredentials(draft, row);
+    });
+    state = await readState();
+    order = await orderByUploadToken(state, token);
+  }
   const customer = state.customers.find((item) => item.id === order.customerId);
   return {
     ...publicUploadCard({ order, customer }),
+    canonicalPath: `/u/${order.uploadSlug}`,
     maxPhotoBytes: await photoByteLimit(),
   };
 }
@@ -1293,7 +1320,7 @@ export async function createManualOrder(
       files: [],
       history: [{ at: nowIso(), from: null, to: "nhan_don", by: actor.id, note: "Tạo đơn tại quầy" }],
     };
-    await ensureUploadToken(order);
+    await ensureUploadCredentials(state, order);
     refreshDeposit(state, order);
     if (input.depositPaid > 0) {
       order.depositPaid = Math.round(input.depositPaid);
@@ -1327,7 +1354,7 @@ export async function reviseOrder(
     dueDate: string | null;
     discount?: number | null;
     customerShip?: number | null;
-    items?: { skuId: string; quantity: number; unitPrice?: number | null; priceReason?: string }[];
+    items?: { skuId: string; quantity: number; variant?: string; unitPrice?: number | null; priceReason?: string }[];
   },
 ) {
   assertRole(actor, ["owner", "sale"]);
@@ -1380,7 +1407,7 @@ export async function reviseOrder(
           lineTotal: unitPrice === null ? null : unitPrice * item.quantity,
           ...(previous?.listUnitPrice !== undefined ? { listUnitPrice: previous.listUnitPrice } : {}),
           ...(previous?.sellerSku ? { sellerSku: previous.sellerSku } : {}),
-          ...(previous?.variant ? { variant: previous.variant } : {}),
+          variant: item.variant?.trim() || previous?.variant || "",
         };
       });
       const totals = sumItems(items);
@@ -3501,7 +3528,7 @@ async function commitMarketplaceOrders(actor: Actor, channel: MarketplaceChannel
         files: [],
         history: [{ at: nowIso(), from: null, to: "nhan_don", by: actor.id, note }],
       };
-      await ensureUploadToken(order);
+      await ensureUploadCredentials(state, order);
       refreshDeposit(state, order);
       state.orders.unshift(order);
       audit(state, actor.id, "order.import", order.id, null, {
