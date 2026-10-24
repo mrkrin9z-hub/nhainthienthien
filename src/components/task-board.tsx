@@ -1,6 +1,6 @@
 import type { TaskCard } from "@/domain/checklists";
 
-const STATUS_LABEL = { chua_lam: "Chưa làm", dang_lam: "Đang làm", xong: "Xong" } as const;
+const STATUS_LABEL = { chua_lam: "Cần làm", dang_lam: "Đang làm", xong: "Xong" } as const;
 
 export function TaskBoard({
   cards,
@@ -69,20 +69,25 @@ export function TaskBoard({
                   </button>
                 ))}
               </div>
-              <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-dashed text-sm font-semibold">
-                {task.photo ? "Chụp ảnh hoàn thành" : "Chụp ảnh minh chứng"}
-                <input
-                  className="sr-only"
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file) onPhoto(task, file);
-                  }}
-                />
-              </label>
+              {task.needsProof ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Ảnh lưu tại {task.driveFolder}</p>
+                  <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-xl border border-dashed text-sm font-semibold">
+                    Tải ảnh chứng
+                    <input
+                      className="sr-only"
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.target.value = "";
+                        if (file) onPhoto(task, file);
+                      }}
+                    />
+                  </label>
+                </div>
+              ) : null}
             </article>
           ))}
         </section>

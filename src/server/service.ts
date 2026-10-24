@@ -53,6 +53,8 @@ import { albumFolderParts, driveFolderParts, orderKindFolder } from "@/domain/dr
 import {
   applyTaskStatus,
   checklistCards,
+  checklistTemplate,
+  needsProof,
   orderStepKind,
   SHEET_COVERAGE,
   SHOP_RULES,
@@ -1865,11 +1867,12 @@ export async function createPriceSize(
     heightCm: number;
     sheets: number;
     prices: Partial<Record<Channel, number>>;
+    code?: string;
   },
 ) {
   assertRole(actor, ["owner"]);
   const draft: PriceDraft = {
-    code: null,
+    code: input.code?.trim() || null,
     widthCm: input.widthCm,
     heightCm: input.heightCm,
     sheets: input.sheets,
@@ -1961,6 +1964,40 @@ export async function stockIn(
       note: input.note.trim(),
     });
     audit(state, actor.id, "stock.in", material.id, null, { qty, packPrice: input.packPrice });
+  });
+}
+
+export async function stockInMany(
+  actor: Actor,
+  input: { supplier: string; note: string; lines: { materialId: string; packs: number; packPrice: number | null }[] },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const lines = input.lines.filter((line) => line.materialId && line.packs > 0);
+  if (!lines.length) throw new Error("Chưa có dòng nhập.");
+  const stamp = `Phiếu nhập ${vnYmd()}`;
+  await mutate(async (state) => {
+    for (const line of lines) {
+      const material = state.materials.find((item) => item.id === line.materialId);
+      if (!material) throw new Error("Không thấy vật tư.");
+      const qty = material.packSize ? line.packs * material.packSize : line.packs;
+      material.stock = Math.round((material.stock + qty) * 10000) / 10000;
+      if (input.supplier.trim()) material.supplier = input.supplier.trim();
+      if (line.packPrice !== null) {
+        if (actor.role === "owner") material.packPrice = line.packPrice;
+        else material.pendingPrice = line.packPrice;
+      }
+      state.movements.unshift({
+        id: nid(),
+        at: nowIso(),
+        materialId: material.id,
+        qty,
+        reason: "Nhập hàng",
+        orderId: null,
+        by: actor.id,
+        note: [stamp, input.note.trim()].filter(Boolean).join(" · "),
+      });
+    }
+    audit(state, actor.id, "stock.in", stamp, null, { lines: lines.length });
   });
 }
 
@@ -5084,6 +5121,8 @@ export async function saveStaffPhoto(input: {
       deletedAt: null,
     };
     if (input.taskId) {
+      const template = checklistTemplate(input.taskId);
+      if (!template || !needsProof(template)) throw new Error("Việc này không cần ảnh.");
       const bucket = taskFileBucket(state, input.taskId, vnYmd());
       file.kind = "task";
       bucket.files.push(file);
@@ -5094,7 +5133,7 @@ export async function saveStaffPhoto(input: {
         createdAt: file.createdAt,
         source: "manual",
         channel: "tai_tiem",
-      }, taskFolderParts(bucket.period, bucket.title));
+      }, taskFolderParts(bucket.group, bucket.title));
       applyTaskStatus(state, { taskId: input.taskId, status: "xong", by: null, ymd: vnYmd(), at: file.createdAt });
       return;
     }
@@ -5141,6 +5180,8 @@ export async function saveActorTaskPhoto(
   if (photoTooBig(input.bytes.byteLength, limit)) throw new Error("Mỗi ảnh tối đa 10MB khi chưa nối Google Drive.");
   const mime = input.mime || "image/jpeg";
   if (!imageMimeAllowed(mime) || !imageBytesMatch(mime, input.bytes)) throw new Error("Chỉ nhận ảnh JPG, PNG, WEBP hoặc HEIC.");
+  const template = checklistTemplate(input.taskId);
+  if (!template || !needsProof(template)) throw new Error("Việc này không cần ảnh.");
   const drive = await driveConnected();
   await mutate(async (state) => {
     const bucket = taskFileBucket(state, input.taskId, vnYmd());
@@ -5170,7 +5211,7 @@ export async function saveActorTaskPhoto(
         source: "manual",
         channel: "tai_tiem",
       },
-      taskFolderParts(bucket.period, bucket.title),
+      taskFolderParts(bucket.group, bucket.title),
     );
     applyTaskStatus(state, { taskId: input.taskId, status: "xong", by: actor.id, ymd: vnYmd(), at: file.createdAt });
   });

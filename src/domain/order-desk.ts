@@ -70,6 +70,50 @@ export function deskTabMeta(id: DeskTab) {
   return DESK_TABS.find((tab) => tab.id === id) ?? DESK_TABS[0];
 }
 
+/** Bảng việc xưởng. Cột bám đúng trạng thái đơn, không tạo trạng thái riêng. */
+export const PRODUCTION_LANES = [
+  { id: "chua", label: "Chưa làm", statuses: ["nhan_don", "thiet_ke", "cho_duyet"] },
+  { id: "in", label: "Đã in", statuses: ["in"] },
+  { id: "goi", label: "Đã đóng gói", statuses: ["dong_goi"] },
+  { id: "giao", label: "Đã giao", statuses: ["giao"] },
+] as const;
+
+export type ProductionLane = (typeof PRODUCTION_LANES)[number]["id"];
+
+const LANE_NEXT: Partial<Record<OrderStatus, string>> = {
+  thiet_ke: "Thiết kế",
+  cho_duyet: "Chờ duyệt",
+  in: "Đã in",
+  dong_goi: "Đã đóng gói",
+  giao: "Đã giao",
+  xong: "Xong",
+  nhan_don: "Nhận đơn",
+};
+
+export function productionLane(status: string): ProductionLane | null {
+  const lane = PRODUCTION_LANES.find((item) => (item.statuses as readonly string[]).includes(status));
+  return lane?.id ?? null;
+}
+
+export function productionMove(input: { status: string; role: "owner" | "sale" | "production"; channel: string }): {
+  next: OrderStatus | null;
+  back: OrderStatus | null;
+  nextLabel: string;
+  backLabel: string;
+} {
+  const choices = listStatusChoices(input).filter((status) => status !== "huy");
+  const flow = FLOW;
+  const index = flow.indexOf(input.status as OrderStatus);
+  const next = index >= 0 ? choices.find((status) => flow.indexOf(status) === index + 1) ?? null : null;
+  const back = index >= 0 ? choices.find((status) => flow.indexOf(status) === index - 1) ?? null : null;
+  return {
+    next,
+    back,
+    nextLabel: next ? LANE_NEXT[next] ?? next : "",
+    backLabel: back ? "Quay lại" : "",
+  };
+}
+
 export function isMarketplace(channel: string): boolean {
   return channel === "tiktok" || channel === "shopee";
 }

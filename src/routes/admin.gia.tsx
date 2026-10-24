@@ -3,18 +3,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
 import { ListPager, useListPage } from "@/components/admin/list-page";
 import { PageToolbar } from "@/components/admin/page-toolbar";
-import { GoodsLinks } from "@/components/admin/sections";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatMaybe } from "@/lib/brand";
+import { Switch } from "@/components/ui/switch";
+import { formatMaybe, formatVnd } from "@/lib/brand";
 import { cloneShelf, createPriceSize, getBom, getMe, getPriceBoard, importPriceSheet, pullCatalog, runQuote, runRecalc, saveBomQty, savePieces, savePrice, setSkuSold } from "@/lib/admin.functions";
+import { DESK_CHANNEL_LABEL } from "@/domain/order-desk";
 import { isMoHomeGroup } from "@/domain/mohome";
 import { CHANNEL_LABEL, CHANNELS, type Channel } from "@/domain/types";
+import { MoreHorizontal, Settings } from "lucide-react";
 
 export const Route = createFileRoute("/admin/gia")({
   component: PricePage,
@@ -22,56 +24,54 @@ export const Route = createFileRoute("/admin/gia")({
 
 function PricePage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
-  const [groupId, setGroupId] = useState("trang_guong");
-  const [channel, setChannel] = useState<Channel>("tai_tiem");
+  const [groupId, setGroupId] = useState("all");
+  const [channel, setChannel] = useState<Channel | "all">("all");
+  const [inStock, setInStock] = useState(false);
   const allowed = me.data?.role === "owner" || me.data?.role === "sale";
   const board = useQuery({
-    queryKey: ["prices", groupId],
-    queryFn: () => getPriceBoard({ data: { groupId } }),
+    queryKey: ["prices", "catalog"],
+    queryFn: () => getPriceBoard({ data: {} }),
     enabled: allowed,
   });
   const owner = me.data?.role === "owner";
   const [createOpen, setCreateOpen] = useState(false);
   const [excelOpen, setExcelOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [q, setQ] = useState("");
-  const [priced, setPriced] = useState("all");
+  const displayChannel: Channel = channel === "all" ? "tai_tiem" : channel;
+  const excelGroup = groupId === "all" ? (board.data?.groups[0]?.id ?? "trang_guong") : groupId;
   const priceRows = (board.data?.rows ?? []).filter((row) => {
-    const cell = row.prices[channel];
-    if (priced === "co" && (cell?.price ?? null) === null) return false;
-    if (priced === "trong" && (cell?.price ?? null) !== null) return false;
+    if (groupId !== "all" && row.groupId !== groupId) return false;
+    if (channel !== "all") {
+      const onChannel = row.soldOn?.includes(channel) || row.prices[channel]?.price != null;
+      if (!onChannel) return false;
+    }
+    if (inStock) return false;
     const needle = q.trim().toLowerCase();
     return !needle || `${row.code} ${row.name}`.toLowerCase().includes(needle);
   });
-  const priceChips: FilterChip[] = [
-    { id: "all", label: "Tất cả", count: board.data?.rows.length ?? 0, ...ALL_TONE },
-    { id: "co", label: "Đã có giá", count: (board.data?.rows ?? []).filter((row) => (row.prices[channel]?.price ?? null) !== null).length, color: "#059669" },
-    { id: "trong", label: "Chưa có giá", count: (board.data?.rows ?? []).filter((row) => (row.prices[channel]?.price ?? null) === null).length, color: "#D97706" },
-  ];
-  const list = useListPage(priceRows, `${groupId}|${channel}|${q}|${priced}`);
+  const list = useListPage(priceRows, `${groupId}|${channel}|${q}|${inStock}`);
   if (me.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
   if (me.data?.role === "production") return <p className="text-lg font-semibold text-primary">Chỉ chủ và sale xem bảng giá.</p>;
 
+  const selectClass = "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm";
   return (
-    <div className="space-y-4">
-      <GoodsLinks />
+    <div className="space-y-4 bg-slate-50">
       <PageToolbar
-        title="Bảng giá theo kênh"
-        hint={
-          channel === "mo_home"
-            ? "Giá nội bộ Mơ Home, tách khỏi giá Nhà In. Hoa hồng sale = 0. Bật «Bán ở kênh này» khi mã được bán. Chưa có bảng giá thì để trống, không lấy giá tại tiệm."
-            : "Giá chung cho tại tiệm, web và Facebook. TikTok/Shopee: giá bán là giá sau giảm, niêm yết để đối chiếu. Lãi tính từ vốn bảng 22/10, mực 4,4%, hoa hồng 3% tại tiệm và Facebook, sàn 27% + 11.000đ, quảng cáo Facebook 10% và đóng gói 8.000đ. Mơ Home không dùng giá này."
-        }
-        search={q}
-        onSearch={setQ}
-        searchPlaceholder="Tìm mã hoặc quy cách…"
+        title="Sản phẩm"
+        hint="Một bảng cho mọi nhóm và kênh. Giá Mơ Home không lấy từ giá tại tiệm."
         actions={
           owner ? (
             <>
-              <Button variant="outline" className="min-h-11" onClick={() => setExcelOpen(true)}>
-                Tạo từ Excel
+              <Button variant="outline" className="min-h-10 rounded-xl bg-white" onClick={() => setExcelOpen(true)}>
+                Nhập Excel
               </Button>
-              <Button className="min-h-11" onClick={() => setCreateOpen(true)}>
-                Tạo
+              <Button variant="outline" className="min-h-10 rounded-xl bg-white" onClick={() => setSettingsOpen(true)}>
+                <Settings className="mr-1 size-4" />
+                Cài đặt
+              </Button>
+              <Button className="min-h-10 rounded-xl bg-blue-600 hover:bg-blue-700" onClick={() => setCreateOpen(true)}>
+                + Tạo
               </Button>
             </>
           ) : null
@@ -80,44 +80,57 @@ function PricePage() {
       {owner ? (
         <>
           <CreatePriceDialog
-            groupId={groupId}
-            groupName={(board.data?.groups ?? []).find((group) => group.id === groupId)?.name ?? ""}
+            groups={board.data?.groups ?? []}
+            groupId={excelGroup}
             open={createOpen}
             onOpenChange={setCreateOpen}
           />
           <ExcelPriceDialog
-            groupId={groupId}
-            groupName={(board.data?.groups ?? []).find((group) => group.id === groupId)?.name ?? ""}
+            groupId={excelGroup}
+            groupName={(board.data?.groups ?? []).find((group) => group.id === excelGroup)?.name ?? ""}
             open={excelOpen}
             onOpenChange={setExcelOpen}
           />
+          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Cài đặt giá</DialogTitle>
+              </DialogHeader>
+              <ShelfTools groupId={excelGroup} channel={displayChannel === "mo_home" ? "tai_tiem" : displayChannel} />
+              <p className="text-sm text-muted-foreground">Giá vốn và phí kênh nằm ở Cài đặt chi phí. Tạo khổ giá vẫn mở từ nút + Tạo.</p>
+            </DialogContent>
+          </Dialog>
         </>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        {(board.data?.groups ?? []).map((group) => (
-          <button
-            key={group.id}
-            type="button"
-            onClick={() => setGroupId(group.id)}
-            className={`min-h-11 rounded-full px-4 text-sm font-semibold ${groupId === group.id ? "bg-accent text-accent-foreground" : "bg-card"}`}
-          >
-            {group.name}
-          </button>
-        ))}
+      <input
+        value={q}
+        onChange={(event) => setQ(event.target.value)}
+        placeholder="Tìm tên, mã sản phẩm..."
+        aria-label="Tìm tên, mã sản phẩm..."
+        className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm"
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <select className={selectClass} aria-label="Tất cả nhóm" value={groupId} onChange={(event) => setGroupId(event.target.value)}>
+          <option value="all">Tất cả nhóm</option>
+          {(board.data?.groups ?? []).map((group) => (
+            <option key={group.id} value={group.id}>
+              {group.name}
+            </option>
+          ))}
+        </select>
+        <select className={selectClass} aria-label="Tất cả kênh" value={channel} onChange={(event) => setChannel(event.target.value as Channel | "all")}>
+          <option value="all">Tất cả kênh</option>
+          {CHANNELS.map((item) => (
+            <option key={item} value={item}>
+              {DESK_CHANNEL_LABEL[item]}
+            </option>
+          ))}
+        </select>
+        <label className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium">
+          <Switch checked={inStock} onCheckedChange={setInStock} aria-label="Có tồn kho" />
+          Có tồn kho
+        </label>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {CHANNELS.map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => setChannel(item)}
-            className={`min-h-11 rounded-full px-4 text-sm font-semibold ${channel === item ? "bg-primary text-primary-foreground" : "bg-card"}`}
-          >
-            {CHANNEL_LABEL[item]}
-          </button>
-        ))}
-      </div>
-      {owner && channel !== "mo_home" ? <ShelfTools groupId={groupId} channel={channel} /> : null}
       {(board.data?.rows.length ?? 0) === 0 && !board.isLoading ? (
         <p className="rounded-2xl bg-card px-4 py-3 text-sm">
           Nhóm này chưa có mã. Cần bảng giá: mã, tên, nhóm (ép gỗ lụa, khung gỗ, khung nhôm hoặc album photobook), khổ cm, số tấm, giá bán nội bộ, vốn vật tư, và định mức nếu khác hàng Nhà In.
@@ -130,22 +143,36 @@ function PricePage() {
           ))}
         </div>
       ) : null}
-      <FilterChips label="Giá kênh đang chọn" value={priced} chips={priceChips} onChange={setPriced} />
-      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="khổ" onPage={list.setPage} />
-      <div className="overflow-hidden rounded-md border bg-card">
-        <div className="hidden grid-cols-[3rem_7rem_minmax(0,1.2fr)_8rem_7rem_minmax(0,1fr)] gap-2 border-b bg-muted/40 px-3 py-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase md:grid">
-          <span>STT</span>
-          <span>Mã SP</span>
-          <span>Tên sản phẩm</span>
-          <span>Giá bán</span>
-          <span>Lãi</span>
-          <span>Trạng thái</span>
-        </div>
-        <div className="divide-y">
-          {list.slice.map((row, index) => (
-            <PriceRow key={`${row.skuId}-${channel}`} row={row} channel={channel} owner={owner} stt={list.start + index + 1} />
-          ))}
-        </div>
+      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="sản phẩm" onPage={list.setPage} />
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full min-w-[880px] text-sm">
+          <thead>
+            <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+              <th className="px-3 py-3">STT</th>
+              <th className="px-3 py-3">Mã SP</th>
+              <th className="px-3 py-3">Tên sản phẩm</th>
+              <th className="px-3 py-3">Nhóm SP</th>
+              <th className="px-3 py-3">Kênh</th>
+              <th className="px-3 py-3 text-right">Giá</th>
+              <th className="px-3 py-3 text-right">Tồn kho</th>
+              <th className="px-3 py-3">Trạng thái</th>
+              <th className="px-3 py-3" />
+            </tr>
+          </thead>
+          <tbody>
+            {list.slice.map((row, index) => (
+              <PriceRow
+                key={row.skuId}
+                row={row}
+                channel={displayChannel}
+                groupName={(board.data?.groups ?? []).find((group) => group.id === row.groupId)?.name ?? row.groupId}
+                owner={owner}
+                stt={list.start + index + 1}
+              />
+            ))}
+          </tbody>
+        </table>
+        {inStock ? <p className="px-4 py-8 text-center text-sm text-slate-500">Chưa có tồn thành phẩm. Hàng in theo đơn, vật tư nằm ở Kho.</p> : null}
       </div>
       {owner ? <Calculator skus={board.data?.rows ?? []} /> : <p className="text-sm text-muted-foreground">Máy tính giá vốn và lãi chỉ chủ xem.</p>}
       {owner ? <BomEditor skus={board.data?.rows ?? []} /> : null}
@@ -220,9 +247,18 @@ const PRICE_STATUS: Record<string, string> = {
   cho_duyet: "Chờ duyệt",
 };
 
+const CHANNEL_PILL: Record<Channel, string> = {
+  tai_tiem: "bg-slate-100 text-slate-700",
+  facebook: "bg-blue-100 text-blue-800",
+  tiktok: "bg-pink-100 text-pink-800",
+  shopee: "bg-orange-100 text-orange-800",
+  mo_home: "bg-violet-100 text-violet-800",
+};
+
 function PriceRow({
   row,
   channel,
+  groupName,
   owner,
   stt,
 }: {
@@ -236,15 +272,12 @@ function PriceRow({
     prices: Record<string, { price: number | null; listPrice?: number | null; status: string; note: string; profit?: number | null; marginPercent?: number | null; sold?: boolean }>;
   };
   channel: Channel;
+  groupName: string;
   owner: boolean;
   stt: number;
 }) {
   const queryClient = useQueryClient();
   const cell = row.prices[channel] ?? { price: null, status: "dang_ban", note: "" };
-  const margin =
-    cell.profit === null || cell.profit === undefined
-      ? "Chưa đủ số"
-      : `${formatMaybe(cell.profit)}${cell.marginPercent === null || cell.marginPercent === undefined ? "" : ` · ${cell.marginPercent}%`}`;
   const [open, setOpen] = useState(false);
   const [price, setPrice] = useState("");
   const [status, setStatus] = useState(cell.status);
@@ -299,33 +332,46 @@ function PriceRow({
     }
   }
 
+  const tagged = CHANNELS.filter((item) => row.soldOn?.includes(item) || row.prices[item]?.price != null);
+  const shownTags = tagged.slice(0, 2);
+  const extraTags = tagged.length - shownTags.length;
   return (
-    <article className="grid gap-2 p-3 md:grid-cols-[3rem_7rem_minmax(0,1.2fr)_8rem_7rem_minmax(0,1fr)] md:items-center md:gap-2 md:px-3">
-      <p className="hidden text-[13px] text-muted-foreground md:block">{stt}</p>
-      <p className="font-semibold md:text-[13px]">
-        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[12px]">{row.code}</span>
-      </p>
-      <div className="text-[13px]">
-        <p className="font-medium">{row.name}</p>
-        <p className="text-xs text-muted-foreground">Vốn {formatMaybe(row.sheetCost)}</p>
-        {cell.sold ? null : <p className="text-xs font-semibold text-muted-foreground">Không bán ở kênh này</p>}
-        {pack ? <p className="text-xs text-muted-foreground">Gói {row.piecesPerPack ?? "—"} miếng</p> : null}
-      </div>
-      <div>
-        <p className="text-[13px] font-semibold">{cell.price === null ? "Chưa có" : formatMaybe(cell.price)}</p>
-        {cell.listPrice != null && cell.listPrice !== cell.price ? (
-          <p className="mt-1 text-xs text-muted-foreground">Niêm yết {formatMaybe(cell.listPrice)}</p>
-        ) : null}
-      </div>
-      <p className="text-xs font-semibold">{margin}</p>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px]">{PRICE_STATUS[cell.status] ?? cell.status}</span>
+    <tr className="border-b last:border-0">
+      <td className="px-3 py-3 text-slate-500">{stt}</td>
+      <td className="px-3 py-3">
+        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs">{row.code}</span>
+      </td>
+      <td className="px-3 py-3 font-medium text-slate-900">{row.name}</td>
+      <td className="px-3 py-3 text-slate-600">{groupName}</td>
+      <td className="px-3 py-3">
+        <div className="flex flex-wrap gap-1">
+          {shownTags.map((item) => (
+            <span key={item} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${CHANNEL_PILL[item]}`}>
+              {DESK_CHANNEL_LABEL[item]}
+            </span>
+          ))}
+          {extraTags > 0 ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">+{extraTags} khác</span> : null}
+        </div>
+      </td>
+      <td className="px-3 py-3 text-right font-semibold tabular-nums">{cell.price === null ? "—" : formatVnd(cell.price)}</td>
+      <td className="px-3 py-3 text-right text-slate-400">—</td>
+      <td className="px-3 py-3">
+        <Switch checked={Boolean(cell.sold)} disabled={!owner} aria-label={`Trạng thái ${row.code}`} onCheckedChange={(next) => void toggleSold(next)} />
+      </td>
+      <td className="px-3 py-3 text-right">
         {owner ? (
-          <Button type="button" variant="outline" className="min-h-9 shrink-0" onClick={begin}>
-            Sửa
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="inline-flex size-9 items-center justify-center rounded-lg hover:bg-slate-100" aria-label={`Menu ${row.code}`}>
+                <MoreHorizontal className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={begin}>Sửa giá</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : null}
-      </div>
+      </td>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -369,30 +415,32 @@ function PriceRow({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </article>
+    </tr>
   );
 }
 
 function CreatePriceDialog({
+  groups,
   groupId,
-  groupName,
   open,
   onOpenChange,
 }: {
+  groups: { id: string; name: string }[];
   groupId: string;
-  groupName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState<"sp" | "combo">("sp");
+  const [pickedGroup, setPickedGroup] = useState(groupId);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [sheets, setSheets] = useState("1");
-  const [walkIn, setWalkIn] = useState("");
-  const [moHome, setMoHome] = useState("");
-  const [facebook, setFacebook] = useState("");
-  const [tiktok, setTiktok] = useState("");
-  const [shopee, setShopee] = useState("");
+  const [price, setPrice] = useState("");
+  const [channels, setChannels] = useState<Channel[]>(["tai_tiem", "facebook"]);
+  const [detail, setDetail] = useState("");
   const [saving, setSaving] = useState(false);
 
   function digits(value: string) {
@@ -400,38 +448,40 @@ function CreatePriceDialog({
   }
 
   async function save() {
-    const internal = isMoHomeGroup(groupId);
-    if (!width || !height || !sheets || (internal ? !moHome : !walkIn)) {
-      toast.error(internal ? "Nhập rộng, cao, số tấm và giá nội bộ Mơ Home." : "Nhập rộng, cao, số tấm và giá tại tiệm.");
+    const found = name.match(/(\d+)\s*[x×]\s*(\d+)/);
+    const widthCm = Number(width || found?.[1] || "");
+    const heightCm = Number(height || found?.[2] || "");
+    const sheetCount = tab === "combo" ? Math.max(2, Number(sheets || "2")) : Number(sheets || "1");
+    const internal = isMoHomeGroup(pickedGroup);
+    if (!name.trim() || !price || !widthCm || !heightCm || !pickedGroup) {
+      toast.error("Nhập tên, nhóm, khổ và giá.");
       return;
     }
+    if (!internal && !channels.includes("tai_tiem")) {
+      toast.error("Nhóm Nhà In cần chọn kênh Tại tiệm. Giá Mơ Home không copy sang.");
+      return;
+    }
+    if (internal && !channels.includes("mo_home") && !channels.includes("tai_tiem")) {
+      toast.error("Nhóm Mơ Home cần giá nội bộ.");
+      return;
+    }
+    const amount = Number(price);
     const prices: Partial<Record<Channel, number>> = {};
-    if (walkIn) prices.tai_tiem = Number(walkIn);
-    if (moHome) prices.mo_home = Number(moHome);
-    if (facebook) prices.facebook = Number(facebook);
-    if (tiktok) prices.tiktok = Number(tiktok);
-    if (shopee) prices.shopee = Number(shopee);
+    for (const item of channels) prices[item] = amount;
     setSaving(true);
     try {
       const result = await createPriceSize({
         data: {
-          groupId,
-          widthCm: Number(width),
-          heightCm: Number(height),
-          sheets: Number(sheets),
+          groupId: pickedGroup,
+          widthCm,
+          heightCm,
+          sheets: sheetCount,
           prices,
+          ...(code.trim() ? { code: code.trim() } : {}),
         },
       });
-      toast.success(result.created ? "Đã tạo khổ giá" : "Khổ này đã có, đã cập nhật giá");
+      toast.success(result.created ? "Đã thêm sản phẩm" : "Khổ này đã có, đã cập nhật giá");
       onOpenChange(false);
-      setWidth("");
-      setHeight("");
-      setSheets("1");
-      setWalkIn("");
-      setMoHome("");
-      setFacebook("");
-      setTiktok("");
-      setShopee("");
       await queryClient.invalidateQueries({ queryKey: ["prices"] });
     } catch (error) {
       toast.error((error as Error).message);
@@ -440,60 +490,95 @@ function CreatePriceDialog({
     }
   }
 
+  function toggleChannel(item: Channel) {
+    setChannels((current) => (current.includes(item) ? current.filter((id) => id !== item) : [...current, item]));
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Tạo khổ giá{groupName ? ` · ${groupName}` : ""}</DialogTitle>
+          <DialogTitle>Thêm sản phẩm mới</DialogTitle>
         </DialogHeader>
+        <p className="sr-only">Tạo khổ giá</p>
+        <div className="flex gap-2">
+          {(["sp", "combo"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              className={`min-h-10 flex-1 rounded-xl text-sm font-semibold ${tab === item ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"}`}
+              onClick={() => {
+                setTab(item);
+                setSheets(item === "combo" ? "2" : "1");
+              }}
+            >
+              {item === "sp" ? "Sản phẩm" : "Combo"}
+            </button>
+          ))}
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-sm font-semibold">
-            Rộng (cm)
+            Mã sản phẩm*
+            <Input className="mt-1 min-h-11" value={code} placeholder="Để trống nếu tự sinh" onChange={(event) => setCode(event.target.value)} />
+          </label>
+          <label className="text-sm font-semibold">
+            Giá (VNĐ)*
+            <Input className="mt-1 min-h-11" inputMode="numeric" value={price} onChange={(event) => setPrice(digits(event.target.value))} />
+          </label>
+        </div>
+        <label className="text-sm font-semibold">
+          Tên sản phẩm*
+          <Input className="mt-1 min-h-11" value={name} placeholder="Ảnh gỗ 40×60" onChange={(event) => setName(event.target.value)} />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-sm font-semibold">
+            Rộng cm*
             <Input className="mt-1 min-h-11" inputMode="numeric" value={width} onChange={(event) => setWidth(digits(event.target.value))} />
           </label>
           <label className="text-sm font-semibold">
-            Cao (cm)
+            Cao cm*
             <Input className="mt-1 min-h-11" inputMode="numeric" value={height} onChange={(event) => setHeight(digits(event.target.value))} />
           </label>
+        </div>
+        {tab === "combo" ? (
           <label className="text-sm font-semibold">
             Số tấm
             <Input className="mt-1 min-h-11" inputMode="numeric" value={sheets} onChange={(event) => setSheets(digits(event.target.value))} />
           </label>
-          <label className="text-sm font-semibold">
-            {isMoHomeGroup(groupId) ? "Giá nội bộ Mơ Home" : "Giá tại tiệm"}
-            <Input
-              className="mt-1 min-h-11"
-              inputMode="numeric"
-              value={isMoHomeGroup(groupId) ? moHome : walkIn}
-              onChange={(event) => (isMoHomeGroup(groupId) ? setMoHome(digits(event.target.value)) : setWalkIn(digits(event.target.value)))}
-            />
-          </label>
-          {isMoHomeGroup(groupId) ? (
-            <label className="text-sm font-semibold">
-              Giá tại tiệm, nếu bán cả Nhà In
-              <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chỉ nội bộ" value={walkIn} onChange={(event) => setWalkIn(digits(event.target.value))} />
-            </label>
-          ) : (
-            <label className="text-sm font-semibold">
-              Giá nội bộ Mơ Home
-              <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chưa bán nội bộ" value={moHome} onChange={(event) => setMoHome(digits(event.target.value))} />
-            </label>
-          )}
-          <label className="text-sm font-semibold">
-            Facebook
-            <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chưa có" value={facebook} onChange={(event) => setFacebook(digits(event.target.value))} />
-          </label>
-          <label className="text-sm font-semibold">
-            TikTok
-            <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chưa có" value={tiktok} onChange={(event) => setTiktok(digits(event.target.value))} />
-          </label>
-          <label className="text-sm font-semibold sm:col-span-2">
-            Shopee
-            <Input className="mt-1 min-h-11" inputMode="numeric" placeholder="Để trống nếu chưa có" value={shopee} onChange={(event) => setShopee(digits(event.target.value))} />
-          </label>
+        ) : null}
+        <label className="text-sm font-semibold">
+          Nhóm sản phẩm*
+          <select className="mt-1 min-h-11 w-full rounded-xl border bg-white px-3 text-sm" value={pickedGroup} onChange={(event) => setPickedGroup(event.target.value)}>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">Kênh bán</p>
+            <div className="flex gap-2 text-xs font-semibold text-blue-600">
+              <button type="button" onClick={() => setChannels([...CHANNELS])}>Chọn tất cả</button>
+              <button type="button" onClick={() => setChannels([])}>Bỏ chọn</button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {CHANNELS.map((item) => (
+              <label key={item} className="flex min-h-10 items-center gap-2 rounded-xl border bg-white px-3 text-sm">
+                <input type="checkbox" checked={channels.includes(item)} onChange={() => toggleChannel(item)} />
+                {DESK_CHANNEL_LABEL[item]}
+              </label>
+            ))}
+          </div>
         </div>
+        <label className="text-sm font-semibold">
+          Mô tả
+          <textarea className="mt-1 min-h-24 w-full rounded-xl border bg-white px-3 py-2 text-sm" value={detail} onChange={(event) => setDetail(event.target.value)} />
+        </label>
         <DialogFooter>
-          <Button className="min-h-11" disabled={saving} onClick={() => void save()}>
+          <Button className="min-h-11 rounded-xl bg-blue-600 hover:bg-blue-700" disabled={saving} onClick={() => void save()}>
             Tạo
           </Button>
         </DialogFooter>

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { applyStoreMigrations } from "./migrate-shop.ts";
-import { applyOrderDesk, deskAlerts, deskTabMeta, deskTabOf, estimateNet, listStatusChoices, maskBuyer, shipModeOf } from "./order-desk.ts";
+import { applyOrderDesk, deskAlerts, deskTabMeta, deskTabOf, estimateNet, listStatusChoices, maskBuyer, productionLane, productionMove, shipModeOf } from "./order-desk.ts";
 import { DEFAULT_SETTINGS } from "./seed.ts";
 
 test("danh sách chỉ đưa bước kế, không nhảy", () => {
@@ -27,6 +27,15 @@ test("bốn tab làm việc, không nhảy bước xưởng", () => {
   assert.equal(deskTabOf({ status: "nhan_don", deskIssue: "tra_hang" }), "can_lam");
   assert.equal(deskTabOf({ status: "xong", deskIssue: "tra_hang" }), "xong_huy");
   assert.equal(deskTabMeta("can_lam").label, "Cần làm");
+  assert.equal(productionLane("cho_duyet"), "chua");
+  assert.equal(productionLane("in"), "in");
+  assert.equal(productionLane("dong_goi"), "goi");
+  assert.equal(productionLane("giao"), "giao");
+  assert.equal(productionLane("xong"), null);
+  assert.equal(productionMove({ status: "in", role: "production", channel: "tai_tiem" }).next, "dong_goi");
+  assert.equal(productionMove({ status: "in", role: "production", channel: "tai_tiem" }).back, null);
+  assert.equal(productionMove({ status: "dong_goi", role: "owner", channel: "tai_tiem" }).back, "in");
+  assert.equal(productionMove({ status: "nhan_don", role: "production", channel: "facebook" }).next, null);
   assert.equal(deskTabMeta("can_gui").label, "Cần gửi");
   assert.equal(deskTabMeta("xong_huy").label, "Xong/Hủy");
   assert.equal(shipModeOf({ channel: "tiktok", fulfillment: "delivery" }), "san");
