@@ -295,7 +295,7 @@ function StockBody() {
       {m === "nhap" && canIn ? <BulkReceive materials={allMaterials} owner={owner} onDone={refresh} /> : null}
       {m === "muc" && canIn ? (
         <section className="rounded-2xl border bg-card p-4">
-          <p className="mb-3 text-sm text-muted-foreground">Mỗi màu một lọ. Mã màu để trống cho đến khi có mã Canon. Mực tính lãi vẫn là 4,4% giá bán.</p>
+          <p className="mb-3 text-sm text-muted-foreground">Mỗi màu một lọ. Mã màu để trống cho đến khi có mã Canon. Giá vốn mực cần số ml trong một lọ và giá mua lọ đó. Hai ô để trống cho đến khi chủ điền.</p>
           <InkList inks={inks} onOpen={async (ink) => {
             await markInkOpened({ data: { materialId: ink.id } });
             toast.success(`Đã trừ 1 lọ ${ink.name}`);
@@ -379,6 +379,7 @@ function MaterialForms({
   const [actual, setActual] = useState("");
   const [minStock, setMinStock] = useState(material.minStock === null ? "" : String(material.minStock));
   const [packPrice, setPackPrice] = useState(material.packPrice == null ? "" : String(material.packPrice));
+  const [mlPerBottle, setMlPerBottle] = useState(material.packSize == null ? "" : String(material.packSize));
   const [leadTime, setLeadTime] = useState(String(material.leadTimeDays));
   const [name, setName] = useState(material.name);
   const [code, setCode] = useState(material.code ?? "");
@@ -444,9 +445,12 @@ function MaterialForms({
             <>
               <Input className="h-11 w-40" aria-label="Tên màu mực" placeholder="Tên màu" value={name} onChange={(e) => setName(e.target.value)} />
               <Input className="h-11 w-36" aria-label="Mã mực" placeholder="Mã màu" value={code} onChange={(e) => setCode(e.target.value)} />
+              <Input className="h-11 w-36" aria-label="ml mỗi lọ" placeholder="ml mỗi lọ" inputMode="decimal" value={mlPerBottle} onChange={(e) => setMlPerBottle(e.target.value.replace(/[^\d.]/g, ""))} />
+              <Input className="h-11 w-40" aria-label="Giá mua một lọ" placeholder="Giá mua một lọ" inputMode="numeric" value={packPrice} onChange={(e) => setPackPrice(e.target.value.replace(/[^\d]/g, ""))} />
             </>
-          ) : null}
-          <Input className="h-11 w-32" placeholder="Giá / lần mua" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
+          ) : (
+            <Input className="h-11 w-32" placeholder="Giá / lần mua" aria-label="Giá mỗi lần mua" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
+          )}
           <Input className="h-11 w-28" placeholder="Tồn tối thiểu" value={minStock} onChange={(e) => setMinStock(e.target.value)} />
           <Input className="h-11 w-28" placeholder="Ngày chờ hàng" value={leadTime} onChange={(e) => setLeadTime(e.target.value)} />
           <Button
@@ -457,7 +461,7 @@ function MaterialForms({
                 data: {
                   materialId: material.id,
                   packPrice: packPrice.trim() === "" ? null : Number(packPrice),
-                  packSize: material.packSize,
+                  packSize: ink ? (mlPerBottle.trim() === "" ? null : Number(mlPerBottle)) : material.packSize,
                   minStock: minStock.trim() === "" ? null : Number(minStock),
                   supplier,
                   leadTimeDays: leadTime.trim() === "" ? null : Number(leadTime),
