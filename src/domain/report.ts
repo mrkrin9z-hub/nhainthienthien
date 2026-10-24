@@ -1,4 +1,5 @@
 import { fixedCostsApply, quoteSku, vnMonth, vnYmd } from "./calc.ts";
+import { linesForSku } from "./group-supply.ts";
 import { laborBill, orderInScope, reportScopeLabel, type ReportScope } from "./mohome.ts";
 import { previousMonth, wasteDayStats, wasteMonth, wasteMonthCompare, type WasteDayStat, type WasteSlice } from "./waste.ts";
 import { fixedRows } from "./views.ts";
@@ -108,7 +109,7 @@ function lineProfit(state: ShopState, order: Order): LineProfit {
       price: item.lineTotal,
       channel: order.channel,
       settings: state.settings,
-      boms: state.boms,
+      boms: linesForSku(state, sku),
       materials: state.materials,
       affiliate: false,
     });

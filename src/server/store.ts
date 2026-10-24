@@ -11,6 +11,8 @@ const SHOP_KEY = "shop_state";
 const BACKUP_PREFIX = "shop_backup:";
 
 let cached: ShopState | null = null;
+let cachedAt = 0;
+const KV_CACHE_MS = 8_000;
 let queue: Promise<void> = Promise.resolve();
 
 export function usesSupabase(): boolean {
@@ -152,13 +154,14 @@ async function loadWhere(where: Where): Promise<ShopState> {
 
 export async function readState(): Promise<ShopState> {
   const where = await persistence();
-  if (where === "file" && cached) {
+  const warm = cached && (where === "file" || Date.now() - cachedAt < KV_CACHE_MS);
+  if (warm && cached) {
     void ensureDailyBackup(cached);
     return structuredClone(cached);
   }
   const state = await loadWhere(where);
-  if (where === "file") cached = state;
-  else cached = null;
+  cached = state;
+  cachedAt = Date.now();
   void ensureDailyBackup(state);
   return structuredClone(state);
 }
@@ -170,8 +173,10 @@ export async function mutate<T>(fn: (state: ShopState) => T | Promise<T>): Promi
       write: async (next, expected) => {
         const where = await persistence();
         const ok = await writeIfVersion(next, expected, where);
-        if (ok && where === "file") cached = next;
-        if (ok && where !== "file") cached = null;
+        if (ok) {
+          cached = next;
+          cachedAt = Date.now();
+        }
         if (ok) void ensureDailyBackup(next);
         return ok;
       },

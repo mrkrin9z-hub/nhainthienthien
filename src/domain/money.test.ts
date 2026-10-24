@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { appendCollection, buildLedger, expenseReport, expenseStamp, handoverError, holderBalances, ordersToCollect, SHOP_TILL_ID, walletCards, walletOfMethod, type CashOrder } from "./money.ts";
+import { appendCollection, buildLedger, expenseReport, expenseStamp, handoverError, holderBalances, inkPurchaseExpense, ordersToCollect, SHOP_TILL_ID, walletCards, walletOfMethod, type CashOrder } from "./money.ts";
 
 function order(partial: Partial<CashOrder> & Pick<CashOrder, "id" | "code">): CashOrder {
   return {
@@ -156,6 +156,38 @@ test("nộp tiền mặt chuyển từ người thu sang két, ví cửa hàng k
   assert.equal(after[0]?.staffId, SHOP_TILL_ID);
   const lines = buildLedger({ orders, expenses: [], adjusts: [] });
   assert.equal(walletCards(lines, "2026-10").find((card) => card.id === "tien_mat")?.balance, 80000);
+});
+
+test("nhập mực theo lọ vào chi phí tháng, không trừ ví", () => {
+  const bought = inkPurchaseExpense({
+    materialName: "Mực màu 1",
+    packs: 2,
+    packPrice: 5000,
+    at: "2026-10-24T10:00:00.000Z",
+    by: "owner",
+    note: "",
+  });
+  assert.ok(bought);
+  assert.equal(bought.name, "Nhập Mực màu 1");
+  assert.equal(bought.amount, 10000);
+  assert.equal(bought.category, "muc_in");
+  assert.equal(bought.month, "2026-10");
+  assert.equal(bought.note, "2 lọ");
+  assert.equal("wallet" in bought && bought.wallet, false);
+  assert.equal(inkPurchaseExpense({ materialName: "Mực màu 1", packs: 1, packPrice: null, at: "2026-10-24T10:00:00.000Z", by: "owner" }), null);
+  assert.equal(inkPurchaseExpense({ materialName: "Mực màu 1", packs: 1, packPrice: 0, at: "2026-10-24T10:00:00.000Z", by: "owner" }), null);
+  const report = expenseReport(
+    [
+      { id: "e1", ...bought },
+      { id: "e2", name: "Mực in tháng", amount: 1000, note: "", at: "2026-10-24T11:00:00.000Z", month: "2026-10", category: "muc_in", wallet: "tien_mat", by: "owner" },
+    ],
+    "2026-10",
+  );
+  assert.equal(report.total, 11000);
+  assert.equal(report.byCategory.find((row) => row.id === "muc_in")?.label, "Mực in");
+  assert.equal(report.byCategory.find((row) => row.id === "muc_in")?.amount, 11000);
+  assert.equal(report.byWallet.find((row) => row.id === "tien_mat")?.amount, 1000);
+  assert.equal(report.unknown, 10000);
 });
 
 test("ngày chi giữa trưa giờ Việt Nam", () => {

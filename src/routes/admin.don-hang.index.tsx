@@ -1,6 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 
-import { OrderManager } from "@/components/admin/order-manager";
+import { getMe } from "@/lib/admin.functions";
+
+const OrderManager = lazy(() => import("@/components/admin/order-manager").then((mod) => ({ default: mod.OrderManager })));
 
 export const Route = createFileRoute("/admin/don-hang/")({
   validateSearch: (search: Record<string, unknown>): { status: string; q: string } => ({
@@ -11,15 +15,19 @@ export const Route = createFileRoute("/admin/don-hang/")({
 });
 
 function OrdersPage() {
+  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const navigate = Route.useNavigate();
   const { status, q } = Route.useSearch();
+  if (!me.data) return null;
   return (
-    <OrderManager
-      status={status}
-      q={q}
-      onStatus={(next, query) => {
-        void navigate({ to: "/admin/don-hang", search: { status: next, q: query } });
-      }}
-    />
+    <Suspense fallback={null}>
+      <OrderManager
+        status={status}
+        q={q}
+        onStatus={(next, query) => {
+          void navigate({ to: "/admin/don-hang", search: { status: next, q: query } });
+        }}
+      />
+    </Suspense>
   );
 }

@@ -47,9 +47,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ADMIN_MODULE_GROUPS, modulesForRole, type AdminModule, type AdminModuleGroup } from "@/admin-os/modules";
+import { AdminLogin } from "@/components/admin/admin-login";
 import { DeskTabs } from "@/components/admin/desk-tabs";
 import { LOGO_HORIZONTAL } from "@/lib/assets";
-import { changeOwnPassword, getMe, getNavCounts, loginStaff, logoutStaff } from "@/lib/admin.functions";
+import { changeOwnPassword, getMe, getNavCounts, logoutStaff } from "@/lib/admin.functions";
 import { ROLE_LABEL, type Role } from "@/domain/types";
 
 const ICONS: Record<string, typeof LayoutDashboard> = {
@@ -177,12 +178,12 @@ function initials(name: string) {
   return letters.toUpperCase().slice(0, 2) || "U";
 }
 
-export function AdminShell() {
+export function AdminShell({ initialMe = undefined }: { initialMe?: Awaited<ReturnType<typeof getMe>> }) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const search = useRouterState({ select: (state) => state.location.search as Record<string, unknown> });
-  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
+  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe(), initialData: initialMe });
   const counts = useQuery({ queryKey: ["nav-counts"], queryFn: () => getNavCounts(), enabled: Boolean(me.data) && !me.data.mustChangePassword });
   const [menuOpen, setMenuOpen] = useState(false);
   const [narrow, setNarrow] = useState(false);
@@ -327,7 +328,10 @@ const GROUP_ICONS: Record<string, typeof LayoutDashboard> = {
   "Tổng quan": LayoutDashboard,
   "Đơn hàng": ClipboardList,
   "Sản xuất": ClipboardList,
-  "Sản phẩm & giá": Tags,
+  "Sản phẩm": Tags,
+  "Tiền": HandCoins,
+  "Thống kê báo cáo": BarChart3,
+  "Thống kê khách hàng": Users,
   "Kho vật tư": Package,
   "Nhân sự": Users,
   "Cài đặt": Settings,
@@ -337,7 +341,7 @@ function groupTile(title: string | undefined): string {
   if (title === "Nhân sự") return "bg-[#ffedd5] text-[#ea580c]";
   if (title === "Kho vật tư") return "bg-[#ccfbf1] text-[#0f766e]";
   if (title === "Cài đặt") return "bg-[#f1f5f9] text-[#475569]";
-  if (title === "Sản phẩm & giá") return "bg-[#fef3c7] text-[#b45309]";
+  if (title === "Sản phẩm") return "bg-[#fef3c7] text-[#b45309]";
   if (title === "Sản xuất") return "bg-[#ede9fe] text-[#6d28d9]";
   return "bg-[#e0eefe] text-[#2563eb]";
 }
@@ -517,61 +521,3 @@ function ForcePasswordChange({ onDone }: { onDone: () => void }) {
   );
 }
 
-function AdminLogin({ onDone }: { onDone: () => void }) {
-  const queryClient = useQueryClient();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [needsCode, setNeedsCode] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  return (
-    <div className="admin-desk flex min-h-screen items-center justify-center px-4 py-10">
-      <form
-        className="glass-card w-full max-w-md p-6"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          setLoading(true);
-          try {
-            const result = await loginStaff({ data: { email, password, code: code || undefined } });
-            if (result && "needsTotp" in result) {
-              setNeedsCode(true);
-              toast.message("Nhập mã 6 số từ ứng dụng xác thực.");
-              return;
-            }
-            queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "me" });
-            toast.success("Đã đăng nhập");
-            onDone();
-          } catch (error) {
-            toast.error((error as Error).message);
-          } finally {
-            setLoading(false);
-          }
-        }}
-      >
-        <img src={LOGO_HORIZONTAL} alt="Nhà In Thiên Thiên" className="mx-auto h-12 w-auto" />
-        <h1 className="mt-4 text-center text-2xl font-bold text-primary">Đăng nhập nội bộ</h1>
-        <p className="mt-1 text-center text-sm text-muted-foreground">Chủ, sale và sản xuất — mỗi người một tài khoản. Đăng nhập chưa phải chấm công.</p>
-        <div className="mt-6 space-y-4">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" autoComplete="username" className="mt-1 min-h-12" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </div>
-          <div>
-            <Label htmlFor="password">Mật khẩu</Label>
-            <Input id="password" type="password" autoComplete="current-password" className="mt-1 min-h-12" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </div>
-          {needsCode ? (
-            <div>
-              <Label htmlFor="totp">Mã xác thực 6 số</Label>
-              <Input id="totp" inputMode="numeric" autoComplete="one-time-code" className="mt-1 min-h-12" value={code} onChange={(e) => setCode(e.target.value)} required />
-            </div>
-          ) : null}
-          <Button type="submit" className="min-h-12 w-full" disabled={loading}>
-            {loading ? "Đang vào…" : "Đăng nhập"}
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-}

@@ -106,7 +106,7 @@ export function materialCost(
   sku: Sku,
   boms: BomLine[],
   materials: Material[],
-): { lines: CostLine[]; total: number | null; incomplete: boolean } {
+): { lines: CostLine[]; total: number | null; known: number; incomplete: boolean } {
   const lines: CostLine[] = [];
   let total = 0;
   let incomplete = false;
@@ -140,7 +140,7 @@ export function materialCost(
       detail: `${qty} ${material.unit}`,
     });
   }
-  return { lines, total: incomplete ? null : money(total), incomplete };
+  return { lines, total: incomplete ? null : money(total), known: money(total), incomplete };
 }
 
 export function feeLines(
@@ -200,6 +200,8 @@ export function feeLines(
 export type Quote = {
   price: number | null;
   material: number | null;
+  /** Tổng các dòng đã có đơn giá, kể cả khi còn dòng thiếu giá. */
+  materialKnown: number;
   materialIncomplete: boolean;
   ink: number | null;
   fees: number | null;
@@ -226,6 +228,7 @@ export function quoteSku(input: {
     return {
       price: null,
       material: material.total,
+      materialKnown: material.known,
       materialIncomplete: material.incomplete,
       ink: null,
       fees: null,
@@ -237,8 +240,7 @@ export function quoteSku(input: {
       lines,
     };
   }
-  const ink = (input.price * input.settings.inkPercent) / 100;
-  lines.push({ name: "Mực", amount: ink, detail: `${input.settings.inkPercent}% giá bán` });
+  const ink = 0;
   const fees = feeLines(input.channel, input.price, input.settings, input.affiliate);
   lines.push(...fees);
   const shippingUnknown = fees.some((f) => f.name.startsWith("Phí ship") && f.amount === null);
@@ -257,6 +259,7 @@ export function quoteSku(input: {
   return {
     price: input.price,
     material: material.total,
+    materialKnown: material.known,
     materialIncomplete: material.incomplete,
     ink,
     fees: feesIncomplete ? null : feeSum,
@@ -277,12 +280,11 @@ export function sheetMargin(
   settings: Settings,
 ): { profit: number | null; marginPercent: number | null } {
   if (price === null || sheetCost === null) return { profit: null, marginPercent: null };
-  const ink = (price * settings.inkPercent) / 100;
   const fees = feeLines(channel, price, settings, false);
   const known = fees.filter((fee) => !(fee.name.startsWith("Phí ship") && fee.amount === null));
   if (known.some((fee) => fee.amount === null)) return { profit: null, marginPercent: null };
   const feeSum = known.reduce((sum, fee) => sum + (fee.amount ?? 0), 0);
-  const profit = money(price - sheetCost - ink - feeSum);
+  const profit = money(price - sheetCost - feeSum);
   return {
     profit,
     marginPercent: price === 0 ? null : Math.round((profit / price) * 1000) / 10,

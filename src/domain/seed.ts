@@ -4,6 +4,7 @@ import { ensureChecklistTasks } from "./checklists.ts";
 import { applyDeskSheetCosts, inkBottles } from "./desk-supply.ts";
 import { catalogPrices, DESK_PRODUCT_DESCRIPTION, DESK_PRODUCT_NAME, MIN_STOCK_20261022, stampSheetCosts } from "./price-import.ts";
 import { formulaQty } from "./calc.ts";
+import { defaultGroupSupplies, defaultSizeOverrides } from "./group-supply.ts";
 import { CAR_MAGNET_SIZES, FRIDGE_MAGNET_SIZES, PHOTO_PRINT_SIZES } from "./sizes.ts";
 import { DEFAULT_ROLE_MODULES, defaultNotifyPrefs, defaultSePay, defaultShopChannels } from "./org-desk.ts";
 import type { BomLine, ChannelPrice, Group, Material, Settings, ShopState, Sku } from "./types.ts";
@@ -78,6 +79,9 @@ export const DEFAULT_SETTINGS: Settings = {
   menuLinks20261022: true,
   taskMenu20261023: true,
   deskBom20261023: true,
+  groupSupply20261024: true,
+  inkMl20261024: true,
+  inkExpense20261024: true,
   checklist20261023: true,
   platformFeeNote:
     "Hoạch toán sàn: 27% + 11.000đ/đơn. Bảng phí từng hạng mục trong file Phi-san ghi chưa xác minh, chỉ để đối chiếu.",
@@ -525,6 +529,8 @@ export async function buildSeed(): Promise<ShopState> {
     prices: prices(skus),
     materials: materialRows,
     boms,
+    groupSupplies: defaultGroupSupplies(settings),
+    sizeOverrides: defaultSizeOverrides(),
     customers: [],
     orders: [],
     reprints: [],

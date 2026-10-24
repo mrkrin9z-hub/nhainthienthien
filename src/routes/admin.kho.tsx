@@ -61,7 +61,7 @@ function StockHub() {
           title: "Nhập và hao hụt",
           cards: [
             { id: "nhap", title: "Nhập vật tư", blurb: "Ghi lần mua giấy, gỗ, nam châm hoặc mực.", to: "/admin/kho", search: { m: "nhap" }, icon: PackagePlus, roles: ["owner", "sale"] },
-            { id: "muc", title: "Mở lọ mực", blurb: "Trừ một lọ khi mở màu mới. Mực tính lãi vẫn là 4,4%.", to: "/admin/kho", search: { m: "muc" }, icon: Droplets, roles: ["owner", "sale"] },
+            { id: "muc", title: "Mở lọ mực", blurb: "Trừ một lọ khi mở màu mới. Không trừ theo từng bản in.", to: "/admin/kho", search: { m: "muc" }, icon: Droplets, roles: ["owner", "sale"] },
             { id: "hong", title: "Báo hỏng", blurb: "Phiếu hỏng, hao hụt và ảnh kèm theo.", to: "/admin/kho", search: { m: "hong" }, icon: TriangleAlert },
           ],
         },
@@ -295,7 +295,7 @@ function StockBody() {
       {m === "nhap" && canIn ? <BulkReceive materials={allMaterials} owner={owner} onDone={refresh} /> : null}
       {m === "muc" && canIn ? (
         <section className="rounded-2xl border bg-card p-4">
-          <p className="mb-3 text-sm text-muted-foreground">Mỗi màu một lọ. Mã màu để trống cho đến khi có mã Canon. Mực tính lãi vẫn là 4,4% giá bán.</p>
+          <p className="mb-3 text-sm text-muted-foreground">Mỗi màu một lọ. Tồn chỉ đổi khi nhập, mở lọ hoặc ghi số đếm. Giá trên phiếu nhập vào chi phí tháng, không vào giá vốn từng sản phẩm. Chưa ghi giá thì dùng Chi tiền, mục Mực in.</p>
           <InkList inks={inks} onOpen={async (ink) => {
             await markInkOpened({ data: { materialId: ink.id } });
             toast.success(`Đã trừ 1 lọ ${ink.name}`);
@@ -445,8 +445,9 @@ function MaterialForms({
               <Input className="h-11 w-40" aria-label="Tên màu mực" placeholder="Tên màu" value={name} onChange={(e) => setName(e.target.value)} />
               <Input className="h-11 w-36" aria-label="Mã mực" placeholder="Mã màu" value={code} onChange={(e) => setCode(e.target.value)} />
             </>
-          ) : null}
-          <Input className="h-11 w-32" placeholder="Giá / lần mua" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
+          ) : (
+            <Input className="h-11 w-32" placeholder="Giá / lần mua" aria-label="Giá mỗi lần mua" value={packPrice} onChange={(e) => setPackPrice(e.target.value)} />
+          )}
           <Input className="h-11 w-28" placeholder="Tồn tối thiểu" value={minStock} onChange={(e) => setMinStock(e.target.value)} />
           <Input className="h-11 w-28" placeholder="Ngày chờ hàng" value={leadTime} onChange={(e) => setLeadTime(e.target.value)} />
           <Button
@@ -456,8 +457,8 @@ function MaterialForms({
               await saveMaterial({
                 data: {
                   materialId: material.id,
-                  packPrice: packPrice.trim() === "" ? null : Number(packPrice),
-                  packSize: material.packSize,
+                  packPrice: ink ? (material.packPrice ?? null) : packPrice.trim() === "" ? null : Number(packPrice),
+                  packSize: ink ? 1 : material.packSize,
                   minStock: minStock.trim() === "" ? null : Number(minStock),
                   supplier,
                   leadTimeDays: leadTime.trim() === "" ? null : Number(leadTime),

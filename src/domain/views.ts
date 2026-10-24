@@ -1,4 +1,5 @@
 import { fixedCostsApply, isWeeklyOff, kpiTarget, quoteSku, vnParts, vnYmd, vnMonth } from "./calc.ts";
+import { linesForSku } from "./group-supply.ts";
 import { checklistBadge } from "./checklists.ts";
 import { commissionForSale } from "./commission.ts";
 import { materialForecast } from "./forecast.ts";
@@ -186,12 +187,13 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
         grossIncomplete = true;
         continue;
       }
+      const priced = { ...sku, sheets: sku.sheets * item.quantity };
       const quote = quoteSku({
-        sku,
+        sku: priced,
         price: item.unitPrice * item.quantity,
         channel: order.channel,
         settings: state.settings,
-        boms: state.boms,
+        boms: linesForSku(state, sku),
         materials: state.materials,
         affiliate: false,
       });
@@ -336,7 +338,7 @@ export function orderDetail(state: ShopState, order: Order, role: Role) {
             price: item.lineTotal,
             channel: order.channel,
             settings: state.settings,
-            boms: state.boms,
+            boms: linesForSku(state, sku),
             materials: state.materials,
             affiliate: false,
           });

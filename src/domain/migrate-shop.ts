@@ -2,6 +2,7 @@ import { ensureChecklistTasks } from "./checklists.ts";
 import { ensureMoHome } from "./mohome.ts";
 import { ensureWaste } from "./waste.ts";
 import { applyDeskSheetCosts, applyDeskSupplies } from "./desk-supply.ts";
+import { ensureGroupSupplies, ensureInkExpenseModel, ensureInkMillilitres } from "./group-supply.ts";
 import { ensureOrgCollections } from "./org-desk.ts";
 import {
   applyApprovedHr,
@@ -53,6 +54,7 @@ type Migratable = {
     notifyPrefs?: NotifyPrefs;
     catalogImport20261022?: boolean;
     deskBom20261023?: boolean;
+    groupSupply20261024?: boolean;
     fixedCosts?: Settings["fixedCosts"];
     publicHours?: string;
   };
@@ -61,6 +63,8 @@ type Migratable = {
   prices?: ChannelPrice[];
   materials?: Material[];
   boms?: BomLine[];
+  groupSupplies?: import("./types.ts").GroupSupply[];
+  sizeOverrides?: import("./types.ts").GroupSizeOverride[];
   orders?: (Order | { code?: string; isTest?: boolean; customerId?: string; items: { name: string }[]; history?: { note: string }[]; customerNote?: string; internalNote?: string; stockWarning?: string })[];
   customers?: { id: string; name: string; phone: string }[];
   staff?: { id: string; email: string; name: string; role: Role | string }[];
@@ -182,6 +186,9 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (grantDeskLinks(state)) changed = true;
   if (grantTaskMenu(state)) changed = true;
   if (applyDeskSupplies(state as unknown as Parameters<typeof applyDeskSupplies>[0])) changed = true;
+  if (ensureGroupSupplies(state as unknown as Parameters<typeof ensureGroupSupplies>[0])) changed = true;
+  if (ensureInkMillilitres(state as unknown as Parameters<typeof ensureInkMillilitres>[0])) changed = true;
+  if (ensureInkExpenseModel(state as unknown as Parameters<typeof ensureInkExpenseModel>[0])) changed = true;
   if (ensureChecklistTasks(state)) changed = true;
   if (ensureOrgCollections(state)) changed = true;
   if (ensureMoHome(state)) changed = true;

@@ -7,9 +7,12 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
-import { Toaster } from "@/components/ui/sonner";
+const Toaster = lazy(() => import("@/components/ui/sonner").then((mod) => ({ default: mod.Toaster })));
+
+const FONT_STYLESHEET =
+  "https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Nunito+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=optional";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -75,7 +78,24 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
+  head: ({ matches }) => {
+    const path = matches[matches.length - 1]?.pathname ?? "/";
+    const admin = path.startsWith("/admin");
+    const links: Array<Record<string, string>> = [
+      { rel: "icon", href: "/favicon.png?v=3", type: "image/png", sizes: "32x32" },
+    ];
+    if (!admin) {
+      links.unshift(
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      );
+      links.push(
+        { rel: "icon", href: "/favicon.ico?v=3", sizes: "any" },
+        { rel: "manifest", href: "/manifest.webmanifest" },
+        { rel: "apple-touch-icon", href: "/brand/apple-touch-icon.png?v=2" },
+      );
+    }
+    return {
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
@@ -98,23 +118,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Nunito+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap",
-      },
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-      { rel: "icon", href: "/favicon.png?v=2", type: "image/png", sizes: "32x32" },
-      { rel: "icon", href: "/favicon.ico?v=2", sizes: "any" },
-      { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/brand/apple-touch-icon.png?v=2" },
-    ],
-  }),
+    links,
+    };
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -125,10 +131,17 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="vi">
       <head>
+        <style>{`body{margin:0;background:#f7f4ee;color:#243044;font-family:ui-sans-serif,system-ui,sans-serif}`}</style>
+        <link rel="stylesheet" href={appCss} media="print" data-app-css="1" />
         <HeadContent />
       </head>
       <body>
         {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `for(const l of document.querySelectorAll('link[data-app-css]')){const go=()=>{l.media='all'};l.addEventListener('load',go);if(l.sheet)go()}if(location.pathname.startsWith('/admin')){}else{const l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(FONT_STYLESHEET)};l.media='print';l.setAttribute('data-fonts','1');const go=()=>{l.media='all'};l.addEventListener('load',go);document.head.appendChild(l);if(l.sheet)go()}`,
+          }}
+        />
         <Scripts />
       </body>
     </html>
@@ -137,16 +150,33 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const [toasts, setToasts] = useState(false);
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    const link = document.querySelector("link[data-fonts]");
+    if (link instanceof HTMLLinkElement) link.media = "all";
+    const show = () => setToasts(true);
+    const toastTimer = window.setTimeout(show, 8000);
+    window.addEventListener("pointerdown", show, { once: true });
+    const workerTimer = window.setTimeout(() => {
+      if (!("serviceWorker" in navigator)) return;
+      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    }, 8000);
+    return () => {
+      window.clearTimeout(toastTimer);
+      window.clearTimeout(workerTimer);
+      window.removeEventListener("pointerdown", show);
+    };
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
-      <Toaster position="top-center" richColors offset={72} mobileOffset={{ top: "4.5rem" }} />
+      {toasts ? (
+        <Suspense fallback={null}>
+          <Toaster position="top-center" richColors offset={72} mobileOffset={{ top: "4.5rem" }} />
+        </Suspense>
+      ) : null}
     </QueryClientProvider>
   );
 }

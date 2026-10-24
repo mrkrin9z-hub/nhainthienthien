@@ -162,12 +162,18 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
 
   async function applyStatus(order: Row, status: OrderStatus, note: string) {
     setBusy(order.id);
+    const previous = queryClient.getQueryData<typeof orders.data>(["orders"]);
+    queryClient.setQueryData(["orders"], (current: typeof orders.data) => {
+      if (!current) return current;
+      return { ...current, orders: current.orders.map((row) => (row.id === order.id ? { ...row, status } : row)) };
+    });
     try {
       await changeStatus({ data: { orderId: order.id, status, note } });
       toast.success(`${order.code}: ${STATUS_LABEL[status]}`);
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
       await queryClient.invalidateQueries({ queryKey: ["nav-counts"] });
     } catch (error) {
+      if (previous) queryClient.setQueryData(["orders"], previous);
       toast.error((error as Error).message);
     } finally {
       setBusy(null);

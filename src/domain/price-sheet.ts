@@ -154,7 +154,8 @@ export function applyPriceDrafts(
     if (item.isNew) {
       item.sku.soldOn = soldOnForNewSku(groupId, item.prices);
       state.skus.push(item.sku);
-      state.boms.push(...copiedBoms(state, groupId, item.sku));
+      const supplied = (state as { groupSupplies?: { groupId: string }[] }).groupSupplies?.some((row) => row.groupId === groupId);
+      if (!supplied) state.boms.push(...copiedBoms(state, groupId, item.sku));
       created += 1;
     } else updated += 1;
     for (const channel of CHANNELS) {

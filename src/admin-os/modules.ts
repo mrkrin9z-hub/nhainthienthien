@@ -36,12 +36,24 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
     items: [{ to: "/admin/san-xuat", label: "Sản xuất", roles: ["owner", "production"], mode: "live" }],
   },
   {
-    title: "Sản phẩm & giá",
-    items: [{ to: "/admin/gia", label: "Sản phẩm & giá", roles: ["owner", "sale"], mode: "live" }],
+    title: "Sản phẩm",
+    items: [{ to: "/admin/gia", label: "Sản phẩm", roles: ["owner", "sale"], mode: "live" }],
   },
   {
     title: "Kho vật tư",
     items: [{ to: "/admin/kho", label: "Kho vật tư", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" }],
+  },
+  {
+    title: "Tiền",
+    items: [{ to: "/admin/thu", label: "Tiền", roles: ["owner", "sale"], mode: "live" }],
+  },
+  {
+    title: "Thống kê báo cáo",
+    items: [{ to: "/admin/bao-cao", label: "Thống kê báo cáo", roles: ["owner"], mode: "live" }],
+  },
+  {
+    title: "Thống kê khách hàng",
+    items: [{ to: "/admin/khach", label: "Thống kê khách hàng", roles: ["owner", "sale"], mode: "live" }],
   },
   {
     title: "Nhân sự",

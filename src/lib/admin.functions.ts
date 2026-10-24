@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { CHANNELS } from "@/domain/types";
+import { CHANNELS, SUPPLY_SCALES } from "@/domain/types";
 import type { Actor } from "@/server/service";
 
 async function session(): Promise<Actor> {
@@ -480,6 +480,41 @@ export const saveBomQty = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const getGroupSupply = createServerFn({ method: "GET" }).handler(async () => {
+  const { groupSupplyBoard } = await import("@/server/service");
+  return groupSupplyBoard(await actor());
+});
+
+export const createProductGroup = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ name: z.string().min(2).max(80) }).parse(data))
+  .handler(async ({ data }) => {
+    const { createProductGroup: create } = await import("@/server/service");
+    return create(await actor(), data);
+  });
+
+const supplyRule = z.object({
+  materialId: z.string(),
+  phase: z.enum(["print", "pack"]),
+  scale: z.enum(SUPPLY_SCALES),
+  qty: z.number().min(0).nullable(),
+  rollWidthCm: z.number().positive().nullable(),
+});
+
+const sizeOverride = z.object({
+  size: z.string().max(20),
+  materialId: z.string(),
+  phase: z.enum(["print", "pack"]),
+  qty: z.number().min(0).nullable(),
+});
+
+export const saveGroupSupply = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ groupId: z.string(), rules: z.array(supplyRule).max(40), overrides: z.array(sizeOverride).max(80) }).parse(data))
+  .handler(async ({ data }) => {
+    const { saveGroupSupply: save } = await import("@/server/service");
+    await save(await actor(), data);
+    return { ok: true };
+  });
+
 export const getWaste = createServerFn({ method: "GET" }).handler(async () => {
   const { wasteBoard } = await import("@/server/service");
   return wasteBoard(await actor());
@@ -708,7 +743,7 @@ export const saveExpense = createServerFn({ method: "POST" })
         name: z.string(),
         amount: z.number(),
         note: z.string().optional().default(""),
-        category: z.enum(["mat_bang", "dien_nuoc", "vat_tu", "van_chuyen", "nhan_su", "sua_chua", "khac"]).optional(),
+        category: z.enum(["mat_bang", "dien_nuoc", "vat_tu", "muc_in", "van_chuyen", "nhan_su", "sua_chua", "khac"]).optional(),
         wallet: z.enum(["tien_mat", "chuyen_khoan"]).optional(),
         date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       })
