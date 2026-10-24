@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { OrderCommercePanel } from "@/components/admin/order-commerce";
 import { OrderDesk, type DeskSku } from "@/components/admin/order-desk";
 import { OrderQrDialog } from "@/components/admin/order-qr-dialog";
 import { WaybillBox } from "@/components/admin/waybill-box";
@@ -126,7 +127,9 @@ function OrderDetailPage() {
       </div>
 
       {tab === "thong-tin" ? (
-        role === "production" ? (
+        <>
+        <OrderCommercePanel order={data} money={role !== "production"} />
+        {role === "production" ? (
           <section className="rounded-md border bg-card p-4">
             <h2 className="font-semibold text-primary">Sản phẩm</h2>
             <ul className="mt-2 space-y-1 text-sm">
@@ -199,7 +202,8 @@ function OrderDetailPage() {
               await refresh();
             }}
           />
-        )
+        )}
+        </>
       ) : null}
 
       {tab === "khach" ? (

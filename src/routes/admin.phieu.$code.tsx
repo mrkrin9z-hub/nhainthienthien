@@ -8,6 +8,9 @@ import { BRAND, formatMaybe } from "@/lib/brand";
 import { getOrderDetail, orderUploadLink } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/phieu/$code")({
+  validateSearch: (search: Record<string, unknown>): { loai: string } => ({
+    loai: search.loai === "sx" ? "sx" : "",
+  }),
   component: SlipPage,
 });
 
@@ -23,6 +26,7 @@ function SlipPage() {
 
 function SlipBody() {
   const { code } = Route.useParams();
+  const { loai } = Route.useSearch();
   const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
   const [paper, setPaper] = useState<Paper>("k80");
   const [qr, setQr] = useState<string | null>(null);
@@ -91,7 +95,7 @@ function SlipBody() {
       `}</style>
       <div className="no-print flex flex-wrap items-center gap-2">
         <Button className="min-h-12" onClick={() => window.print()}>In phiếu</Button>
-        {(["k80", "a5", "a4"] as const).map((size) => (
+        {loai === "sx" ? null : (["k80", "a5", "a4"] as const).map((size) => (
           <button
             key={size}
             type="button"
@@ -102,7 +106,9 @@ function SlipBody() {
           </button>
         ))}
       </div>
-      {paper === "k80" ? (
+      {loai === "sx" ? (
+        <ProductionSlip data={data} when={when} />
+      ) : paper === "k80" ? (
         <K80Slip sheetRef={sheetRef} pageHeight={k80Height} data={data} when={when} where={where} qr={qr} />
       ) : (
         <OfficeSlip data={data} when={when} where={where} qr={qr} paper={paper} />
@@ -262,6 +268,30 @@ function OfficeSlip({
           <p className="text-xs font-semibold">Gửi ảnh thiết kế</p>
         </div>
       </div>
+    </article>
+  );
+}
+
+function ProductionSlip({ data, when }: { data: SlipData; when: string }) {
+  return (
+    <article className="slip-sheet mx-auto box-border w-[72mm] bg-white p-2 text-[12px] leading-snug text-black shadow">
+      <header className="border-b border-black pb-2 text-center">
+        <p className="text-[15px] font-extrabold">NHÀ IN THIÊN THIÊN</p>
+        <p className="mt-1 text-[13px] font-extrabold">Phiếu sản xuất</p>
+        <p className="font-mono font-bold">{data.code}</p>
+        <p>{data.channelOrderId || data.channelLabel}</p>
+        <p>{when}</p>
+      </header>
+      <ul className="mt-2 space-y-2">
+        {data.items.map((item) => (
+          <li key={item.id} className="border-b border-black pb-1">
+            <p className="font-semibold">{item.sellerSku || item.skuCode}</p>
+            <p>{item.name}{item.variant ? ` · ${item.variant}` : ""}</p>
+            <p>Số lượng: {item.quantity}</p>
+          </li>
+        ))}
+      </ul>
+      {data.customerNote ? <p className="mt-2">Ghi chú: {data.customerNote}</p> : null}
     </article>
   );
 }

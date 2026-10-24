@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { vnYmd } from "@/domain/calc";
 import { skuSoldOn } from "@/domain/mohome";
+import { isMarketplace, PAYMENT_METHODS, type PaymentMethod } from "@/domain/order-desk";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { getCustomers } from "@/lib/admin.functions";
 import { formatMaybe, formatVnd } from "@/lib/brand";
@@ -49,11 +50,22 @@ export type DeskSave = {
   depositMethod: string;
   discount: number | null;
   customerShip: number | null;
+  shipBy?: string | null;
+  autoCancelAt?: string | null;
+  paymentMethod?: PaymentMethod;
+  netAmount?: number | null;
+  designFileUrl?: string | null;
   items?: { skuId: string; quantity: number; unitPrice?: number; priceReason?: string }[];
 };
 
 function blankLine(): Line {
   return { key: crypto.randomUUID(), skuId: "", query: "", quantity: 1, unitPrice: "", priceTouched: false };
+}
+
+function localIso(value: string): string | null {
+  if (!value) return null;
+  const at = new Date(value);
+  return Number.isNaN(at.getTime()) ? null : at.toISOString();
 }
 
 function digits(value: string): number {
@@ -113,6 +125,11 @@ export function OrderDesk({
   const [customerShip, setCustomerShip] = useState(initial.customerShip == null ? "" : String(initial.customerShip));
   const [priceReason, setPriceReason] = useState("");
   const [marketplaceCode, setMarketplaceCode] = useState(initial.marketplaceCode);
+  const [shipBy, setShipBy] = useState("");
+  const [autoCancelAt, setAutoCancelAt] = useState("");
+  const [commercePay, setCommercePay] = useState<PaymentMethod>("");
+  const [netAmount, setNetAmount] = useState("");
+  const [designFileUrl, setDesignFileUrl] = useState("");
   const [lines, setLines] = useState<Line[]>(
     initial.lines.length
       ? initial.lines.map((line) => ({ ...line, query: "", priceTouched: line.unitPrice !== "" }))
@@ -192,6 +209,7 @@ export function OrderDesk({
 
   function changeChannel(next: Channel) {
     setChannel(next);
+    if (isMarketplace(next)) setFulfillment("delivery");
     setLines((current) =>
       current.map((line) => {
         if (line.priceTouched || !line.skuId) return line;
@@ -233,6 +251,11 @@ export function OrderDesk({
         depositMethod: draftPaid > 0 ? method : "",
         discount: discount.trim() === "" ? null : digits(discount),
         customerShip: customerShip.trim() === "" ? null : digits(customerShip),
+        shipBy: localIso(shipBy),
+        autoCancelAt: localIso(autoCancelAt),
+        paymentMethod: commercePay,
+        netAmount: netAmount.trim() === "" ? null : digits(netAmount),
+        designFileUrl: designFileUrl.trim() || null,
         ...(itemsLocked ? {} : { items }),
       });
     } catch (error) {
@@ -271,10 +294,14 @@ export function OrderDesk({
               )}
             </Field>
             <Field label="Nhận hàng">
-              <select className={control} value={fulfillment} disabled={fieldsLocked} onChange={(event) => setFulfillment(event.target.value as "pickup" | "delivery")}>
-                <option value="pickup">Tại tiệm</option>
-                <option value="delivery">Giao hàng</option>
-              </select>
+              {isMarketplace(channel) ? (
+                <Input className="min-h-11" value="Nhãn sàn" readOnly />
+              ) : (
+                <select className={control} value={fulfillment} disabled={fieldsLocked} onChange={(event) => setFulfillment(event.target.value as "pickup" | "delivery")}>
+                  <option value="pickup">Lấy tại xưởng</option>
+                  <option value="delivery">Tự giao</option>
+                </select>
+              )}
             </Field>
             <div className="relative md:col-span-2">
               <Field label="Khách hàng" required icon={<UserRound className="size-3.5" />}>
@@ -400,8 +427,32 @@ export function OrderDesk({
             <Input className="min-h-11" type="date" min={vnYmd()} value={dueDate} disabled={fieldsLocked} onChange={(event) => setDueDate(event.target.value)} />
           </Field>
           <p className="text-xs text-muted-foreground">
-            {fulfillment === "delivery" ? "Giao hàng — cần địa chỉ khách." : "Khách nhận tại tiệm."}
+            {isMarketplace(channel) ? "Đơn sàn in nhãn của TikTok hoặc Shopee." : fulfillment === "delivery" ? "Tự giao — cần địa chỉ khách." : "Khách lấy tại xưởng."}
           </p>
+          {mode === "create" ? (
+            <div className="space-y-3">
+              <Field label="Hạn gửi">
+                <Input className="min-h-11" type="datetime-local" value={shipBy} onChange={(event) => setShipBy(event.target.value)} />
+              </Field>
+              <Field label="Tự hủy">
+                <Input className="min-h-11" type="datetime-local" value={autoCancelAt} onChange={(event) => setAutoCancelAt(event.target.value)} />
+              </Field>
+              <Field label="Thanh toán">
+                <select className={control} value={commercePay} onChange={(event) => setCommercePay(event.target.value as PaymentMethod)}>
+                  <option value="">Chưa chọn</option>
+                  {PAYMENT_METHODS.map((item) => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Thực nhận ước tính">
+                <Input className="min-h-11" inputMode="numeric" value={netAmount} placeholder="Để trống thì tự tính" onChange={(event) => setNetAmount(event.target.value.replace(/[^\d]/g, ""))} />
+              </Field>
+              <Field label="Link ảnh thiết kế">
+                <Input className="min-h-11" value={designFileUrl} placeholder="Link Google Drive" onChange={(event) => setDesignFileUrl(event.target.value)} />
+              </Field>
+            </div>
+          ) : null}
         </section>
 
         <section className={card}>

@@ -31,6 +31,7 @@ import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/im
 import { albumPhone, photoTooBig, publicUploadCard, uploadTokenShape } from "@/domain/order-upload";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
 import { marketplaceEditLocked, orderRevisionBlock } from "@/domain/order-edit";
+import { fulfillmentFor, isMarketplace, type PaymentMethod, type ShipMode } from "@/domain/order-desk";
 import {
   cleanBank,
   feedbackAnswer,
@@ -1217,6 +1218,11 @@ export async function createManualOrder(
     depositMethod: string;
     discount?: number | null;
     customerShip?: number | null;
+    shipBy?: string | null;
+    autoCancelAt?: string | null;
+    paymentMethod?: PaymentMethod;
+    netAmount?: number | null;
+    designFileUrl?: string | null;
     items: { skuId: string; quantity: number; unitPrice?: number | null; priceReason?: string }[];
   },
 ) {
@@ -1240,6 +1246,13 @@ export async function createManualOrder(
       internalNote: "",
       dueDate: input.dueDate,
       marketplaceCode: input.marketplaceCode.trim(),
+      channelOrderId: input.marketplaceCode.trim(),
+      shipBy: input.shipBy ?? null,
+      autoCancelAt: input.autoCancelAt ?? null,
+      shipMode: isMarketplace(input.channel) ? "san" : input.fulfillment === "pickup" ? "pickup" : "tu_giao",
+      paymentMethod: input.paymentMethod || "",
+      netAmount: input.netAmount ?? null,
+      designFileUrl: input.designFileUrl?.trim() || null,
       shipping: {
         ...blankShipping(),
         carrier: defaultCarrier({ channel: input.channel, source: "manual", fulfillment: input.fulfillment }),
@@ -1320,6 +1333,7 @@ export async function reviseOrder(
     order.address = input.address.trim();
     order.customerNote = input.note.trim();
     order.fulfillment = input.fulfillment;
+    order.shipMode = input.fulfillment === "pickup" ? "pickup" : "tu_giao";
     order.dueDate = input.dueDate;
     if (input.discount !== undefined) order.discount = input.discount;
     if (input.customerShip !== undefined) {
@@ -1349,6 +1363,8 @@ export async function reviseOrder(
           unitPrice,
           lineTotal: unitPrice === null ? null : unitPrice * item.quantity,
           ...(previous?.listUnitPrice !== undefined ? { listUnitPrice: previous.listUnitPrice } : {}),
+          ...(previous?.sellerSku ? { sellerSku: previous.sellerSku } : {}),
+          ...(previous?.variant ? { variant: previous.variant } : {}),
         };
       });
       const totals = sumItems(items);
@@ -1378,12 +1394,78 @@ export async function setOrderFulfillment(actor: Actor, input: { orderId: string
     const order = state.orders.find((item) => item.id === input.orderId);
     if (!order) throw new Error("Không tìm thấy đơn.");
     if (actor.role === "sale" && order.channel === "mo_home") throw new Error("Đơn Mơ Home chỉ chủ sửa.");
+    if (isMarketplace(order.channel)) throw new Error("Đơn sàn dùng nhãn của sàn, không đổi lấy tại xưởng.");
     if (order.fulfillment === input.fulfillment) return;
     const before = order.fulfillment;
     order.fulfillment = input.fulfillment;
+    order.shipMode = input.fulfillment === "pickup" ? "pickup" : "tu_giao";
     if (input.fulfillment === "pickup") order.address = "";
     order.updatedAt = nowIso();
     audit(state, actor.id, "order.fulfillment", order.id, { fulfillment: before }, { fulfillment: order.fulfillment });
+  });
+}
+
+export async function saveOrderCommerce(
+  actor: Actor,
+  input: {
+    orderId: string;
+    channelOrderId: string;
+    shipBy: string | null;
+    autoCancelAt: string | null;
+    paymentMethod: PaymentMethod;
+    netAmount: number | null;
+    designFileUrl: string;
+    shipMode: ShipMode;
+    deskIssue: "" | "giao_that_bai" | "tra_hang";
+    carrier: string;
+    tracking: string;
+    customerNote: string;
+    items: { id: string; sellerSku: string; variant: string }[];
+  },
+) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  await mutate(async (state) => {
+    const order = state.orders.find((item) => item.id === input.orderId);
+    if (!order) throw new Error("Không tìm thấy đơn.");
+    if (actor.role === "sale" && order.channel === "mo_home") throw new Error("Đơn Mơ Home chỉ chủ sửa.");
+    const marketplace = isMarketplace(order.channel);
+    if (marketplace && input.shipMode !== "san") throw new Error("Đơn TikTok và Shopee dùng nhãn sàn.");
+    if (!marketplace && input.shipMode === "san") throw new Error("Bán lẻ và Facebook chọn tự giao hoặc lấy tại xưởng.");
+    order.channelOrderId = input.channelOrderId.trim();
+    if (marketplace && !order.marketplaceCode && order.channelOrderId) order.marketplaceCode = order.channelOrderId;
+    order.shipBy = input.shipBy;
+    order.autoCancelAt = input.autoCancelAt;
+    order.designFileUrl = input.designFileUrl.trim() || null;
+    order.shipMode = input.shipMode;
+    order.fulfillment = fulfillmentFor(input.shipMode);
+    if (input.shipMode === "pickup") order.address = "";
+    order.deskIssue = input.deskIssue || null;
+    order.customerNote = input.customerNote.trim();
+    order.shipping = { ...orderShipping(order), carrier: input.carrier.trim(), tracking: input.tracking.trim() };
+    if (actor.role !== "production") {
+      order.paymentMethod = input.paymentMethod;
+      order.netAmount = input.netAmount;
+    }
+    for (const row of input.items) {
+      const item = order.items.find((line) => line.id === row.id);
+      if (!item) continue;
+      item.sellerSku = row.sellerSku.trim();
+      item.variant = row.variant.trim();
+    }
+    order.updatedAt = nowIso();
+    audit(state, actor.id, "order.commerce", order.id, null, { shipMode: order.shipMode, channelOrderId: order.channelOrderId });
+  });
+}
+
+export async function markLabelsPrinted(actor: Actor, orderIds: string[]) {
+  assertRole(actor, ["owner", "sale", "production"]);
+  await mutate(async (state) => {
+    const stamp = nowIso();
+    for (const id of orderIds) {
+      const order = state.orders.find((item) => item.id === id);
+      if (!order) continue;
+      order.labelPrintedAt = stamp;
+    }
   });
 }
 
@@ -3367,6 +3449,8 @@ async function commitMarketplaceOrders(actor: Actor, channel: MarketplaceChannel
         internalNote: notes.join(". "),
         dueDate: null,
         marketplaceCode: planned.platformOrderId,
+        channelOrderId: planned.platformOrderId,
+        shipMode: "san",
         recipientName: planned.buyer,
         shipping: {
           carrier: planned.carrier.trim() || defaultCarrier({ channel, source: "manual", fulfillment: "delivery" }),

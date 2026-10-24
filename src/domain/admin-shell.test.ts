@@ -44,10 +44,10 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(desk, /admin-desk/);
   assert.match(desk, /Thiên Thiên/);
   assert.match(desk, /aria-label="Mục quản trị"/);
-  const orders = readFileSync(new URL("../routes/admin.don-hang.index.tsx", import.meta.url), "utf8");
-  assert.match(orders, /Dạng cột/);
-  assert.match(orders, /Danh sách/);
-  assert.match(orders, /Chưa thu/);
+  const orders = readFileSync(new URL("../components/admin/order-manager.tsx", import.meta.url), "utf8");
+  assert.match(orders, /DESK_TABS/);
+  assert.match(orders, /Đánh dấu đã gửi/);
+  assert.match(orders, /In phiếu sản xuất/);
   assert.match(orders, /\/orders\/create/);
   const form = readFileSync(new URL("../components/admin/order-desk.tsx", import.meta.url), "utf8");
   assert.match(readFileSync(new URL("../routes/orders.create.tsx", import.meta.url), "utf8"), /Tạo đơn hàng mới/);
@@ -135,7 +135,7 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../components/admin/order-qr-dialog.tsx", import.meta.url), "utf8"), /gui-anh|QR|upload/i);
   assert.match(readFileSync(new URL("../components/admin/desk-tabs.tsx", import.meta.url), "utf8"), /Chuyển nộp/);
   assert.match(readFileSync(new URL("../components/admin/desk-tabs.tsx", import.meta.url), "utf8"), /Báo hỏng/);
-  assert.match(readFileSync(new URL("../routes/admin.don-hang.index.tsx", import.meta.url), "utf8"), /In bill/);
+  assert.match(readFileSync(new URL("../components/admin/order-manager.tsx", import.meta.url), "utf8"), /In bill/);
   assert.match(desk, /modulesForRole/);
   assert.match(readFileSync(new URL("../routes/admin.bao-cao-chi.tsx", import.meta.url), "utf8"), /Báo cáo chi phí/);
   const prices = readFileSync(new URL("../routes/admin.gia.tsx", import.meta.url), "utf8");
@@ -145,7 +145,8 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../routes/admin.cai-dat.tsx", import.meta.url), "utf8"), /Sửa kênh cửa hàng/);
   assert.match(readFileSync(new URL("../routes/admin.kho.tsx", import.meta.url), "utf8"), /cursor-pointer/);
   assert.match(readFileSync(new URL("../components/admin/list-page.tsx", import.meta.url), "utf8"), /Hiển thị/);
-  for (const file of ["admin.don-hang.index.tsx", "admin.kho.tsx", "admin.gia.tsx", "admin.thu.tsx", "admin.chi-phi.tsx", "admin.san-pham.tsx", "admin.san-xuat.tsx", "admin.khach.index.tsx", "admin.khach.$id.tsx", "admin.cai-dat.tsx"]) {
+  assert.match(readFileSync(new URL("../components/admin/order-manager.tsx", import.meta.url), "utf8"), /ListPager/);
+  for (const file of ["admin.kho.tsx", "admin.gia.tsx", "admin.thu.tsx", "admin.chi-phi.tsx", "admin.san-pham.tsx", "admin.san-xuat.tsx", "admin.khach.index.tsx", "admin.khach.$id.tsx", "admin.cai-dat.tsx"]) {
     assert.match(readFileSync(new URL(`../routes/${file}`, import.meta.url), "utf8"), /ListPager/);
   }
   const dash = readFileSync(new URL("../routes/admin.index.tsx", import.meta.url), "utf8");

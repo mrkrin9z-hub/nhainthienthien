@@ -60,6 +60,11 @@ export function CreateOrderForm({
             depositMethod: value.depositMethod,
             discount: value.discount,
             customerShip: value.customerShip,
+            shipBy: value.shipBy,
+            autoCancelAt: value.autoCancelAt,
+            paymentMethod: value.paymentMethod,
+            netAmount: value.netAmount,
+            designFileUrl: value.designFileUrl,
             items: value.items ?? [],
           },
         });

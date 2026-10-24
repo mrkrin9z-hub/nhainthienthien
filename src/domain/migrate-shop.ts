@@ -14,6 +14,7 @@ import {
   MIN_STOCK_20261022,
 } from "./price-import.ts";
 import { repairMojibake } from "./text-repair.ts";
+import { applyOrderDesk } from "./order-desk.ts";
 import { tiktokPriceFor } from "./tiktok-price.ts";
 import type { BomLine, ChannelPrice, Material, NotifyPrefs, Order, Role, RoleModules, SePayConfig, ServicePackage, Settings, Sku } from "./types.ts";
 
@@ -186,6 +187,7 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (ensureMoHome(state)) changed = true;
   if (ensureWaste(state as Parameters<typeof ensureWaste>[0])) changed = true;
   if (applyTiktokPrices(state)) changed = true;
+  if (applyOrderDesk(state)) changed = true;
   return changed;
 }
 
