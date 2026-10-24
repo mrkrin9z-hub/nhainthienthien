@@ -27,6 +27,7 @@ export function CreateOrderForm({
   return (
     <OrderDesk
       mode="create"
+      retail
       owner={me.data?.role === "owner"}
       fieldsLocked={false}
       itemsLocked={false}
@@ -60,7 +61,12 @@ export function CreateOrderForm({
             depositMethod: value.depositMethod,
             discount: value.discount,
             customerShip: value.customerShip,
-            items: value.items ?? [],
+            shipBy: value.shipBy,
+            autoCancelAt: value.autoCancelAt,
+            paymentMethod: value.paymentMethod,
+            netAmount: value.netAmount,
+            designFileUrl: value.designFileUrl,
+            items: (value.items ?? []).map((item) => ({ ...item, variant: item.variant ?? "" })),
           },
         });
         toast.success(`Đã tạo ${result.code}`);

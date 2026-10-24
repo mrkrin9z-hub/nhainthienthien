@@ -6,6 +6,62 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { customerUploadPath } from "@/domain/order-upload";
 import { orderUploadLink } from "@/lib/admin.functions";
 
+/** Mã khách gửi ảnh, luôn hiện trên đơn. Cùng token với phiếu in. */
+export function OrderUploadCard({ orderId, code, cancelled }: { orderId: string; code: string; cancelled?: boolean }) {
+  const [token, setToken] = useState<string | null>(null);
+  const [image, setImage] = useState<string | null>(null);
+  useEffect(() => {
+    let cancel = false;
+    void orderUploadLink({ data: { orderId, rotate: false } })
+      .then((result) => {
+        if (!cancel) setToken(result.slug);
+      })
+      .catch((error: Error) => {
+        if (!cancel) toast.error(error.message);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [orderId]);
+  const link = token && typeof window !== "undefined" ? `${window.location.origin}${customerUploadPath(token)}` : "";
+  useEffect(() => {
+    if (!link) return;
+    let cancel = false;
+    void import("qrcode").then((QR) => {
+      void QR.toDataURL(link, { width: 280, margin: 1, errorCorrectionLevel: "M" }).then((url) => {
+        if (!cancel) setImage(url);
+      });
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [link]);
+  return (
+    <section className="flex flex-wrap items-center gap-3 rounded-md border bg-card p-3">
+      {image ? <img src={image} alt={`Mã QR khách gửi ảnh cho đơn ${code}`} width={112} height={112} className="h-28 w-28" /> : <div className="grid h-28 w-28 place-items-center text-xs text-muted-foreground">Đang tạo mã…</div>}
+      <div className="min-w-0 flex-1 space-y-1">
+        <h2 className="font-semibold text-primary">Khách gửi ảnh</h2>
+        <p className="text-xs text-muted-foreground">{cancelled ? "Đơn đã hủy, link không nhận thêm ảnh." : "Khách mở link hoặc quét mã, không cần đăng nhập. Ảnh vào thư mục đơn."}</p>
+        {link ? <p className="break-all font-mono text-sm font-semibold text-primary">{link}</p> : null}
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-9"
+          disabled={!link}
+          onClick={() => {
+            void navigator.clipboard.writeText(link).then(
+              () => toast.success("Đã chép link gửi ảnh"),
+              () => toast.error("Không chép được"),
+            );
+          }}
+        >
+          Chép link
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 export function OrderQrDialog({
   open,
   onOpenChange,
@@ -18,11 +74,12 @@ export function OrderQrDialog({
   code: string;
 }) {
   const [token, setToken] = useState<string | null>(null);
+  const [staffToken, setStaffToken] = useState<string | null>(null);
   const [image, setImage] = useState<string | null>(null);
   const [staffImage, setStaffImage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const link = token && typeof window !== "undefined" ? `${window.location.origin}${customerUploadPath(token)}` : "";
-  const staffLink = token && typeof window !== "undefined" ? `${window.location.origin}/q/don/${token}` : "";
+  const staffLink = staffToken && typeof window !== "undefined" ? `${window.location.origin}/q/don/${staffToken}` : "";
 
   useEffect(() => {
     if (!open) return;
@@ -30,7 +87,10 @@ export function OrderQrDialog({
     setBusy(true);
     void orderUploadLink({ data: { orderId, rotate: false } })
       .then((result) => {
-        if (!cancel) setToken(result.token);
+        if (!cancel) {
+          setToken(result.slug);
+          setStaffToken(result.token);
+        }
       })
       .catch((error: Error) => {
         if (!cancel) toast.error(error.message);
@@ -66,7 +126,8 @@ export function OrderQrDialog({
     setBusy(true);
     try {
       const result = await orderUploadLink({ data: { orderId, rotate: true } });
-      setToken(result.token);
+      setToken(result.slug);
+      setStaffToken(result.token);
       setImage(null);
       setStaffImage(null);
       toast.success("Đã đổi mã");
@@ -104,7 +165,7 @@ export function OrderQrDialog({
             <p className="text-sm font-semibold">Gửi ảnh thiết kế</p>
           </div>
         </div>
-        {link ? <p className="break-all text-xs text-muted-foreground">{link}</p> : null}
+        {link ? <p className="break-all font-mono text-sm font-semibold text-primary">{link}</p> : null}
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"

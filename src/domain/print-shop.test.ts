@@ -118,7 +118,7 @@ test("nhận tại tiệm vào bảng giao; khách đã nhận không vượt c�
     }),
     null,
   );
-  const desk = readFileSync(new URL("../routes/admin.don-hang.index.tsx", import.meta.url), "utf8");
+  const desk = readFileSync(new URL("../components/admin/order-manager.tsx", import.meta.url), "utf8");
   assert.match(desk, /Lấy tại xưởng/);
   assert.match(desk, /Khách đã nhận/);
   assert.match(desk, /Đã giao/);

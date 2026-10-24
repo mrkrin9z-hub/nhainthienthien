@@ -142,6 +142,8 @@ export type Settings = {
   catalogImport20261022?: boolean;
   /** Đã ghi giá khách trả theo bảng TikTok 23/10 một lần. Không chạy lại. */
   tiktokPrice20261023?: boolean;
+  /** Đã gắn cách giao và mã đơn kênh cho sổ cũ. Không chạy lại. */
+  orderDesk20261024?: boolean;
   /** Đề xuất lương, KPI, hoa hồng. Khi pendingOwnerApproval = false thì số đã vào kpiTargets / lương / hoa hồng. */
   hrDraft?: HrDraft;
   /** Đã chép đề xuất nhân sự vào số đang dùng. Không chạy lại. */
@@ -463,6 +465,10 @@ export type OrderItem = {
   skuId: string;
   name: string;
   skuCode: string;
+  /** SKU người bán trên sàn, ví dụ NCX-LM11-1225. Khác mã nội bộ. */
+  sellerSku?: string;
+  /** Phân loại trên sàn (khổ, combo). */
+  variant?: string;
   quantity: number;
   unitPrice: number | null;
   lineTotal: number | null;
@@ -485,6 +491,23 @@ export type Order = {
   /** Chiến dịch / nguồn ads gắn đơn. */
   campaignId?: string | null;
   marketplaceCode: string;
+  /** Mã đơn trên TikTok hoặc Shopee. Đơn bán lẻ và Facebook để trống. */
+  channelOrderId?: string;
+  /** Hạn phải bàn giao cho hãng hoặc cho khách. */
+  shipBy?: string | null;
+  /** Mốc sàn tự hủy nếu chưa gửi. */
+  autoCancelAt?: string | null;
+  /** pickup = lấy tại xưởng, tu_giao = shop tự giao, san = nhãn TikTok/Shopee. */
+  shipMode?: "pickup" | "tu_giao" | "san";
+  paymentMethod?: "" | "cod" | "chuyen_khoan" | "tien_mat" | "vi_san";
+  /** Thực nhận ước tính sau phí. Thiếu thì trang đơn tự tính từ phí kênh. */
+  netAmount?: number | null;
+  /** Link Drive của file thiết kế. */
+  designFileUrl?: string | null;
+  /** Ghi đè tab khi giao lỗi hoặc khách trả hàng. Không đổi bước xưởng. */
+  deskIssue?: "giao_that_bai" | "tra_hang" | null;
+  /** Lần in phiếu sản xuất gần nhất. */
+  labelPrintedAt?: string | null;
   /** Tên người nhận trên sàn. Không ghi đè tên khách đã nhập tại tiệm. */
   recipientName?: string;
   shipping?: OrderShipping;
@@ -504,6 +527,8 @@ export type Order = {
   stockWarning: string;
   accessTokenHash: string;
   accessToken: string;
+  /** Mã ngắn trên link /u và mã QR. Mã hex cũ vẫn mở được và chuyển sang link này. */
+  uploadSlug?: string;
   idempotencyKey: string | null;
   createdAt: string;
   updatedAt: string;

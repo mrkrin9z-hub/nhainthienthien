@@ -10,7 +10,7 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
-import { photoLimitLabel, uploadTokenShape } from "@/domain/order-upload";
+import { photoLimitLabel, uploadKeyShape } from "@/domain/order-upload";
 import { publicStatusLabel } from "@/domain/public-status";
 import { formatMaybe } from "@/lib/brand";
 import { postFormWithProgress, putDriveFile } from "@/lib/drive-put";
@@ -65,9 +65,8 @@ function guessMime(file: File): string {
   return "image/jpeg";
 }
 
-function CustomerUploadPage() {
-  const { token } = Route.useParams();
-  const valid = uploadTokenShape(token);
+export function CustomerUploadScreen({ token }: { token: string }) {
+  const valid = uploadKeyShape(token);
   const target = useQuery({
     queryKey: ["upload-target", token],
     queryFn: () => getUploadTarget({ data: { token } }),
@@ -78,6 +77,12 @@ function CustomerUploadPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ code: string; fileCount: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const canonicalPath = (target.data as { canonicalPath?: string } | undefined)?.canonicalPath;
+  useEffect(() => {
+    if (!canonicalPath?.startsWith("/u/")) return;
+    if (window.location.pathname === canonicalPath) return;
+    window.location.replace(canonicalPath);
+  }, [canonicalPath]);
   const [openPhoto, setOpenPhoto] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState(0);
   const [photoNotes, setPhotoNotes] = useState<Record<string, string>>({});
@@ -469,4 +474,9 @@ function CustomerUploadPage() {
       ) : null}
     </div>
   );
+}
+
+function CustomerUploadPage() {
+  const { token } = Route.useParams();
+  return <CustomerUploadScreen token={token} />;
 }

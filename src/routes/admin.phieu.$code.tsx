@@ -5,9 +5,13 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { BRAND, formatMaybe } from "@/lib/brand";
+import { customerUploadPath } from "@/domain/order-upload";
 import { getOrderDetail, orderUploadLink } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/phieu/$code")({
+  validateSearch: (search: Record<string, unknown>): { loai: string } => ({
+    loai: search.loai === "sx" ? "sx" : "",
+  }),
   component: SlipPage,
 });
 
@@ -23,6 +27,7 @@ function SlipPage() {
 
 function SlipBody() {
   const { code } = Route.useParams();
+  const { loai } = Route.useSearch();
   const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
   const [paper, setPaper] = useState<Paper>("k80");
   const [qr, setQr] = useState<string | null>(null);
@@ -34,7 +39,7 @@ function SlipBody() {
     queryFn: () => orderUploadLink({ data: { orderId: data!.id, rotate: false } }),
     enabled: Boolean(data?.id),
   });
-  const designUrl = upload.data?.token ? `${typeof window === "undefined" ? `https://${BRAND.website}` : window.location.origin}/q/don/${upload.data.token}` : "";
+  const designUrl = upload.data?.slug ? `${typeof window === "undefined" ? `https://${BRAND.website}` : window.location.origin}${customerUploadPath(upload.data.slug)}` : "";
 
   useEffect(() => {
     if (!designUrl) return;
@@ -91,7 +96,7 @@ function SlipBody() {
       `}</style>
       <div className="no-print flex flex-wrap items-center gap-2">
         <Button className="min-h-12" onClick={() => window.print()}>In phiếu</Button>
-        {(["k80", "a5", "a4"] as const).map((size) => (
+        {loai === "sx" ? null : (["k80", "a5", "a4"] as const).map((size) => (
           <button
             key={size}
             type="button"
@@ -102,7 +107,9 @@ function SlipBody() {
           </button>
         ))}
       </div>
-      {paper === "k80" ? (
+      {loai === "sx" ? (
+        <ProductionSlip data={data} when={when} qr={qr} />
+      ) : paper === "k80" ? (
         <K80Slip sheetRef={sheetRef} pageHeight={k80Height} data={data} when={when} where={where} qr={qr} />
       ) : (
         <OfficeSlip data={data} when={when} where={where} qr={qr} paper={paper} />
@@ -261,6 +268,34 @@ function OfficeSlip({
           {qr ? <img src={qr} alt={`Mã gửi ảnh thiết kế ${data.code}`} className="h-28 w-28" /> : <div className="h-28 w-28" />}
           <p className="text-xs font-semibold">Gửi ảnh thiết kế</p>
         </div>
+      </div>
+    </article>
+  );
+}
+
+function ProductionSlip({ data, when, qr }: { data: SlipData; when: string; qr: string | null }) {
+  return (
+    <article className="slip-sheet mx-auto box-border w-[72mm] bg-white p-2 text-[12px] leading-snug text-black shadow">
+      <header className="border-b border-black pb-2 text-center">
+        <p className="text-[15px] font-extrabold">NHÀ IN THIÊN THIÊN</p>
+        <p className="mt-1 text-[13px] font-extrabold">Phiếu sản xuất</p>
+        <p className="font-mono font-bold">{data.code}</p>
+        <p>{data.channelOrderId || data.channelLabel}</p>
+        <p>{when}</p>
+      </header>
+      <ul className="mt-2 space-y-2">
+        {data.items.map((item) => (
+          <li key={item.id} className="border-b border-black pb-1">
+            <p className="font-semibold">{item.sellerSku || item.skuCode}</p>
+            <p>{item.name}{item.variant ? ` · ${item.variant}` : ""}</p>
+            <p>Số lượng: {item.quantity}</p>
+          </li>
+        ))}
+      </ul>
+      {data.customerNote ? <p className="mt-2">Ghi chú: {data.customerNote}</p> : null}
+      <div className="mt-2 text-center">
+        {qr ? <img src={qr} alt={`Mã gửi ảnh thiết kế ${data.code}`} className="mx-auto h-24 w-24" /> : null}
+        <p className="text-[11px] font-semibold">Khách gửi ảnh</p>
       </div>
     </article>
   );

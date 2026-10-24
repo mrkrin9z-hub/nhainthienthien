@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Phone, Plus, Trash2, UserRound } from "lucide-react";
+import { MapPin, Minus, Phone, Plus, Trash2, UserRound } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { vnYmd } from "@/domain/calc";
 import { skuSoldOn } from "@/domain/mohome";
+import { isMarketplace, PAYMENT_METHODS, type PaymentMethod } from "@/domain/order-desk";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { getCustomers } from "@/lib/admin.functions";
 import { formatMaybe, formatVnd } from "@/lib/brand";
@@ -34,6 +35,7 @@ type Line = {
   quantity: number;
   unitPrice: string;
   priceTouched: boolean;
+  variant: string;
 };
 
 export type DeskSave = {
@@ -49,11 +51,22 @@ export type DeskSave = {
   depositMethod: string;
   discount: number | null;
   customerShip: number | null;
-  items?: { skuId: string; quantity: number; unitPrice?: number; priceReason?: string }[];
+  shipBy?: string | null;
+  autoCancelAt?: string | null;
+  paymentMethod?: PaymentMethod;
+  netAmount?: number | null;
+  designFileUrl?: string | null;
+  items?: { skuId: string; quantity: number; variant?: string; unitPrice?: number; priceReason?: string }[];
 };
 
 function blankLine(): Line {
-  return { key: crypto.randomUUID(), skuId: "", query: "", quantity: 1, unitPrice: "", priceTouched: false };
+  return { key: crypto.randomUUID(), skuId: "", query: "", quantity: 1, unitPrice: "", priceTouched: false, variant: "" };
+}
+
+function localIso(value: string): string | null {
+  if (!value) return null;
+  const at = new Date(value);
+  return Number.isNaN(at.getTime()) ? null : at.toISOString();
 }
 
 function digits(value: string): number {
@@ -69,6 +82,7 @@ export function OrderDesk({
   lockNote,
   catalog,
   channelOptions,
+  retail = false,
   initial,
   paidSoFar,
   payments = [],
@@ -83,6 +97,8 @@ export function OrderDesk({
   lockNote: string;
   catalog: DeskSku[];
   channelOptions?: { id: Channel; label: string }[];
+  /** Khách lẻ: form ngắn. TikTok và Shopee không tạo tay. */
+  retail?: boolean;
   initial: {
     channel: Channel;
     fullName: string;
@@ -94,7 +110,7 @@ export function OrderDesk({
     marketplaceCode: string;
     discount?: number | null;
     customerShip?: number | null;
-    lines: { key: string; skuId: string; quantity: number; unitPrice: string }[];
+    lines: { key: string; skuId: string; quantity: number; unitPrice: string; variant?: string }[];
   };
   paidSoFar: number;
   payments?: { at: string; amount: number; method: string; byName: string }[];
@@ -113,9 +129,14 @@ export function OrderDesk({
   const [customerShip, setCustomerShip] = useState(initial.customerShip == null ? "" : String(initial.customerShip));
   const [priceReason, setPriceReason] = useState("");
   const [marketplaceCode, setMarketplaceCode] = useState(initial.marketplaceCode);
+  const [shipBy, setShipBy] = useState("");
+  const [autoCancelAt, setAutoCancelAt] = useState("");
+  const [commercePay, setCommercePay] = useState<PaymentMethod>("");
+  const [netAmount, setNetAmount] = useState("");
+  const [designFileUrl, setDesignFileUrl] = useState("");
   const [lines, setLines] = useState<Line[]>(
     initial.lines.length
-      ? initial.lines.map((line) => ({ ...line, query: "", priceTouched: line.unitPrice !== "" }))
+      ? initial.lines.map((line) => ({ ...line, query: "", priceTouched: line.unitPrice !== "", variant: line.variant ?? "" }))
       : mode === "create"
         ? []
         : [blankLine()],
@@ -132,9 +153,15 @@ export function OrderDesk({
     enabled: mode === "create" && fullName.trim().length >= 2,
   });
 
-  const channelList = channelOptions?.length
-    ? channelOptions
-    : (Object.keys(CHANNEL_LABEL) as Channel[]).map((id) => ({ id, label: CHANNEL_LABEL[id] }));
+  const compact = retail && mode === "create";
+  const channelList = compact
+    ? [
+        { id: "tai_tiem" as const, label: "Trực tiếp" },
+        { id: "facebook" as const, label: "Facebook" },
+      ]
+    : channelOptions?.length
+      ? channelOptions
+      : (Object.keys(CHANNEL_LABEL) as Channel[]).map((id) => ({ id, label: CHANNEL_LABEL[id] }));
   const sellable = useMemo(
     () => catalog.filter((sku) => skuSoldOn(sku, channel)),
     [catalog, channel],
@@ -183,6 +210,7 @@ export function OrderDesk({
             quantity: 1,
             unitPrice: listed === null ? "" : String(listed),
             priceTouched: false,
+            variant: "",
           } satisfies Line;
         }),
       ];
@@ -192,6 +220,7 @@ export function OrderDesk({
 
   function changeChannel(next: Channel) {
     setChannel(next);
+    if (isMarketplace(next)) setFulfillment("delivery");
     setLines((current) =>
       current.map((line) => {
         if (line.priceTouched || !line.skuId) return line;
@@ -208,6 +237,7 @@ export function OrderDesk({
       .map((line) => ({
         skuId: line.skuId,
         quantity: line.quantity,
+        variant: line.variant.trim(),
         ...(line.unit !== null ? { unitPrice: line.unit, ...(line.priceTouched ? { priceReason } : {}) } : {}),
       }));
     if (!itemsLocked && !items.length) {
@@ -233,6 +263,11 @@ export function OrderDesk({
         depositMethod: draftPaid > 0 ? method : "",
         discount: discount.trim() === "" ? null : digits(discount),
         customerShip: customerShip.trim() === "" ? null : digits(customerShip),
+        shipBy: localIso(shipBy),
+        autoCancelAt: localIso(autoCancelAt),
+        paymentMethod: commercePay,
+        netAmount: netAmount.trim() === "" ? null : digits(netAmount),
+        designFileUrl: designFileUrl.trim() || null,
         ...(itemsLocked ? {} : { items }),
       });
     } catch (error) {
@@ -271,10 +306,23 @@ export function OrderDesk({
               )}
             </Field>
             <Field label="Nhận hàng">
-              <select className={control} value={fulfillment} disabled={fieldsLocked} onChange={(event) => setFulfillment(event.target.value as "pickup" | "delivery")}>
-                <option value="pickup">Tại tiệm</option>
-                <option value="delivery">Giao hàng</option>
-              </select>
+              {isMarketplace(channel) ? (
+                <Input className="min-h-11" value="Nhãn sàn" readOnly />
+              ) : (
+                <select
+                  className={control}
+                  value={fulfillment}
+                  disabled={fieldsLocked}
+                  onChange={(event) => {
+                    const next = event.target.value as "pickup" | "delivery";
+                    setFulfillment(next);
+                    if (next === "pickup") setAddress("");
+                  }}
+                >
+                  <option value="pickup">Lấy tại xưởng</option>
+                  <option value="delivery">{compact ? "Giao" : "Tự giao"}</option>
+                </select>
+              )}
             </Field>
             <div className="relative md:col-span-2">
               <Field label="Khách hàng" required icon={<UserRound className="size-3.5" />}>
@@ -322,11 +370,13 @@ export function OrderDesk({
             <Field label="Số điện thoại" required icon={<Phone className="size-3.5" />}>
               <Input className="min-h-11" value={phone} required disabled={fieldsLocked} inputMode="tel" autoComplete="tel" onChange={(event) => setPhone(event.target.value)} />
             </Field>
+            {compact && fulfillment !== "delivery" ? null : (
             <div className="md:col-span-2">
               <Field label="Địa chỉ" icon={<MapPin className="size-3.5" />}>
                 <Input className="min-h-11" value={address} disabled={fieldsLocked} required={fulfillment === "delivery" && !fieldsLocked} onChange={(event) => setAddress(event.target.value)} />
               </Field>
             </div>
+            )}
             {channel === "tiktok" || channel === "shopee" ? (
               <Field label="Mã đơn sàn">
                 <Input className="min-h-11" value={marketplaceCode} disabled={mode === "edit" || fieldsLocked} onChange={(event) => setMarketplaceCode(event.target.value)} />
@@ -376,6 +426,7 @@ export function OrderDesk({
                   onSku={(skuId) => chooseSku(line.key, skuId)}
                   onQty={(quantity) => patchLine(line.key, { quantity })}
                   onPrice={(unitPrice) => patchLine(line.key, { unitPrice, priceTouched: true })}
+                  onVariant={(variant) => patchLine(line.key, { variant })}
                   onRemove={() => setLines((current) => current.filter((item) => item.key !== line.key))}
                 />
               ))}
@@ -390,35 +441,73 @@ export function OrderDesk({
           {itemsLocked ? null : (
             <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} catalog={sellable} channel={channel} onConfirm={addSkus} />
           )}
+          <div className="space-y-2 border-t pt-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Tạm tính</span>
+              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(goods)}</span>
+            </div>
+            {fieldsLocked ? null : (
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Giảm giá</span>
+                <Input className="h-9 w-32 text-right" inputMode="numeric" value={discount} placeholder="0" aria-label="Giảm giá" onChange={(event) => setDiscount(event.target.value.replace(/[^\d]/g, ""))} />
+              </label>
+            )}
+            <div className="flex items-center justify-between border-t pt-2">
+              <span className="font-semibold">Tổng</span>
+              <span className="font-semibold">{goods === null ? "—" : formatVnd(Math.max(0, goods - (Number.isFinite(discountAmount) ? discountAmount : 0)))}</span>
+            </div>
+          </div>
         </section>
       </div>
 
       <aside className="space-y-4 xl:sticky xl:top-4">
-        <section className={card}>
+        <MaybeDetails compact={compact}>
           <h2 className="text-base font-bold">Lịch trình đơn hàng</h2>
-          <Field label="Ngày hẹn giao / nhận" required={mode === "create"}>
+          <Field label="Ngày hẹn giao / nhận" required={mode === "create" && !compact}>
             <Input className="min-h-11" type="date" min={vnYmd()} value={dueDate} disabled={fieldsLocked} onChange={(event) => setDueDate(event.target.value)} />
           </Field>
           <p className="text-xs text-muted-foreground">
-            {fulfillment === "delivery" ? "Giao hàng — cần địa chỉ khách." : "Khách nhận tại tiệm."}
+            {isMarketplace(channel) ? "Đơn sàn in nhãn của TikTok hoặc Shopee." : fulfillment === "delivery" ? "Tự giao — cần địa chỉ khách." : "Khách lấy tại xưởng."}
           </p>
-        </section>
+          {mode === "create" ? (
+            <div className="space-y-3">
+              <Field label="Hạn gửi">
+                <Input className="min-h-11" type="datetime-local" value={shipBy} onChange={(event) => setShipBy(event.target.value)} />
+              </Field>
+              <Field label="Tự hủy">
+                <Input className="min-h-11" type="datetime-local" value={autoCancelAt} onChange={(event) => setAutoCancelAt(event.target.value)} />
+              </Field>
+              <Field label="Thanh toán">
+                <select className={control} value={commercePay} onChange={(event) => setCommercePay(event.target.value as PaymentMethod)}>
+                  <option value="">Chưa chọn</option>
+                  {PAYMENT_METHODS.map((item) => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Thực nhận ước tính">
+                <Input className="min-h-11" inputMode="numeric" value={netAmount} placeholder="Để trống thì tự tính" onChange={(event) => setNetAmount(event.target.value.replace(/[^\d]/g, ""))} />
+              </Field>
+              <Field label="Link ảnh thiết kế">
+                <Input className="min-h-11" value={designFileUrl} placeholder="Link Google Drive" onChange={(event) => setDesignFileUrl(event.target.value)} />
+              </Field>
+            </div>
+          ) : null}
+        </MaybeDetails>
 
         <section className={card}>
           <h2 className="text-base font-bold">Tổng thanh toán</h2>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tổng thanh toán</span>
-              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(goods)}</span>
+              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(Math.max(0, goods - (Number.isFinite(discountAmount) ? discountAmount : 0) + (Number.isFinite(shipAmount) ? shipAmount : 0)))}</span>
             </div>
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">Giảm giá</span>
-              <Input className="h-9 w-32 text-right" inputMode="numeric" value={discount} disabled={fieldsLocked} placeholder="Để trống" aria-label="Giảm giá" onChange={(event) => setDiscount(event.target.value.replace(/[^\d]/g, ""))} />
-            </label>
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">Phí giao khách trả</span>
-              <Input className="h-9 w-32 text-right" inputMode="numeric" value={customerShip} disabled={fieldsLocked} placeholder="Để trống" aria-label="Phí giao khách trả" onChange={(event) => setCustomerShip(event.target.value.replace(/[^\d]/g, ""))} />
-            </label>
+            {compact ? null : (
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Phí giao khách trả</span>
+                <Input className="h-9 w-32 text-right" inputMode="numeric" value={customerShip} disabled={fieldsLocked} placeholder="Để trống" aria-label="Phí giao khách trả" onChange={(event) => setCustomerShip(event.target.value.replace(/[^\d]/g, ""))} />
+              </label>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Đã thanh toán</span>
               <span className="font-medium">{formatVnd(paid)}</span>
@@ -451,7 +540,7 @@ export function OrderDesk({
               <span className="font-semibold">{remain === null ? "—" : formatVnd(Math.abs(remain))}</span>
             </div>
           </div>
-          {mode === "create" ? (
+          {compact ? null : mode === "create" ? (
             <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
               <p className="text-sm font-medium">Thanh toán lần 1</p>
               <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn.</p>
@@ -507,19 +596,31 @@ export function OrderDesk({
               </Button>
             </div>
           )}
-          <p className="text-[11px] text-muted-foreground">
-            {fieldsLocked
-              ? "Đơn sàn không thu thêm và không sửa giá trên web."
-              : channel === "facebook"
-                ? "Đơn Facebook có thể cần cọc trước khi in."
-                : "Cọc có thể để trống, ghi thêm được sau khi mở đơn."}
-          </p>
+          {compact ? null : (
+            <p className="text-[11px] text-muted-foreground">
+              {fieldsLocked
+                ? "Đơn sàn không thu thêm và không sửa giá trên web."
+                : channel === "facebook"
+                  ? "Đơn Facebook có thể cần cọc trước khi in."
+                  : "Cọc có thể để trống, ghi thêm được sau khi mở đơn."}
+            </p>
+          )}
           <Button type="submit" className="min-h-12 w-full text-base font-bold" disabled={saving || fieldsLocked}>
             {saving ? "Đang lưu..." : mode === "create" ? "Lưu đơn hàng" : "Cập nhật"}
           </Button>
         </section>
       </aside>
     </form>
+  );
+}
+
+function MaybeDetails({ compact, children }: { compact: boolean; children: ReactNode }) {
+  if (!compact) return <section className={card}>{children}</section>;
+  return (
+    <details className={card}>
+      <summary className="cursor-pointer text-sm font-semibold">Thêm</summary>
+      <div className="mt-3 space-y-3">{children}</div>
+    </details>
   );
 }
 
@@ -547,6 +648,7 @@ function ProductLine({
   onSku,
   onQty,
   onPrice,
+  onVariant,
   onRemove,
 }: {
   index: number;
@@ -559,6 +661,7 @@ function ProductLine({
   onSku: (skuId: string) => void;
   onQty: (quantity: number) => void;
   onPrice: (unitPrice: string) => void;
+  onVariant: (variant: string) => void;
   onRemove: () => void;
 }) {
   const query = line.query.trim().toLowerCase();
@@ -576,19 +679,17 @@ function ProductLine({
 
   return (
     <div className="rounded-xl border p-3">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground">Dòng {index + 1}</p>
         {canRemove ? (
           <Button type="button" size="icon" variant="ghost" aria-label="Xóa dòng" onClick={onRemove}>
-            <Trash2 className="size-3" />
+            <Trash2 className="size-4" />
           </Button>
         ) : null}
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Field label="Tìm sản phẩm">
-          <Input className="min-h-11" placeholder="Tìm mã hoặc tên" value={line.query} disabled={locked} onChange={(event) => onQuery(event.target.value)} aria-label={`Tìm sản phẩm dòng ${index + 1}`} />
-        </Field>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_auto_7rem_6.5rem]">
         <Field label="Sản phẩm">
+          <Input className="mb-1 min-h-11" placeholder="Tìm mã hoặc tên" value={line.query} disabled={locked} onChange={(event) => onQuery(event.target.value)} aria-label={`Tìm sản phẩm dòng ${index + 1}`} />
           <select className={control} value={line.skuId} disabled={locked} aria-label={`Sản phẩm dòng ${index + 1}`} onChange={(event) => onSku(event.target.value)}>
             <option value="">Chọn sản phẩm</option>
             {[...groups.entries()].map(([name, items]) => (
@@ -602,8 +703,27 @@ function ProductLine({
             ))}
           </select>
         </Field>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+        <Field label="Mẫu">
+          <Input className="min-h-11" value={line.variant} disabled={locked} placeholder="Phân loại" aria-label={`Mẫu dòng ${index + 1}`} onChange={(event) => onVariant(event.target.value)} />
+        </Field>
+        <Field label="Số lượng">
+          <div className="flex min-h-11 items-center">
+            <Button type="button" variant="outline" className="size-11 shrink-0" aria-label={`Giảm số lượng dòng ${index + 1}`} disabled={locked || line.quantity <= 1} onClick={() => onQty(line.quantity - 1)}>
+              <Minus className="size-4" />
+            </Button>
+            <Input
+              className="h-11 w-14 rounded-none border-x-0 text-center"
+              inputMode="numeric"
+              disabled={locked}
+              aria-label={`Số lượng dòng ${index + 1}`}
+              value={line.quantity}
+              onChange={(event) => onQty(Math.min(500, Math.max(1, Number(event.target.value.replace(/\D/g, "")) || 1)))}
+            />
+            <Button type="button" variant="outline" className="size-11 shrink-0" aria-label={`Tăng số lượng dòng ${index + 1}`} disabled={locked || line.quantity >= 500} onClick={() => onQty(line.quantity + 1)}>
+              <Plus className="size-4" />
+            </Button>
+          </div>
+        </Field>
         <Field label="Đơn giá">
           {owner && !locked ? (
             <Input
@@ -617,18 +737,6 @@ function ProductLine({
           ) : (
             <p className="flex min-h-11 items-center text-sm">{line.unit === null ? "Chưa có giá" : formatVnd(line.unit)}</p>
           )}
-        </Field>
-        <Field label="Số lượng">
-          <Input
-            className="min-h-11 text-center"
-            type="number"
-            min={1}
-            max={500}
-            disabled={locked}
-            aria-label={`Số lượng dòng ${index + 1}`}
-            value={line.quantity}
-            onChange={(event) => onQty(Math.min(500, Math.max(1, Number(event.target.value) || 1)))}
-          />
         </Field>
         <Field label="Thành tiền">
           <p className="flex min-h-11 items-center text-sm font-semibold">{line.sku ? formatMaybe(line.lineTotal) : "—"}</p>

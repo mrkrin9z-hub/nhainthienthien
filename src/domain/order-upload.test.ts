@@ -4,7 +4,7 @@ import test from "node:test";
 import { albumFolderParts } from "./drive-path.ts";
 import { imagePreviewable } from "./images.ts";
 import { bytesStillShared } from "./files.ts";
-import { albumPhone, customerUploadPath, googleThumbSize, photoLimitLabel, photoTooBig, publicUploadCard, SHARED_UPLOAD_PATH, uploadTokenShape } from "./order-upload.ts";
+import { albumPhone, customerUploadPath, googleThumbSize, photoLimitLabel, photoTooBig, publicUploadCard, SHARED_UPLOAD_PATH, uploadKeyShape, uploadSlugFromBytes, uploadSlugShape, uploadTokenShape } from "./order-upload.ts";
 import type { OrderFile, ShopState } from "./types.ts";
 
 test("mã gửi ảnh là 32 ký tự hex và ra đúng đường dẫn", () => {
@@ -16,6 +16,12 @@ test("mã gửi ảnh là 32 ký tự hex và ra đúng đường dẫn", () => 
   assert.equal(uploadTokenShape(`${token}zz`), false);
   assert.throws(() => customerUploadPath("khong-phai-ma"), /không hợp lệ/);
   assert.equal(SHARED_UPLOAD_PATH, "/gui-anh");
+  assert.equal(uploadSlugShape("AB12cd"), true);
+  assert.equal(uploadSlugShape("AB12"), false);
+  assert.equal(uploadSlugFromBytes(new Uint8Array(8)), "00000000");
+  assert.equal(customerUploadPath("AB12CD34"), "/u/AB12CD34");
+  assert.equal(uploadKeyShape(token), true);
+  assert.equal(uploadKeyShape("AB12CD34"), true);
 });
 
 test("ảnh có khung xem trước, video thì không", () => {

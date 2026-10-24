@@ -37,7 +37,7 @@ function CreateOrderBody() {
         </Link>
         <div>
           <h1 className="text-2xl font-extrabold text-primary">Tạo đơn hàng mới</h1>
-          <p className="text-sm text-muted-foreground">Khách, kênh, sản phẩm và thanh toán — lưu một lần.</p>
+          <p className="text-sm text-muted-foreground">Khách lẻ, trực tiếp hoặc Facebook. Tên, số, sản phẩm, mẫu, số lượng và tiền.</p>
         </div>
       </div>
       <CreateOrderForm

@@ -190,6 +190,7 @@ export function linesFromTiktokOrders(orders: unknown): ParsedLine[] {
       orderAmount: money(payment?.total_amount),
       status: isCancelledStatus(status) ? "CANCELLED" : status,
       createdAt: unixIso(order.create_time),
+      shipBy: unixIso(order.rts_sla_time) ?? unixIso(order.ship_by_date),
     };
     const grouped = new Map<string, ParsedLine>();
     const items = Array.isArray(order.line_items) ? order.line_items : [];
@@ -265,6 +266,7 @@ export function linesFromShopeeOrders(orders: unknown): ParsedLine[] {
       orderAmount: money(order.total_amount),
       status: cancelled ? "CANCELLED" : status,
       createdAt: unixIso(order.create_time),
+      shipBy: unixIso(order.ship_by_date) ?? unixIso(order.rts_sla_time),
     };
     const items = Array.isArray(order.item_list) ? order.item_list : [];
     let pushed = 0;

@@ -102,6 +102,7 @@ export const orderUploadLink = createServerFn({ method: "POST" })
 const itemSchema = z.object({
   skuId: z.string().min(2),
   quantity: z.number().int().min(1).max(500),
+  variant: z.string().max(80).optional().default(""),
   unitPrice: z.number().int().min(0).nullable().optional(),
   priceReason: z.string().max(300).optional(),
 });
@@ -125,6 +126,11 @@ export const createDeskOrder = createServerFn({ method: "POST" })
         marketplaceCode: z.string().optional().default(""),
         depositPaid: z.number().int().min(0).max(100_000_000).optional().default(0),
         depositMethod: z.string().optional().default(""),
+        shipBy: z.string().nullable().optional().default(null),
+        autoCancelAt: z.string().nullable().optional().default(null),
+        paymentMethod: z.enum(["", "cod", "chuyen_khoan", "tien_mat", "vi_san"]).optional().default(""),
+        netAmount: z.number().int().min(0).max(100_000_000).nullable().optional().default(null),
+        designFileUrl: z.string().max(500).nullable().optional().default(null),
         ...moneyAdjust,
         items: z.array(itemSchema).min(1),
       })
@@ -169,6 +175,40 @@ export const setFulfillment = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { setOrderFulfillment } = await import("@/server/service");
     await setOrderFulfillment(await actor(), data);
+    return { ok: true };
+  });
+
+export const saveOrderCommerce = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        orderId: z.string().uuid(),
+        channelOrderId: z.string().max(80).optional().default(""),
+        shipBy: z.string().nullable().optional().default(null),
+        autoCancelAt: z.string().nullable().optional().default(null),
+        paymentMethod: z.enum(["", "cod", "chuyen_khoan", "tien_mat", "vi_san"]).optional().default(""),
+        netAmount: z.number().int().min(0).max(100_000_000).nullable().optional().default(null),
+        designFileUrl: z.string().max(500).optional().default(""),
+        shipMode: z.enum(["pickup", "tu_giao", "san"]),
+        deskIssue: z.enum(["", "giao_that_bai", "tra_hang"]).optional().default(""),
+        carrier: z.string().max(80).optional().default(""),
+        tracking: z.string().max(80).optional().default(""),
+        customerNote: z.string().max(2000).optional().default(""),
+        items: z.array(z.object({ id: z.string().uuid(), sellerSku: z.string().max(80), variant: z.string().max(80) })).max(50),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveOrderCommerce: save } = await import("@/server/service");
+    await save(await actor(), data);
+    return { ok: true };
+  });
+
+export const markLabelsPrinted = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderIds: z.array(z.string().uuid()).min(1).max(50) }).parse(data))
+  .handler(async ({ data }) => {
+    const { markLabelsPrinted: mark } = await import("@/server/service");
+    await mark(await actor(), data.orderIds);
     return { ok: true };
   });
 

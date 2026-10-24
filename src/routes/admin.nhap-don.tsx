@@ -108,7 +108,7 @@ function ImportBody() {
         {plan ? (
           <div className="space-y-2 text-sm">
             <p>
-              {plan.orders.length} đơn sẽ nhập. {plan.duplicates.length} đơn đã có, bỏ qua. {plan.cancelled} đơn đã hủy, bỏ qua. {plan.issues.length} dòng chưa nhập được.
+              {plan.orders.length} đơn sẽ nhập. {(plan.updates ?? []).length} đơn đã có, sẽ cập nhật. {plan.cancelled} đơn đã hủy. {plan.issues.length} dòng chưa nhập được.
             </p>
             {plan.orders.slice(0, 20).map((order) => (
               <div key={order.platformOrderId} className="rounded-2xl bg-background px-3 py-2">

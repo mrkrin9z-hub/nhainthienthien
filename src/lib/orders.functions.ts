@@ -43,9 +43,11 @@ export const createOrder = createServerFn({ method: "POST" })
     });
   });
 
+const uploadKey = z.string().regex(/^(?:[a-f0-9]{32}|[0-9A-Za-z]{6,8})$/);
+
 const uploadTicketSchema = z.object({
   orderId: z.string().uuid(),
-  accessToken: z.string().min(10),
+  accessToken: uploadKey,
   fileName: z.string().min(1).max(200),
   mimeType: z.string().min(3).max(100),
   sizeBytes: z.number().int().min(1),
@@ -61,7 +63,7 @@ export const createUploadTicket = createServerFn({ method: "POST" })
 
 const markFileSchema = z.object({
   orderId: z.string().uuid(),
-  accessToken: z.string().min(10),
+  accessToken: uploadKey,
   fileId: z.string().uuid(),
   status: z.enum(["complete", "error"]),
   widthPx: z.number().int().positive().optional(),
@@ -77,7 +79,7 @@ export const markFileStatus = createServerFn({ method: "POST" })
 
 const submitSchema = z.object({
   orderId: z.string().uuid(),
-  accessToken: z.string().min(10),
+  accessToken: uploadKey,
 });
 
 export const submitOrder = createServerFn({ method: "POST" })
@@ -136,14 +138,14 @@ const driveFileSchema = z.object({
 });
 
 export const prepareOrderDriveUpload = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), accessToken: z.string().min(10), fileId: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), accessToken: uploadKey, fileId: z.string().uuid() }).parse(data))
   .handler(async ({ data }) => {
     const { prepareOrderDriveUpload: open } = await import("@/server/service");
     return open(data);
   });
 
 export const finishOrderDriveUpload = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => driveFileSchema.extend({ orderId: z.string().uuid(), accessToken: z.string().min(10) }).parse(data))
+  .inputValidator((data: unknown) => driveFileSchema.extend({ orderId: z.string().uuid(), accessToken: uploadKey }).parse(data))
   .handler(async ({ data }) => {
     const { finishOrderDriveUpload: finish } = await import("@/server/service");
     return finish(data);
@@ -164,12 +166,12 @@ export const finishAlbumDriveUpload = createServerFn({ method: "POST" })
   });
 
 const uploadTargetSchema = z.object({
-  token: z.string().regex(/^[a-f0-9]{32}$/),
+  token: uploadKey,
 });
 
 export const setCustomerPrint = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({ token: z.string().regex(/^[a-f0-9]{32}$/), fileId: z.string().uuid(), print: z.boolean() }).parse(data),
+    z.object({ token: uploadKey, fileId: z.string().uuid(), print: z.boolean() }).parse(data),
   )
   .handler(async ({ data }) => {
     const { setCustomerFilePrint } = await import("@/server/service");
@@ -181,7 +183,7 @@ export const setCustomerComment = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
       .object({
-        token: z.string().regex(/^[a-f0-9]{32}$/),
+        token: uploadKey,
         fileId: z.string().uuid(),
         comment: z.string().max(500),
       })

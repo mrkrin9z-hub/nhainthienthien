@@ -16,11 +16,12 @@ const FIELD_ALIASES = {
     "seller sku id",
     "product sku",
     "seller sku",
+    "sku nguoi ban",
     "ma sku phan loai",
     "ma sku",
   ],
   name: ["product name", "item name", "ten san pham"],
-  variation: ["variation name", "ten phan loai hang", "phan loai hang", "variation"],
+  variation: ["variation name", "ten phan loai hang", "phan loai hang", "phan loai", "variation", "mau"],
   qty: ["quantity", "so luong", "qty"],
   buyer: ["ten nguoi nhan", "recipient name", "customer name", "nguoi nhan", "recipient"],
   platformBuyer: ["buyer username", "nguoi mua"],
@@ -52,6 +53,7 @@ const FIELD_ALIASES = {
   dealPrice: ["gia uu dai"],
   status: ["trang thai don hang", "order status", "status"],
   createdAt: ["created time", "ngay dat hang", "order creation date", "created at"],
+  shipBy: ["ship by date", "ship by", "rts sla time", "rts sla", "thoi han gui hang", "han gui hang", "han gui", "shipped by"],
   cod: ["cod amount", "tien thu ho", "cod"],
 } as const;
 
@@ -112,6 +114,7 @@ export type ParsedLine = {
   lineAmount: number | null;
   status: string;
   createdAt: string | null;
+  shipBy: string | null;
 };
 
 export type ImportIssue = {
@@ -128,6 +131,7 @@ export type PlannedItem = {
   name: string;
   /** Tiền dòng trên sàn. Null khi file không có tiền từng dòng. */
   platformLineTotal: number | null;
+  variation?: string;
 };
 
 export type PlannedOrder = {
@@ -143,8 +147,24 @@ export type PlannedOrder = {
   orderAmount: number | null;
   flags: string[];
   createdAt: string | null;
+  shipBy?: string | null;
+  payment?: string;
   status: "nhan_don";
   items: PlannedItem[];
+};
+
+/** Đơn đã có mã kênh. Nhập lại thì cập nhật vận đơn, hạn gửi, SKU và hủy nếu file báo hủy. */
+export type PlannedUpdate = {
+  platformOrderId: string;
+  carrier: string;
+  tracking: string;
+  shipBy: string | null;
+  payment: string;
+  orderAmount: number | null;
+  cancel: boolean;
+  fileStatus: string;
+  items: PlannedItem[];
+  itemNote: string;
 };
 
 const PHONE_HIDDEN = "SĐT bị ẩn";
@@ -335,6 +355,7 @@ export function parseMarketplaceTable(table: string[][]): ParsedLine[] {
       lineAmount,
       status: cell(row, columns.status),
       createdAt: parseCreatedTime(cell(row, columns.createdAt)),
+      shipBy: parseCreatedTime(cell(row, columns.shipBy)),
     });
   }
   return lines;
@@ -366,8 +387,12 @@ export function planMarketplaceImport(input: {
   lines: ParsedLine[];
   maps: Pick<SkuMap, "externalSku" | "skuId">[];
   existingIds: string[];
-}): { orders: PlannedOrder[]; issues: ImportIssue[]; duplicates: string[]; cancelled: number } {
+  /** Mã SKU của tiệm. Khớp thẳng Seller SKU khi chưa có bảng map. API sau này gọi cùng hàm này. */
+  skus?: { id: string; code: string }[];
+}): { orders: PlannedOrder[]; updates: PlannedUpdate[]; issues: ImportIssue[]; duplicates: string[]; cancelled: number } {
   const maps = new Map(input.maps.map((row) => [foldHeader(row.externalSku), row.skuId]));
+  const byCode = new Map((input.skus ?? []).map((sku) => [foldHeader(sku.code), sku.id]));
+  const skuFor = (external: string) => maps.get(foldHeader(external)) ?? byCode.get(foldHeader(external));
   const existing = new Set(input.existingIds.map((id) => id.trim()));
   const groups = new Map<string, ParsedLine[]>();
   for (const line of input.lines) {
@@ -377,16 +402,19 @@ export function planMarketplaceImport(input: {
     groups.set(line.orderId, list);
   }
   const orders: PlannedOrder[] = [];
+  const updates: PlannedUpdate[] = [];
   const issues: ImportIssue[] = [];
   const duplicates: string[] = [];
   let cancelled = 0;
   for (const [orderId, lines] of groups) {
-    if (lines.some((line) => isCancelledStatus(line.status))) {
-      cancelled += 1;
-      continue;
-    }
     if (existing.has(orderId)) {
       duplicates.push(orderId);
+      updates.push(groupUpdate(orderId, lines, skuFor));
+      if (lines.some((line) => isCancelledStatus(line.status))) cancelled += 1;
+      continue;
+    }
+    if (lines.some((line) => isCancelledStatus(line.status))) {
+      cancelled += 1;
       continue;
     }
     const items: PlannedItem[] = [];
@@ -397,12 +425,12 @@ export function planMarketplaceImport(input: {
         pending.push({ orderId, sku: "", name, reason: "Thiếu SKU" });
         continue;
       }
-      const skuId = maps.get(foldHeader(line.sku));
+      const skuId = skuFor(line.sku);
       if (!skuId) {
         pending.push({ orderId, sku: line.sku, name, reason: "Chưa có bảng map SKU" });
         continue;
       }
-      items.push({ skuId, quantity: line.qty, externalSku: line.sku, name, platformLineTotal: line.lineAmount });
+      items.push({ skuId, quantity: line.qty, externalSku: line.sku, name, platformLineTotal: line.lineAmount, variation: line.variation });
     }
     const phone = normalizeMarketplacePhone(lines.map((line) => line.phone).find((value) => value.trim()) ?? "");
     const flags: string[] = [];
@@ -432,9 +460,45 @@ export function planMarketplaceImport(input: {
       orderAmount,
       flags,
       createdAt: lines.find((line) => line.createdAt)?.createdAt ?? null,
+      shipBy: lines.find((line) => line.shipBy)?.shipBy ?? null,
+      payment: lines.map((line) => line.payment).find((value) => value.trim()) ?? "",
       status: "nhan_don",
       items,
     });
   }
-  return { orders, issues, duplicates, cancelled };
+  return { orders, updates, issues, duplicates, cancelled };
+}
+
+function groupUpdate(orderId: string, lines: ParsedLine[], skuFor: (sku: string) => string | undefined): PlannedUpdate {
+  const items: PlannedItem[] = [];
+  let unmapped = 0;
+  for (const line of lines) {
+    if (!line.sku) continue;
+    const skuId = skuFor(line.sku);
+    const name = [line.name, line.variation].filter(Boolean).join(" — ");
+    if (!skuId) {
+      unmapped += 1;
+      continue;
+    }
+    items.push({
+      skuId,
+      quantity: line.qty,
+      externalSku: line.sku,
+      name,
+      platformLineTotal: line.lineAmount,
+      variation: line.variation,
+    });
+  }
+  return {
+    platformOrderId: orderId,
+    carrier: lines.map((line) => line.carrier).find((value) => value.trim()) ?? "",
+    tracking: lines.map((line) => line.tracking).find((value) => value.trim()) ?? "",
+    shipBy: lines.find((line) => line.shipBy)?.shipBy ?? null,
+    payment: lines.map((line) => line.payment).find((value) => value.trim()) ?? "",
+    orderAmount: lines.find((line) => line.orderAmount !== null)?.orderAmount ?? null,
+    cancel: lines.some((line) => isCancelledStatus(line.status)),
+    fileStatus: lines.map((line) => line.status).find((value) => value.trim()) ?? "",
+    items,
+    itemNote: unmapped ? `${unmapped} SKU chưa khớp mã tiệm, giữ sản phẩm cũ` : "",
+  };
 }

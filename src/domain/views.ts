@@ -7,6 +7,7 @@ import { bankLabel, deskAlerts, hasPackingPhoto, itemChangeNote, transferQrUrl }
 import { onDeliveryDesk, orderShipping } from "./shipping.ts";
 import { wasteMonth } from "./waste.ts";
 import type { Order, OrderStatus, Role, ShopState } from "./types.ts";
+import { deskTabMeta, deskTabOf, estimateNet, maskBuyer, shipModeOf, isMarketplace } from "./order-desk.ts";
 import { CHANNEL_LABEL, STATUS_LABEL, STATUS_REPLY } from "./types.ts";
 
 export type Viewer = { id: string; name: string; role: Role };
@@ -47,8 +48,35 @@ export function orderSummary(state: ShopState, order: Order, role: Role) {
     isTest: Boolean(order.isTest),
     late: isLate(state, order),
     fileCount: order.files.filter((file) => !file.deletedAt && file.status === "complete").length,
+    customerPhotoCount: order.files.filter((file) => !file.deletedAt && file.status === "complete" && file.kind === "original").length,
     fulfillment: order.fulfillment,
     dueDate: order.dueDate,
+    channelOrderId: order.channelOrderId || order.marketplaceCode || "",
+    shipBy: order.shipBy ?? null,
+    autoCancelAt: order.autoCancelAt ?? null,
+    shipMode: shipModeOf(order),
+    deskTab: deskTabOf(order),
+    deskTabLabel: deskTabMeta(deskTabOf(order)).label,
+    deskIssue: order.deskIssue ?? null,
+    carrier: order.shipping?.carrier ?? "",
+    tracking: order.shipping?.tracking ?? "",
+    paymentMethod: order.paymentMethod || "",
+    netAmount: showMoney ? estimateNet(order.total, order.channel, state.settings, order.netAmount) : null,
+    netStored: showMoney ? order.netAmount != null : false,
+    designFileUrl: order.designFileUrl || "",
+    labelPrintedAt: order.labelPrintedAt ?? null,
+    buyerName: isMarketplace(order.channel) ? maskBuyer(order.recipientName || customer.name) : customer.name || "—",
+    customerNote: order.customerNote,
+    items: order.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      skuCode: item.skuCode,
+      sellerSku: item.sellerSku || "",
+      variant: item.variant || "",
+      quantity: item.quantity,
+      unitPrice: showMoney ? item.unitPrice : null,
+      lineTotal: showMoney ? item.lineTotal : null,
+    })),
   };
 }
 

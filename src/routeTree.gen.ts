@@ -66,6 +66,7 @@ import { Route as DanhGiaTokenRouteImport } from './routes/danh-gia.$token'
 import { Route as GuiAnhIndexRouteImport } from './routes/gui-anh.index'
 import { Route as GuiAnhTokenRouteImport } from './routes/gui-anh.$token'
 import { Route as OrdersCreateRouteImport } from './routes/orders.create'
+import { Route as UCodeRouteImport } from './routes/u.$code'
 import { Route as AdminAlbumIndexRouteImport } from './routes/admin.album.index'
 import { Route as AdminAlbumIdRouteImport } from './routes/admin.album.$id'
 import { Route as AdminDonHangIndexRouteImport } from './routes/admin.don-hang.index'
@@ -382,6 +383,11 @@ const OrdersCreateRoute = OrdersCreateRouteImport.update({
   path: '/create',
   getParentRoute: () => OrdersRoute,
 } as any)
+const UCodeRoute = UCodeRouteImport.update({
+  id: '/u/$code',
+  path: '/u/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminAlbumIndexRoute = AdminAlbumIndexRouteImport.update({
   id: '/album/',
   path: '/album/',
@@ -592,6 +598,7 @@ export interface FileRoutesByFullPath {
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/orders/create': typeof OrdersCreateRoute
+  '/u/$code': typeof UCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/gui-anh/': typeof GuiAnhIndexRoute
   '/admin/album/$id': typeof AdminAlbumIdRoute
@@ -680,6 +687,7 @@ export interface FileRoutesByTo {
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/orders/create': typeof OrdersCreateRoute
+  '/u/$code': typeof UCodeRoute
   '/admin': typeof AdminIndexRoute
   '/gui-anh': typeof GuiAnhIndexRoute
   '/admin/album/$id': typeof AdminAlbumIdRoute
@@ -770,6 +778,7 @@ export interface FileRoutesById {
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/orders/create': typeof OrdersCreateRoute
+  '/u/$code': typeof UCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/gui-anh/': typeof GuiAnhIndexRoute
   '/admin/album/$id': typeof AdminAlbumIdRoute
@@ -861,6 +870,7 @@ export interface FileRouteTypes {
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/orders/create'
+    | '/u/$code'
     | '/admin/'
     | '/gui-anh/'
     | '/admin/album/$id'
@@ -949,6 +959,7 @@ export interface FileRouteTypes {
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/orders/create'
+    | '/u/$code'
     | '/admin'
     | '/gui-anh'
     | '/admin/album/$id'
@@ -1038,6 +1049,7 @@ export interface FileRouteTypes {
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/orders/create'
+    | '/u/$code'
     | '/admin/'
     | '/gui-anh/'
     | '/admin/album/$id'
@@ -1085,6 +1097,7 @@ export interface RootRouteChildren {
   TraCuuRoute: typeof TraCuuRoute
   DanhGiaTokenRoute: typeof DanhGiaTokenRoute
   GuiAnhTokenRoute: typeof GuiAnhTokenRoute
+  UCodeRoute: typeof UCodeRoute
   GuiAnhIndexRoute: typeof GuiAnhIndexRoute
   ApiAdminProductPhotoRoute: typeof ApiAdminProductPhotoRoute
   ApiPublicAlbumRoute: typeof ApiPublicAlbumRoute
@@ -1511,6 +1524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrdersCreateRouteImport
       parentRoute: typeof OrdersRoute
     }
+    '/u/$code': {
+      id: '/u/$code'
+      path: '/u/$code'
+      fullPath: '/u/$code'
+      preLoaderRoute: typeof UCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/album/': {
       id: '/admin/album/'
       path: '/album'
@@ -1858,6 +1878,7 @@ const rootRouteChildren: RootRouteChildren = {
   TraCuuRoute: TraCuuRoute,
   DanhGiaTokenRoute: DanhGiaTokenRoute,
   GuiAnhTokenRoute: GuiAnhTokenRoute,
+  UCodeRoute: UCodeRoute,
   GuiAnhIndexRoute: GuiAnhIndexRoute,
   ApiAdminProductPhotoRoute: ApiAdminProductPhotoRoute,
   ApiPublicAlbumRoute: ApiPublicAlbumRoute,
