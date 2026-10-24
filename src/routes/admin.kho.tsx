@@ -15,7 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CircleCheck, CircleDashed, ClipboardList, Droplets, MoreHorizontal, Package, PackagePlus, PackageSearch, TriangleAlert } from "lucide-react";
 import { formatMaybe } from "@/lib/brand";
 import { WasteDesk } from "@/components/admin/waste-desk";
-import { approvePrice, countStock, downloadExcel, getInventory, getMe, markInkOpened, receiveStock, saveMaterial } from "@/lib/admin.functions";
+import { familySizes, purchaseUnit, sizeLabel } from "@/domain/stock-receive";
+import { approvePrice, countStock, downloadExcel, getInventory, getMe, markInkOpened, receiveStock, receiveStockMany, saveMaterial } from "@/lib/admin.functions";
 
 const STOCK_MODES = ["ton", "nhap", "hong", "phieu", "muc"] as const;
 type StockMode = (typeof STOCK_MODES)[number];
@@ -291,34 +292,7 @@ function StockBody() {
       </Dialog>
       </>
       ) : null}
-      {m === "nhap" && canIn ? (
-        <section className="max-w-lg space-y-3 rounded-2xl border bg-card p-4">
-          <label className="text-sm font-semibold">
-            Vật tư
-            <select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 text-sm" aria-label="Chọn vật tư" value={receiveId} onChange={(event) => setReceiveId(event.target.value)}>
-              <option value="">Chọn vật tư</option>
-              {allMaterials.map((material) => (
-                <option key={material.id} value={material.id}>{material.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm font-semibold">
-            Số lần mua
-            <Input className="mt-1 min-h-11" inputMode="numeric" aria-label="Số lần mua" value={packs} onChange={(event) => setPacks(event.target.value.replace(/[^\d]/g, ""))} />
-          </label>
-          <Button
-            className="min-h-11"
-            disabled={!receiveId || !Number(packs)}
-            onClick={async () => {
-              await receiveStock({ data: { materialId: receiveId, packs: Number(packs), packPrice: null, supplier: "", note: "" } });
-              toast.success(owner ? "Đã nhập kho" : "Đã nhập kho. Giá mới chờ chủ duyệt.");
-              await refresh();
-            }}
-          >
-            Nhập
-          </Button>
-        </section>
-      ) : null}
+      {m === "nhap" && canIn ? <BulkReceive materials={allMaterials} owner={owner} onDone={refresh} /> : null}
       {m === "muc" && canIn ? (
         <section className="rounded-2xl border bg-card p-4">
           <p className="mb-3 text-sm text-muted-foreground">Mỗi màu một lọ. Mã màu để trống cho đến khi có mã Canon. Mực tính lãi vẫn là 4,4% giá bán.</p>
@@ -499,6 +473,154 @@ function MaterialForms({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function BulkReceive({
+  materials,
+  owner,
+  onDone,
+}: {
+  materials: { id: string; name: string; unit: string }[];
+  owner: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const blank = () => ({ key: crypto.randomUUID(), materialId: "", qty: "1", price: "" });
+  const [rows, setRows] = useState([blank()]);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const focusId = rows.find((row) => row.materialId)?.materialId ?? "";
+  const sizes = familySizes(materials, focusId);
+
+  async function save() {
+    const lines = rows
+      .filter((row) => row.materialId && Number(row.qty) > 0)
+      .map((row) => ({
+        materialId: row.materialId,
+        packs: Number(row.qty),
+        packPrice: row.price.trim() === "" ? null : Number(row.price),
+      }));
+    if (!lines.length) {
+      toast.error("Chọn vật tư và số lượng.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await receiveStockMany({ data: { note, supplier: "", lines } });
+      toast.success(owner ? "Đã ghi một phiếu nhập." : "Đã ghi một phiếu nhập. Giá mới chờ chủ duyệt.");
+      setRows([blank()]);
+      setNote("");
+      await onDone();
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3 rounded-2xl border bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Phiếu nhập</h2>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" className="min-h-10" disabled={!sizes.length} onClick={() => setRows(sizes.map((item) => ({ key: item.id, materialId: item.id, qty: "1", price: "" })))}>
+            Thêm mọi khổ
+          </Button>
+          <Button type="button" variant="outline" className="min-h-10" onClick={() => setRows((current) => [...current, blank()])}>
+            + Thêm dòng
+          </Button>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead>
+            <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+              <th className="py-2 pr-2">Vật tư</th>
+              <th className="py-2 pr-2">Khổ / loại</th>
+              <th className="py-2 pr-2">Số lượng</th>
+              <th className="py-2 pr-2">Đơn vị</th>
+              <th className="py-2 pr-2">Đơn giá</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const material = materials.find((item) => item.id === row.materialId);
+              const options = material ? familySizes(materials, material.id) : [];
+              return (
+                <tr key={row.key} className="border-b">
+                  <td className="py-2 pr-2">
+                    <select
+                      className="h-10 w-full min-w-40 rounded-lg border bg-white px-2 text-sm"
+                      aria-label="Vật tư"
+                      value={row.materialId}
+                      onChange={(event) => setRows((current) => current.map((item) => (item.key === row.key ? { ...item, materialId: event.target.value } : item)))}
+                    >
+                      <option value="">Chọn vật tư</option>
+                      {materials.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-2 pr-2">
+                    {options.length > 1 ? (
+                      <select
+                        className="h-10 rounded-lg border bg-white px-2 text-sm"
+                        aria-label="Khổ"
+                        value={row.materialId}
+                        onChange={(event) => setRows((current) => current.map((item) => (item.key === row.key ? { ...item, materialId: event.target.value } : item)))}
+                      >
+                        {options.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {sizeLabel(item)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-slate-500">{material ? sizeLabel(material) || material.name : "—"}</span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-2">
+                    <Input
+                      className="h-10 w-24"
+                      inputMode="decimal"
+                      aria-label="Số lượng"
+                      value={row.qty}
+                      onChange={(event) => setRows((current) => current.map((item) => (item.key === row.key ? { ...item, qty: event.target.value.replace(/[^\d.]/g, "") } : item)))}
+                    />
+                  </td>
+                  <td className="py-2 pr-2 text-slate-600">{material ? purchaseUnit(material) : "—"}</td>
+                  <td className="py-2 pr-2">
+                    <Input
+                      className="h-10 w-28"
+                      inputMode="numeric"
+                      aria-label="Đơn giá"
+                      placeholder="Tuỳ chọn"
+                      value={row.price}
+                      onChange={(event) => setRows((current) => current.map((item) => (item.key === row.key ? { ...item, price: event.target.value.replace(/[^\d]/g, "") } : item)))}
+                    />
+                  </td>
+                  <td className="py-2">
+                    <button type="button" className="text-sm text-slate-400" onClick={() => setRows((current) => (current.length === 1 ? [blank()] : current.filter((item) => item.key !== row.key)))}>
+                      Xóa
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <label className="block text-sm font-semibold">
+        Ghi chú phiếu
+        <Input className="mt-1 h-10" value={note} onChange={(event) => setNote(event.target.value)} />
+      </label>
+      <Button className="min-h-11 bg-blue-600 hover:bg-blue-700" disabled={busy} onClick={() => void save()}>
+        Lưu phiếu nhập
+      </Button>
+    </section>
   );
 }
 

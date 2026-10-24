@@ -67,6 +67,106 @@ export const SHEET_COVERAGE: SheetCoverage[] = [
   { sheet: "Bảng giá Mơ Home", inApp: "Kênh Mơ Home (nội bộ), giá để trống", gap: "Không thấy bảng giá trong file import hay Drive. Cần mã, tên, khổ, số tấm, giá nội bộ và vốn vật tư." },
 ];
 
+export type DeskAssignee = "admin" | "sale" | "production";
+export type TaskPriority = "cao" | "vua" | "thap";
+
+export const ASSIGNEE_LABEL: Record<DeskAssignee, string> = {
+  admin: "Admin",
+  sale: "Sale",
+  production: "Sản xuất",
+};
+
+export const PRIORITY_LABEL: Record<TaskPriority, string> = {
+  cao: "Cao",
+  vua: "Vừa",
+  thap: "Thấp",
+};
+
+export const STATUS_WORD: Record<ChecklistStatus, string> = {
+  chua_lam: "Cần làm",
+  dang_lam: "Đang làm",
+  xong: "Xong",
+};
+
+const PROOF_SECTIONS = new Set([
+  "Cần chụp",
+  "Quay video",
+  "Video xưởng",
+  "Ảnh sản phẩm thật",
+  "Kệ, quầy, trưng bày",
+  "Ảnh in demo (mẫu trưng bày)",
+  "Showroom",
+]);
+
+/** Ảnh chứng chỉ khi việc là chụp sản phẩm, quay video hoặc setup kệ. Hóa đơn và câu "không cần chụp" thì không. */
+export function needsProof(template: Pick<ChecklistTemplate, "title" | "section">): boolean {
+  const title = template.title;
+  const text = `${title} ${template.section}`;
+  if (/không cần chụp|ảnh hóa đơn|chứng từ/i.test(text)) return false;
+  if (/^(chọn |duyệt |chốt |quyết |giao nhân viên|hỏi |quy định)/i.test(title)) return false;
+  if (template.section === "Showroom tại tiệm") return /kệ|trưng bày|chụp/i.test(title);
+  if (template.section === "Đèn & góc chụp sản phẩm") return /chụp/i.test(title);
+  if (PROOF_SECTIONS.has(template.section)) return true;
+  return /chụp ảnh thật|quay video|chụp mặt tiền|kệ trưng bày/i.test(title);
+}
+
+/** Thư mục Drive theo nhóm việc, không theo ngày. */
+export function taskGroupFolder(template: Pick<ChecklistTemplate, "title" | "section" | "list">): string {
+  const title = template.title;
+  if (template.section === "Cần chụp" || /chụp ảnh thật|chụp mặt tiền/i.test(title)) return "Cần chụp";
+  if (template.section === "Quay video" || template.section === "Video xưởng" || /quay video/i.test(title)) return "Quay video";
+  if (
+    /kệ/i.test(template.section) ||
+    /kệ trưng bày/i.test(title) ||
+    template.section === "Ảnh in demo (mẫu trưng bày)" ||
+    template.section === "Showroom" ||
+    template.section === "Showroom tại tiệm"
+  ) {
+    return "Setup kệ";
+  }
+  return LIST_LABEL[template.list];
+}
+
+function ownerPerson(owner: string): boolean {
+  const text = owner.trim().toLowerCase();
+  if (/sale|sản xuất|nhân viên|em |cả tiệm|\/ nv|\bnv\b/.test(text)) return false;
+  return /chủ|việt|anh/.test(text);
+}
+
+/** Việc của chủ = Admin. Sale và sản xuất theo vai. Việc "cả tiệm" chia theo nội dung. */
+export function deskAssignee(template: Pick<ChecklistTemplate, "role" | "owner" | "title" | "section" | "detail">): DeskAssignee {
+  if (template.role === "sale") return "sale";
+  if (template.role === "production") return "production";
+  if (template.role === "owner") return "admin";
+  if (ownerPerson(template.owner)) return "admin";
+  const title = template.title.toLowerCase();
+  const blob = `${title} ${template.section} ${template.detail}`.toLowerCase();
+  if (/^(duyệt|chốt|quyết|giao nhân viên|chọn nhân viên)/.test(title)) return "admin";
+  if (/chụp|quay|kệ|trưng bày|đóng gói|ép gỗ|máy in|máy ép|cân đo|in mẫu|showroom|vật tư/.test(blob)) return "production";
+  if (/đăng |inbox|listing|tiktok|shopee|facebook|nội dung|content|bàn giao đơn|seller|chat/.test(blob)) return "sale";
+  return "admin";
+}
+
+export function taskPriority(template: Pick<ChecklistTemplate, "due" | "repeat" | "list">): TaskPriority {
+  if (template.repeat === "daily") return "cao";
+  if (template.repeat === "weekly") return "vua";
+  const due = template.due ?? "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(due)) {
+    if (due <= "2026-11-07") return "cao";
+    if (due <= "2026-12-01") return "vua";
+    return "thap";
+  }
+  if (template.list === "dao_tao") return "thap";
+  if (template.list === "anh" || template.list === "setup" || template.list === "khai_truong" || template.list === "chot") return "vua";
+  return "thap";
+}
+
+export function mineAssignee(role: Role): DeskAssignee {
+  if (role === "sale") return "sale";
+  if (role === "production") return "production";
+  return "admin";
+}
+
 export type TaskCard = {
   id: string;
   list: ChecklistListId;
@@ -76,11 +176,17 @@ export type TaskCard = {
   detail: string;
   owner: string;
   role: ChecklistRole;
+  assignee: DeskAssignee;
+  assigneeLabel: string;
   due: string | null;
+  priority: TaskPriority;
+  priorityLabel: string;
   repeat: ChecklistRepeat;
   shift: string;
   status: ChecklistStatus;
   photo: boolean;
+  needsProof: boolean;
+  driveFolder: string;
   draft: boolean;
   note: string;
   link: string;
@@ -138,10 +244,16 @@ export function checklistCards(state: { tasks?: ShopState["tasks"]; taskChecks?:
       owner: template.owner,
       role: template.role,
       due: template.due,
+      assignee: deskAssignee(template),
+      assigneeLabel: ASSIGNEE_LABEL[deskAssignee(template)],
+      priority: taskPriority(template),
+      priorityLabel: PRIORITY_LABEL[taskPriority(template)],
       repeat: template.repeat,
       shift: template.shift,
       status: saved?.status ?? (template.repeat === "once" ? template.sheetStatus : "chua_lam"),
       photo: template.photo,
+      needsProof: needsProof(template),
+      driveFolder: taskFolderParts(taskGroupFolder(template), template.title).join(" / "),
       draft: template.draft,
       note: link && savedNote.trim() === link ? "" : savedNote,
       link,
@@ -196,20 +308,22 @@ export function applyTaskStatus(
   return { period, title: template.title };
 }
 
-/** Thư mục Drive cho ảnh của một việc. */
-export function taskFolderParts(period: string, title: string): [string, string, string] {
+/** Thư mục Drive cho ảnh của một việc: Việc tiệm / nhóm / tên việc. */
+export function taskFolderParts(group: string, title: string): [string, string, string] {
   const clean = title.replace(/[\\/]/g, " ").replace(/\s+/g, " ").trim().slice(0, 70);
-  return ["Việc tiệm", period, clean || "Việc"];
+  const folder = group.replace(/[\\/]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40) || "Việc";
+  return ["Việc tiệm", folder, clean || "Việc"];
 }
 
 export function taskFileBucket(
   state: { tasks?: ShopState["tasks"]; taskChecks?: ShopState["taskChecks"] },
   taskId: string,
   ymd: string,
-): { files: OrderFile[]; period: string; title: string } {
+): { files: OrderFile[]; period: string; title: string; group: string } {
   const template = checklistTemplate(taskId);
   if (!template) throw new Error("Không thấy việc.");
   const period = periodFor(template, ymd);
+  const group = taskGroupFolder(template);
   if (template.repeat === "once") {
     const tasks = (state.tasks ??= []);
     let row = tasks.find((item) => item.id === template.id);
@@ -217,7 +331,7 @@ export function taskFileBucket(
       row = { id: template.id, status: template.sheetStatus, note: template.note, updatedAt: null, updatedBy: null, files: [] };
       tasks.push(row);
     }
-    return { files: row.files, period, title: template.title };
+    return { files: row.files, period, title: template.title, group };
   }
   const checks = (state.taskChecks ??= []);
   let row = checks.find((item) => item.taskId === template.id && item.period === period);
@@ -225,7 +339,7 @@ export function taskFileBucket(
     row = { id: crypto.randomUUID(), taskId: template.id, period, status: "dang_lam", note: "", updatedAt: new Date().toISOString(), updatedBy: null, files: [] };
     checks.push(row);
   }
-  return { files: row.files, period, title: template.title };
+  return { files: row.files, period, title: template.title, group };
 }
 
 const MENU_PATH = "/admin/viec";

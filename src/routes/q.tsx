@@ -108,7 +108,7 @@ function PhoneTasks() {
       {pinState.pin.length === 4 ? (
         <>
           <p className="text-sm text-muted-foreground">
-            {tasks.data?.drive ? "Ảnh lên Google Drive theo ngày và việc." : "Ảnh lưu trên máy chủ, mỗi ảnh tối đa 10MB. Drive chưa nối."}
+            {tasks.data?.drive ? "Ảnh chứng lên Google Drive theo nhóm việc ghi trên thẻ." : "Ảnh chứng lưu trên máy chủ, mỗi ảnh tối đa 10MB. Drive chưa nối."}
           </p>
           <div className="flex flex-wrap gap-3 text-sm">
             {TASK_DOCS.map((doc) => (

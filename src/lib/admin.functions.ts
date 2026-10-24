@@ -333,6 +333,7 @@ export const createPriceSize = createServerFn({ method: "POST" })
         heightCm: z.number().int().min(1).max(200),
         sheets: z.number().int().min(1).max(100),
         prices: priceMap,
+        code: z.string().min(2).max(40).optional(),
       })
       .parse(data),
   )
@@ -344,7 +345,7 @@ export const createPriceSize = createServerFn({ method: "POST" })
     if (data.prices.tiktok !== undefined) prices.tiktok = data.prices.tiktok;
     if (data.prices.shopee !== undefined) prices.shopee = data.prices.shopee;
     if (data.prices.mo_home !== undefined) prices.mo_home = data.prices.mo_home;
-    return create(await actor(), { ...data, prices });
+    return create(await actor(), { ...data, prices, code: data.code });
   });
 
 export const importPriceSheet = createServerFn({ method: "POST" })
@@ -414,6 +415,31 @@ export const receiveStock = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { stockIn } = await import("@/server/service");
     await stockIn(await actor(), data);
+    return { ok: true };
+  });
+
+export const receiveStockMany = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        supplier: z.string().optional().default(""),
+        note: z.string().optional().default(""),
+        lines: z
+          .array(
+            z.object({
+              materialId: z.string().min(1),
+              packs: z.number().positive(),
+              packPrice: z.number().min(0).nullable(),
+            }),
+          )
+          .min(1)
+          .max(40),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { stockInMany } = await import("@/server/service");
+    await stockInMany(await actor(), data);
     return { ok: true };
   });
 
