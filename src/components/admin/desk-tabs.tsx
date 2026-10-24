@@ -22,13 +22,13 @@ export function tabsFor(pathname: string, search: Record<string, unknown>, role:
   }
   if (onPath(pathname, "/admin/gia") || onPath(pathname, "/admin/san-pham")) {
     return [
-      { key: "gia", to: "/admin/gia", label: "Bảng giá", active: onPath(pathname, "/admin/gia") },
+      { key: "gia", to: "/admin/gia", label: "Bảng giá", search: { m: "bang-gia" }, active: onPath(pathname, "/admin/gia") && panel === "bang-gia" },
       { key: "sp", to: "/admin/san-pham", label: "Sản phẩm", search: { m: "" }, active: onPath(pathname, "/admin/san-pham") && panel !== "nhap" },
     ];
   }
   if (onPath(pathname, "/admin/kho")) {
     const stock = [
-      { key: "ton", to: "/admin/kho", label: "Tồn", search: { m: "" }, active: panel !== "nhap" && panel !== "hong" },
+      { key: "ton", to: "/admin/kho", label: "Tồn", search: { m: "ton" }, active: panel === "ton" },
       ...(role === "production" ? [] : [{ key: "nhap", to: "/admin/kho", label: "Nhập", search: { m: "nhap" }, active: panel === "nhap" }]),
       { key: "hong", to: "/admin/kho", label: "Báo hỏng", search: { m: "hong" }, active: panel === "hong" },
     ];

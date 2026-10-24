@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 
 import { parseSettingsPanel, SETTINGS_HUB_GROUPS, type SettingsHubCard, type SettingsPanel } from "@/admin-os/settings-hub";
+import { AccessHub } from "@/components/admin/access-hub";
 import { ListPager, useListPage } from "@/components/admin/list-page";
 import { canPreviewPhoto, PhotoViewer, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
@@ -196,40 +197,14 @@ function SettingsBody() {
 
   if (!panel) {
     return (
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-extrabold text-primary">Cài đặt hệ thống</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Kênh cửa hàng, chi phí, kết nối và quyền — mở từng mục bằng nút truy cập.
-          </p>
-        </div>
-        {SETTINGS_HUB_GROUPS.map((group) => (
-          <section key={group.title} className="space-y-3">
-            <h2 className="text-sm font-bold tracking-wide text-muted-foreground uppercase">{group.title}</h2>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {group.cards.map((card) => {
-                const Icon = ICONS[card.icon] ?? Settings2;
-                return (
-                  <Link
-                    key={card.id}
-                    to={card.to}
-                    search={card.search}
-                    className="flex min-h-[5.5rem] gap-3 rounded-2xl border bg-card px-4 py-3 shadow-sm transition hover:border-primary/40 hover:bg-muted/30"
-                  >
-                    <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Icon className="size-5" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block font-semibold text-foreground">{card.title}</span>
-                      <span className="mt-0.5 block text-sm text-muted-foreground">{card.blurb}</span>
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        ))}
-      </div>
+      <AccessHub
+        title="Cài đặt hệ thống"
+        hint="Kênh cửa hàng, chi phí, kết nối và quyền — mở từng mục bằng nút truy cập."
+        groups={SETTINGS_HUB_GROUPS.map((group) => ({
+          title: group.title,
+          cards: group.cards.map((card) => ({ ...card, icon: ICONS[card.icon] ?? Settings2 })),
+        }))}
+      />
     );
   }
 
