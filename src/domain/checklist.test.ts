@@ -19,7 +19,7 @@ import {
 test("sheet checklist đủ việc và không mang câu hứa ra app", async () => {
   const count = (list: string) => CHECKLIST_TEMPLATES.filter((item) => item.list === list).length;
   assert.equal(count("setup"), 56);
-  assert.equal(count("anh"), 54);
+  assert.equal(count("anh"), 73);
   assert.equal(count("sale_ngay"), 19);
   assert.equal(count("sale_tuan"), 9);
   assert.equal(count("chot"), 24);
@@ -28,6 +28,12 @@ test("sheet checklist đủ việc và không mang câu hứa ra app", async () 
   assert.equal(count("dao_tao"), 10);
   const blob = JSON.stringify(CHECKLIST_TEMPLATES);
   assert.doesNotMatch(blob, /miễn phí|tặng quà|tặng 1/i);
+  assert.equal(CHECKLIST_TEMPLATES.find((item) => item.id === "anh-chup-nct")?.link, "https://drive.google.com/file/d/10s9AdkzMF9zLqZqLSwCBrRUyodvnm2Is/view");
+  assert.equal(CHECKLIST_TEMPLATES.find((item) => item.id === "anh-video-nct")?.link, "https://drive.google.com/file/d/1F6cDFHSLaOw3F3PRZ6CFB0kxYXF29FGQ/view");
+  assert.equal(CHECKLIST_TEMPLATES.find((item) => item.id === "anh-16")?.sheetStatus, "xong");
+  assert.equal(CHECKLIST_TEMPLATES.filter((item) => item.section === "Cần chụp").length, 10);
+  assert.equal(CHECKLIST_TEMPLATES.filter((item) => item.section === "Quay video").length, 9);
+  assert.ok(CHECKLIST_TEMPLATES.filter((item) => item.list === "khai_truong" && item.link).length >= 20);
   assert.ok(CHECKLIST_TEMPLATES.filter((item) => item.list === "sale_ngay").every((item) => item.draft));
   assert.match(CHECKLIST_TEMPLATES.find((item) => item.id === "ngay-1")?.detail ?? "", /chưa duyệt/);
   const seeded = await buildSeed();

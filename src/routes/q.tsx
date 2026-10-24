@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { useStaffPin } from "@/components/staff-pin";
 import { TaskBoard } from "@/components/task-board";
-import { LIST_LABEL, type ChecklistListId, type TaskCard } from "@/domain/checklists";
+import { LIST_LABEL, TASK_DOCS, type ChecklistListId, type TaskCard } from "@/domain/checklists";
 import { loadPhoneTasks, savePhoneTaskStatus, staffPinStatus } from "@/lib/phone.functions";
 
 export const Route = createFileRoute("/q")({
@@ -15,12 +15,14 @@ export const Route = createFileRoute("/q")({
   component: PhoneTasks,
 });
 
-const CHIPS: { id: ChecklistListId | "hom_nay"; label: string }[] = [
+const CHIPS: { id: ChecklistListId | "hom_nay" | "can_chup" | "quay_video"; label: string }[] = [
   { id: "hom_nay", label: "Hôm nay" },
   { id: "sale_tuan", label: "Tuần" },
   { id: "setup", label: "Setup" },
   { id: "khai_truong", label: "Khai trương" },
   { id: "chot", label: "24 việc" },
+  { id: "can_chup", label: "Cần chụp" },
+  { id: "quay_video", label: "Quay video" },
   { id: "anh", label: "Ảnh" },
   { id: "dao_tao", label: "Đào tạo" },
 ];
@@ -31,7 +33,7 @@ function PhoneTasks() {
   const ready = useQuery({ queryKey: ["staff-pin"], queryFn: () => staffPinStatus() });
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
-  const [list, setList] = useState<ChecklistListId | "hom_nay">("hom_nay");
+  const [list, setList] = useState<(typeof CHIPS)[number]["id"]>("hom_nay");
   const [busyId, setBusyId] = useState<string | null>(null);
   const client = useQueryClient();
   const tasks = useQuery({
@@ -43,8 +45,12 @@ function PhoneTasks() {
 
   const cards = useMemo(() => {
     const rows = tasks.data?.cards ?? [];
-    const today = rows.filter((card) => card.list === "sale_ngay" || card.list === "sop");
-    const picked = list === "hom_nay" ? today : rows.filter((card) => card.list === list);
+    const picked = rows.filter((card) => {
+      if (list === "can_chup") return card.section === "Cần chụp";
+      if (list === "quay_video") return card.section === "Quay video";
+      if (list === "hom_nay") return card.list === "sale_ngay" || card.list === "sop";
+      return card.list === list;
+    });
     if (!v) return picked;
     return [...picked].sort((a, b) => (a.id === v ? -1 : b.id === v ? 1 : 0));
   }, [tasks.data?.cards, list, v]);
@@ -104,6 +110,13 @@ function PhoneTasks() {
           <p className="text-sm text-muted-foreground">
             {tasks.data?.drive ? "Ảnh lên Google Drive theo ngày và việc." : "Ảnh lưu trên máy chủ, mỗi ảnh tối đa 10MB. Drive chưa nối."}
           </p>
+          <div className="flex flex-wrap gap-3 text-sm">
+            {TASK_DOCS.map((doc) => (
+              <a key={doc.href} href={doc.href} target="_blank" rel="noreferrer" className="font-semibold text-primary underline">
+                {doc.title}
+              </a>
+            ))}
+          </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {CHIPS.map((chip) => (
               <button
