@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,8 @@ function SlipBody() {
   const { loai } = Route.useSearch();
   const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
   const [qr, setQr] = useState<string | null>(null);
+  const [pageHeight, setPageHeight] = useState(120);
+  const sheetRef = useRef<HTMLElement>(null);
   const data = order.data;
   const upload = useQuery({
     queryKey: ["slip-upload", data?.id],
@@ -53,6 +55,13 @@ function SlipBody() {
     };
   }, [designUrl]);
 
+  useEffect(() => {
+    const node = sheetRef.current;
+    if (!node) return;
+    const mm = Math.ceil((node.scrollHeight * 25.4) / 96) + 4;
+    setPageHeight(Math.max(70, mm));
+  }, [data, qr, loai]);
+
   if (order.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
   if (order.isError || !data) return <p className="font-semibold text-destructive">{(order.error as Error)?.message ?? "Không thấy đơn."}</p>;
 
@@ -69,7 +78,7 @@ function SlipBody() {
   return (
     <div className="space-y-4">
       <style>{`
-        @page { size: 80mm auto; margin: 0; }
+        @page { size: 80mm ${pageHeight}mm; margin: 0; }
         @media print {
           html, body {
             width: 80mm !important;
@@ -109,7 +118,7 @@ function SlipBody() {
         <p className="text-sm text-muted-foreground">Khổ in 80mm. Phần chữ rộng 72mm, vừa vùng in của máy nhiệt USB.</p>
       </div>
       <div className="k80-frame mx-auto box-border w-[80mm] bg-neutral-200 px-[4mm] py-[2mm] print:bg-white">
-        {loai === "sx" ? <ProductionSlip data={data} when={when} qr={qr} /> : <K80Slip data={data} when={when} where={where} qr={qr} />}
+        {loai === "sx" ? <ProductionSlip sheetRef={sheetRef} data={data} when={when} qr={qr} /> : <K80Slip sheetRef={sheetRef} data={data} when={when} where={where} qr={qr} />}
       </div>
     </div>
   );
@@ -122,14 +131,17 @@ function K80Slip({
   when,
   where,
   qr,
+  sheetRef,
 }: {
   data: SlipData;
   when: string;
   where: string;
   qr: string | null;
+  sheetRef: RefObject<HTMLElement | null>;
 }) {
   return (
     <article
+      ref={sheetRef}
       className="slip-sheet mx-auto box-border w-[72mm] bg-white px-0 py-[2mm] text-[12px] leading-snug text-black shadow print:shadow-none"
       style={{ fontFamily: '"Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif' }}
     >
@@ -179,9 +191,19 @@ function K80Slip({
   );
 }
 
-function ProductionSlip({ data, when, qr }: { data: SlipData; when: string; qr: string | null }) {
+function ProductionSlip({
+  data,
+  when,
+  qr,
+  sheetRef,
+}: {
+  data: SlipData;
+  when: string;
+  qr: string | null;
+  sheetRef: RefObject<HTMLElement | null>;
+}) {
   return (
-    <article className="slip-sheet mx-auto box-border w-[72mm] bg-white px-0 py-[2mm] text-[12px] leading-snug text-black shadow print:shadow-none">
+    <article ref={sheetRef} className="slip-sheet mx-auto box-border w-[72mm] bg-white px-0 py-[2mm] text-[12px] leading-snug text-black shadow print:shadow-none">
       <header className="border-b border-black pb-2 text-center">
         <p className="text-[15px] font-extrabold">NHÀ IN THIÊN THIÊN</p>
         <p className="mt-1 text-[13px] font-extrabold">Phiếu sản xuất</p>
