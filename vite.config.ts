@@ -12,4 +12,16 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (id.includes("node_modules/react-dom") || id.includes("node_modules/react/") || id.includes("node_modules/scheduler")) return "react";
+            if (id.includes("node_modules/sonner")) return "sonner";
+          },
+        },
+      },
+    },
+  },
 });
