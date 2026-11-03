@@ -44,6 +44,11 @@ export function SiteFooter() {
               Zalo {phone}
             </a>
           ) : null}
+          <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="block text-foreground/80 hover:text-primary">
+            Shopee: nhainthienthien
+          </a>
+          <p className="text-muted-foreground">{BRAND.address}</p>
+          {config.data?.hours ? <p className="text-muted-foreground">Mở cửa {config.data.hours}</p> : null}
           <p className="text-muted-foreground">{BRAND.website}</p>
         </div>
       </div>

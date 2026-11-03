@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Clock, Globe, MessageCircle, PackageSearch, Phone, UploadCloud } from "lucide-react";
+import { Clock, Globe, MapPin, MessageCircle, PackageSearch, Phone, ShoppingBag, UploadCloud } from "lucide-react";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
@@ -82,6 +82,16 @@ function ContactPage() {
             </a>
           ) : null}
           <div className="glass-card rounded-3xl p-5">
+            <MapPin className="size-6 text-accent" />
+            <h2 className="mt-3 text-lg font-bold text-foreground">Địa chỉ tiệm</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{BRAND.address}</p>
+          </div>
+          <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="glass-card rounded-3xl p-5">
+            <ShoppingBag className="size-6 text-accent" />
+            <h2 className="mt-3 text-lg font-bold text-foreground">Mua trên Shopee / TikTok</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Shopee: nhainthienthien · TikTok Shop: Nhà In Thiên Thiên</p>
+          </a>
+          <div className="glass-card rounded-3xl p-5">
             <Clock className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Thời gian làm việc</h2>
             <p className="mt-1 text-sm text-muted-foreground">{hours}</p>
@@ -104,7 +114,7 @@ function ContactPage() {
           }}
         >
           <h2 className="text-lg font-bold text-foreground">Gửi tin cho xưởng</h2>
-          <p className="text-sm text-muted-foreground">Xưởng đọc tin trong trang quản trị. Không cần số của tiệm.</p>
+          <p className="text-sm text-muted-foreground">Để lại tin, tiệm gọi hoặc nhắn lại cho bạn.</p>
           <div>
             <Label htmlFor="ten">Tên</Label>
             <Input id="ten" className="mt-1 min-h-11" value={name} onChange={(event) => setName(event.target.value)} required />

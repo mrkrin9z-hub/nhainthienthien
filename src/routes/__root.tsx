@@ -102,7 +102,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Nhà In Thiên Thiên — In đẹp từng khoảnh khắc" },
       {
         name: "description",
-        content: "In ảnh ép gỗ, ảnh thờ, giấy khen và nam châm. Gửi ảnh online, theo dõi tiến trình trên web.",
+        content: "In ảnh tráng gương 4K, thời khóa biểu, nam châm và ảnh lụa theo yêu cầu. Gửi ảnh online, theo dõi tiến trình trên web.",
       },
       { name: "author", content: "Nhà In Thiên Thiên" },
       { name: "apple-mobile-web-app-capable", content: "yes" },

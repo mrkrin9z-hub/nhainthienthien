@@ -17,6 +17,7 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { catalogQueryOptions, minPrice, offerLines, publicConfigQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
 import { catalogImage } from "@/lib/product-images";
+import heroImg from "@/assets/hero-thuc-te.jpg";
 import { BRAND, formatVnd } from "@/lib/brand";
 
 export const Route = createFileRoute("/")({
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "In ảnh ép gỗ, ảnh thờ, giấy khen và nam châm. Gửi ảnh online 3 bước, nhận mã đơn và theo dõi tiến trình.",
+          "In ảnh tráng gương 4K, thời khóa biểu, nam châm và ảnh lụa theo yêu cầu. Gửi ảnh online 3 bước, nhận mã đơn và theo dõi tiến trình.",
       },
       { property: "og:title", content: "Nhà In Thiên Thiên — In đẹp từng khoảnh khắc" },
       {
@@ -84,7 +85,7 @@ const FAQS = [
   },
   {
     q: "Khi nào thì biết tiến trình đơn?",
-    a: "Sau khi nhận đơn, xưởng cập nhật từng bước trên trang tra cứu. Ảnh thờ có hỗ trợ chỉnh sửa ảnh cơ bản.",
+    a: "Sau khi nhận đơn, xưởng cập nhật từng bước trên trang tra cứu. Tiệm hỗ trợ chỉnh sửa ảnh cơ bản.",
   },
 ];
 
@@ -183,8 +184,8 @@ function HomePage() {
 
           <div className="rise overflow-hidden rounded-[2rem] bg-secondary">
             <img
-              src={catalogImage("anh-tho", null)}
-              alt="Ảnh mẫu in tại tiệm"
+              src={heroImg}
+              alt="Ảnh tráng gương 40×60 treo tại tiệm Nhà In Thiên Thiên"
               width={800}
               height={1000}
               fetchPriority="high"

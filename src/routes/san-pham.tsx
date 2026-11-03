@@ -11,12 +11,13 @@ import { Button } from "@/components/ui/button";
 import {
   catalogQueryOptions,
   minPrice,
+  minListPrice,
   type CatalogProduct,
   type CatalogVariant,
 } from "@/lib/catalog.functions";
 import { matchingSheet, sheetOptionLabel, sizeChoices, sizeSummary } from "@/domain/catalog-label";
 import { catalogImage } from "@/lib/product-images";
-import { formatVnd } from "@/lib/brand";
+import { BRAND, formatVnd, tiktokUrl } from "@/lib/brand";
 
 export const Route = createFileRoute("/san-pham")({
   loader: ({ context }) => context.queryClient.ensureQueryData(catalogQueryOptions),
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/san-pham")({
       {
         name: "description",
         content:
-          "Xem ảnh mẫu và giá từng kích thước: ảnh ép gỗ tráng gương bo viền, ảnh thờ, giấy khen và nam châm. Chọn size, chọn số lượng và đặt mua ngay.",
+          "Xem ảnh mẫu và giá từng kích thước: ảnh tráng gương 4K, thời khóa biểu, nam châm tủ lạnh, nam châm Lái Mới và ảnh lụa. Chọn size, chọn số lượng và đặt mua ngay.",
       },
       { property: "og:title", content: "Sản phẩm & bảng giá in ảnh — Nhà In Thiên Thiên" },
       {
@@ -185,6 +186,7 @@ function ProductsPage() {
 
 function ProductTile({ product, onOpen }: { product: CatalogProduct; onOpen: () => void }) {
   const from = minPrice(product);
+  const fromList = minListPrice(product);
   return (
     <article className="glass-card flex flex-col overflow-hidden rounded-2xl">
       <button type="button" onClick={onOpen} className="text-left">
@@ -209,6 +211,9 @@ function ProductTile({ product, onOpen }: { product: CatalogProduct; onOpen: () 
             <span className="mr-1 text-[11px] font-medium text-muted-foreground">từ</span>
           )}
           {from === null ? "Liên hệ" : formatVnd(from)}
+          {fromList ? (
+            <span className="ml-1.5 text-xs font-medium text-muted-foreground line-through">{formatVnd(fromList)}</span>
+          ) : null}
         </p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
           {sizeSummary(product.variants)}
@@ -270,6 +275,9 @@ function VariantSheet({
             <h3 className="truncate text-lg font-bold text-foreground">{product.name}</h3>
             <p className="text-xl font-extrabold text-accent">
               {price === null ? "Liên hệ" : formatVnd(price)}
+              {variant?.list_price ? (
+                <span className="ml-2 text-sm font-medium text-muted-foreground line-through">{formatVnd(variant.list_price)}</span>
+              ) : null}
             </p>
           </div>
           <button
@@ -285,6 +293,16 @@ function VariantSheet({
         <p className="mt-3 text-sm text-muted-foreground">
           {product.turnaround_text ? `${product.description} • ${product.turnaround_text}` : product.description}
         </p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+          {tiktokUrl(product.slug) ? (
+            <a href={tiktokUrl(product.slug) ?? undefined} target="_blank" rel="noopener" className="rounded-full border border-border px-3 py-1.5 text-foreground/80 hover:text-primary">
+              Xem trên TikTok Shop
+            </a>
+          ) : null}
+          <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="rounded-full border border-border px-3 py-1.5 text-foreground/80 hover:text-primary">
+            Shop trên Shopee
+          </a>
+        </div>
 
         <p className="mt-5 text-sm font-semibold text-foreground">Chọn kích thước</p>
         <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Chọn kích thước">

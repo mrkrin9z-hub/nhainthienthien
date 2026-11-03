@@ -408,6 +408,10 @@ export async function publicCatalog() {
             unit: "cm",
             price,
             sale_price: null as number | null,
+            list_price: (() => {
+              const lp = priceOf(state.prices, sku.id, "tai_tiem")?.listPrice ?? priceOf(state.prices, sku.id, "tiktok")?.listPrice ?? null;
+              return typeof lp === "number" && price !== null && lp > price ? lp : null;
+            })(),
             requires_quote: price === null,
             recommended_width_px: sku.widthCm ? Math.round((sku.widthCm / 2.54) * 300) : null,
             recommended_height_px: sku.heightCm ? Math.round((sku.heightCm / 2.54) * 300) : null,

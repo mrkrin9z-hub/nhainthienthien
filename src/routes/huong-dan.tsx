@@ -30,7 +30,7 @@ const GUIDE = [
   {
     title: "Bước 1 — Chọn sản phẩm và quy cách",
     points: [
-      "Chọn ảnh ép gỗ tráng gương để bàn, ảnh thờ, giấy khen ép gỗ hoặc nam châm. Giá lấy từ bảng giá tại tiệm.",
+      "Chọn ảnh ép gỗ tráng gương để bàn, thời khóa biểu, nam châm hoặc ảnh lụa. Giá lấy từ bảng giá tại tiệm.",
       "Chọn kích thước và số lượng cho từng quy cách.",
     ],
   },
