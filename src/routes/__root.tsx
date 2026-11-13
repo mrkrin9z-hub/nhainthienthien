@@ -155,8 +155,14 @@ function RootComponent() {
   const router = useRouter();
   useEffect(() => {
     installMotion();
+    if ("startViewTransition" in document) {
+      // Chỉ dùng chuyển trang mượt cho các lần bấm sau, không áp cho lần tải đầu.
+      const timer = window.setTimeout(() => {
+        router.options.defaultViewTransition = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
     // Trình duyệt chưa có View Transitions: trượt nhẹ nội dung khi đổi trang.
-    if ("startViewTransition" in document) return;
     return router.subscribe("onResolved", (event) => {
       if (!event.pathChanged) return;
       const root = document.documentElement;

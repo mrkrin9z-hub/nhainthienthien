@@ -17,8 +17,8 @@ export const getRouter = () => {
     // Tải trước trang khi rê chuột / chạm vào link để bấm là mở ngay.
     defaultPreload: "intent",
     defaultPreloadDelay: 40,
-    // Chuyển trang mượt (View Transitions); trình duyệt không hỗ trợ thì dùng hiệu ứng CSS ở styles.css.
-    defaultViewTransition: true,
+    // View Transitions bật sau lần tải đầu (xem __root.tsx), để lần mở trang đầu không bị nhảy bố cục (CLS).
+    defaultViewTransition: false,
   });
 
   return router;
