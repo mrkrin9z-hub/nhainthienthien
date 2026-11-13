@@ -503,3 +503,220 @@ textarea,
     animation: none !important;
   }
 }
+
+/* ===== Giao diện Glass + Flat cho trang khách (chỉ trong .shop-ui, trang quản trị không đổi) =====
+ * Kính mờ (backdrop-filter) chỉ dùng cho thanh cố định: header, thanh tab dưới, thanh mua/thanh toán,
+ * bảng tiến trình. Thẻ trong danh sách dùng nền phẳng + bóng rất nhẹ, không làm mờ (nhẹ máy). */
+.shop-ui {
+  position: relative;
+  isolation: isolate;
+  background-color: #f5f6f9;
+  color: #123047;
+}
+/* Nền lưới màu dịu (cố định, không blur) */
+.shop-ui::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(55% 38% at 0% 0%, rgb(31 116 184 / 0.13), transparent 72%),
+    radial-gradient(45% 30% at 100% 6%, rgb(244 158 13 / 0.1), transparent 70%),
+    radial-gradient(60% 40% at 100% 70%, rgb(31 116 184 / 0.07), transparent 72%),
+    radial-gradient(60% 45% at 0% 100%, rgb(244 158 13 / 0.07), transparent 70%);
+}
+.shop-ui svg.lucide {
+  stroke-width: 1.85;
+}
+
+@utility card {
+  background-color: #fff;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 1px rgb(18 48 71 / 0.04),
+    0 1px 2px rgb(18 48 71 / 0.04),
+    0 8px 24px -14px rgb(18 48 71 / 0.16);
+}
+
+@layer components {
+/* Thẻ phẳng: bo lớn, bóng mềm thay viền cứng */
+
+
+
+/* Header kính xanh thương hiệu */
+.glass-header {
+  background-image: linear-gradient(100deg, #155e9a, #1a68a8);
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.14), 0 10px 30px -18px rgb(18 48 71 / 0.55);
+}
+/* Thanh cố định dưới: kính trắng */
+.glass-bar {
+  background-color: rgb(255 255 255 / 0.97);
+  border-top: 1px solid rgb(18 48 71 / 0.06);
+  box-shadow: 0 -10px 30px -20px rgb(18 48 71 / 0.35);
+}
+.glass-sheet {
+  background-color: rgb(255 255 255 / 0.98);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.7) inset, 0 -20px 50px -20px rgb(18 48 71 / 0.4);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .glass-header {
+    background-image: linear-gradient(100deg, rgb(21 94 154 / 0.9), rgb(26 104 168 / 0.88));
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+    backdrop-filter: blur(18px) saturate(170%);
+  }
+  .glass-bar {
+    background-color: rgb(255 255 255 / 0.78);
+    border-top-color: rgb(255 255 255 / 0.75);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+  }
+  .glass-sheet {
+    background-color: rgb(255 255 255 / 0.84);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+  .glass-blur {
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+    backdrop-filter: blur(10px) saturate(160%);
+  }
+}
+
+/* Nhãn kính trên ảnh (không blur để nhẹ khi nhiều thẻ) */
+.glass-chip {
+  background-color: rgb(255 255 255 / 0.86);
+  border: 1px solid rgb(255 255 255 / 0.9);
+  box-shadow: 0 4px 12px -4px rgb(18 48 71 / 0.28);
+  color: #123047;
+}
+.glass-dark {
+  background-color: rgb(18 48 71 / 0.5);
+  border: 1px solid rgb(255 255 255 / 0.22);
+  color: #fff;
+}
+
+/* Nút phẳng dạng viên thuốc */
+.btn-cta {
+  background-color: #f49e0d;
+  color: #123047;
+  font-weight: 700;
+  border-radius: 9999px;
+  box-shadow: 0 8px 18px -10px rgb(244 158 13 / 0.9), inset 0 1px 0 rgb(255 255 255 / 0.35);
+}
+.btn-cta:hover {
+  background-color: #f6a823;
+}
+.btn-soft {
+  background-color: #e8f1fa;
+  color: #155e9a;
+  font-weight: 600;
+  border-radius: 9999px;
+}
+.btn-soft:hover {
+  background-color: #dceaf8;
+}
+.btn-ghost {
+  background-color: #fff;
+  color: #123047;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 1px rgb(18 48 71 / 0.1) inset;
+}
+.btn-ghost:hover {
+  box-shadow: 0 0 0 1px rgb(21 94 154 / 0.35) inset;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 9999px;
+  padding: 0 0.45rem;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.25rem;
+  white-space: nowrap;
+}
+.pill-blue {
+  background-color: #e8f1fa;
+  color: #155e9a;
+}
+.pill-sale {
+  background-color: #fff1dc;
+  color: #9a4508;
+}
+
+/* Tiêu đề khối có vạch nhấn */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #123047;
+}
+.section-title::before {
+  content: "";
+  width: 4px;
+  height: 1.05em;
+  border-radius: 9999px;
+  background-image: linear-gradient(180deg, #f49e0d, #f7b23b);
+}
+
+/* Ô nhập: bo mềm, viền nhạt, focus xanh */
+.shop-ui :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea) {
+  border-radius: 14px;
+  background-color: #f7f9fc;
+  border-color: rgb(18 48 71 / 0.1);
+}
+.shop-ui :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea):focus-visible {
+  background-color: #fff;
+  border-color: #1f74b8;
+  box-shadow: 0 0 0 3px rgb(31 116 184 / 0.18);
+}
+.shop-ui form[role="search"] input,
+.shop-ui form[role="search"] input:focus-visible {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .product-card {
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.22s ease;
+  }
+  .product-card:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      0 0 0 1px rgb(18 48 71 / 0.04),
+      0 18px 36px -18px rgb(18 48 71 / 0.32);
+  }
+  .hero-tile img {
+    transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .hero-tile:hover img {
+    transform: scale(1.035);
+  }
+  .btn-cta,
+  .btn-soft,
+  .btn-ghost {
+    transition: transform 0.14s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .btn-cta:active,
+  .btn-soft:active,
+  .btn-ghost:active {
+    transform: scale(0.96);
+  }
+}
+.glass-panel {
+  background-color: rgb(255 255 255 / 0.97);
+  box-shadow: 0 10px 24px -20px rgb(18 48 71 / 0.45);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .glass-panel {
+    background-color: rgb(255 255 255 / 0.76);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+  }
+}
+
+}

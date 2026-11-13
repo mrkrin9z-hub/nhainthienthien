@@ -44,7 +44,7 @@ function SideTile({
       to={to}
       params={{ slug }}
       search={v ? { v } : {}}
-      className={`hero-tile relative block overflow-hidden rounded-[14px] bg-[#dfe6ee] text-white ${className}`}
+      className={`hero-tile relative block overflow-hidden rounded-[20px] bg-[#dfe6ee] text-white shadow-[0_14px_30px_-20px_rgb(18_48_71/0.6)] ${className}`}
     >
       <picture>
         {imgDesktop ? <source media="(min-width: 768px)" srcSet={imgDesktop} /> : null}
@@ -78,13 +78,13 @@ export function HomeHero({ products }: { products: Product[] }) {
   const tkb = priceOf(products, "thoi-khoa-bieu", "TKB-20x30-C1", 70000);
 
   return (
-    <section className="bg-white p-2.5 md:bg-transparent md:px-0 md:pb-3 md:pt-0">
+    <section className="pt-2.5 md:pb-1 md:pt-0">
       <div className="grid h-[clamp(300px,80vw,380px)] grid-cols-[1.25fr_1fr] grid-rows-2 gap-2 md:h-[420px] md:grid-cols-[1.5fr_1fr_1fr] md:gap-3">
         <Link
           to="/san-pham/$slug"
           params={{ slug: "trang-guong" }}
           search={{ v: combo.id ?? "TG-13x18-C4" }}
-          className="hero-tile row-span-2 flex flex-col overflow-hidden rounded-[14px] text-white"
+          className="hero-tile row-span-2 flex flex-col overflow-hidden rounded-[20px] text-white shadow-[0_18px_40px_-22px_rgb(18_48_71/0.7)]"
           style={{ backgroundColor: NAVY }}
         >
           <div className="relative shrink-0 basis-[44%] overflow-hidden bg-[#dfe6ee] md:basis-1/2">
@@ -101,7 +101,7 @@ export function HomeHero({ products }: { products: Product[] }) {
               />
             </picture>
             <span className="absolute inset-0 bg-gradient-to-b from-transparent from-55% to-[#123047]" aria-hidden />
-            <span className="absolute left-2.5 top-2.5 z-[1] rounded-full bg-cta px-2.5 py-1 text-[11px] font-extrabold text-[#1b1300] md:left-3 md:top-3 md:text-xs">
+            <span className="glass-chip absolute left-2.5 top-2.5 z-[1] rounded-full px-2.5 py-1 text-[11px] font-extrabold md:left-3 md:top-3 md:text-xs">
               Combo 4 ảnh 13×18
             </span>
           </div>
@@ -119,14 +119,14 @@ export function HomeHero({ products }: { products: Product[] }) {
               ) : null}
             </div>
             <div className="mt-1.5 flex flex-col-reverse items-start gap-2 md:flex-row md:items-center md:gap-3">
-              <span className="self-center rounded-full bg-cta px-4 py-2.5 text-[13px] font-bold text-[#1b1300] shadow-[0_6px_16px_rgb(244_158_13/0.35)] md:self-auto md:px-6 md:py-3 md:text-base">
+              <span className="btn-cta self-center px-5 py-2.5 text-[13px] md:self-auto md:px-7 md:py-3 md:text-base">
                 Mua ngay ›
               </span>
               <span className="flex flex-nowrap gap-1">
-                <span className="whitespace-nowrap rounded-full border border-white/40 bg-white/15 px-[7px] py-[3px] text-[10.5px] font-semibold md:px-3 md:py-1.5 md:text-[13px]">
+                <span className="whitespace-nowrap rounded-full bg-white/12 px-[7px] ring-1 ring-inset ring-white/25 py-[3px] text-[10.5px] font-semibold md:px-3 md:py-1.5 md:text-[13px]">
                   🚚 Freeship từ 300k
                 </span>
-                <span className="whitespace-nowrap rounded-full border border-white/40 bg-white/15 px-[7px] py-[3px] text-[10.5px] font-semibold md:px-3 md:py-1.5 md:text-[13px]">
+                <span className="whitespace-nowrap rounded-full bg-white/12 px-[7px] ring-1 ring-inset ring-white/25 py-[3px] text-[10.5px] font-semibold md:px-3 md:py-1.5 md:text-[13px]">
                   💵 COD
                 </span>
               </span>
@@ -170,7 +170,7 @@ export function HomeHero({ products }: { products: Product[] }) {
           className="hidden md:block"
         />
       </div>
-      <p className="flex items-center gap-2 px-0.5 pt-2 text-xs text-[#5b6b7a] md:text-sm">
+      <p className="flex items-center gap-2 px-1 pt-2.5 text-xs text-[#5b6b7a] md:text-sm">
         <img src="/brand/icon-192.png" alt="" width={22} height={22} loading="lazy" decoding="async" className="size-[22px] rounded-full" />
         Nhà In Thiên Thiên · {BRAND.region} · Giao tận nơi
       </p>

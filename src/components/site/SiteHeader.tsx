@@ -27,11 +27,11 @@ export function CartButton({ tone = "light" }: { tone?: "light" | "dark" }) {
       to="/gio-hang"
       data-cart-icon
       aria-label={count ? `Giỏ hàng, ${count} sản phẩm` : "Giỏ hàng"}
-      className={`relative grid size-10 shrink-0 place-items-center rounded-full ${tone === "light" ? "text-white" : "text-foreground"}`}
+      className={`relative grid size-10 shrink-0 place-items-center rounded-full ${tone === "light" ? "bg-white/12 text-white ring-1 ring-white/20 hover:bg-white/20" : "text-foreground"}`}
     >
-      <ShoppingCart className="size-6" />
+      <ShoppingCart className="size-[22px]" />
       {count > 0 ? (
-        <span className="absolute -right-0.5 top-0 min-w-5 rounded-full border-2 border-white bg-cta px-1 text-center text-[11px] font-bold leading-4 text-cta-foreground">
+        <span className="absolute -right-1 -top-1 min-w-5 rounded-full border-2 border-white bg-cta shadow-sm px-1 text-center text-[11px] font-bold leading-4 text-cta-foreground">
           {count > 99 ? "99+" : count}
         </span>
       ) : null}
@@ -48,7 +48,7 @@ function SearchBox({ defaultValue = "" }: { defaultValue?: string | undefined })
     navigate({ to: "/san-pham", search: text ? { q: text } : {} });
   }
   return (
-    <form role="search" onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-2 rounded-sm bg-white px-3 shadow-sm">
+    <form role="search" onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-white/95 pl-3.5 pr-1 shadow-[0_6px_18px_-10px_rgb(18_48_71/0.6)] ring-1 ring-white/60 focus-within:bg-white focus-within:ring-2 focus-within:ring-white">
       <Search className="size-4 shrink-0 text-brand-blue" aria-hidden />
       <input
         type="search"
@@ -58,7 +58,7 @@ function SearchBox({ defaultValue = "" }: { defaultValue?: string | undefined })
         aria-label="Tìm sản phẩm"
         className="h-10 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
       />
-      <button type="submit" className="hidden h-8 shrink-0 rounded-sm bg-cta px-5 text-sm font-semibold text-cta-foreground md:block">
+      <button type="submit" className="btn-cta hidden h-8 shrink-0 px-6 text-sm md:block">
         Tìm
       </button>
     </form>
@@ -73,9 +73,9 @@ export function SiteHeader({ back, title, hideTabs, query }: { back?: boolean; t
   const router = useRouter();
   return (
     <>
-      <header className="sticky top-0 z-40 bg-sale-gradient text-white shadow-sm">
+      <header className="glass-header sticky top-0 z-40 text-white">
         <div className="mx-auto hidden h-8 max-w-6xl items-center justify-between px-6 text-xs md:flex">
-          <span className="opacity-90">{BRAND.address}</span>
+          <span className="opacity-85">{BRAND.address}</span>
           <nav className="flex items-center gap-5">
             <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="opacity-90 hover:opacity-100">
               Shopee: nhainthienthien
@@ -99,12 +99,12 @@ export function SiteHeader({ back, title, hideTabs, query }: { back?: boolean; t
             </button>
           ) : (
             <Link to="/" aria-label={BRAND.name} className="shrink-0 md:hidden">
-              <img src={LOGO_SQUARE} alt="" className="size-9 rounded-full bg-white object-contain p-0.5" />
+              <img src={LOGO_SQUARE} alt="" className="size-9 rounded-full bg-white object-contain p-0.5 shadow-[0_4px_12px_-6px_rgb(0_0_0/0.5)]" />
             </Link>
           )}
           <Link to="/" className="hidden shrink-0 items-center gap-3 md:flex">
-            <img src={LOGO_SQUARE} alt="" className="size-12 rounded-full bg-white object-contain p-1" />
-            <span className="text-xl font-extrabold leading-tight">
+            <img src={LOGO_SQUARE} alt="" className="size-12 rounded-full bg-white object-contain p-1 shadow-[0_6px_16px_-8px_rgb(0_0_0/0.5)]" />
+            <span className="text-xl font-extrabold leading-tight tracking-tight">
               Nhà In
               <span className="block text-base font-bold opacity-95">Thiên Thiên</span>
             </span>
@@ -120,7 +120,7 @@ export function SiteHeader({ back, title, hideTabs, query }: { back?: boolean; t
       </header>
       {hideTabs ? null : (
         <nav
-          className="site-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-border bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
+          className="site-bottom-nav glass-bar fixed inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)] md:hidden"
           aria-label="Điều hướng"
         >
           <ul className="grid grid-cols-4">
@@ -129,10 +129,12 @@ export function SiteHeader({ back, title, hideTabs, query }: { back?: boolean; t
                 <Link
                   to={tab.to}
                   activeOptions={{ exact: tab.exact }}
-                  className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground"
-                  activeProps={{ className: "text-brand-blue" }}
+                  className="group flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#5b6b7a]"
+                  activeProps={{ className: "is-active !text-brand-blue font-semibold" }}
                 >
-                  <tab.icon className="size-5" {...(tab.to === "/gio-hang" ? { "data-cart-icon": "" } : {})} />
+                  <span className="grid h-7 w-12 place-items-center rounded-full transition-colors group-[.is-active]:bg-brand-blue-soft">
+                    <tab.icon className="size-5" {...(tab.to === "/gio-hang" ? { "data-cart-icon": "" } : {})} />
+                  </span>
                   {tab.label}
                 </Link>
               </li>

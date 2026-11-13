@@ -75,14 +75,14 @@ function HomePage() {
   return (
     <div className="shop-ui min-h-screen bg-shop-bg">
       <SiteHeader />
-      <main className="mx-auto max-w-6xl pb-20 md:px-6 md:pb-0 md:pt-4">
+      <main className="mx-auto max-w-6xl px-2.5 pb-20 md:px-6 md:pb-0 md:pt-5">
         <HomeHero products={products} />
 
         {/* Chính sách */}
-        <section className="mt-2 grid grid-cols-4 gap-1 bg-white px-2 py-3 md:rounded-sm">
+        <section className="card mt-3 grid grid-cols-4 gap-1 px-2 py-3.5 md:py-4">
           {POLICY_CHIPS.map((chip) => (
             <Link key={chip.label} to="/chinh-sach" className="flex flex-col items-center gap-1 text-center">
-              <span className="grid size-10 place-items-center rounded-full bg-brand-blue-soft text-brand-blue">
+              <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-b from-[#eef5fc] to-[#e1edf9] text-brand-blue">
                 <chip.icon className="size-5" aria-hidden />
               </span>
               <span className="text-[10px] leading-tight text-foreground/80 md:text-xs">{chip.label}</span>
@@ -91,9 +91,9 @@ function HomePage() {
         </section>
 
         {/* Danh mục */}
-        <section className="mt-2 bg-white md:rounded-sm">
-          <h2 className="border-b border-border px-3 py-3 text-sm font-semibold uppercase text-muted-foreground">Danh mục</h2>
-          <div className="scrollbar-none flex gap-1 overflow-x-auto px-2 py-3">
+        <section className="card mt-3">
+          <h2 className="section-title px-3.5 pt-3.5">Danh mục</h2>
+          <div className="scrollbar-none flex gap-1 overflow-x-auto px-2 pb-3.5 pt-3">
             {categories.map((category) => {
               const first = products.find((product) => product.category === category);
               return (
@@ -103,7 +103,7 @@ function HomePage() {
                   search={{ cat: category }}
                   className="flex w-20 shrink-0 flex-col items-center gap-1.5 text-center"
                 >
-                  {first ? <ProductCover product={first} className="size-14 rounded-full border border-border" /> : null}
+                  {first ? <ProductCover product={first} className="size-14 rounded-2xl shadow-[0_0_0_1px_rgb(18_48_71/0.06),0_6px_14px_-8px_rgb(18_48_71/0.35)]" /> : null}
                   <span className="text-xs text-foreground">{category}</span>
                 </Link>
               );
@@ -114,7 +114,7 @@ function HomePage() {
               { to: "/chinh-sach" as const, label: "Chính sách", icon: ScrollText },
             ].map((item) => (
               <Link key={item.to} to={item.to} className="flex w-20 shrink-0 flex-col items-center gap-1.5 text-center">
-                <span className="grid size-14 place-items-center rounded-full border border-border bg-brand-blue-soft text-brand-blue">
+                <span className="grid size-14 place-items-center rounded-2xl bg-gradient-to-b from-[#eef5fc] to-[#e1edf9] text-brand-blue">
                   <item.icon className="size-6" aria-hidden />
                 </span>
                 <span className="text-xs text-foreground">{item.label}</span>
@@ -124,28 +124,28 @@ function HomePage() {
         </section>
 
         {/* Gợi ý */}
-        <section id="gian-hang" className="mt-2 scroll-mt-24">
-          <h2 className="sticky top-14 z-10 border-b-4 border-cta bg-white py-3 text-center text-sm font-semibold uppercase text-brand-blue md:static md:rounded-t-sm">
+        <section id="gian-hang" className="mt-4 scroll-mt-24">
+          <h2 className="section-title px-1 pb-2.5">
             Sản phẩm đang bán
           </h2>
-          <div className="grid grid-cols-2 gap-1.5 p-1.5 sm:grid-cols-3 md:grid-cols-5 md:gap-2.5 md:px-0">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-5 md:gap-3">
             {products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
-          <div className="px-3 pb-3 text-center">
-            <Link to="/san-pham" className="inline-flex min-h-10 items-center rounded-sm border border-border bg-white px-10 text-sm text-foreground/80">
+          <div className="px-3 pb-1 pt-4 text-center">
+            <Link to="/san-pham" className="btn-ghost inline-flex min-h-11 items-center px-10 text-sm font-semibold">
               Xem tất cả
             </Link>
           </div>
         </section>
 
         {/* 3 bước */}
-        <section className="mt-2 bg-white p-3 md:rounded-sm md:p-5">
-          <h2 className="text-base text-foreground">Đặt in trong 3 bước</h2>
+        <section className="card mt-3 p-3.5 md:p-5">
+          <h2 className="section-title">Đặt in trong 3 bước</h2>
           <ol className="mt-3 grid grid-cols-3 gap-2">
             {STEPS.map((step, i) => (
-              <li key={step.title} className="rounded-sm border border-border p-2 text-center md:p-4">
+              <li key={step.title} className="rounded-2xl bg-[#f5f8fc] p-2.5 text-center md:p-4">
                 <step.icon className="mx-auto size-6 text-brand-blue" aria-hidden />
                 <p className="mt-1 text-[11px] font-semibold text-sale">Bước {i + 1}</p>
                 <h3 className="text-xs font-semibold text-foreground md:text-sm">{step.title}</h3>
@@ -155,13 +155,13 @@ function HomePage() {
           </ol>
         </section>
 
-        <div className="mt-2 md:rounded-sm">
+        <div className="mt-3">
           <ShopInfoBlock hours={config.data?.hours} />
         </div>
 
         {/* FAQ */}
-        <section className="mt-2 bg-white p-3 md:rounded-sm md:p-5">
-          <h2 className="text-base text-foreground">Câu hỏi thường gặp</h2>
+        <section className="card mt-3 p-3.5 md:p-5">
+          <h2 className="section-title">Câu hỏi thường gặp</h2>
           <div className="mt-2 divide-y divide-border">
             {FAQS.map((f) => (
               <details key={f.q} className="group py-3">
@@ -178,7 +178,7 @@ function HomePage() {
               <MessageCircle className="size-4" /> Nhắn Zalo
             </a>
           ) : (
-            <a href={BRAND.messengerUrl} target="_blank" rel="noopener" className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-sale">
+            <a href={BRAND.messengerUrl} target="_blank" rel="noopener" className="btn-soft mt-3 inline-flex min-h-10 items-center gap-2 px-4 text-sm">
               <MessageCircle className="size-4" /> Chat với shop qua Messenger
             </a>
           )}

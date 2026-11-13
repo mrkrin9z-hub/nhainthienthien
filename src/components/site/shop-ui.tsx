@@ -40,7 +40,7 @@ export function ProductCover({ product, className }: { product: CatalogProduct; 
 
 export function FreeshipTag({ className = "" }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-0.5 rounded-sm border border-brand-blue/70 px-1 text-[10px] font-semibold leading-4 text-brand-blue ${className}`}>
+    <span className={`pill pill-blue ${className}`}>
       <Truck className="size-3" aria-hidden /> Freeship từ 300k
     </span>
   );
@@ -56,23 +56,23 @@ export function ProductCard({ product }: { product: CatalogProduct }) {
     <Link
       to="/san-pham/$slug"
       params={{ slug: product.slug }}
-      className="product-card group flex flex-col overflow-hidden rounded-sm bg-white shadow-[0_1px_2px_rgb(0_0_0/0.08)] transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
+      className="product-card card group flex flex-col overflow-hidden !rounded-2xl"
     >
       <div className="relative">
         <ProductCover product={product} className="aspect-square w-full" />
         {pct ? (
-          <span className="absolute right-0 top-0 rounded-bl-sm bg-cta px-1.5 py-0.5 text-xs font-bold text-cta-foreground">-{pct}%</span>
+          <span className="glass-chip absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-extrabold text-[#9a4508]">-{pct}%</span>
         ) : null}
       </div>
-      <div className="flex flex-1 flex-col p-2">
-        <h3 className="line-clamp-2 min-h-[2.5rem] text-[13px] font-normal leading-5 text-foreground">{product.name}</h3>
-        <div className="mt-1 flex flex-wrap gap-1">
+      <div className="flex flex-1 flex-col p-2.5">
+        <h3 className="line-clamp-2 min-h-[2.5rem] text-[13px] !font-medium leading-5 text-[#123047]">{product.name}</h3>
+        <div className="mt-1.5 flex flex-wrap gap-1">
           <FreeshipTag />
-          <span className="rounded-sm border border-sale/60 px-1 text-[10px] font-semibold leading-4 text-sale">COD</span>
+          <span className="pill pill-sale">COD</span>
         </div>
         <div className="mt-auto pt-1.5">
           <p className="flex flex-wrap items-baseline gap-x-1.5">
-            <span className="text-base font-semibold text-sale">
+            <span className="text-[17px] font-extrabold tracking-tight text-sale">
               {from === null ? "Liên hệ" : formatVnd(from)}
             </span>
             {many && from !== null ? <span className="text-[11px] text-muted-foreground">trở lên</span> : null}
@@ -109,14 +109,14 @@ export function PolicyChips({ className = "" }: { className?: string }) {
 
 export function ShopInfoBlock({ hours }: { hours?: string | undefined }) {
   return (
-    <section className="flex items-center gap-3 bg-white p-3 md:p-4">
-      <img src="/brand/logo-vuong.png" alt="" className="size-14 shrink-0 rounded-full border border-border object-contain p-1" />
+    <section className="card flex items-center gap-3 p-3 md:p-4">
+      <img src="/brand/logo-vuong.png" alt="" className="size-14 shrink-0 rounded-full bg-white object-contain p-1 shadow-[0_0_0_1px_rgb(18_48_71/0.08),0_6px_14px_-8px_rgb(18_48_71/0.4)]" />
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-foreground">Nhà In Thiên Thiên</p>
         <p className="mt-0.5 text-xs text-muted-foreground">{BRAND.address}</p>
         {hours ? <p className="text-xs text-muted-foreground">Mở cửa {hours}</p> : null}
       </div>
-      <Link to="/" className="shrink-0 rounded-sm border border-brand-blue px-3 py-1.5 text-xs font-semibold text-brand-blue">
+      <Link to="/" className="btn-soft shrink-0 px-4 py-2 text-xs">
         Xem shop
       </Link>
     </section>
@@ -126,12 +126,12 @@ export function ShopInfoBlock({ hours }: { hours?: string | undefined }) {
 export function Stepper({ value, onChange, min = 1, small }: { value: number; onChange: (n: number) => void; min?: number; small?: boolean }) {
   const size = small ? "size-7" : "size-9";
   return (
-    <div className="flex items-center border border-border">
-      <button type="button" aria-label="Giảm" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))} className={`grid ${size} place-items-center text-foreground disabled:text-muted-foreground/50`}>
+    <div className="flex items-center rounded-full bg-[#f1f4f8] p-0.5">
+      <button type="button" aria-label="Giảm" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))} className={`grid ${size} place-items-center rounded-full text-foreground hover:bg-white disabled:text-muted-foreground/50`}>
         <Minus className="size-4" />
       </button>
-      <span className={`grid ${small ? "h-7 w-9" : "h-9 w-12"} place-items-center border-x border-border text-sm`}>{value}</span>
-      <button type="button" aria-label="Tăng" onClick={() => onChange(Math.min(500, value + 1))} className={`grid ${size} place-items-center text-foreground`}>
+      <span className={`grid ${small ? "h-7 w-9" : "h-9 w-12"} place-items-center text-sm font-semibold tabular-nums`}>{value}</span>
+      <button type="button" aria-label="Tăng" onClick={() => onChange(Math.min(500, value + 1))} className={`grid ${size} place-items-center rounded-full text-foreground hover:bg-white`}>
         <Plus className="size-4" />
       </button>
     </div>

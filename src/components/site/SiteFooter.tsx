@@ -12,7 +12,7 @@ export function SiteFooter() {
   const phone = showZalo ? config.data?.phone ?? "" : "";
   const zalo = showZalo ? config.data?.zalo ?? "" : "";
   return (
-    <footer className="mt-2 border-t-2 border-brand-blue bg-white pb-24 md:mt-6 md:pb-0">
+    <footer className="mt-4 rounded-t-[28px] bg-white/85 pb-24 shadow-[0_-12px_40px_-28px_rgb(18_48_71/0.45)] md:mt-8 md:pb-0">
       <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 md:grid-cols-4 md:gap-10 md:px-6 md:py-8">
         <div className="md:col-span-2">
           <img src={LOGO_HORIZONTAL} alt={BRAND.name} width={120} height={40} loading="lazy" decoding="async" className="h-10 w-auto" />
@@ -54,7 +54,7 @@ export function SiteFooter() {
           <p className="text-muted-foreground">{BRAND.website}</p>
         </div>
       </div>
-      <div className="border-t border-border py-4 text-center text-xs text-muted-foreground">
+      <div className="border-t border-[#123047]/5 py-4 text-center text-xs text-muted-foreground">
         © {new Date().getFullYear()} {BRAND.name}
       </div>
     </footer>

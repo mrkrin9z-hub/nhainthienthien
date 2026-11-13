@@ -69,50 +69,50 @@ function CartPage() {
   return (
     <div className="shop-ui min-h-screen bg-shop-bg pb-28 md:pb-24">
       <SiteHeader back title={`Giỏ hàng (${cart.count})`} hideTabs />
-      <main className="mx-auto max-w-6xl md:px-6 md:pt-4">
-        <h1 className="hidden py-2 text-xl text-foreground md:block">Giỏ hàng</h1>
+      <main className="mx-auto max-w-6xl px-2.5 pt-2.5 md:px-6 md:pt-5">
+        <h1 className="hidden pb-3 text-xl tracking-tight text-[#123047] md:block">Giỏ hàng</h1>
         {rows.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 bg-white px-6 py-20 text-center md:rounded-sm">
+          <div className="card flex flex-col items-center gap-3 px-6 py-20 text-center">
             <ShoppingCart className="size-16 text-muted-foreground/40" aria-hidden />
             <p className="text-sm text-muted-foreground">Giỏ hàng của bạn còn trống</p>
-            <Link to="/san-pham" className="rounded-sm bg-cta px-6 py-2.5 text-sm font-semibold text-cta-foreground">
+            <Link to="/san-pham" className="btn-cta px-7 py-2.5 text-sm">
               Mua sắm ngay
             </Link>
           </div>
         ) : (
-          <section className="bg-white md:rounded-sm">
-            <div className="flex items-center gap-2 border-b border-border px-3 py-3">
+          <section className="card overflow-hidden">
+            <div className="flex items-center gap-2 border-b border-[#123047]/6 px-3.5 py-3">
               <input type="checkbox" checked={allOn} onChange={() => setUnselected(allOn ? new Set(rows.map((r) => r.key)) : new Set())} className="size-4 accent-[var(--brand-blue)]" aria-label="Chọn tất cả" />
-              <Store className="size-4 text-foreground" aria-hidden />
+              <Store className="size-4 text-brand-blue" aria-hidden />
               <span className="text-sm font-semibold">Nhà In Thiên Thiên</span>
             </div>
-            <ul className="divide-y divide-border">
+            <ul className="divide-y divide-[#123047]/6">
               {rows.map((r) => {
                 const thumb = variantThumb(r.product, r.variant);
                 return (
-                  <li key={r.key} className="flex gap-2 px-3 py-3">
+                  <li key={r.key} className="flex gap-2.5 px-3.5 py-3.5">
                     <input type="checkbox" checked={!unselected.has(r.key)} onChange={() => toggle(r.key)} className="mt-8 size-4 shrink-0 accent-[var(--brand-blue)]" aria-label={`Chọn ${r.product.name}`} />
                     <Link to="/san-pham/$slug" params={{ slug: r.product.slug }} search={{ v: r.variant.id }} className="shrink-0">
                       {thumb ? (
-                        <img src={thumb} alt="" width={80} height={80} className="size-20 border border-border object-cover" />
+                        <img src={thumb} alt="" width={80} height={80} className="size-20 rounded-2xl object-cover shadow-[0_0_0_1px_rgb(18_48_71/0.06)]" />
                       ) : (
-                        <ImagePlaceholder className="size-20 border border-border" />
+                        <ImagePlaceholder className="size-20 rounded-2xl" />
                       )}
                     </Link>
                     <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-sm leading-5 text-foreground">{r.product.name}</p>
-                      <p className="mt-1 inline-block max-w-full truncate rounded-sm bg-shop-bg px-1.5 py-0.5 text-xs text-muted-foreground">
+                      <p className="line-clamp-2 text-sm font-medium leading-5 text-[#123047]">{r.product.name}</p>
+                      <p className="mt-1 inline-block max-w-full truncate rounded-full bg-[#f3f6fa] px-2.5 py-0.5 text-xs text-[#5b6b7a]">
                         Phân loại: {r.variant.name}
                         {r.design ? ` · ${r.design}` : ""}
                       </p>
                       <div className="mt-1.5 flex flex-wrap items-end justify-between gap-2">
                         <p className="flex items-baseline gap-1.5">
-                          <span className="text-sm font-semibold text-sale">{r.unit ? formatVnd(r.unit) : "Liên hệ"}</span>
+                          <span className="text-[15px] font-extrabold tracking-tight text-sale">{r.unit ? formatVnd(r.unit) : "Liên hệ"}</span>
                           {r.variant.list_price ? <s className="text-xs text-muted-foreground">{formatVnd(r.variant.list_price)}</s> : null}
                         </p>
                         <div className="flex items-center gap-2">
                           <Stepper small value={r.qty} onChange={(n) => cart.setQty(r.variantId, r.design, n)} />
-                          <button type="button" aria-label="Xóa" onClick={() => cart.remove(r.variantId, r.design)} className="grid size-8 place-items-center text-muted-foreground hover:text-sale">
+                          <button type="button" aria-label="Xóa" onClick={() => cart.remove(r.variantId, r.design)} className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-[#fff3e0] hover:text-sale">
                             <Trash2 className="size-4" />
                           </button>
                         </div>
@@ -122,7 +122,7 @@ function CartPage() {
                 );
               })}
             </ul>
-            <div className="flex items-center gap-2 border-t border-border px-3 py-3 text-xs text-foreground/80">
+            <div className="flex items-center gap-2 border-t border-[#123047]/6 bg-[#f6f9fc] px-3.5 py-3 text-xs text-foreground/80">
               <Truck className="size-4 shrink-0 text-brand-blue" aria-hidden />
               {picked.length === 0
                 ? "Chọn sản phẩm để xem phí ship."
@@ -135,19 +135,19 @@ function CartPage() {
       </main>
 
       {rows.length ? (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-white pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-auto flex max-w-6xl items-center gap-2 pl-3 md:px-6">
+        <div className="glass-bar fixed inset-x-0 bottom-0 z-50 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2">
+          <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 md:px-6">
             <label className="flex shrink-0 items-center gap-1.5 text-sm">
               <input type="checkbox" checked={allOn} onChange={() => setUnselected(allOn ? new Set(rows.map((r) => r.key)) : new Set())} className="size-4 accent-[var(--brand-blue)]" />
               Tất cả
             </label>
             <div className="min-w-0 flex-1 text-right">
               <p className="text-xs text-foreground">
-                Tổng thanh toán <span className="text-base font-semibold text-sale">{formatVnd(subtotal)}</span>
+                Tổng thanh toán <span className="text-lg font-extrabold tracking-tight text-sale">{formatVnd(subtotal)}</span>
               </p>
               {saved > 0 ? <p className="text-[11px] text-sale">Tiết kiệm {formatVnd(saved)}</p> : null}
             </div>
-            <button type="button" onClick={checkout} disabled={!picked.length} className="min-h-14 shrink-0 bg-cta px-5 text-sm font-semibold text-cta-foreground disabled:opacity-50 md:min-h-12 md:rounded-sm md:px-10">
+            <button type="button" onClick={checkout} disabled={!picked.length} className="btn-cta min-h-12 shrink-0 px-6 text-sm disabled:opacity-50 md:px-10">
               Mua hàng ({picked.reduce((s, r) => s + r.qty, 0)})
             </button>
           </div>

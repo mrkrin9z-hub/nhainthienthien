@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Banknote, CheckCircle2, Copy, MessageCircle, ChevronDown, ChevronUp, ImagePlus, Loader2, MapPin, Minus, Plus, Store, Trash2, Truck, X } from "lucide-react";
+import { AlertCircle, Banknote, Check, CheckCircle2, Copy, MessageCircle, ChevronDown, ChevronUp, ImagePlus, Loader2, MapPin, Minus, Plus, Store, Trash2, Truck, X } from "lucide-react";
 
 import { LocalPhotoThumb } from "@/components/photo-thumb";
 import { SiteHeader } from "@/components/site/SiteHeader";
@@ -352,23 +352,22 @@ function OrderPage() {
   return (
     <div className="shop-ui min-h-screen bg-shop-bg pb-28 md:pb-24">
       <SiteHeader back title="Thanh toán" hideTabs />
-      <main className="mx-auto max-w-4xl space-y-2 md:px-6 md:pt-4">
-        <h1 className="hidden py-2 text-xl text-foreground md:block">Thanh toán</h1>
+      <main className="mx-auto max-w-4xl space-y-3 px-2.5 pt-2.5 md:px-6 md:pt-5">
+        <h1 className="hidden text-xl tracking-tight text-[#123047] md:block">Thanh toán</h1>
 
         {/* Nhận hàng */}
-        <section className="bg-white p-3 md:rounded-sm md:p-5">
-          <div className="h-1 bg-[repeating-linear-gradient(45deg,var(--sale)_0_12px,transparent_12px_18px,#6fa6d6_18px_30px,transparent_30px_36px)] opacity-80" aria-hidden />
-          <h2 className="mt-3 flex items-center gap-1.5 text-sm text-sale">
-            <MapPin className="size-4" aria-hidden /> Thông tin nhận hàng
+        <section className="card p-3.5 md:p-5">
+          <h2 className="flex items-center gap-2 text-[15px] text-[#123047]">
+            <span className="grid size-8 place-items-center rounded-xl bg-[#fff3e0] text-sale"><MapPin className="size-4" aria-hidden /></span> Thông tin nhận hàng
           </h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="name">Họ và tên</Label>
-              <Input id="name" className={`h-11 rounded-sm ${bad(fullName.trim().length > 1)}`} value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
+              <Input id="name" className={`h-11 ${bad(fullName.trim().length > 1)}`} value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="tel">Số điện thoại</Label>
-              <Input id="tel" className={`h-11 rounded-sm ${bad(phoneDigits.length >= 8)}`} inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <Input id="tel" className={`h-11 ${bad(phoneDigits.length >= 8)}`} inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Hình thức nhận hàng">
@@ -384,8 +383,8 @@ function OrderPage() {
                 role="radio"
                 aria-checked={fulfillment === value}
                 onClick={() => setFulfillment(value)}
-                className={`flex min-h-11 items-center justify-center gap-1.5 rounded-sm border px-3 text-sm ${
-                  fulfillment === value ? "border-sale bg-sale-soft text-sale" : "border-border text-foreground/80"
+                className={`flex min-h-11 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl px-2 text-[13px] transition-[background-color,box-shadow,color] ${
+                  fulfillment === value ? "bg-[#fff3e0] font-semibold text-sale shadow-[0_0_0_1.5px_var(--sale)]" : "bg-[#f3f6fa] text-[#123047]/80"
                 }`}
               >
                 <Icon className="size-4" aria-hidden /> {label}
@@ -395,37 +394,37 @@ function OrderPage() {
           {fulfillment === "delivery" ? (
             <div className="mt-3 space-y-1">
               <Label htmlFor="addr">Địa chỉ nhận hàng</Label>
-              <Textarea id="addr" className={`rounded-sm ${bad(address.trim().length >= 8)}`} placeholder="Số nhà, đường, phường/xã, tỉnh/thành" value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="street-address" />
+              <Textarea id="addr" className={`${bad(address.trim().length >= 8)}`} placeholder="Số nhà, đường, phường/xã, tỉnh/thành" value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="street-address" />
             </div>
           ) : (
-            <p className="mt-3 rounded-sm bg-shop-bg px-3 py-2 text-xs text-foreground/80">
+            <p className="mt-3 rounded-2xl bg-[#f3f6fa] px-3 py-2.5 text-xs text-foreground/80">
               Nhận tại: {BRAND.address}. {config.hours ? `Mở cửa ${config.hours}.` : ""}
             </p>
           )}
         </section>
 
         {/* Sản phẩm */}
-        <section className="bg-white md:rounded-sm">
-          <div className="flex items-center gap-2 border-b border-border px-3 py-3 md:px-5">
-            <Store className="size-4" aria-hidden />
+        <section className="card overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-[#123047]/6 px-3.5 py-3 md:px-5">
+            <Store className="size-4 text-brand-blue" aria-hidden />
             <span className="text-sm font-semibold">Nhà In Thiên Thiên</span>
           </div>
           {selected.length ? (
-            <ul className="divide-y divide-border">
+            <ul className="divide-y divide-[#123047]/6">
               {selected.map((row) => {
                 const thumb = variantThumb(row.product, row.variant);
                 return (
-                  <li key={row.id} className="flex gap-3 px-3 py-3 md:px-5">
+                  <li key={row.id} className="flex gap-3 px-3.5 py-3 md:px-5">
                     {thumb ? (
-                      <img src={thumb} alt="" width={64} height={64} className="size-16 shrink-0 border border-border object-cover" />
+                      <img src={thumb} alt="" width={64} height={64} className="size-16 shrink-0 rounded-xl object-cover shadow-[0_0_0_1px_rgb(18_48_71/0.06)]" />
                     ) : (
-                      <ImagePlaceholder className="size-16 shrink-0 border border-border" />
+                      <ImagePlaceholder className="size-16 shrink-0 rounded-xl" />
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-1 text-sm text-foreground">{row.product.name}</p>
                       <p className="text-xs text-muted-foreground">Phân loại: {row.variant.name}</p>
                       <div className="mt-1 flex items-center justify-between gap-2">
-                        <span className="text-sm text-sale">{row.unitPrice ? formatVnd(row.unitPrice) : "Liên hệ"}</span>
+                        <span className="text-sm font-bold text-sale">{row.unitPrice ? formatVnd(row.unitPrice) : "Liên hệ"}</span>
                         <div className="flex items-center gap-1">
                           <Stepper small min={1} value={row.quantity} onChange={(n) => setQty(row.id, n)} />
                           <button type="button" aria-label="Bỏ sản phẩm" onClick={() => setQty(row.id, 0)} className="grid size-7 place-items-center text-muted-foreground">
@@ -442,27 +441,27 @@ function OrderPage() {
             <p className={`px-3 py-4 text-sm md:px-5 ${tried ? "text-sale" : "text-muted-foreground"}`}>Chưa chọn sản phẩm nào.</p>
           )}
           {designText ? (
-            <p className="border-t border-border px-3 py-2 text-xs text-foreground/80 md:px-5">{designText}</p>
+            <p className="border-t border-[#123047]/6 px-3.5 py-2 text-xs text-foreground/80 md:px-5">{designText}</p>
           ) : null}
           <button
             type="button"
             onClick={() => setPicking((v) => !v)}
-            className="flex w-full items-center justify-center gap-1 border-t border-border py-3 text-sm text-sale"
+            className="flex w-full items-center justify-center gap-1 border-t border-[#123047]/6 py-3 text-sm font-semibold text-brand-blue hover:bg-[#f6f9fc]"
           >
             {picking ? <ChevronUp className="size-4" /> : <Plus className="size-4" />}
             {picking ? "Thu gọn" : "Thêm sản phẩm"}
           </button>
           {picking ? (
-            <div className="space-y-2 border-t border-border bg-shop-bg p-2">
+            <div className="space-y-2 border-t border-[#123047]/6 bg-[#f6f8fb] p-2">
               {products.map((product) => {
                 const open = product.slug === activeProduct?.slug;
                 return (
-                  <div key={product.id} id={`sp-${product.slug}`} className="scroll-mt-24 rounded-sm bg-white">
+                  <div key={product.id} id={`sp-${product.slug}`} className="scroll-mt-24 rounded-2xl bg-white shadow-[0_0_0_1px_rgb(18_48_71/0.05)]">
                     <button type="button" onClick={() => setActiveSlug(product.slug)} className="flex min-h-14 w-full items-center gap-3 p-2 text-left">
                       {variantThumb(product, product.variants[0] ?? { width: null, height: null }) ? (
-                        <img src={variantThumb(product, product.variants[0] ?? { width: null, height: null }) ?? ""} alt="" width={48} height={48} className="size-12 shrink-0 object-cover" />
+                        <img src={variantThumb(product, product.variants[0] ?? { width: null, height: null }) ?? ""} alt="" width={48} height={48} className="size-12 shrink-0 rounded-xl object-cover" />
                       ) : (
-                        <ImagePlaceholder className="size-12 shrink-0" />
+                        <ImagePlaceholder className="size-12 shrink-0 rounded-xl" />
                       )}
                       <span className="min-w-0 flex-1">
                         <span className="line-clamp-2 text-sm">{product.name}</span>
@@ -471,7 +470,7 @@ function OrderPage() {
                       <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition ${open ? "rotate-180" : ""}`} />
                     </button>
                     {open ? (
-                      <div className="border-t border-border p-2">
+                      <div className="border-t border-[#123047]/6 p-2">
                         <ProductOptions product={product} quantities={quantities} setQty={setQty} />
                       </div>
                     ) : null}
@@ -484,8 +483,8 @@ function OrderPage() {
 
         {/* Gửi ảnh */}
         {showUpload ? (
-        <section className="bg-white p-3 md:rounded-sm md:p-5">
-          <h2 className="text-sm text-foreground">
+        <section className="card p-3.5 md:p-5">
+          <h2 className="text-[15px] text-[#123047]">
             Ảnh cần in <span className="font-normal text-muted-foreground">(không bắt buộc)</span>
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -494,13 +493,13 @@ function OrderPage() {
           </p>
           <ul className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
             {files.map((f) => (
-              <li key={f.key} className="relative overflow-hidden rounded-sm border border-border bg-white text-xs">
+              <li key={f.key} className="relative overflow-hidden rounded-xl bg-white text-xs shadow-[0_0_0_1px_rgb(18_48_71/0.08)]">
                 <LocalPhotoThumb file={f.file} className="aspect-square w-full object-cover" />
                 <button
                   type="button"
                   aria-label="Xóa ảnh"
                   onClick={() => setFiles((prev) => prev.filter((x) => x.key !== f.key))}
-                  className="absolute right-0 top-0 grid size-6 place-items-center bg-black/45 text-white"
+                  className="glass-dark absolute right-1 top-1 grid size-6 place-items-center rounded-full"
                 >
                   <X className="size-3.5" />
                 </button>
@@ -514,7 +513,7 @@ function OrderPage() {
               </li>
             ))}
             <li>
-              <label className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-sm border border-dashed text-center text-[11px] border-brand-blue/60 text-brand-blue`}>
+              <label className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-[1.5px] border-dashed border-brand-blue/45 bg-[#f3f8fd] text-center text-[11px] font-semibold text-brand-blue transition-colors hover:bg-brand-blue-soft`}>
                 <ImagePlus className="size-6" aria-hidden />
                 Thêm ảnh
                 <input type="file" multiple accept={ACCEPT} className="hidden" onChange={(e) => addFiles(e.target.files)} />
@@ -528,13 +527,13 @@ function OrderPage() {
         ) : null}
 
         {/* Ghi chú */}
-        <section className="bg-white p-3 md:rounded-sm md:p-5">
-          <Label htmlFor="note" className="text-sm">Lời nhắn cho shop</Label>
-          <Textarea id="note" className="mt-1 rounded-sm" placeholder={selected.some((r) => r.product.slug.startsWith("thoi-khoa-bieu")) ? "Tên, lớp của bé in trên thời khóa biểu, màu viền…" : "Ví dụ: cắt ảnh theo chiều dọc, chỉnh sáng…"} value={note} onChange={(e) => setNote(e.target.value)} />
+        <section className="card p-3.5 md:p-5">
+          <Label htmlFor="note" className="text-[15px] font-semibold text-[#123047]">Lời nhắn cho shop</Label>
+          <Textarea id="note" className="mt-2" placeholder={selected.some((r) => r.product.slug.startsWith("thoi-khoa-bieu")) ? "Tên, lớp của bé in trên thời khóa biểu, màu viền…" : "Ví dụ: cắt ảnh theo chiều dọc, chỉnh sáng…"} value={note} onChange={(e) => setNote(e.target.value)} />
         </section>
 
         {/* Vận chuyển + thanh toán */}
-        <section className="divide-y divide-border bg-white md:rounded-sm">
+        <section className="card divide-y divide-[#123047]/6">
           <div className="flex items-start gap-2 px-3 py-3 md:px-5">
             <Truck className="mt-0.5 size-4 shrink-0 text-brand-blue" aria-hidden />
             <div className="min-w-0 flex-1 text-sm">
@@ -557,14 +556,14 @@ function OrderPage() {
                 {fulfillment === "delivery" ? "Thanh toán khi nhận hàng (COD)" : "Tiền mặt hoặc chuyển khoản tại tiệm"}
               </p>
               {deposit ? (
-                <p className="mt-1 rounded-sm bg-sale-soft px-2 py-1 text-xs text-sale">
+                <p className="mt-1.5 rounded-xl bg-[#fff3e0] px-2.5 py-1.5 text-xs text-[#9a4508]">
                   Đơn từ 300.000đ hoặc có ảnh từ 40×60 trở lên cần cọc 50% ({formatVnd(Math.round(subtotal / 2))}) trước khi làm hàng. Tiệm sẽ báo cách chuyển cọc.
                 </p>
               ) : null}
             </div>
           </div>
           <div className="space-y-1.5 px-3 py-3 text-sm md:px-5">
-            <p className="font-medium text-foreground">Chi tiết thanh toán</p>
+            <p className="font-semibold text-[#123047]">Chi tiết thanh toán</p>
             <p className="flex justify-between text-muted-foreground">
               <span>Tổng tiền hàng</span>
               <span>{formatVnd(subtotal)}</span>
@@ -575,12 +574,12 @@ function OrderPage() {
             </p>
             <p className="flex justify-between text-base">
               <span>Tổng thanh toán</span>
-              <span className="font-semibold text-sale">{formatVnd(total)}</span>
+              <span className="text-lg font-extrabold tracking-tight text-sale">{formatVnd(total)}</span>
             </p>
             <p className="text-[11px] text-muted-foreground">Tiệm xác nhận lại phí ship trên đơn. Chính sách xem tại trang <Link to="/chinh-sach" className="text-sale underline">Chính sách</Link>.</p>
           </div>
         </section>
-        {error ? <p className="bg-white px-3 py-3 text-sm font-semibold text-destructive md:rounded-sm">{error}</p> : null}
+        {error ? <p className="card px-3.5 py-3 text-sm font-semibold text-destructive">{error}</p> : null}
       </main>
 
       {progress ? (
@@ -594,11 +593,11 @@ function OrderPage() {
         />
       ) : null}
 
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-white pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto flex max-w-4xl items-center gap-3 pl-3 md:px-6">
+      <div className="glass-bar fixed inset-x-0 bottom-0 z-50 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2">
+        <div className="mx-auto flex max-w-4xl items-center gap-3 px-3 md:px-6">
           <div className="min-w-0 flex-1 text-right">
             <p className="text-xs text-foreground">
-              Tổng thanh toán <span className="text-lg font-semibold text-sale">{formatVnd(total)}</span>
+              Tổng thanh toán <span className="text-lg font-extrabold tracking-tight text-sale">{formatVnd(total)}</span>
             </p>
             {tried && missing ? <p className="text-[11px] text-sale">{missing}</p> : null}
           </div>
@@ -610,7 +609,7 @@ function OrderPage() {
             }}
             disabled={busy}
             data-ripple
-            className="flex min-h-14 shrink-0 items-center gap-1.5 bg-cta px-6 text-sm font-semibold text-cta-foreground disabled:opacity-60 md:min-h-12 md:rounded-sm md:px-12"
+            className="btn-cta relative flex min-h-12 shrink-0 items-center gap-1.5 overflow-hidden px-7 text-sm disabled:opacity-60 md:px-12"
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
             Đặt hàng
@@ -668,7 +667,7 @@ function ProductOptions({
           const qty = quantities[variant.id] ?? 0;
           const amount = variant.requires_quote ? null : (variant.sale_price ?? variant.price);
           return (
-            <li key={variant.id} className="flex items-center justify-between gap-3 rounded-sm border border-border px-3 py-2">
+            <li key={variant.id} className="flex items-center justify-between gap-3 rounded-2xl bg-[#f6f8fb] px-3 py-2">
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-foreground">
                   {showOptions ? sheetOptionLabel(variant.sheets) : variant.name}
@@ -677,7 +676,7 @@ function ProductOptions({
                   {amount == null ? "Liên hệ báo giá" : formatVnd(amount)}
                 </span>
               </span>
-              <div className="flex shrink-0 items-center rounded-full border border-border">
+              <div className="flex shrink-0 items-center rounded-full bg-white shadow-[0_0_0_1px_rgb(18_48_71/0.08)]">
                 <button
                   type="button"
                   aria-label={`Giảm ${showOptions ? sheetOptionLabel(variant.sheets) : variant.name}`}
@@ -746,22 +745,25 @@ function OrderDone({ code, total, phone, zalo }: { code: string; total: number; 
     <div className="shop-ui min-h-screen bg-shop-bg">
       <SiteHeader />
       <main className="mx-auto max-w-xl px-3 py-6 md:px-6 md:py-12">
-        <div className="rounded-sm bg-white p-5 text-center md:p-8">
-          <CheckCircle2 className="mx-auto size-14 text-brand-blue" />
-          <h1 className="mt-3 text-2xl text-foreground">Đặt hàng thành công</h1>
-          <div className="mx-auto mt-4 max-w-sm rounded-sm border border-dashed border-brand-blue/50 bg-brand-blue-soft p-3 text-left">
+        <div className="card relative overflow-hidden p-5 text-center md:p-8">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#e8f1fa] to-transparent" aria-hidden />
+          <span className="pop-in relative mx-auto grid size-16 place-items-center rounded-full bg-gradient-to-b from-[#1f74b8] to-[#155e9a] text-white shadow-[0_12px_28px_-12px_rgb(21_94_154/0.9)]">
+            <Check className="size-8" strokeWidth={2.5} />
+          </span>
+          <h1 className="relative mt-3 text-2xl tracking-tight text-[#123047]">Đặt hàng thành công</h1>
+          <div className="relative mx-auto mt-4 max-w-sm rounded-2xl bg-[#f3f8fd] p-3.5 text-left shadow-[0_0_0_1px_rgb(21_94_154/0.12)]">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Mã đơn</p>
-                <p className="text-xl font-bold tracking-wide text-foreground">{code}</p>
+                <p className="text-xl font-extrabold tracking-wide text-[#123047]">{code}</p>
               </div>
-              <button type="button" onClick={copyOrder} className="flex min-h-10 shrink-0 items-center gap-1 rounded-sm border border-brand-blue bg-white px-3 text-sm text-brand-blue">
+              <button type="button" onClick={copyOrder} className="btn-ghost flex min-h-10 shrink-0 items-center gap-1 px-3.5 text-sm font-semibold !text-brand-blue">
                 <Copy className="size-4" aria-hidden /> Chép
               </button>
             </div>
-            <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-brand-blue/20 pt-2">
+            <div className="mt-2.5 flex items-baseline justify-between gap-3 border-t border-dashed border-brand-blue/20 pt-2.5">
               <span className="text-xs text-muted-foreground">Tổng thanh toán (dự kiến)</span>
-              <span className="text-lg font-bold text-sale">{totalText}</span>
+              <span className="text-lg font-extrabold tracking-tight text-sale">{totalText}</span>
             </div>
           </div>
           <p className="mt-4 text-sm text-muted-foreground">
@@ -774,19 +776,19 @@ function OrderDone({ code, total, phone, zalo }: { code: string; total: number; 
             onClick={() => {
               if (copyText(message)) toast.success(viaZalo ? "Đã chép tin nhắn, dán vào Zalo rồi gửi" : "Đã chép tin nhắn, dán vào Messenger rồi gửi");
             }}
-            className={`mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-sm text-base font-bold ${
-              viaZalo ? "bg-[#0068ff] text-white" : "bg-cta text-cta-foreground"
+            className={`mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-full text-base font-bold ${
+              viaZalo ? "bg-[#0068ff] text-white shadow-[0_10px_24px_-12px_rgb(0_104_255/0.9)]" : "btn-cta"
             }`}
           >
             <MessageCircle className="size-5" aria-hidden /> {chatLabel}
           </a>
-          <p className="mt-2 rounded-sm bg-shop-bg px-3 py-2 text-left text-xs text-foreground/80">“{message}”</p>
+          <p className="mt-2.5 rounded-2xl bg-[#f3f6fa] px-3.5 py-2.5 text-left text-xs leading-relaxed text-foreground/80">“{message}”</p>
           <p className="mt-3 text-xs text-muted-foreground">Ảnh in chưa gửi? Có thể gửi sau qua Zalo/Messenger của shop.</p>
           <div className="mt-5 grid grid-cols-2 gap-2">
-            <Button asChild size="lg" variant="outline" className="rounded-sm border-brand-blue text-brand-blue">
+            <Button asChild size="lg" variant="ghost" className="btn-soft h-12">
               <Link to="/tra-cuu" search={{ code, phone }}>Xem đơn hàng</Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="rounded-sm">
+            <Button asChild size="lg" variant="ghost" className="btn-ghost h-12">
               <Link to="/">Tiếp tục mua sắm</Link>
             </Button>
           </div>

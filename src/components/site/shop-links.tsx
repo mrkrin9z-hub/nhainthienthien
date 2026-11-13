@@ -66,7 +66,7 @@ export function ShopLinksBlock({ title = "Liên hệ & mua tại", className = "
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`${label}: ${sub} (mở tab mới)`}
-            className="press flex min-h-[84px] flex-col items-center justify-center gap-1.5 rounded-md border border-border bg-white px-1 py-2.5 text-center transition hover:border-brand-blue hover:shadow-sm active:scale-[0.98]"
+            className="press flex min-h-[84px] flex-col items-center justify-center gap-1.5 rounded-2xl bg-white px-1 py-2.5 text-center shadow-[0_0_0_1px_rgb(18_48_71/0.06),0_8px_20px_-14px_rgb(18_48_71/0.4)] transition hover:-translate-y-0.5 hover:shadow-[0_0_0_1px_rgb(21_94_154/0.25),0_12px_24px_-14px_rgb(18_48_71/0.45)] active:scale-[0.98]"
           >
             <Icon className="size-9" />
             <span className="text-[13px] leading-tight font-semibold text-foreground">{label}</span>
@@ -82,7 +82,7 @@ export function ShopLinksBlock({ title = "Liên hệ & mua tại", className = "
 export function ShopLinksRow({ tiktokHref }: { tiktokHref?: string | null }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <span className="shrink-0 text-sm text-muted-foreground">Mua tại sàn</span>
+      <span className="shrink-0 text-sm font-semibold text-[#123047]">Mua tại sàn</span>
       <div className="grid grid-cols-3 gap-2 sm:flex">
         {SHOP_LINKS.map(({ key, label, href, Icon }) => (
           <a
@@ -91,7 +91,7 @@ export function ShopLinksRow({ tiktokHref }: { tiktokHref?: string | null }) {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`${label} (mở tab mới)`}
-            className="press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-border bg-white px-2 text-[13px] font-medium whitespace-nowrap text-foreground hover:border-brand-blue sm:pr-3 sm:pl-1.5"
+            className="press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-[#f3f6fa] px-2 text-[13px] font-semibold whitespace-nowrap text-[#123047] transition hover:bg-white hover:shadow-[0_0_0_1px_rgb(21_94_154/0.3)] sm:pr-3 sm:pl-1.5"
           >
             <Icon className="size-6 shrink-0" />
             {label}
