@@ -6,9 +6,8 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { POLICY_CHIPS, ProductCard, ProductCover, ShopInfoBlock } from "@/components/site/shop-ui";
 import { catalogQueryOptions, publicConfigQueryOptions } from "@/lib/catalog.functions";
-import heroImg from "@/assets/hero-thuc-te.jpg";
-import { BRAND, formatVnd } from "@/lib/brand";
-import { discountPercent } from "@/lib/ship-estimate";
+import { HERO_MAIN_DESKTOP, HERO_MAIN_MOBILE, HomeHero } from "@/components/site/home-hero";
+import { BRAND } from "@/lib/brand";
 
 export const Route = createFileRoute("/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(catalogQueryOptions),
@@ -27,6 +26,10 @@ export const Route = createFileRoute("/")({
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+    ],
+    links: [
+      { rel: "preload", as: "image", href: HERO_MAIN_MOBILE, media: "(max-width: 767px)", fetchPriority: "high" },
+      { rel: "preload", as: "image", href: HERO_MAIN_DESKTOP, media: "(min-width: 768px)", fetchPriority: "high" },
     ],
   }),
   component: HomePage,
@@ -69,61 +72,11 @@ function HomePage() {
   const zalo = showZalo ? (config.data?.zalo ?? "") : "";
   const categories = [...new Set(products.map((product) => product.category).filter(Boolean))];
 
-  // Banner combo lấy giá thật từ bảng giá (combo 4 ảnh 13×18).
-  const tg = products.find((product) => product.slug === "trang-guong");
-  const combo = tg?.variants.find((variant) => variant.width === 13 && variant.height === 18 && variant.sheets === 4);
-  const comboPct = combo ? discountPercent(combo.price, combo.list_price) : null;
-
   return (
     <div className="shop-ui min-h-screen bg-shop-bg">
       <SiteHeader />
       <main className="mx-auto max-w-6xl pb-20 md:px-6 md:pb-0 md:pt-4">
-        {/* Banner */}
-        <section className="grid gap-2 bg-white p-2 md:grid-cols-[2fr_1fr] md:rounded-sm md:p-3">
-          <Link to="/san-pham" className="relative block overflow-hidden rounded-sm">
-            <img
-              src={heroImg}
-              alt="Ảnh tráng gương 40×60 treo tại tiệm Nhà In Thiên Thiên"
-              width={800}
-              height={1000}
-              fetchPriority="high"
-              decoding="async"
-              className="aspect-[2/1] w-full object-cover md:aspect-[16/7]"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/25 to-transparent" />
-            <div className="absolute inset-y-0 left-0 flex max-w-[70%] flex-col justify-center p-4 text-white md:p-8">
-              <p className="text-[11px] font-semibold uppercase tracking-wide opacity-90">Nhà In Thiên Thiên</p>
-              <h1 className="mt-1 text-xl leading-tight md:text-4xl">In ảnh tráng gương 4K theo ảnh của bạn</h1>
-              <span className="mt-3 inline-flex w-fit items-center gap-1 rounded-sm bg-cta px-3 py-1.5 text-xs font-semibold text-cta-foreground md:text-sm">
-                Mua ngay <ChevronRight className="size-4" />
-              </span>
-            </div>
-          </Link>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
-            {combo ? (
-              <Link
-                to="/san-pham/$slug"
-                params={{ slug: "trang-guong" }}
-                search={{ v: combo.id }}
-                className="flex flex-col justify-center rounded-sm bg-promo-gradient p-3 text-cta-foreground"
-              >
-                <span className="text-[11px] font-semibold uppercase opacity-90">Combo 4 ảnh 13×18</span>
-                <span className="mt-0.5 text-xl font-extrabold md:text-2xl">{formatVnd(combo.price ?? 0)}</span>
-                {combo.list_price ? (
-                  <span className="text-xs opacity-90">
-                    <s>{formatVnd(combo.list_price)}</s>
-                    {comboPct ? ` · -${comboPct}%` : ""}
-                  </span>
-                ) : null}
-              </Link>
-            ) : null}
-            <Link to="/chinh-sach" className="flex flex-col justify-center rounded-sm bg-brand-blue-soft p-3 text-brand-blue">
-              <span className="text-[11px] font-semibold uppercase">Giao tận nơi</span>
-              <span className="mt-0.5 text-base font-extrabold leading-tight md:text-lg">Freeship đơn từ 300k</span>
-              <span className="text-xs text-foreground/70">COD · Nhận tại tiệm 0đ</span>
-            </Link>
-          </div>
-        </section>
+        <HomeHero products={products} />
 
         {/* Chính sách */}
         <section className="mt-2 grid grid-cols-4 gap-1 bg-white px-2 py-3 md:rounded-sm">
