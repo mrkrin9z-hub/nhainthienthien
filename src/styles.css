@@ -308,3 +308,198 @@ html.admin-desk .fixed.inset-0.z-50 {
 .snap-gallery > * {
   scroll-snap-align: start;
 }
+
+/* ===== Chuyển động & cảm giác nhanh (nhẹ, chỉ CSS) ===== */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+a,
+button,
+label,
+summary,
+input,
+select,
+textarea,
+[role="button"],
+[role="radio"] {
+  touch-action: manipulation; /* bỏ trễ 300ms khi chạm */
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+  /* Phản hồi khi bấm: lún nhẹ ngay lập tức */
+  button:not(:disabled),
+  [role="button"],
+  a.bg-cta,
+  a.bg-sale,
+  a.bg-brand-blue,
+  .site-bottom-nav a,
+  .press {
+    transition:
+      transform 0.14s ease,
+      opacity 0.14s ease,
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+  button:not(:disabled):active,
+  [role="button"]:active,
+  a.bg-cta:active,
+  a.bg-sale:active,
+  a.bg-brand-blue:active,
+  .site-bottom-nav a:active,
+  .press:active {
+    transform: scale(0.96);
+    transition-duration: 0.05s;
+  }
+  .product-card:active {
+    transform: scale(0.985);
+  }
+
+  /* Gợn sóng khi chạm nút chính */
+  .tap-ripple {
+    position: absolute;
+    border-radius: 9999px;
+    background: currentColor;
+    opacity: 0.22;
+    transform: scale(0);
+    pointer-events: none;
+    animation: tap-ripple 0.55s ease-out forwards;
+  }
+  @keyframes tap-ripple {
+    to {
+      transform: scale(1);
+      opacity: 0;
+    }
+  }
+
+  /* Ảnh tải lười hiện dần */
+  img[loading="lazy"] {
+    animation: img-in 0.45s ease both;
+  }
+  @keyframes img-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* Chuyển trang: View Transitions */
+  ::view-transition-old(root) {
+    animation: vt-out 0.16s ease both;
+  }
+  ::view-transition-new(root) {
+    animation: vt-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  @keyframes vt-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes vt-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  /* Trình duyệt không có View Transitions: trượt nhẹ nội dung sau khi đổi trang */
+  .page-enter main {
+    animation: vt-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  /* Giỏ hàng nảy khi thêm sản phẩm */
+  .cart-bump {
+    animation: cart-bump 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+  }
+  @keyframes cart-bump {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.28); }
+    65% { transform: scale(0.92); }
+    100% { transform: scale(1); }
+  }
+  .fly-dot {
+    position: fixed;
+    z-index: 100;
+    border-radius: 9999px;
+    background: var(--cta) center / cover no-repeat;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+    border: 2px solid #fff;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  /* Chip chọn phân loại: dấu tích bật ra */
+  .pop-in {
+    animation: pop-in 0.22s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  }
+  @keyframes pop-in {
+    from { transform: scale(0); opacity: 0; }
+  }
+
+  /* Bảng trượt từ dưới lên */
+  .sheet-up {
+    animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  @keyframes sheet-up {
+    from { transform: translateY(24px); opacity: 0; }
+  }
+  .fade-in {
+    animation: vt-out 0.2s ease reverse both;
+  }
+
+  /* Chấm chỉ số ảnh */
+  .gallery-dot {
+    transition: width 0.25s ease, background-color 0.25s ease, opacity 0.25s ease;
+  }
+  .gallery-count {
+    transition: opacity 0.2s ease;
+  }
+  .progress-bar {
+    background-image: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.35) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s linear infinite;
+  }
+}
+
+/* Khung chờ ảnh: ánh sáng lướt (skeleton) */
+.skeleton {
+  background-color: var(--muted);
+  background-image: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.55) 40%, transparent 60%);
+  background-size: 200% 100%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton {
+    animation: shimmer 1.4s ease-in-out 3; /* lướt vài lần rồi dừng cho nhẹ máy */
+  }
+}
+@keyframes shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+
+.snap-gallery {
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.snap-gallery > * {
+  scroll-snap-stop: always;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

@@ -10,6 +10,8 @@ import { FreeshipTag, ImagePlaceholder, PolicyChips, ProductCard, ShopInfoBlock,
 import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct, type CatalogVariant } from "@/lib/catalog.functions";
 import { matchingSheet, sizeChoices } from "@/domain/catalog-label";
 import { BRAND, formatVnd, tiktokUrl } from "@/lib/brand";
+import { ShopLinksRow } from "@/components/site/shop-links";
+import { flyToCart } from "@/lib/motion";
 import { useCart } from "@/lib/cart";
 import { galleryFor, mediaFor, type MediaItem } from "@/lib/product-media";
 import { discountPercent } from "@/lib/ship-estimate";
@@ -132,9 +134,11 @@ function ProductPage() {
     return true;
   }
 
-  function addToCart() {
+  function addToCart(event?: { currentTarget: Element }) {
     if (!ready() || !variant) return;
     cart.add(variant.id, qty, design ?? undefined);
+    const first = gallery.find((m) => m.kind === "image");
+    flyToCart(event?.currentTarget ?? null, first && first.kind === "image" ? first.src : null);
     toast.success("Đã thêm vào giỏ hàng", { action: { label: "Xem giỏ", onClick: () => navigate({ to: "/gio-hang" }) } });
   }
 
@@ -148,7 +152,7 @@ function ProductPage() {
 
   const buyButtons = (
     <>
-      <button type="button" onClick={addToCart} className="flex min-h-12 flex-1 items-center justify-center gap-1.5 border border-brand-blue bg-brand-blue-soft px-3 text-sm font-medium text-brand-blue md:rounded-sm">
+      <button type="button" onClick={addToCart} data-ripple className="flex min-h-12 flex-1 items-center justify-center gap-1.5 border border-brand-blue bg-brand-blue-soft px-3 text-sm font-medium text-brand-blue md:rounded-sm">
         <ShoppingCart className="size-5" aria-hidden /> Thêm vào giỏ
       </button>
       <button type="button" onClick={buyNow} className="min-h-12 flex-1 bg-cta px-3 text-sm font-semibold text-cta-foreground md:rounded-sm">
@@ -246,7 +250,7 @@ function ProductPage() {
                         <img src={opt.image} alt={opt.label} loading="lazy" width={240} height={240} className="aspect-square w-full bg-muted object-cover" />
                         <span className="block truncate px-1 py-0.5 text-[10px] leading-4 text-foreground">{opt.label}</span>
                         {design === opt.key ? (
-                          <span className="absolute right-0 top-0 grid size-4 place-items-center rounded-bl-sm bg-sale text-white">
+                          <span className="pop-in absolute right-0 top-0 grid size-4 place-items-center rounded-bl-sm bg-sale text-white">
                             <Check className="size-3" />
                           </span>
                         ) : null}
@@ -280,6 +284,10 @@ function ProductPage() {
           <ShopInfoBlock hours={config.data?.hours} />
         </div>
 
+        <div className="mt-2 bg-white px-3 py-3 md:rounded-sm md:px-5">
+          <ShopLinksRow tiktokHref={tiktok} />
+        </div>
+
         <section className="mt-2 bg-white p-3 md:rounded-sm md:p-5">
           <h2 className="bg-shop-bg px-3 py-2 text-sm font-semibold uppercase text-foreground">Mô tả sản phẩm</h2>
           <div className="space-y-2 px-1 pt-3 text-sm leading-relaxed text-foreground/85">
@@ -290,12 +298,6 @@ function ProductPage() {
                 Ảnh nét nhất khi khổ {variant.width}×{variant.height} cm có ảnh gốc khoảng {variant.recommended_width_px}×{variant.recommended_height_px} px. Tiệm kiểm tra và báo lại nếu ảnh chưa đủ nét.
               </p>
             ) : null}
-            <p className="flex flex-wrap gap-3 pt-1 text-xs">
-              {tiktok ? (
-                <a href={tiktok} target="_blank" rel="noopener" className="text-sale underline">Xem trên TikTok Shop</a>
-              ) : null}
-              <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="text-sale underline">Shop trên Shopee</a>
-            </p>
           </div>
           <h2 className="mt-4 bg-shop-bg px-3 py-2 text-sm font-semibold uppercase text-foreground">Vận chuyển & đổi trả</h2>
           <ul className="list-disc space-y-1 pl-5 pt-3 text-sm leading-relaxed text-foreground/85">
@@ -342,12 +344,12 @@ function VariantChip({ active, label, detail, onClick }: { active: boolean; labe
       role="radio"
       aria-checked={active}
       onClick={onClick}
-      className={`relative min-h-9 rounded-sm border px-3 py-1.5 text-left text-sm ${active ? "border-sale text-sale" : "border-border bg-white text-foreground"}`}
+      className={`relative min-h-9 rounded-sm border px-3 py-1.5 text-left text-sm ${active ? "border-sale bg-sale-soft/40 text-sale" : "border-border bg-white text-foreground hover:border-sale/50"}`}
     >
       {label}
       {detail ? <span className={`ml-1.5 text-xs ${active ? "text-sale" : "text-muted-foreground"}`}>{detail}</span> : null}
       {active ? (
-        <span className="absolute bottom-0 right-0 grid size-3.5 place-items-center rounded-tl-sm bg-sale text-white">
+        <span className="pop-in absolute bottom-0 right-0 grid size-3.5 place-items-center rounded-tl-sm bg-sale text-white">
           <Check className="size-2.5" />
         </span>
       ) : null}
@@ -378,7 +380,7 @@ function Gallery({ items }: { items: MediaItem[] }) {
           }}
         >
           {items.map((item, i) => (
-            <div key={item.src} className="w-full shrink-0">
+            <div key={item.src} className="skeleton w-full shrink-0">
               {item.kind === "video" ? (
                 <video src={item.src} poster={item.poster} controls playsInline preload="metadata" className="aspect-square w-full bg-black object-contain" aria-label={item.alt} />
               ) : (
@@ -389,16 +391,23 @@ function Gallery({ items }: { items: MediaItem[] }) {
                   height={900}
                   loading={i === 0 ? "eager" : "lazy"}
                   decoding="async"
-                  className="aspect-square w-full bg-muted object-cover"
+                  className="aspect-square w-full object-cover"
                 />
               )}
             </div>
           ))}
         </div>
         {items.length > 1 ? (
-          <span className="absolute bottom-3 right-3 rounded-full bg-black/45 px-2 py-0.5 text-xs text-white">
-            {index + 1}/{items.length}
-          </span>
+          <>
+            <span className="gallery-count absolute bottom-3 right-3 rounded-full bg-black/45 px-2 py-0.5 text-xs tabular-nums text-white">
+              {index + 1}/{items.length}
+            </span>
+            <span className="pointer-events-none absolute inset-x-0 bottom-3.5 flex justify-center gap-1 md:hidden" aria-hidden>
+              {items.map((item, i) => (
+                <span key={item.src} className={`gallery-dot h-1.5 rounded-full ${i === index ? "w-4 bg-white" : "w-1.5 bg-white/60"}`} />
+              ))}
+            </span>
+          </>
         ) : null}
       </div>
       {items.length > 1 ? (

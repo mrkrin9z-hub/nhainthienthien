@@ -21,6 +21,7 @@ export function ImagePlaceholder({ className = "" }: { className?: string }) {
 export function ProductCover({ product, className }: { product: CatalogProduct; className: string }) {
   if (hasPlaceholderCover(product.slug)) return <ImagePlaceholder className={className} />;
   return (
+    <div className={`skeleton overflow-hidden ${className}`}>
     <img
       src={catalogImage(product.slug, product.cover_path)}
       alt={`Ảnh mẫu ${product.name}`}
@@ -28,11 +29,12 @@ export function ProductCover({ product, className }: { product: CatalogProduct; 
       decoding="async"
       width={600}
       height={600}
-      className={`object-cover ${className}`}
+      className="size-full object-cover"
       onError={(event) => {
         event.currentTarget.src = catalogImage(product.slug, null);
       }}
     />
+    </div>
   );
 }
 
@@ -54,7 +56,7 @@ export function ProductCard({ product }: { product: CatalogProduct }) {
     <Link
       to="/san-pham/$slug"
       params={{ slug: product.slug }}
-      className="group flex flex-col overflow-hidden rounded-sm bg-white shadow-[0_1px_2px_rgb(0_0_0/0.08)] transition hover:-translate-y-px hover:shadow-md"
+      className="product-card group flex flex-col overflow-hidden rounded-sm bg-white shadow-[0_1px_2px_rgb(0_0_0/0.08)] transition duration-200 hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="relative">
         <ProductCover product={product} className="aspect-square w-full" />

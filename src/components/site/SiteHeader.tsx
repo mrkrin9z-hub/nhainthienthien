@@ -25,6 +25,7 @@ export function CartButton({ tone = "light" }: { tone?: "light" | "dark" }) {
   return (
     <Link
       to="/gio-hang"
+      data-cart-icon
       aria-label={count ? `Giỏ hàng, ${count} sản phẩm` : "Giỏ hàng"}
       className={`relative grid size-10 shrink-0 place-items-center rounded-full ${tone === "light" ? "text-white" : "text-foreground"}`}
     >
@@ -131,7 +132,7 @@ export function SiteHeader({ back, title, hideTabs, query }: { back?: boolean; t
                   className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground"
                   activeProps={{ className: "text-brand-blue" }}
                 >
-                  <tab.icon className="size-5" />
+                  <tab.icon className="size-5" {...(tab.to === "/gio-hang" ? { "data-cart-icon": "" } : {})} />
                   {tab.label}
                 </Link>
               </li>

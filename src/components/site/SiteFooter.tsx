@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LOGO_HORIZONTAL } from "@/lib/assets";
 import { BRAND } from "@/lib/brand";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
+import { ShopLinksBlock } from "@/components/site/shop-links";
 
 export function SiteFooter() {
   const config = useQuery(publicConfigQueryOptions);
@@ -12,12 +13,13 @@ export function SiteFooter() {
   const zalo = showZalo ? config.data?.zalo ?? "" : "";
   return (
     <footer className="mt-2 border-t-2 border-brand-blue bg-white pb-24 md:mt-6 md:pb-0">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-8 md:grid-cols-4 md:px-6">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 md:grid-cols-4 md:gap-10 md:px-6 md:py-8">
         <div className="md:col-span-2">
-          <img src={LOGO_HORIZONTAL} alt={BRAND.name} className="h-10 w-auto" />
-          <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
+          <img src={LOGO_HORIZONTAL} alt={BRAND.name} width={120} height={40} loading="lazy" decoding="async" className="h-10 w-auto" />
+          <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
             {BRAND.slogan} {BRAND.message}
           </p>
+          <ShopLinksBlock className="mt-5 max-w-sm" />
         </div>
         <div className="space-y-2 text-sm">
           <h2 className="font-sans text-xs font-bold tracking-[0.16em] text-foreground uppercase">Gian hàng</h2>
@@ -47,9 +49,6 @@ export function SiteFooter() {
               Zalo {phone}
             </a>
           ) : null}
-          <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="block text-foreground/80 hover:text-sale">
-            Shopee: nhainthienthien
-          </a>
           <p className="text-muted-foreground">{BRAND.address}</p>
           {config.data?.hours ? <p className="text-muted-foreground">Mở cửa {config.data.hours}</p> : null}
           <p className="text-muted-foreground">{BRAND.website}</p>

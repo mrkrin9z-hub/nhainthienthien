@@ -15,6 +15,7 @@ const FONT_STYLESHEET =
   "https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Nunito+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=optional";
 
 import appCss from "../styles.css?url";
+import { installMotion } from "../lib/motion";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
@@ -151,6 +152,20 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const [toasts, setToasts] = useState(false);
+  const router = useRouter();
+  useEffect(() => {
+    installMotion();
+    // Trình duyệt chưa có View Transitions: trượt nhẹ nội dung khi đổi trang.
+    if ("startViewTransition" in document) return;
+    return router.subscribe("onResolved", (event) => {
+      if (!event.pathChanged) return;
+      const root = document.documentElement;
+      root.classList.remove("page-enter");
+      void root.offsetWidth;
+      root.classList.add("page-enter");
+      window.setTimeout(() => root.classList.remove("page-enter"), 400);
+    });
+  }, [router]);
   useEffect(() => {
     const link = document.querySelector("link[data-fonts]");
     if (link instanceof HTMLLinkElement) link.media = "all";

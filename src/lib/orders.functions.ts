@@ -61,6 +61,22 @@ export const createUploadTicket = createServerFn({ method: "POST" })
     return ticket(data);
   });
 
+const uploadTicketsSchema = z.object({
+  orderId: z.string().uuid(),
+  accessToken: uploadKey,
+  files: z
+    .array(z.object({ fileName: z.string().min(1).max(200), mimeType: z.string().min(3).max(100), sizeBytes: z.number().int().min(1) }))
+    .min(1)
+    .max(200),
+});
+
+export const createUploadTickets = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => uploadTicketsSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { createUploadTickets: tickets } = await import("@/server/service");
+    return tickets(data);
+  });
+
 const markFileSchema = z.object({
   orderId: z.string().uuid(),
   accessToken: uploadKey,
@@ -80,6 +96,7 @@ export const markFileStatus = createServerFn({ method: "POST" })
 const submitSchema = z.object({
   orderId: z.string().uuid(),
   accessToken: uploadKey,
+  sendLater: z.boolean().optional(),
 });
 
 export const submitOrder = createServerFn({ method: "POST" })

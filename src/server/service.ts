@@ -948,6 +948,44 @@ export async function createUploadTicket(input: {
   return { fileId, path: storagePath, mode: "server" as const };
 }
 
+/** Tạo nhiều phiếu tải ảnh trong một lần ghi sổ (nhanh hơn gọi từng ảnh). */
+export async function createUploadTickets(input: {
+  orderId: string;
+  accessToken: string;
+  files: { fileName: string; mimeType: string; sizeBytes: number }[];
+}) {
+  const limit = await photoByteLimit();
+  const rows = input.files.map((item) => {
+    if (!imageMimeAllowed(item.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
+    if (photoTooBig(item.sizeBytes, limit)) {
+      throw new Error(limit === null ? "Ảnh quá lớn." : "Mỗi ảnh tối đa 10MB khi chưa nối Google Drive.");
+    }
+    const fileId = nid();
+    const safe = item.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
+    return { ...item, fileId, path: `orders/${input.orderId}/originals/${fileId}-${safe}` };
+  });
+  await mutate(async (state) => {
+    const order = await orderByToken(state, input.orderId, input.accessToken);
+    if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+    for (const row of rows) {
+      order.files.push({
+        id: row.fileId,
+        name: row.fileName,
+        mime: row.mimeType,
+        size: row.sizeBytes,
+        status: "uploading",
+        kind: "original",
+        storage: "local",
+        path: row.path,
+        driveFileId: null,
+        createdAt: nowIso(),
+        deletedAt: null,
+      });
+    }
+  });
+  return { fileIds: rows.map((row) => row.fileId) };
+}
+
 async function putPhoto(
   file: OrderFile,
   folder: { orderId: string; code: string; customerName: string; createdAt: string; source: string; channel: string },
@@ -1146,10 +1184,29 @@ export async function markFileStatus(input: {
   return { ok: true };
 }
 
-export async function submitWebOrder(input: { orderId: string; accessToken: string }) {
+export async function submitWebOrder(input: { orderId: string; accessToken: string; sendLater?: boolean | undefined }) {
   return mutate(async (state) => {
     const order = await orderByToken(state, input.orderId, input.accessToken);
-    if (!order.files.length) {
+    if (input.sendLater) {
+      // Khách chọn gửi ảnh sau qua Messenger/Zalo: bỏ các ảnh chưa tải xong, đơn vẫn vào "nhận đơn".
+      const failed = order.files.filter((file) => !file.deletedAt && file.status !== "complete");
+      for (const file of failed) file.deletedAt = nowIso();
+      if (order.status === "draft_upload" || order.status === "upload_error") {
+        const from = order.status;
+        order.status = "nhan_don";
+        order.updatedAt = nowIso();
+        order.history.push({
+          at: nowIso(),
+          from,
+          to: "nhan_don",
+          by: null,
+          note: failed.length ? `Khách sẽ gửi ${failed.length} ảnh sau qua Messenger/Zalo (tải lên web bị lỗi)` : "Khách đặt đơn trên web",
+        });
+      }
+      return { status: order.status, allDone: true };
+    }
+    const liveFiles = order.files.filter((file) => !file.deletedAt);
+    if (!liveFiles.length) {
       // Ảnh không bắt buộc (hàng có sẵn như Lái Mới, TKB; hoặc khách gửi ảnh sau qua Zalo/Messenger).
       if (order.status !== "draft_upload") return { status: order.status, allDone: true };
       const from = order.status;
@@ -1158,7 +1215,7 @@ export async function submitWebOrder(input: { orderId: string; accessToken: stri
       order.history.push({ at: nowIso(), from, to: "nhan_don", by: null, note: "Khách đặt đơn trên web, chưa gửi ảnh" });
       return { status: "nhan_don" as const, allDone: true };
     }
-    const allDone = order.files.every((file) => file.status === "complete");
+    const allDone = liveFiles.every((file) => file.status === "complete");
     const next = allDone ? "nhan_don" : "upload_error";
     const from = order.status;
     order.status = next;

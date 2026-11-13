@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Clock, Globe, MapPin, MessageCircle, PackageSearch, Phone, ShoppingBag, UploadCloud } from "lucide-react";
+import { Clock, Globe, MapPin, MessageCircle, PackageSearch, Phone, UploadCloud } from "lucide-react";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { BRAND } from "@/lib/brand";
+import { ShopLinksBlock } from "@/components/site/shop-links";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 import { submitInquiry } from "@/lib/orders.functions";
 
@@ -56,7 +57,12 @@ function ContactPage() {
           Đặt in trên web, rồi tra cứu đơn bằng mã đơn và số điện thoại đã đặt.
         </p>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <section className="glass-card mt-6 rounded-3xl p-5">
+          <ShopLinksBlock />
+          <p className="mt-3 text-sm text-muted-foreground">Nhắn fanpage để được tư vấn, hoặc mua ngay trên TikTok Shop / Shopee nếu bạn quen dùng sàn.</p>
+        </section>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <Link to="/dat-in" className="glass-card rounded-3xl p-5">
             <UploadCloud className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Đặt in online</h2>
@@ -86,11 +92,6 @@ function ContactPage() {
             <h2 className="mt-3 text-lg font-bold text-foreground">Địa chỉ tiệm</h2>
             <p className="mt-1 text-sm text-muted-foreground">{BRAND.address}</p>
           </div>
-          <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="glass-card rounded-3xl p-5">
-            <ShoppingBag className="size-6 text-accent" />
-            <h2 className="mt-3 text-lg font-bold text-foreground">Mua trên Shopee / TikTok</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Shopee: nhainthienthien · TikTok Shop: Nhà In Thiên Thiên</p>
-          </a>
           <div className="glass-card rounded-3xl p-5">
             <Clock className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Thời gian làm việc</h2>
