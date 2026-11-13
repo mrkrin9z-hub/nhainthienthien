@@ -148,10 +148,10 @@ function ProductPage() {
 
   const buyButtons = (
     <>
-      <button type="button" onClick={addToCart} className="flex min-h-12 flex-1 items-center justify-center gap-1.5 border border-sale bg-sale-soft px-3 text-sm font-medium text-sale md:rounded-sm">
+      <button type="button" onClick={addToCart} className="flex min-h-12 flex-1 items-center justify-center gap-1.5 border border-brand-blue bg-brand-blue-soft px-3 text-sm font-medium text-brand-blue md:rounded-sm">
         <ShoppingCart className="size-5" aria-hidden /> Thêm vào giỏ
       </button>
-      <button type="button" onClick={buyNow} className="min-h-12 flex-1 bg-sale px-3 text-sm font-semibold text-white md:rounded-sm">
+      <button type="button" onClick={buyNow} className="min-h-12 flex-1 bg-cta px-3 text-sm font-semibold text-cta-foreground md:rounded-sm">
         Mua ngay
       </button>
     </>
@@ -179,7 +179,7 @@ function ProductPage() {
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 bg-sale-soft/60 px-3 py-3 md:mt-4 md:px-5 md:py-4">
                 <span className="text-2xl font-semibold text-sale md:text-3xl">{price === null ? "Liên hệ" : formatVnd(price * 1)}</span>
                 {variant?.list_price ? <s className="text-sm text-muted-foreground">{formatVnd(variant.list_price)}</s> : null}
-                {pct ? <span className="rounded-sm bg-sale px-1.5 py-0.5 text-xs font-bold text-white">-{pct}%</span> : null}
+                {pct ? <span className="rounded-sm bg-cta px-1.5 py-0.5 text-xs font-bold text-cta-foreground">-{pct}%</span> : null}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <FreeshipTag />
@@ -268,7 +268,7 @@ function ProductPage() {
 
               <div className="mt-5 hidden gap-3 md:flex">
                 <a href={BRAND.messengerUrl} target="_blank" rel="noopener" className="flex min-h-12 items-center gap-1.5 rounded-sm border border-border px-4 text-sm text-foreground/80">
-                  <MessageCircle className="size-5 text-sale" aria-hidden /> Chat ngay
+                  <MessageCircle className="size-5 text-brand-blue" aria-hidden /> Chat ngay
                 </a>
                 {buyButtons}
               </div>
@@ -322,7 +322,7 @@ function ProductPage() {
 
       {/* Thanh mua cố định trên điện thoại */}
       <div className="fixed inset-x-0 bottom-0 z-50 flex border-t border-border bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
-        <a href={BRAND.messengerUrl} target="_blank" rel="noopener" className="flex min-h-12 w-20 shrink-0 flex-col items-center justify-center text-[10px] text-sale">
+        <a href={BRAND.messengerUrl} target="_blank" rel="noopener" className="flex min-h-12 w-20 shrink-0 flex-col items-center justify-center text-[10px] text-brand-blue">
           <MessageCircle className="size-5" aria-hidden /> Chat ngay
         </a>
         {buyButtons}

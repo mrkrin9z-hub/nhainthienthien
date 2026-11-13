@@ -75,14 +75,14 @@ function CartPage() {
           <div className="flex flex-col items-center gap-3 bg-white px-6 py-20 text-center md:rounded-sm">
             <ShoppingCart className="size-16 text-muted-foreground/40" aria-hidden />
             <p className="text-sm text-muted-foreground">Giỏ hàng của bạn còn trống</p>
-            <Link to="/san-pham" className="rounded-sm bg-sale px-6 py-2.5 text-sm font-semibold text-white">
+            <Link to="/san-pham" className="rounded-sm bg-cta px-6 py-2.5 text-sm font-semibold text-cta-foreground">
               Mua sắm ngay
             </Link>
           </div>
         ) : (
           <section className="bg-white md:rounded-sm">
             <div className="flex items-center gap-2 border-b border-border px-3 py-3">
-              <input type="checkbox" checked={allOn} onChange={() => setUnselected(allOn ? new Set(rows.map((r) => r.key)) : new Set())} className="size-4 accent-[var(--sale)]" aria-label="Chọn tất cả" />
+              <input type="checkbox" checked={allOn} onChange={() => setUnselected(allOn ? new Set(rows.map((r) => r.key)) : new Set())} className="size-4 accent-[var(--brand-blue)]" aria-label="Chọn tất cả" />
               <Store className="size-4 text-foreground" aria-hidden />
               <span className="text-sm font-semibold">Nhà In Thiên Thiên</span>
             </div>
@@ -91,7 +91,7 @@ function CartPage() {
                 const thumb = variantThumb(r.product, r.variant);
                 return (
                   <li key={r.key} className="flex gap-2 px-3 py-3">
-                    <input type="checkbox" checked={!unselected.has(r.key)} onChange={() => toggle(r.key)} className="mt-8 size-4 shrink-0 accent-[var(--sale)]" aria-label={`Chọn ${r.product.name}`} />
+                    <input type="checkbox" checked={!unselected.has(r.key)} onChange={() => toggle(r.key)} className="mt-8 size-4 shrink-0 accent-[var(--brand-blue)]" aria-label={`Chọn ${r.product.name}`} />
                     <Link to="/san-pham/$slug" params={{ slug: r.product.slug }} search={{ v: r.variant.id }} className="shrink-0">
                       {thumb ? (
                         <img src={thumb} alt="" width={80} height={80} className="size-20 border border-border object-cover" />
@@ -123,7 +123,7 @@ function CartPage() {
               })}
             </ul>
             <div className="flex items-center gap-2 border-t border-border px-3 py-3 text-xs text-foreground/80">
-              <Truck className="size-4 shrink-0 text-teal-700" aria-hidden />
+              <Truck className="size-4 shrink-0 text-brand-blue" aria-hidden />
               {picked.length === 0
                 ? "Chọn sản phẩm để xem phí ship."
                 : ship.fee === 0
@@ -138,7 +138,7 @@ function CartPage() {
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-white pb-[env(safe-area-inset-bottom)]">
           <div className="mx-auto flex max-w-6xl items-center gap-2 pl-3 md:px-6">
             <label className="flex shrink-0 items-center gap-1.5 text-sm">
-              <input type="checkbox" checked={allOn} onChange={() => setUnselected(allOn ? new Set(rows.map((r) => r.key)) : new Set())} className="size-4 accent-[var(--sale)]" />
+              <input type="checkbox" checked={allOn} onChange={() => setUnselected(allOn ? new Set(rows.map((r) => r.key)) : new Set())} className="size-4 accent-[var(--brand-blue)]" />
               Tất cả
             </label>
             <div className="min-w-0 flex-1 text-right">
@@ -147,7 +147,7 @@ function CartPage() {
               </p>
               {saved > 0 ? <p className="text-[11px] text-sale">Tiết kiệm {formatVnd(saved)}</p> : null}
             </div>
-            <button type="button" onClick={checkout} disabled={!picked.length} className="min-h-14 shrink-0 bg-sale px-5 text-sm font-semibold text-white disabled:opacity-50 md:min-h-12 md:rounded-sm md:px-10">
+            <button type="button" onClick={checkout} disabled={!picked.length} className="min-h-14 shrink-0 bg-cta px-5 text-sm font-semibold text-cta-foreground disabled:opacity-50 md:min-h-12 md:rounded-sm md:px-10">
               Mua hàng ({picked.reduce((s, r) => s + r.qty, 0)})
             </button>
           </div>

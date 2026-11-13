@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Banknote, CheckCircle2, ChevronDown, ChevronUp, ImagePlus, Loader2, MapPin, Minus, Plus, Store, Trash2, Truck, X } from "lucide-react";
+import { AlertCircle, Banknote, CheckCircle2, Copy, MessageCircle, ChevronDown, ChevronUp, ImagePlus, Loader2, MapPin, Minus, Plus, Store, Trash2, Truck, X } from "lucide-react";
 
 import { LocalPhotoThumb } from "@/components/photo-thumb";
 import { SiteHeader } from "@/components/site/SiteHeader";
@@ -19,7 +19,8 @@ import { postFormWithProgress, putDriveFile } from "@/lib/drive-put";
 import { createOrder, createUploadTicket, finishOrderDriveUpload, markFileStatus, prepareOrderDriveUpload, submitOrder } from "@/lib/orders.functions";
 import { BRAND, formatVnd } from "@/lib/brand";
 import { useCart } from "@/lib/cart";
-import { variantThumb } from "@/lib/product-media";
+import { needsCustomerPhotos, variantThumb } from "@/lib/product-media";
+import { toast } from "sonner";
 import { needsDeposit, shipEstimate } from "@/lib/ship-estimate";
 
 export const Route = createFileRoute("/dat-in")({
@@ -101,6 +102,7 @@ function OrderPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [doneCode, setDoneCode] = useState<string | null>(null);
+  const [doneTotal, setDoneTotal] = useState(0);
   const idempotencyKey = useRef(crypto.randomUUID());
 
   const activeProduct: CatalogProduct | undefined =
@@ -159,9 +161,7 @@ function OrderPage() {
   const contactOk = fullName.trim().length > 1 && phoneDigits.length >= 8 && (fulfillment !== "delivery" || address.trim().length >= 8);
   const missing = !selected.length
     ? "Chọn ít nhất một sản phẩm."
-    : !files.length
-      ? "Thêm ít nhất một ảnh để in."
-      : fullName.trim().length < 2 || phoneDigits.length < 8
+    : fullName.trim().length < 2 || phoneDigits.length < 8
         ? "Nhập họ tên và số điện thoại."
         : fulfillment === "delivery" && address.trim().length < 8
           ? "Nhập địa chỉ nhận hàng."
@@ -170,6 +170,8 @@ function OrderPage() {
   const ship = shipEstimate(shipLines, fulfillment);
   const deposit = needsDeposit(shipLines);
   const total = subtotal + ship.fee;
+  const needsPhotos = selected.some((r) => needsCustomerPhotos(r.product.slug));
+  const showUpload = needsPhotos || files.length > 0;
   const orderNote = [designText, note.trim()].filter(Boolean).join("\n").slice(0, 1000);
 
   async function handleSubmit() {
@@ -177,10 +179,6 @@ function OrderPage() {
     setTried(true);
     if (!selected.length) {
       setError("Vui lòng chọn ít nhất một sản phẩm.");
-      return;
-    }
-    if (!files.length) {
-      setError("Vui lòng chọn ít nhất một ảnh gốc.");
       return;
     }
     if (!contactOk) {
@@ -271,6 +269,7 @@ function OrderPage() {
       if (!result.allDone) {
         setError(uploadError ?? "Một số ảnh chưa tải lên được. Vui lòng bấm gửi lại để thử tiếp.");
       } else {
+        setDoneTotal(total);
         setDoneCode(order.code);
         if (src === "cart") cart.clear();
       }
@@ -282,30 +281,7 @@ function OrderPage() {
   }
 
   if (doneCode) {
-    return (
-      <div className="shop-ui min-h-screen bg-shop-bg">
-        <SiteHeader />
-        <main className="mx-auto max-w-xl px-4 py-12 text-center md:px-6">
-          <div className="rounded-sm bg-white p-6">
-            <CheckCircle2 className="mx-auto size-14 text-sale" />
-            <h1 className="mt-4 text-2xl text-foreground">Đặt hàng thành công</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Mã đơn của bạn là <strong className="text-foreground">{doneCode}</strong>. Hãy lưu lại để tra cứu tiến trình.
-              Tiệm sẽ xem ảnh và báo lại trên đơn.
-            </p>
-            <div className="mt-6 flex justify-center gap-3">
-              <Button asChild size="lg" className="rounded-sm bg-sale text-white hover:bg-sale/90">
-                <Link to="/tra-cuu" search={{ code: doneCode, phone }}>Xem đơn hàng</Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-sm">
-                <Link to="/">Tiếp tục mua sắm</Link>
-              </Button>
-            </div>
-          </div>
-        </main>
-        <SiteFooter />
-      </div>
-    );
+    return <OrderDone code={doneCode} total={doneTotal} phone={phone} zalo={config.zalo} />;
   }
 
   const bad = (ok: boolean) => (tried && !ok ? "border-sale" : "");
@@ -444,10 +420,14 @@ function OrderPage() {
         </section>
 
         {/* Gửi ảnh */}
+        {showUpload ? (
         <section className="bg-white p-3 md:rounded-sm md:p-5">
-          <h2 className="text-sm text-foreground">Ảnh cần in</h2>
+          <h2 className="text-sm text-foreground">
+            Ảnh cần in <span className="font-normal text-muted-foreground">(không bắt buộc)</span>
+          </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Gửi ảnh gốc từ điện thoại. JPG, PNG, WEBP, HEIC — {maxPhotoBytes === null ? "không giới hạn dung lượng và số lượng" : photoLimitLabel(maxPhotoBytes)}.
+            {" "}Có thể gửi ảnh sau qua Zalo/Messenger của shop.
           </p>
           <ul className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
             {files.map((f) => (
@@ -466,12 +446,12 @@ function OrderPage() {
                     <div className="h-full bg-sale transition-[width]" style={{ width: `${f.progress}%` }} />
                   </div>
                 ) : null}
-                {f.status === "complete" ? <CheckCircle2 className="absolute bottom-1 right-1 size-4 rounded-full bg-white text-teal-600" /> : null}
+                {f.status === "complete" ? <CheckCircle2 className="absolute bottom-1 right-1 size-4 rounded-full bg-white text-brand-blue" /> : null}
                 {f.status === "error" ? <AlertCircle className="absolute bottom-1 right-1 size-4 rounded-full bg-white text-destructive" /> : null}
               </li>
             ))}
             <li>
-              <label className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-sm border border-dashed text-center text-[11px] text-sale ${tried && !files.length ? "border-sale bg-sale-soft" : "border-sale/60"}`}>
+              <label className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-sm border border-dashed text-center text-[11px] border-brand-blue/60 text-brand-blue`}>
                 <ImagePlus className="size-6" aria-hidden />
                 Thêm ảnh
                 <input type="file" multiple accept={ACCEPT} className="hidden" onChange={(e) => addFiles(e.target.files)} />
@@ -482,17 +462,18 @@ function OrderPage() {
             <p className="mt-2 text-xs text-destructive">{files.find((f) => f.message)?.message}</p>
           ) : null}
         </section>
+        ) : null}
 
         {/* Ghi chú */}
         <section className="bg-white p-3 md:rounded-sm md:p-5">
           <Label htmlFor="note" className="text-sm">Lời nhắn cho shop</Label>
-          <Textarea id="note" className="mt-1 rounded-sm" placeholder="Ví dụ: tên bé in trên thời khóa biểu, cắt ảnh theo chiều dọc…" value={note} onChange={(e) => setNote(e.target.value)} />
+          <Textarea id="note" className="mt-1 rounded-sm" placeholder={selected.some((r) => r.product.slug.startsWith("thoi-khoa-bieu")) ? "Tên, lớp của bé in trên thời khóa biểu, màu viền…" : "Ví dụ: cắt ảnh theo chiều dọc, chỉnh sáng…"} value={note} onChange={(e) => setNote(e.target.value)} />
         </section>
 
         {/* Vận chuyển + thanh toán */}
         <section className="divide-y divide-border bg-white md:rounded-sm">
           <div className="flex items-start gap-2 px-3 py-3 md:px-5">
-            <Truck className="mt-0.5 size-4 shrink-0 text-teal-700" aria-hidden />
+            <Truck className="mt-0.5 size-4 shrink-0 text-brand-blue" aria-hidden />
             <div className="min-w-0 flex-1 text-sm">
               <p className="text-foreground">Phương thức vận chuyển</p>
               <p className="text-xs text-muted-foreground">
@@ -554,7 +535,7 @@ function OrderPage() {
               if (!missing) void handleSubmit();
             }}
             disabled={busy}
-            className="flex min-h-14 shrink-0 items-center gap-1.5 bg-sale px-6 text-sm font-semibold text-white disabled:opacity-60 md:min-h-12 md:rounded-sm md:px-12"
+            className="flex min-h-14 shrink-0 items-center gap-1.5 bg-cta px-6 text-sm font-semibold text-cta-foreground disabled:opacity-60 md:min-h-12 md:rounded-sm md:px-12"
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
             Đặt hàng
@@ -644,6 +625,99 @@ function ProductOptions({
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+/** Chép tin nhắn vào bộ nhớ tạm. Có cách dự phòng cho trình duyệt cũ. */
+function copyText(text: string): boolean {
+  try {
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* thử cách dưới */
+  }
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function OrderDone({ code, total, phone, zalo }: { code: string; total: number; phone: string; zalo: string }) {
+  const totalText = formatVnd(total);
+  const message = `Chào shop, em đã đặt đơn hàng mã ${code} trị giá ${totalText}. Shop xác nhận giúp em nhé!`;
+  // Nút Zalo chỉ hiện khi Cài đặt có số Zalo và đang bật "Hiện số Zalo trên web". Chưa có thì dùng Messenger.
+  const viaZalo = Boolean(zalo);
+  const chatUrl = viaZalo ? zalo : BRAND.messengerUrl;
+  const chatLabel = viaZalo ? "Nhắn Zalo cho shop" : "Nhắn Messenger cho shop";
+
+  function copyOrder() {
+    if (copyText(`Mã đơn ${code} · ${totalText}`)) toast.success("Đã chép mã đơn");
+  }
+
+  return (
+    <div className="shop-ui min-h-screen bg-shop-bg">
+      <SiteHeader />
+      <main className="mx-auto max-w-xl px-3 py-6 md:px-6 md:py-12">
+        <div className="rounded-sm bg-white p-5 text-center md:p-8">
+          <CheckCircle2 className="mx-auto size-14 text-brand-blue" />
+          <h1 className="mt-3 text-2xl text-foreground">Đặt hàng thành công</h1>
+          <div className="mx-auto mt-4 max-w-sm rounded-sm border border-dashed border-brand-blue/50 bg-brand-blue-soft p-3 text-left">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Mã đơn</p>
+                <p className="text-xl font-bold tracking-wide text-foreground">{code}</p>
+              </div>
+              <button type="button" onClick={copyOrder} className="flex min-h-10 shrink-0 items-center gap-1 rounded-sm border border-brand-blue bg-white px-3 text-sm text-brand-blue">
+                <Copy className="size-4" aria-hidden /> Chép
+              </button>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-brand-blue/20 pt-2">
+              <span className="text-xs text-muted-foreground">Tổng thanh toán (dự kiến)</span>
+              <span className="text-lg font-bold text-sale">{totalText}</span>
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Nhắn cho shop để được xác nhận đơn nhanh. Tin nhắn có sẵn mã đơn, bạn chỉ cần dán và gửi.
+          </p>
+          <a
+            href={chatUrl}
+            target="_blank"
+            rel="noopener"
+            onClick={() => {
+              if (copyText(message)) toast.success(viaZalo ? "Đã chép tin nhắn, dán vào Zalo rồi gửi" : "Đã chép tin nhắn, dán vào Messenger rồi gửi");
+            }}
+            className={`mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-sm text-base font-bold ${
+              viaZalo ? "bg-[#0068ff] text-white" : "bg-cta text-cta-foreground"
+            }`}
+          >
+            <MessageCircle className="size-5" aria-hidden /> {chatLabel}
+          </a>
+          <p className="mt-2 rounded-sm bg-shop-bg px-3 py-2 text-left text-xs text-foreground/80">“{message}”</p>
+          <p className="mt-3 text-xs text-muted-foreground">Ảnh in chưa gửi? Có thể gửi sau qua Zalo/Messenger của shop.</p>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <Button asChild size="lg" variant="outline" className="rounded-sm border-brand-blue text-brand-blue">
+              <Link to="/tra-cuu" search={{ code, phone }}>Xem đơn hàng</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="rounded-sm">
+              <Link to="/">Tiếp tục mua sắm</Link>
+            </Button>
+          </div>
+        </div>
+      </main>
+      <SiteFooter />
     </div>
   );
 }

@@ -94,7 +94,7 @@ function HomePage() {
             <div className="absolute inset-y-0 left-0 flex max-w-[70%] flex-col justify-center p-4 text-white md:p-8">
               <p className="text-[11px] font-semibold uppercase tracking-wide opacity-90">Nhà In Thiên Thiên</p>
               <h1 className="mt-1 text-xl leading-tight md:text-4xl">In ảnh tráng gương 4K theo ảnh của bạn</h1>
-              <span className="mt-3 inline-flex w-fit items-center gap-1 rounded-sm bg-sale px-3 py-1.5 text-xs font-semibold md:text-sm">
+              <span className="mt-3 inline-flex w-fit items-center gap-1 rounded-sm bg-cta px-3 py-1.5 text-xs font-semibold text-cta-foreground md:text-sm">
                 Mua ngay <ChevronRight className="size-4" />
               </span>
             </div>
@@ -105,7 +105,7 @@ function HomePage() {
                 to="/san-pham/$slug"
                 params={{ slug: "trang-guong" }}
                 search={{ v: combo.id }}
-                className="flex flex-col justify-center rounded-sm bg-sale-gradient p-3 text-white"
+                className="flex flex-col justify-center rounded-sm bg-promo-gradient p-3 text-cta-foreground"
               >
                 <span className="text-[11px] font-semibold uppercase opacity-90">Combo 4 ảnh 13×18</span>
                 <span className="mt-0.5 text-xl font-extrabold md:text-2xl">{formatVnd(combo.price ?? 0)}</span>
@@ -117,7 +117,7 @@ function HomePage() {
                 ) : null}
               </Link>
             ) : null}
-            <Link to="/chinh-sach" className="flex flex-col justify-center rounded-sm bg-sale-soft p-3 text-sale">
+            <Link to="/chinh-sach" className="flex flex-col justify-center rounded-sm bg-brand-blue-soft p-3 text-brand-blue">
               <span className="text-[11px] font-semibold uppercase">Giao tận nơi</span>
               <span className="mt-0.5 text-base font-extrabold leading-tight md:text-lg">Freeship đơn từ 300k</span>
               <span className="text-xs text-foreground/70">COD · Nhận tại tiệm 0đ</span>
@@ -129,7 +129,7 @@ function HomePage() {
         <section className="mt-2 grid grid-cols-4 gap-1 bg-white px-2 py-3 md:rounded-sm">
           {POLICY_CHIPS.map((chip) => (
             <Link key={chip.label} to="/chinh-sach" className="flex flex-col items-center gap-1 text-center">
-              <span className="grid size-10 place-items-center rounded-full bg-sale-soft text-sale">
+              <span className="grid size-10 place-items-center rounded-full bg-brand-blue-soft text-brand-blue">
                 <chip.icon className="size-5" aria-hidden />
               </span>
               <span className="text-[10px] leading-tight text-foreground/80 md:text-xs">{chip.label}</span>
@@ -161,7 +161,7 @@ function HomePage() {
               { to: "/chinh-sach" as const, label: "Chính sách", icon: ScrollText },
             ].map((item) => (
               <Link key={item.to} to={item.to} className="flex w-20 shrink-0 flex-col items-center gap-1.5 text-center">
-                <span className="grid size-14 place-items-center rounded-full border border-border bg-sale-soft text-sale">
+                <span className="grid size-14 place-items-center rounded-full border border-border bg-brand-blue-soft text-brand-blue">
                   <item.icon className="size-6" aria-hidden />
                 </span>
                 <span className="text-xs text-foreground">{item.label}</span>
@@ -172,7 +172,7 @@ function HomePage() {
 
         {/* Gợi ý */}
         <section id="gian-hang" className="mt-2 scroll-mt-24">
-          <h2 className="sticky top-14 z-10 border-b-4 border-sale bg-white py-3 text-center text-sm font-semibold uppercase text-sale md:static md:rounded-t-sm">
+          <h2 className="sticky top-14 z-10 border-b-4 border-cta bg-white py-3 text-center text-sm font-semibold uppercase text-brand-blue md:static md:rounded-t-sm">
             Sản phẩm đang bán
           </h2>
           <div className="grid grid-cols-2 gap-1.5 p-1.5 sm:grid-cols-3 md:grid-cols-5 md:gap-2.5 md:px-0">
@@ -193,7 +193,7 @@ function HomePage() {
           <ol className="mt-3 grid grid-cols-3 gap-2">
             {STEPS.map((step, i) => (
               <li key={step.title} className="rounded-sm border border-border p-2 text-center md:p-4">
-                <step.icon className="mx-auto size-6 text-sale" aria-hidden />
+                <step.icon className="mx-auto size-6 text-brand-blue" aria-hidden />
                 <p className="mt-1 text-[11px] font-semibold text-sale">Bước {i + 1}</p>
                 <h3 className="text-xs font-semibold text-foreground md:text-sm">{step.title}</h3>
                 <p className="mt-0.5 hidden text-xs text-muted-foreground md:block">{step.desc}</p>

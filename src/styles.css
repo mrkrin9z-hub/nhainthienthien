@@ -41,6 +41,10 @@
   --color-sale: var(--sale);
   --color-sale-foreground: var(--sale-foreground);
   --color-sale-soft: var(--sale-soft);
+  --color-cta: var(--cta);
+  --color-cta-foreground: var(--cta-foreground);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-blue-soft: var(--brand-blue-soft);
   --color-shop-bg: var(--shop-bg);
   --color-brand: var(--brand);
   --color-brand-light: var(--brand-light);
@@ -88,11 +92,16 @@
   --input: oklch(0.9 0.024 240);
   --ring: oklch(0.7 0.128 234);
 
-  /* Giao diện gian hàng kiểu sàn: cam đỏ ấm của Thiên Thiên. */
-  --sale: #f0532a;
+  /* Giao diện gian hàng kiểu sàn, màu theo logo Thiên Thiên:
+   * xanh #155E9A, cam #F49E0D, chữ đậm #123047. Giá dùng cam đậm #B45309 (đủ tương phản trên nền trắng). */
+  --sale: #b45309;
   --sale-foreground: #ffffff;
-  --sale-soft: #fff1ec;
-  --shop-bg: #f5f5f5;
+  --sale-soft: #fff4e0;
+  --cta: #f49e0d;
+  --cta-foreground: #123047;
+  --brand-blue: #155e9a;
+  --brand-blue-soft: #e8f1fa;
+  --shop-bg: #f4f6f9;
 
   --brand: oklch(0.46 0.113 249);
   --brand-light: oklch(0.7 0.128 234);
@@ -275,7 +284,11 @@ html.admin-desk .fixed.inset-0.z-50 {
 }
 
 @utility bg-sale-gradient {
-  background-image: linear-gradient(180deg, #f0532a 0%, #f77b3c 100%);
+  background-image: linear-gradient(180deg, #155e9a 0%, #1f74b8 100%);
+}
+
+@utility bg-promo-gradient {
+  background-image: linear-gradient(135deg, #f49e0d 0%, #f7b23b 100%);
 }
 
 /* Trang gian hàng: chữ không chân, tiêu đề gọn như app sàn. */

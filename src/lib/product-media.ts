@@ -18,6 +18,8 @@ type ProductMedia = {
   video?: string | null;
   /** Ảnh bìa đang sai sản phẩm thì không hiện, dùng khung trống. */
   placeholderCover?: boolean;
+  /** In từ ảnh của khách: trang thanh toán hiện ô gửi ảnh (không bắt buộc). */
+  printsCustomerPhotos?: boolean;
   /** Mẫu thiết kế khách chọn (ghi vào ghi chú đơn). */
   designs?: { title: string; options: DesignOption[] };
 };
@@ -52,6 +54,7 @@ export const PRODUCT_MEDIA: Record<string, ProductMedia> = {
     // 30×45 trên TikTok đang dùng chung bộ ảnh 20×30.
     sizeFallback: { "30x45": "20x30" },
     video: null,
+    printsCustomerPhotos: true,
   },
   "nam-cham-xe": {
     gallery: sp("lai-moi", 9),
@@ -79,12 +82,20 @@ export const PRODUCT_MEDIA: Record<string, ProductMedia> = {
   },
   // Ảnh bìa hiện là ảnh TKB ép gỗ, không đúng sản phẩm mica. Chờ ảnh thật.
   "thoi-khoa-bieu-boc-dan": { placeholderCover: true, video: null },
-  "nam-cham-tu-lanh": { gallery: sp("nct", 9), video: null },
-  "anh-lua-6x9": { gallery: sp("lua", 5), video: null },
+  "nam-cham-tu-lanh": { gallery: sp("nct", 9), video: null, printsCustomerPhotos: true },
+  "anh-lua-6x9": { gallery: sp("lua", 5), video: null, printsCustomerPhotos: true },
 };
 
 export function mediaFor(slug: string): ProductMedia {
   return PRODUCT_MEDIA[slug] ?? {};
+}
+
+/**
+ * Sản phẩm in từ ảnh khách gửi: ảnh tráng gương, nam châm tủ lạnh, ảnh lụa.
+ * Lái Mới, TKB (ép gỗ và mica) in theo mẫu có sẵn + tên bé, không cần ảnh.
+ */
+export function needsCustomerPhotos(slug: string): boolean {
+  return mediaFor(slug).printsCustomerPhotos === true;
 }
 
 export function hasPlaceholderCover(slug: string): boolean {

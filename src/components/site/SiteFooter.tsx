@@ -11,7 +11,7 @@ export function SiteFooter() {
   const phone = showZalo ? config.data?.phone ?? "" : "";
   const zalo = showZalo ? config.data?.zalo ?? "" : "";
   return (
-    <footer className="mt-2 border-t-2 border-sale bg-white pb-24 md:mt-6 md:pb-0">
+    <footer className="mt-2 border-t-2 border-brand-blue bg-white pb-24 md:mt-6 md:pb-0">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-8 md:grid-cols-4 md:px-6">
         <div className="md:col-span-2">
           <img src={LOGO_HORIZONTAL} alt={BRAND.name} className="h-10 w-auto" />

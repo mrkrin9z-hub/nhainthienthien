@@ -1149,7 +1149,15 @@ export async function markFileStatus(input: {
 export async function submitWebOrder(input: { orderId: string; accessToken: string }) {
   return mutate(async (state) => {
     const order = await orderByToken(state, input.orderId, input.accessToken);
-    if (!order.files.length) throw new Error("Đơn chưa có ảnh nào được tải lên.");
+    if (!order.files.length) {
+      // Ảnh không bắt buộc (hàng có sẵn như Lái Mới, TKB; hoặc khách gửi ảnh sau qua Zalo/Messenger).
+      if (order.status !== "draft_upload") return { status: order.status, allDone: true };
+      const from = order.status;
+      order.status = "nhan_don";
+      order.updatedAt = nowIso();
+      order.history.push({ at: nowIso(), from, to: "nhan_don", by: null, note: "Khách đặt đơn trên web, chưa gửi ảnh" });
+      return { status: "nhan_don" as const, allDone: true };
+    }
     const allDone = order.files.every((file) => file.status === "complete");
     const next = allDone ? "nhan_don" : "upload_error";
     const from = order.status;

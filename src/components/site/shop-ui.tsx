@@ -38,7 +38,7 @@ export function ProductCover({ product, className }: { product: CatalogProduct; 
 
 export function FreeshipTag({ className = "" }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-0.5 rounded-sm border border-teal-600/70 px-1 text-[10px] font-semibold leading-4 text-teal-700 ${className}`}>
+    <span className={`inline-flex items-center gap-0.5 rounded-sm border border-brand-blue/70 px-1 text-[10px] font-semibold leading-4 text-brand-blue ${className}`}>
       <Truck className="size-3" aria-hidden /> Freeship từ 300k
     </span>
   );
@@ -59,7 +59,7 @@ export function ProductCard({ product }: { product: CatalogProduct }) {
       <div className="relative">
         <ProductCover product={product} className="aspect-square w-full" />
         {pct ? (
-          <span className="absolute right-0 top-0 rounded-bl-sm bg-sale-soft px-1.5 py-0.5 text-xs font-bold text-sale">-{pct}%</span>
+          <span className="absolute right-0 top-0 rounded-bl-sm bg-cta px-1.5 py-0.5 text-xs font-bold text-cta-foreground">-{pct}%</span>
         ) : null}
       </div>
       <div className="flex flex-1 flex-col p-2">
@@ -97,7 +97,7 @@ export function PolicyChips({ className = "" }: { className?: string }) {
     <ul className={`flex flex-wrap gap-x-4 gap-y-2 text-xs text-foreground/80 ${className}`}>
       {POLICY_CHIPS.map((chip) => (
         <li key={chip.label} className="flex items-center gap-1">
-          <chip.icon className="size-4 shrink-0 text-sale" aria-hidden />
+          <chip.icon className="size-4 shrink-0 text-brand-blue" aria-hidden />
           {chip.label}
         </li>
       ))}
@@ -114,7 +114,7 @@ export function ShopInfoBlock({ hours }: { hours?: string | undefined }) {
         <p className="mt-0.5 text-xs text-muted-foreground">{BRAND.address}</p>
         {hours ? <p className="text-xs text-muted-foreground">Mở cửa {hours}</p> : null}
       </div>
-      <Link to="/" className="shrink-0 rounded-sm border border-sale px-3 py-1.5 text-xs font-semibold text-sale">
+      <Link to="/" className="shrink-0 rounded-sm border border-brand-blue px-3 py-1.5 text-xs font-semibold text-brand-blue">
         Xem shop
       </Link>
     </section>

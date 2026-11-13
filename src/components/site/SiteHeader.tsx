@@ -30,7 +30,7 @@ export function CartButton({ tone = "light" }: { tone?: "light" | "dark" }) {
     >
       <ShoppingCart className="size-6" />
       {count > 0 ? (
-        <span className="absolute -right-0.5 top-0 min-w-5 rounded-full border-2 border-white bg-white px-1 text-center text-[11px] font-bold leading-4 text-sale">
+        <span className="absolute -right-0.5 top-0 min-w-5 rounded-full border-2 border-white bg-cta px-1 text-center text-[11px] font-bold leading-4 text-cta-foreground">
           {count > 99 ? "99+" : count}
         </span>
       ) : null}
@@ -48,7 +48,7 @@ function SearchBox({ defaultValue = "" }: { defaultValue?: string | undefined })
   }
   return (
     <form role="search" onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-2 rounded-sm bg-white px-3 shadow-sm">
-      <Search className="size-4 shrink-0 text-sale" aria-hidden />
+      <Search className="size-4 shrink-0 text-brand-blue" aria-hidden />
       <input
         type="search"
         value={q}
@@ -57,7 +57,7 @@ function SearchBox({ defaultValue = "" }: { defaultValue?: string | undefined })
         aria-label="Tìm sản phẩm"
         className="h-10 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
       />
-      <button type="submit" className="hidden h-8 shrink-0 rounded-sm bg-sale px-5 text-sm font-semibold text-white md:block">
+      <button type="submit" className="hidden h-8 shrink-0 rounded-sm bg-cta px-5 text-sm font-semibold text-cta-foreground md:block">
         Tìm
       </button>
     </form>
@@ -129,7 +129,7 @@ export function SiteHeader({ back, title, hideTabs, query }: { back?: boolean; t
                   to={tab.to}
                   activeOptions={{ exact: tab.exact }}
                   className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground"
-                  activeProps={{ className: "text-sale" }}
+                  activeProps={{ className: "text-brand-blue" }}
                 >
                   <tab.icon className="size-5" />
                   {tab.label}
