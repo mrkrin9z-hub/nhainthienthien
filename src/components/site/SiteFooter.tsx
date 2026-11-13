@@ -11,8 +11,8 @@ export function SiteFooter() {
   const phone = showZalo ? config.data?.phone ?? "" : "";
   const zalo = showZalo ? config.data?.zalo ?? "" : "";
   return (
-    <footer className="mt-20 border-t border-border bg-card pb-24 md:pb-0">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-4 md:px-6">
+    <footer className="mt-2 border-t-2 border-sale bg-white pb-24 md:mt-6 md:pb-0">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-8 md:grid-cols-4 md:px-6">
         <div className="md:col-span-2">
           <img src={LOGO_HORIZONTAL} alt={BRAND.name} className="h-10 w-auto" />
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
@@ -20,34 +20,34 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="space-y-2 text-sm">
-          <h2 className="font-sans text-xs font-bold tracking-[0.16em] text-primary uppercase">Gian hàng</h2>
-          <Link to="/san-pham" className="block text-foreground/80 hover:text-primary">
+          <h2 className="font-sans text-xs font-bold tracking-[0.16em] text-foreground uppercase">Gian hàng</h2>
+          <Link to="/san-pham" className="block text-foreground/80 hover:text-sale">
             Sản phẩm và giá
           </Link>
-          <Link to="/dat-in" className="block text-foreground/80 hover:text-primary">
+          <Link to="/dat-in" className="block text-foreground/80 hover:text-sale">
             Đặt in
           </Link>
-          <Link to="/huong-dan" className="block text-foreground/80 hover:text-primary">
+          <Link to="/huong-dan" className="block text-foreground/80 hover:text-sale">
             Hướng dẫn
           </Link>
         </div>
         <div className="space-y-2 text-sm">
-          <h2 className="font-sans text-xs font-bold tracking-[0.16em] text-primary uppercase">Đơn hàng</h2>
-          <Link to="/tra-cuu" className="block text-foreground/80 hover:text-primary">
+          <h2 className="font-sans text-xs font-bold tracking-[0.16em] text-foreground uppercase">Đơn hàng</h2>
+          <Link to="/tra-cuu" className="block text-foreground/80 hover:text-sale">
             Tra cứu đơn
           </Link>
-          <Link to="/lien-he" className="block text-foreground/80 hover:text-primary">
+          <Link to="/lien-he" className="block text-foreground/80 hover:text-sale">
             Liên hệ
           </Link>
-          <Link to="/chinh-sach" className="block text-foreground/80 hover:text-primary">
+          <Link to="/chinh-sach" className="block text-foreground/80 hover:text-sale">
             Chính sách
           </Link>
           {showZalo ? (
-            <a href={zalo} className="block font-semibold text-primary">
+            <a href={zalo} className="block font-semibold text-sale">
               Zalo {phone}
             </a>
           ) : null}
-          <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="block text-foreground/80 hover:text-primary">
+          <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="block text-foreground/80 hover:text-sale">
             Shopee: nhainthienthien
           </a>
           <p className="text-muted-foreground">{BRAND.address}</p>

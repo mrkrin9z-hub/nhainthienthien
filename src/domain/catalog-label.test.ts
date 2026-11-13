@@ -19,13 +19,15 @@ test("đếm khổ, không đếm từng mức giá", () => {
   assert.equal(sizeSummary([{ width: null, height: null }]), "1 quy cách");
 
   const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
-  for (const file of ["../routes/san-pham.tsx", "../routes/dat-in.tsx"]) {
+  // Giao diện kiểu sàn: chọn khổ/combo ở trang chi tiết sản phẩm, trang thanh toán vẫn có bộ chọn đủ.
+  for (const file of ["../routes/san-pham_.$slug.tsx", "../routes/dat-in.tsx"]) {
     const source = read(file);
-    assert.match(source, /sizeSummary\(/, file);
     assert.doesNotMatch(source, /variants\.length\} (kích thước|quy cách)/, file);
     assert.match(source, /sizeChoices\(/, file);
-    assert.match(source, /Chọn số tấm/, file);
   }
+  const checkout = read("../routes/dat-in.tsx");
+  assert.match(checkout, /sizeSummary\(/);
+  assert.match(checkout, /Chọn số tấm/);
 });
 
 test("chọn khổ trước, số tấm của khổ đó xếp sau", () => {

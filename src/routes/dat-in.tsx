@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Loader2, Minus, Plus, UploadCloud, X } from "lucide-react";
+import { AlertCircle, Banknote, CheckCircle2, ChevronDown, ChevronUp, ImagePlus, Loader2, MapPin, Minus, Plus, Store, Trash2, Truck, X } from "lucide-react";
 
 import { LocalPhotoThumb } from "@/components/photo-thumb";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { Button } from "@/components/ui/button";
+import { ImagePlaceholder, Stepper } from "@/components/site/shop-ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,14 +17,18 @@ import { photoLimitLabel } from "@/domain/order-upload";
 import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
 import { postFormWithProgress, putDriveFile } from "@/lib/drive-put";
 import { createOrder, createUploadTicket, finishOrderDriveUpload, markFileStatus, prepareOrderDriveUpload, submitOrder } from "@/lib/orders.functions";
-import { formatVnd } from "@/lib/brand";
-import { catalogImage } from "@/lib/product-images";
+import { BRAND, formatVnd } from "@/lib/brand";
+import { useCart } from "@/lib/cart";
+import { variantThumb } from "@/lib/product-media";
+import { needsDeposit, shipEstimate } from "@/lib/ship-estimate";
 
 export const Route = createFileRoute("/dat-in")({
-  validateSearch: (search: Record<string, unknown>): { product?: string; items?: string } => {
-    const out: { product?: string; items?: string } = {};
+  validateSearch: (search: Record<string, unknown>): { product?: string; items?: string; mau?: string; src?: "cart" } => {
+    const out: { product?: string; items?: string; mau?: string; src?: "cart" } = {};
     if (typeof search["product"] === "string") out.product = search["product"];
     if (typeof search["items"] === "string") out.items = search["items"];
+    if (typeof search["mau"] === "string" && search["mau"].trim()) out.mau = search["mau"].trim().slice(0, 500);
+    if (search["src"] === "cart") out.src = "cart";
     return out;
   },
 
@@ -73,21 +78,22 @@ function parseItems(raw?: string): Record<string, number> {
 }
 
 function OrderPage() {
-  const { product: presetSlug, items: presetItems } = Route.useSearch();
+  const { product: presetSlug, items: presetItems, mau: designText, src } = Route.useSearch();
+  const cart = useCart();
   const { data: products } = useSuspenseQuery(catalogQueryOptions);
   const { data: config } = useSuspenseQuery(publicConfigQueryOptions);
   const maxPhotoBytes = config.maxPhotoBytes;
 
   const initialQuantities = useMemo(() => parseItems(presetItems), [presetItems]);
-  const [step, setStep] = useState(Object.keys(initialQuantities).length ? 2 : 1);
-  const [stepTried, setStepTried] = useState(false);
+  const [tried, setTried] = useState(false);
+  const [picking, setPicking] = useState(Object.keys(initialQuantities).length === 0);
   const [quantities, setQuantities] = useState<Record<string, number>>(initialQuantities);
 
   const [activeSlug, setActiveSlug] = useState<string>(presetSlug ?? products[0]?.slug ?? "");
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup");
+  const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("delivery");
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
 
@@ -106,7 +112,7 @@ function OrderPage() {
   }, [presetSlug]);
 
   const selected = useMemo(() => {
-    const rows: { id: string; label: string; unitPrice: number; quantity: number }[] = [];
+    const rows: { id: string; label: string; unitPrice: number; quantity: number; product: CatalogProduct; variant: CatalogProduct["variants"][number] }[] = [];
     for (const product of products) {
       for (const variant of product.variants) {
         const qty = quantities[variant.id] ?? 0;
@@ -116,6 +122,8 @@ function OrderPage() {
             label: `${product.name} — ${variant.name}`,
             unitPrice: variant.requires_quote ? 0 : (variant.sale_price ?? variant.price ?? 0),
             quantity: qty,
+            product,
+            variant,
           });
         }
       }
@@ -149,19 +157,28 @@ function OrderPage() {
 
   const phoneDigits = phone.replace(/\D/g, "");
   const contactOk = fullName.trim().length > 1 && phoneDigits.length >= 8 && (fulfillment !== "delivery" || address.trim().length >= 8);
-  const canNext = step === 1 ? selected.length > 0 : step === 2 ? files.length > 0 : contactOk;
-  const stepHint = !stepTried
-    ? ""
-    : step === 1
-      ? "Chọn ít nhất một khổ."
-      : step === 2
-        ? "Thêm ít nhất một ảnh."
+  const missing = !selected.length
+    ? "Chọn ít nhất một sản phẩm."
+    : !files.length
+      ? "Thêm ít nhất một ảnh để in."
+      : fullName.trim().length < 2 || phoneDigits.length < 8
+        ? "Nhập họ tên và số điện thoại."
         : fulfillment === "delivery" && address.trim().length < 8
           ? "Nhập địa chỉ nhận hàng."
-          : "Nhập họ tên và số điện thoại.";
+          : "";
+  const shipLines = selected.map((r) => ({ width: r.variant.width, height: r.variant.height, amount: r.unitPrice * r.quantity }));
+  const ship = shipEstimate(shipLines, fulfillment);
+  const deposit = needsDeposit(shipLines);
+  const total = subtotal + ship.fee;
+  const orderNote = [designText, note.trim()].filter(Boolean).join("\n").slice(0, 1000);
 
   async function handleSubmit() {
     setError(null);
+    setTried(true);
+    if (!selected.length) {
+      setError("Vui lòng chọn ít nhất một sản phẩm.");
+      return;
+    }
     if (!files.length) {
       setError("Vui lòng chọn ít nhất một ảnh gốc.");
       return;
@@ -176,7 +193,7 @@ function OrderPage() {
         data: {
           fullName,
           phone,
-          note,
+          note: orderNote,
           fulfillment,
           address,
           idempotencyKey: idempotencyKey.current,
@@ -255,6 +272,7 @@ function OrderPage() {
         setError(uploadError ?? "Một số ảnh chưa tải lên được. Vui lòng bấm gửi lại để thử tiếp.");
       } else {
         setDoneCode(order.code);
+        if (src === "cart") cart.clear();
       }
     } catch (err) {
       setError((err as Error).message);
@@ -265,22 +283,24 @@ function OrderPage() {
 
   if (doneCode) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="shop-ui min-h-screen bg-shop-bg">
         <SiteHeader />
-        <main className="mx-auto max-w-xl px-4 py-16 text-center md:px-6">
-          <CheckCircle2 className="mx-auto size-14 text-accent" />
-          <h1 className="mt-4 text-3xl font-extrabold text-primary">Đã nhận đơn của bạn</h1>
-          <p className="mt-2 text-muted-foreground">
-            Mã đơn của bạn là <strong className="text-foreground">{doneCode}</strong>. Hãy lưu lại
-            để tra cứu tiến trình.
-          </p>
-          <div className="mt-6 flex justify-center gap-3">
-            <Button asChild size="lg">
-              <Link to="/tra-cuu" search={{ code: doneCode, phone }}>Tra cứu đơn</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link to="/">Về trang chủ</Link>
-            </Button>
+        <main className="mx-auto max-w-xl px-4 py-12 text-center md:px-6">
+          <div className="rounded-sm bg-white p-6">
+            <CheckCircle2 className="mx-auto size-14 text-sale" />
+            <h1 className="mt-4 text-2xl text-foreground">Đặt hàng thành công</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Mã đơn của bạn là <strong className="text-foreground">{doneCode}</strong>. Hãy lưu lại để tra cứu tiến trình.
+              Tiệm sẽ xem ảnh và báo lại trên đơn.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <Button asChild size="lg" className="rounded-sm bg-sale text-white hover:bg-sale/90">
+                <Link to="/tra-cuu" search={{ code: doneCode, phone }}>Xem đơn hàng</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="rounded-sm">
+                <Link to="/">Tiếp tục mua sắm</Link>
+              </Button>
+            </div>
           </div>
         </main>
         <SiteFooter />
@@ -288,256 +308,258 @@ function OrderPage() {
     );
   }
 
+  const bad = (ok: boolean) => (tried && !ok ? "border-sale" : "");
+
   return (
-    <div className="min-h-screen bg-background pb-56 lg:pb-0">
-      <SiteHeader />
-      <main className="mx-auto max-w-6xl px-4 py-8 md:px-6">
-        <h1 className="text-3xl font-extrabold text-primary md:text-4xl">Đặt in online</h1>
+    <div className="shop-ui min-h-screen bg-shop-bg pb-28 md:pb-24">
+      <SiteHeader back title="Thanh toán" hideTabs />
+      <main className="mx-auto max-w-4xl space-y-2 md:px-6 md:pt-4">
+        <h1 className="hidden py-2 text-xl text-foreground md:block">Thanh toán</h1>
 
-        <ol className="mt-4 flex gap-2">
-          {["Sản phẩm", "Gửi ảnh", "SĐT, địa chỉ"].map((label, i) => (
-            <li
-              key={label}
-              className={`flex min-h-12 flex-1 items-center justify-center rounded-2xl px-2 py-2 text-center text-xs font-bold leading-tight sm:text-sm ${
-                step === i + 1
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground"
-              }`}
-            >
-              {i + 1}. {label}
-            </li>
-          ))}
-        </ol>
-
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
-          <div>
-            {step > 1 && selected.length > 0 ? (
-              <ul className="mb-4 space-y-1 rounded-3xl bg-card px-4 py-3 text-sm lg:hidden">
-                {selected.map((row) => (
-                  <li key={row.id} className="flex justify-between gap-3">
-                    <span className="min-w-0 text-foreground/80">{row.label} × {row.quantity}</span>
-                    <span className="shrink-0 font-semibold text-primary">{row.unitPrice ? formatVnd(row.unitPrice * row.quantity) : "Liên hệ"}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {step === 1 ? (
-              <section className="space-y-3">
-                {products.map((product) => {
-                  const open = product.slug === activeProduct?.slug;
-                  const from = product.variants
-                    .map((variant) => (variant.requires_quote ? null : (variant.sale_price ?? variant.price)))
-                    .filter((price): price is number => price !== null);
-                  return (
-                    <div key={product.id} id={`sp-${product.slug}`} className="glass-card scroll-mt-24 overflow-hidden rounded-3xl">
-                      <button
-                        type="button"
-                        onClick={() => setActiveSlug(product.slug)}
-                        className="flex min-h-16 w-full items-center gap-3 p-3 text-left"
-                      >
-                        <img
-                          src={catalogImage(product.slug, product.cover_path)}
-                          alt=""
-                          width={64}
-                          height={64}
-                          className="size-16 shrink-0 rounded-2xl object-cover"
-                          onError={(event) => {
-                            event.currentTarget.src = catalogImage(product.slug, null);
-                          }}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[11px] font-bold uppercase tracking-wide text-accent">{product.category}</span>
-                          <span className="block font-extrabold leading-tight text-foreground">{product.name}</span>
-                          <span className="block text-xs text-muted-foreground">
-                            {from.length ? `Từ ${formatVnd(Math.min(...from))}` : "Liên hệ"} · {sizeSummary(product.variants)}
-                          </span>
-                        </span>
-                        <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${open ? "bg-accent text-accent-foreground" : "bg-muted text-foreground/70"}`}>
-                          {open ? "Đang chọn" : "Chọn"}
-                        </span>
-                      </button>
-                      {open ? (
-                        <div className="border-t border-border px-3 pb-3">
-                          <p className="py-3 text-sm text-muted-foreground">{product.description}</p>
-                          <ProductOptions product={product} quantities={quantities} setQty={setQty} />
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </section>
-            ) : null}
-
-            {step === 3 ? (
-              <section className="glass-card space-y-4 rounded-3xl p-5">
-                <div>
-                  <h2 className="text-lg font-extrabold text-primary">Số điện thoại và địa chỉ</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Ảnh đã chọn. Nhập thông tin để nhận mã đơn.</p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="name">Họ và tên</Label>
-                  <Input
-                    id="name"
-                    className="h-12"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="tel">Số điện thoại</Label>
-                  <Input
-                    id="tel"
-                    className="h-12"
-                    inputMode="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Hình thức nhận hàng</Label>
-                  <div className="flex gap-2">
-                    {(
-                      [
-                        ["pickup", "Nhận tại tiệm"],
-                        ["delivery", "Giao hàng"],
-                      ] as const
-                    ).map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setFulfillment(value)}
-                        className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold ${
-                          fulfillment === value
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-foreground/80"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Nhận tại tiệm: 0đ phí ship. Giao ảnh nhỏ (13×18 đến 40×60, thời khóa biểu, ảnh lụa, nam châm): 25.000đ, đơn từ 300.000đ thì 0đ phí ship. Ảnh 50×75 và 60×90: 30.000đ, đơn từ 450.000đ thì 0đ phí ship. Nhận COD. Đơn từ 300.000đ hoặc có ảnh từ 40×60 trở lên cần cọc 50%.
-                </p>
-                {fulfillment === "delivery" ? (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="addr">Địa chỉ nhận hàng</Label>
-                    <Textarea
-                      id="addr"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                    />
-                  </div>
-                ) : null}
-                <div className="space-y-1.5">
-                  <Label htmlFor="note">Ghi chú</Label>
-                  <Textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} />
-                </div>
-                {error ? <p className="text-sm font-semibold text-destructive">{error}</p> : null}
-              </section>
-            ) : null}
-
-            {step === 2 ? (
-              <section className="glass-card rounded-3xl p-5">
-                <h2 className="text-lg font-extrabold text-primary">Gửi ảnh gốc</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Số điện thoại và địa chỉ sẽ nhập ở bước sau.</p>
-                <label className="mt-4 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-10 text-center">
-                  <UploadCloud className="size-8 text-accent" />
-                  <span className="mt-2 font-semibold text-foreground">Chọn ảnh gốc</span>
-                  <span className="mt-1 text-xs text-muted-foreground">
-                    JPG, PNG, WEBP, HEIC — {maxPhotoBytes === null ? "không giới hạn dung lượng và số lượng" : photoLimitLabel(maxPhotoBytes)}
-                  </span>
-                  <input
-                    type="file"
-                    multiple
-                    accept={ACCEPT}
-                    className="hidden"
-                    onChange={(e) => addFiles(e.target.files)}
-                  />
-                </label>
-
-                <ul className="mt-4 grid grid-cols-3 gap-2">
-                  {files.map((f) => (
-                    <li key={f.key} className="overflow-hidden rounded-2xl border border-border bg-card text-sm">
-                      <LocalPhotoThumb file={f.file} className="aspect-square w-full object-cover" />
-                      <span className="flex items-center gap-1 px-2 py-2">
-                        <span className="min-w-0 flex-1 truncate">{f.file.name}</span>
-                        {f.status === "uploading" ? <span className="shrink-0 text-xs font-semibold text-primary">{f.progress}%</span> : null}
-                        {f.status === "complete" ? <CheckCircle2 className="size-4 shrink-0 text-accent" /> : null}
-                        {f.status === "error" ? <AlertCircle className="size-4 shrink-0 text-destructive" /> : null}
-                        <button
-                          type="button"
-                          aria-label="Xóa ảnh"
-                          onClick={() => setFiles((prev) => prev.filter((x) => x.key !== f.key))}
-                        >
-                          <X className="size-4 text-muted-foreground" />
-                        </button>
-                      </span>
-                      {f.status === "uploading" ? (
-                        <div className="mx-2 mb-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${f.progress}%` }} />
-                        </div>
-                      ) : null}
-                      {f.message ? <span className="block px-2 pb-2 text-xs text-destructive">{f.message}</span> : null}
-                    </li>
-                  ))}
-                </ul>
-
-                {error ? (
-                  <p className="mt-4 text-sm font-semibold text-destructive">{error}</p>
-                ) : null}
-              </section>
-            ) : null}
+        {/* Nhận hàng */}
+        <section className="bg-white p-3 md:rounded-sm md:p-5">
+          <div className="h-1 bg-[repeating-linear-gradient(45deg,var(--sale)_0_12px,transparent_12px_18px,#6fa6d6_18px_30px,transparent_30px_36px)] opacity-80" aria-hidden />
+          <h2 className="mt-3 flex items-center gap-1.5 text-sm text-sale">
+            <MapPin className="size-4" aria-hidden /> Thông tin nhận hàng
+          </h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label htmlFor="name">Họ và tên</Label>
+              <Input id="name" className={`h-11 rounded-sm ${bad(fullName.trim().length > 1)}`} value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="tel">Số điện thoại</Label>
+              <Input id="tel" className={`h-11 rounded-sm ${bad(phoneDigits.length >= 8)}`} inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
           </div>
+          <div className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Hình thức nhận hàng">
+            {(
+              [
+                ["delivery", "Giao hàng tận nơi", Truck],
+                ["pickup", "Nhận tại tiệm", Store],
+              ] as const
+            ).map(([value, label, Icon]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={fulfillment === value}
+                onClick={() => setFulfillment(value)}
+                className={`flex min-h-11 items-center justify-center gap-1.5 rounded-sm border px-3 text-sm ${
+                  fulfillment === value ? "border-sale bg-sale-soft text-sale" : "border-border text-foreground/80"
+                }`}
+              >
+                <Icon className="size-4" aria-hidden /> {label}
+              </button>
+            ))}
+          </div>
+          {fulfillment === "delivery" ? (
+            <div className="mt-3 space-y-1">
+              <Label htmlFor="addr">Địa chỉ nhận hàng</Label>
+              <Textarea id="addr" className={`rounded-sm ${bad(address.trim().length >= 8)}`} placeholder="Số nhà, đường, phường/xã, tỉnh/thành" value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="street-address" />
+            </div>
+          ) : (
+            <p className="mt-3 rounded-sm bg-shop-bg px-3 py-2 text-xs text-foreground/80">
+              Nhận tại: {BRAND.address}. {config.hours ? `Mở cửa ${config.hours}.` : ""}
+            </p>
+          )}
+        </section>
 
-          <aside className="glass-panel hidden h-fit rounded-3xl p-5 lg:sticky lg:top-24 lg:block">
-            <Summary
-              selected={selected}
-              subtotal={subtotal}
-              step={step}
-              busy={busy}
-              onBack={() => setStep((s) => Math.max(1, s - 1))}
-              onNext={() => {
-                if (!canNext) {
-                  setStepTried(true);
-                  return;
-                }
-                setStepTried(false);
-                setStep((s) => Math.min(3, s + 1));
-              }}
-              onSubmit={handleSubmit}
-              canNext={canNext}
-              hint={canNext ? "" : stepHint}
-            />
-          </aside>
-        </div>
+        {/* Sản phẩm */}
+        <section className="bg-white md:rounded-sm">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-3 md:px-5">
+            <Store className="size-4" aria-hidden />
+            <span className="text-sm font-semibold">Nhà In Thiên Thiên</span>
+          </div>
+          {selected.length ? (
+            <ul className="divide-y divide-border">
+              {selected.map((row) => {
+                const thumb = variantThumb(row.product, row.variant);
+                return (
+                  <li key={row.id} className="flex gap-3 px-3 py-3 md:px-5">
+                    {thumb ? (
+                      <img src={thumb} alt="" width={64} height={64} className="size-16 shrink-0 border border-border object-cover" />
+                    ) : (
+                      <ImagePlaceholder className="size-16 shrink-0 border border-border" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-1 text-sm text-foreground">{row.product.name}</p>
+                      <p className="text-xs text-muted-foreground">Phân loại: {row.variant.name}</p>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <span className="text-sm text-sale">{row.unitPrice ? formatVnd(row.unitPrice) : "Liên hệ"}</span>
+                        <div className="flex items-center gap-1">
+                          <Stepper small min={1} value={row.quantity} onChange={(n) => setQty(row.id, n)} />
+                          <button type="button" aria-label="Bỏ sản phẩm" onClick={() => setQty(row.id, 0)} className="grid size-7 place-items-center text-muted-foreground">
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className={`px-3 py-4 text-sm md:px-5 ${tried ? "text-sale" : "text-muted-foreground"}`}>Chưa chọn sản phẩm nào.</p>
+          )}
+          {designText ? (
+            <p className="border-t border-border px-3 py-2 text-xs text-foreground/80 md:px-5">{designText}</p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setPicking((v) => !v)}
+            className="flex w-full items-center justify-center gap-1 border-t border-border py-3 text-sm text-sale"
+          >
+            {picking ? <ChevronUp className="size-4" /> : <Plus className="size-4" />}
+            {picking ? "Thu gọn" : "Thêm sản phẩm"}
+          </button>
+          {picking ? (
+            <div className="space-y-2 border-t border-border bg-shop-bg p-2">
+              {products.map((product) => {
+                const open = product.slug === activeProduct?.slug;
+                return (
+                  <div key={product.id} id={`sp-${product.slug}`} className="scroll-mt-24 rounded-sm bg-white">
+                    <button type="button" onClick={() => setActiveSlug(product.slug)} className="flex min-h-14 w-full items-center gap-3 p-2 text-left">
+                      {variantThumb(product, product.variants[0] ?? { width: null, height: null }) ? (
+                        <img src={variantThumb(product, product.variants[0] ?? { width: null, height: null }) ?? ""} alt="" width={48} height={48} className="size-12 shrink-0 object-cover" />
+                      ) : (
+                        <ImagePlaceholder className="size-12 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 text-sm">{product.name}</span>
+                        <span className="block text-xs text-muted-foreground">{sizeSummary(product.variants)}</span>
+                      </span>
+                      <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition ${open ? "rotate-180" : ""}`} />
+                    </button>
+                    {open ? (
+                      <div className="border-t border-border p-2">
+                        <ProductOptions product={product} quantities={quantities} setQty={setQty} />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </section>
+
+        {/* Gửi ảnh */}
+        <section className="bg-white p-3 md:rounded-sm md:p-5">
+          <h2 className="text-sm text-foreground">Ảnh cần in</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Gửi ảnh gốc từ điện thoại. JPG, PNG, WEBP, HEIC — {maxPhotoBytes === null ? "không giới hạn dung lượng và số lượng" : photoLimitLabel(maxPhotoBytes)}.
+          </p>
+          <ul className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
+            {files.map((f) => (
+              <li key={f.key} className="relative overflow-hidden rounded-sm border border-border bg-white text-xs">
+                <LocalPhotoThumb file={f.file} className="aspect-square w-full object-cover" />
+                <button
+                  type="button"
+                  aria-label="Xóa ảnh"
+                  onClick={() => setFiles((prev) => prev.filter((x) => x.key !== f.key))}
+                  className="absolute right-0 top-0 grid size-6 place-items-center bg-black/45 text-white"
+                >
+                  <X className="size-3.5" />
+                </button>
+                {f.status === "uploading" ? (
+                  <div className="absolute inset-x-0 bottom-0 h-1.5 bg-black/20">
+                    <div className="h-full bg-sale transition-[width]" style={{ width: `${f.progress}%` }} />
+                  </div>
+                ) : null}
+                {f.status === "complete" ? <CheckCircle2 className="absolute bottom-1 right-1 size-4 rounded-full bg-white text-teal-600" /> : null}
+                {f.status === "error" ? <AlertCircle className="absolute bottom-1 right-1 size-4 rounded-full bg-white text-destructive" /> : null}
+              </li>
+            ))}
+            <li>
+              <label className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-sm border border-dashed text-center text-[11px] text-sale ${tried && !files.length ? "border-sale bg-sale-soft" : "border-sale/60"}`}>
+                <ImagePlus className="size-6" aria-hidden />
+                Thêm ảnh
+                <input type="file" multiple accept={ACCEPT} className="hidden" onChange={(e) => addFiles(e.target.files)} />
+              </label>
+            </li>
+          </ul>
+          {files.some((f) => f.message) ? (
+            <p className="mt-2 text-xs text-destructive">{files.find((f) => f.message)?.message}</p>
+          ) : null}
+        </section>
+
+        {/* Ghi chú */}
+        <section className="bg-white p-3 md:rounded-sm md:p-5">
+          <Label htmlFor="note" className="text-sm">Lời nhắn cho shop</Label>
+          <Textarea id="note" className="mt-1 rounded-sm" placeholder="Ví dụ: tên bé in trên thời khóa biểu, cắt ảnh theo chiều dọc…" value={note} onChange={(e) => setNote(e.target.value)} />
+        </section>
+
+        {/* Vận chuyển + thanh toán */}
+        <section className="divide-y divide-border bg-white md:rounded-sm">
+          <div className="flex items-start gap-2 px-3 py-3 md:px-5">
+            <Truck className="mt-0.5 size-4 shrink-0 text-teal-700" aria-hidden />
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="text-foreground">Phương thức vận chuyển</p>
+              <p className="text-xs text-muted-foreground">
+                {fulfillment === "pickup"
+                  ? "Nhận tại tiệm: 0đ"
+                  : ship.fee === 0
+                    ? `Đơn từ ${formatVnd(ship.freeFrom)}: 0đ phí ship`
+                    : `Phí ship ${formatVnd(ship.base)}. Mua thêm ${formatVnd(ship.freeFrom - subtotal)} để được freeship.`}
+              </p>
+            </div>
+            <span className="shrink-0 text-sm">{formatVnd(ship.fee)}</span>
+          </div>
+          <div className="flex items-start gap-2 px-3 py-3 md:px-5">
+            <Banknote className="mt-0.5 size-4 shrink-0 text-sale" aria-hidden />
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="text-foreground">Phương thức thanh toán</p>
+              <p className="text-xs text-muted-foreground">
+                {fulfillment === "delivery" ? "Thanh toán khi nhận hàng (COD)" : "Tiền mặt hoặc chuyển khoản tại tiệm"}
+              </p>
+              {deposit ? (
+                <p className="mt-1 rounded-sm bg-sale-soft px-2 py-1 text-xs text-sale">
+                  Đơn từ 300.000đ hoặc có ảnh từ 40×60 trở lên cần cọc 50% ({formatVnd(Math.round(subtotal / 2))}) trước khi làm hàng. Tiệm sẽ báo cách chuyển cọc.
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div className="space-y-1.5 px-3 py-3 text-sm md:px-5">
+            <p className="font-medium text-foreground">Chi tiết thanh toán</p>
+            <p className="flex justify-between text-muted-foreground">
+              <span>Tổng tiền hàng</span>
+              <span>{formatVnd(subtotal)}</span>
+            </p>
+            <p className="flex justify-between text-muted-foreground">
+              <span>Phí vận chuyển (dự kiến)</span>
+              <span>{formatVnd(ship.fee)}</span>
+            </p>
+            <p className="flex justify-between text-base">
+              <span>Tổng thanh toán</span>
+              <span className="font-semibold text-sale">{formatVnd(total)}</span>
+            </p>
+            <p className="text-[11px] text-muted-foreground">Tiệm xác nhận lại phí ship trên đơn. Chính sách xem tại trang <Link to="/chinh-sach" className="text-sale underline">Chính sách</Link>.</p>
+          </div>
+        </section>
+        {error ? <p className="bg-white px-3 py-3 text-sm font-semibold text-destructive md:rounded-sm">{error}</p> : null}
       </main>
 
-      <div className="fixed inset-x-0 bottom-[4.5rem] z-40 border-t border-border bg-card p-3 lg:hidden">
-        <Summary
-          selected={selected}
-          subtotal={subtotal}
-          step={step}
-          busy={busy}
-          compact
-          onBack={() => setStep((s) => Math.max(1, s - 1))}
-          onNext={() => {
-            if (!canNext) {
-              setStepTried(true);
-              return;
-            }
-            setStepTried(false);
-            setStep((s) => Math.min(3, s + 1));
-          }}
-          onSubmit={handleSubmit}
-          canNext={canNext}
-          hint={canNext ? "" : stepHint}
-        />
-      </div>
-
-      <div className="hidden lg:block">
-        <SiteFooter />
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-white pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto flex max-w-4xl items-center gap-3 pl-3 md:px-6">
+          <div className="min-w-0 flex-1 text-right">
+            <p className="text-xs text-foreground">
+              Tổng thanh toán <span className="text-lg font-semibold text-sale">{formatVnd(total)}</span>
+            </p>
+            {tried && missing ? <p className="text-[11px] text-sale">{missing}</p> : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setTried(true);
+              if (!missing) void handleSubmit();
+            }}
+            disabled={busy}
+            className="flex min-h-14 shrink-0 items-center gap-1.5 bg-sale px-6 text-sm font-semibold text-white disabled:opacity-60 md:min-h-12 md:rounded-sm md:px-12"
+          >
+            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+            Đặt hàng
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -590,12 +612,12 @@ function ProductOptions({
           const qty = quantities[variant.id] ?? 0;
           const amount = variant.requires_quote ? null : (variant.sale_price ?? variant.price);
           return (
-            <li key={variant.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border px-3 py-2">
+            <li key={variant.id} className="flex items-center justify-between gap-3 rounded-sm border border-border px-3 py-2">
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-foreground">
                   {showOptions ? sheetOptionLabel(variant.sheets) : variant.name}
                 </span>
-                <span className="block text-xs font-semibold text-accent">
+                <span className="block text-xs font-semibold text-sale">
                   {amount == null ? "Liên hệ báo giá" : formatVnd(amount)}
                 </span>
               </span>
@@ -622,90 +644,6 @@ function ProductOptions({
           );
         })}
       </ul>
-    </div>
-  );
-}
-
-function Summary({
-  selected,
-  subtotal,
-  step,
-  busy,
-  compact,
-  canNext,
-  hint,
-  onBack,
-  onNext,
-  onSubmit,
-}: {
-  selected: { id: string; label: string; unitPrice: number; quantity: number }[];
-  subtotal: number;
-  step: number;
-  busy: boolean;
-  compact?: boolean;
-  canNext: boolean;
-  hint?: string;
-  onBack: () => void;
-  onNext: () => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <div>
-      {!compact ? (
-        <>
-          <h2 className="text-lg font-bold text-primary">Tóm tắt đơn</h2>
-          <ul className="mt-3 space-y-2 text-sm">
-            {selected.length === 0 ? (
-              <li className="text-muted-foreground">Chưa chọn quy cách nào.</li>
-            ) : (
-              selected.map((s) => (
-                <li key={s.id} className="flex justify-between gap-2">
-                  <span className="text-foreground/80">
-                    {s.label} × {s.quantity}
-                  </span>
-                  <span className="font-semibold text-primary">
-                    {s.unitPrice ? formatVnd(s.unitPrice * s.quantity) : "Liên hệ"}
-                  </span>
-                </li>
-              ))
-            )}
-          </ul>
-        </>
-      ) : null}
-
-      <div className="flex items-center justify-between gap-2 text-base font-bold">
-        <span>Tạm tính</span>
-        <span className="text-accent">{formatVnd(subtotal)}</span>
-      </div>
-
-      {hint ? <p className="mt-2 text-center text-xs text-muted-foreground">{hint}</p> : null}
-      <div className="mt-3 flex gap-2">
-        {step > 1 ? (
-          <Button variant="outline" size="lg" onClick={onBack} className="min-h-12 flex-1">
-            Quay lại
-          </Button>
-        ) : null}
-        {step < 3 ? (
-          <Button
-            size="lg"
-            onClick={onNext}
-            disabled={!canNext}
-            className="min-h-12 flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
-          >
-            {step === 1 ? "Gửi ảnh" : "Nhập SĐT"}
-          </Button>
-        ) : (
-          <Button
-            size="lg"
-            onClick={onSubmit}
-            disabled={busy || !canNext}
-            className="min-h-12 flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
-          >
-            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-            Gửi đơn
-          </Button>
-        )}
-      </div>
     </div>
   );
 }

@@ -1,25 +1,22 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowDownUp, SearchX } from "lucide-react";
 
-import { ChoiceChip } from "@/components/site/choice-chip";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { Button } from "@/components/ui/button";
-import {
-  catalogQueryOptions,
-  minPrice,
-  minListPrice,
-  type CatalogProduct,
-  type CatalogVariant,
-} from "@/lib/catalog.functions";
-import { matchingSheet, sheetOptionLabel, sizeChoices, sizeSummary } from "@/domain/catalog-label";
-import { catalogImage } from "@/lib/product-images";
-import { BRAND, formatVnd, tiktokUrl } from "@/lib/brand";
+import { ProductCard } from "@/components/site/shop-ui";
+import { catalogQueryOptions, minPrice } from "@/lib/catalog.functions";
+
+type Search = { q?: string; cat?: string };
 
 export const Route = createFileRoute("/san-pham")({
+  validateSearch: (search: Record<string, unknown>): Search => {
+    const out: Search = {};
+    if (typeof search["q"] === "string" && search["q"].trim()) out.q = search["q"].trim().slice(0, 80);
+    if (typeof search["cat"] === "string" && search["cat"].trim()) out.cat = search["cat"].trim().slice(0, 40);
+    return out;
+  },
   loader: ({ context }) => context.queryClient.ensureQueryData(catalogQueryOptions),
   head: () => ({
     meta: [
@@ -41,347 +38,106 @@ export const Route = createFileRoute("/san-pham")({
   component: ProductsPage,
 });
 
-function variantPrice(v: CatalogVariant): number | null {
-  if (v.requires_quote) return null;
-  return v.sale_price ?? v.price;
+/** Bỏ dấu tiếng Việt để tìm "trang guong" vẫn ra "tráng gương". */
+function fold(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[×x]/g, "x");
 }
+
+type Sort = "relevant" | "asc" | "desc";
 
 function ProductsPage() {
   const { data: products } = useSuspenseQuery(catalogQueryOptions);
-  const navigate = useNavigate();
+  const { q, cat } = Route.useSearch();
+  const [sort, setSort] = useState<Sort>("relevant");
 
-  const [cart, setCart] = useState<Record<string, number>>({});
-  const [openProduct, setOpenProduct] = useState<CatalogProduct | null>(null);
-  const [category, setCategory] = useState<string>("Tất cả");
+  const categories = useMemo(() => [...new Set(products.map((p) => p.category).filter(Boolean))], [products]);
 
-  const categories = useMemo(
-    () => ["Tất cả", ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))],
-    [products],
-  );
-  const visible = products.filter((p) => category === "Tất cả" || p.category === category);
-
-  const lookup = useMemo(() => {
-    const map = new Map<string, { product: CatalogProduct; variant: CatalogVariant }>();
-    for (const product of products)
-      for (const variant of product.variants) map.set(variant.id, { product, variant });
-    return map;
-  }, [products]);
-
-  const lines = Object.entries(cart)
-    .filter(([, qty]) => qty > 0)
-    .map(([id, qty]) => ({ id, qty, entry: lookup.get(id) }))
-    .filter((l): l is { id: string; qty: number; entry: { product: CatalogProduct; variant: CatalogVariant } } =>
-      Boolean(l.entry),
-    )
-    .map((l) => ({ id: l.id, qty: l.qty, product: l.entry.product, variant: l.entry.variant }));
-
-  const total = lines.reduce((sum, l) => sum + (variantPrice(l.variant) ?? 0) * l.qty, 0);
-  const hasQuote = lines.some((l) => variantPrice(l.variant) === null);
-  const totalQty = lines.reduce((s, l) => s + l.qty, 0);
-
-  function addToCart(variantId: string, qty: number, label: string) {
-    setCart((prev) => ({ ...prev, [variantId]: (prev[variantId] ?? 0) + qty }));
-    setOpenProduct(null);
-    toast.success(`Đã thêm ${qty} × ${label} vào đơn`);
-  }
-
-  function checkout() {
-    const items = lines.map((l) => `${l.id}:${l.qty}`).join(",");
-    navigate({ to: "/dat-in", search: { items } });
-  }
+  const visible = useMemo(() => {
+    const words = q ? fold(q).split(/\s+/).filter(Boolean) : [];
+    const list = products.filter((product) => {
+      if (cat && product.category !== cat) return false;
+      if (!words.length) return true;
+      const hay = fold(`${product.name} ${product.category} ${product.description} ${product.variants.map((v) => v.name).join(" ")}`);
+      return words.every((word) => hay.includes(word));
+    });
+    if (sort === "relevant") return list;
+    return [...list].sort((a, b) => {
+      const pa = minPrice(a) ?? Number.MAX_SAFE_INTEGER;
+      const pb = minPrice(b) ?? Number.MAX_SAFE_INTEGER;
+      return sort === "asc" ? pa - pb : pb - pa;
+    });
+  }, [products, q, cat, sort]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <SiteHeader />
-      <main className="mx-auto max-w-6xl px-4 py-8 pb-44 md:px-6 md:py-10">
-        <h1 className="text-2xl font-extrabold text-primary sm:text-3xl md:text-4xl">
-          Sản phẩm & bảng giá
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">
-          Xem ảnh mẫu và giá của từng kích thước ngay tại đây. Bấm vào sản phẩm, chọn khổ, rồi chọn
-          số tấm và số lượng.
-        </p>
-
-        <div className="-mx-4 mt-5 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
-          {categories.map((c) => (
+    <div className="shop-ui min-h-screen bg-shop-bg">
+      <SiteHeader query={q} />
+      <main className="mx-auto max-w-6xl pb-20 md:px-6 md:pb-0 md:pt-4">
+        <h1 className="sr-only">Sản phẩm & bảng giá</h1>
+        <div className="sticky top-14 z-10 bg-white md:static md:rounded-sm">
+          <div className="scrollbar-none flex gap-2 overflow-x-auto px-3 py-2">
+            {[undefined, ...categories].map((c) => {
+              const active = (c ?? "") === (cat ?? "");
+              return (
+                <Link
+                  key={c ?? "all"}
+                  to="/san-pham"
+                  search={{ ...(q ? { q } : {}), ...(c ? { cat: c } : {}) }}
+                  className={`min-h-8 shrink-0 rounded-full border px-3 py-1 text-xs font-medium ${
+                    active ? "border-sale bg-sale-soft text-sale" : "border-border bg-white text-foreground/75"
+                  }`}
+                >
+                  {c ?? "Tất cả"}
+                </Link>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-3 border-t border-border text-center text-sm">
             <button
-              key={c}
               type="button"
-              onClick={() => setCategory(c)}
-              className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-semibold transition ${
-                c === category
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card/70 text-foreground/75"
-              }`}
+              onClick={() => setSort("relevant")}
+              className={`min-h-11 ${sort === "relevant" ? "font-semibold text-sale" : "text-foreground/75"}`}
             >
-              {c}
+              Liên quan
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => setSort(sort === "asc" ? "desc" : "asc")}
+              className={`col-span-2 flex min-h-11 items-center justify-center gap-1 ${sort !== "relevant" ? "font-semibold text-sale" : "text-foreground/75"}`}
+            >
+              Giá {sort === "asc" ? "thấp → cao" : sort === "desc" ? "cao → thấp" : ""}
+              <ArrowDownUp className="size-4" aria-hidden />
+            </button>
+          </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {visible.map((product) => (
-            <ProductTile key={product.id} product={product} onOpen={() => setOpenProduct(product)} />
-          ))}
-        </div>
+        {q ? (
+          <p className="px-3 pt-3 text-sm text-muted-foreground">
+            Kết quả cho “<span className="text-foreground">{q}</span>”: {visible.length} sản phẩm
+          </p>
+        ) : null}
+
+        {visible.length ? (
+          <div className="grid grid-cols-2 gap-1.5 p-1.5 sm:grid-cols-3 md:grid-cols-5 md:gap-2.5 md:px-0">
+            {visible.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 px-6 py-16 text-center text-sm text-muted-foreground">
+            <SearchX className="size-10" aria-hidden />
+            Không tìm thấy sản phẩm phù hợp.
+            <Link to="/san-pham" className="font-semibold text-sale">
+              Xem tất cả sản phẩm
+            </Link>
+          </div>
+        )}
       </main>
-
-      {openProduct ? (
-        <VariantSheet
-          product={openProduct}
-          onClose={() => setOpenProduct(null)}
-          onAdd={addToCart}
-        />
-      ) : null}
-
-      {lines.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-[4.5rem] z-40 border-t border-border bg-card md:bottom-0">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6">
-            <div className="max-h-24 overflow-auto text-sm">
-              {lines.map((l) => (
-                <div key={l.id} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 py-0.5">
-                  <span className="min-w-0 truncate text-foreground/80">
-                    {l.product.name} — {l.variant.name} × {l.qty}
-                  </span>
-                  <span className="shrink-0 font-semibold text-primary">
-                    {variantPrice(l.variant) === null
-                      ? "Liên hệ"
-                      : formatVnd(variantPrice(l.variant)! * l.qty)}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Xoá dòng"
-                    className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-destructive"
-                    onClick={() => setCart((prev) => ({ ...prev, [l.id]: 0 }))}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 md:flex md:justify-end">
-              <div className="min-w-0 text-right">
-                <p className="text-xs text-muted-foreground">Tạm tính ({totalQty} món)</p>
-                <p className="text-lg font-extrabold text-primary">
-                  {formatVnd(total)}
-                  {hasQuote ? " + báo giá" : ""}
-                </p>
-              </div>
-              <Button
-                size="lg"
-                className="min-h-12 shrink-0 bg-accent text-accent-foreground hover:bg-accent/90"
-                onClick={checkout}
-              >
-                <ShoppingBag className="size-4" /> Đặt mua
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <SiteFooter />
-    </div>
-  );
-}
-
-function ProductTile({ product, onOpen }: { product: CatalogProduct; onOpen: () => void }) {
-  const from = minPrice(product);
-  const fromList = minListPrice(product);
-  return (
-    <article className="glass-card flex flex-col overflow-hidden rounded-2xl">
-      <button type="button" onClick={onOpen} className="text-left">
-        <img
-          src={catalogImage(product.slug, product.cover_path)}
-          alt={`Ảnh mẫu ${product.name}`}
-          loading="lazy"
-          width={800}
-          height={600}
-          className="aspect-square w-full object-cover"
-        />
-      </button>
-      <div className="flex flex-1 flex-col p-3">
-        <h2 className="line-clamp-2 text-sm font-bold text-foreground sm:text-base">
-          {product.name}
-        </h2>
-        {product.turnaround_text ? (
-          <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{product.turnaround_text}</p>
-        ) : null}
-        <p className="mt-2 text-base font-extrabold text-accent sm:text-lg">
-          {from === null ? null : (
-            <span className="mr-1 text-[11px] font-medium text-muted-foreground">từ</span>
-          )}
-          {from === null ? "Liên hệ" : formatVnd(from)}
-          {fromList ? (
-            <span className="ml-1.5 text-xs font-medium text-muted-foreground line-through">{formatVnd(fromList)}</span>
-          ) : null}
-        </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          {sizeSummary(product.variants)}
-        </p>
-        <Button
-          onClick={onOpen}
-          className="mt-3 min-h-11 w-full bg-accent text-accent-foreground hover:bg-accent/90"
-        >
-          <ShoppingBag className="size-4" /> Chọn mua
-        </Button>
-      </div>
-    </article>
-  );
-}
-
-function VariantSheet({
-  product,
-  onClose,
-  onAdd,
-}: {
-  product: CatalogProduct;
-  onClose: () => void;
-  onAdd: (variantId: string, qty: number, label: string) => void;
-}) {
-  const choices = useMemo(() => sizeChoices(product.variants), [product]);
-  const [sizeKey, setSizeKey] = useState(choices[0]?.key ?? "");
-  const [variantId, setVariantId] = useState(choices[0]?.variants[0]?.id ?? "");
-  const [qty, setQty] = useState(1);
-
-  const choice = choices.find((item) => item.key === sizeKey) ?? choices[0];
-  const variant = choice?.variants.find((item) => item.id === variantId) ?? choice?.variants[0];
-  const price = variant ? variantPrice(variant) : null;
-  const showOptions = (choice?.variants.length ?? 0) > 1;
-
-  function pickSize(key: string) {
-    const next = choices.find((item) => item.key === key);
-    if (!next) return;
-    const kept = matchingSheet(next.variants, variant?.sheets ?? null);
-    setSizeKey(key);
-    if (kept) setVariantId(kept.id);
-    setQty(1);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center">
-      <div className="max-h-[88vh] w-full overflow-auto rounded-t-3xl border border-border bg-card p-4 sm:max-w-lg sm:rounded-3xl sm:p-6">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
-          <img
-            src={catalogImage(product.slug, product.cover_path)}
-            alt={`Ảnh mẫu ${product.name}`}
-            width={200}
-            height={200}
-            className="size-20 shrink-0 rounded-2xl object-cover"
-          />
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">
-              {product.category}
-            </p>
-            <h3 className="truncate text-lg font-bold text-foreground">{product.name}</h3>
-            <p className="text-xl font-extrabold text-accent">
-              {price === null ? "Liên hệ" : formatVnd(price)}
-              {variant?.list_price ? (
-                <span className="ml-2 text-sm font-medium text-muted-foreground line-through">{formatVnd(variant.list_price)}</span>
-              ) : null}
-            </p>
-          </div>
-          <button
-            type="button"
-            aria-label="Đóng"
-            onClick={onClose}
-            className="grid size-10 shrink-0 place-items-center rounded-full text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-5" />
-          </button>
-        </div>
-
-        <p className="mt-3 text-sm text-muted-foreground">
-          {product.turnaround_text ? `${product.description} • ${product.turnaround_text}` : product.description}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-          {tiktokUrl(product.slug) ? (
-            <a href={tiktokUrl(product.slug) ?? undefined} target="_blank" rel="noopener" className="rounded-full border border-border px-3 py-1.5 text-foreground/80 hover:text-primary">
-              Xem trên TikTok Shop
-            </a>
-          ) : null}
-          <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="rounded-full border border-border px-3 py-1.5 text-foreground/80 hover:text-primary">
-            Shop trên Shopee
-          </a>
-        </div>
-
-        <p className="mt-5 text-sm font-semibold text-foreground">Chọn kích thước</p>
-        <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Chọn kích thước">
-          {choices.map((item) => {
-            const only = item.variants.length === 1 ? item.variants[0] : undefined;
-            const onlyPrice = only ? variantPrice(only) : null;
-            return (
-              <ChoiceChip
-                key={item.key}
-                active={item.key === choice?.key}
-                title={item.label}
-                {...(only
-                  ? { detail: onlyPrice === null ? "Liên hệ" : formatVnd(onlyPrice) }
-                  : {})}
-                onClick={() => pickSize(item.key)}
-              />
-            );
-          })}
-        </div>
-
-        {showOptions && choice ? (
-          <>
-            <p className="mt-4 text-sm font-semibold text-foreground">Chọn số tấm</p>
-            <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Chọn số tấm">
-              {choice.variants.map((item) => {
-                const itemPrice = variantPrice(item);
-                return (
-                  <ChoiceChip
-                    key={item.id}
-                    active={item.id === variant?.id}
-                    title={sheetOptionLabel(item.sheets)}
-                    detail={itemPrice === null ? "Liên hệ" : formatVnd(itemPrice)}
-                    onClick={() => setVariantId(item.id)}
-                  />
-                );
-              })}
-            </div>
-          </>
-        ) : null}
-
-        <div className="mt-5 flex items-center justify-between gap-3">
-          <span className="text-sm text-muted-foreground">Số lượng</span>
-          <div className="flex items-center rounded-full border border-border">
-            <button
-              type="button"
-              aria-label="Giảm"
-              className="grid size-11 place-items-center text-muted-foreground"
-              onClick={() => setQty((q) => Math.max(1, q - 1))}
-            >
-              <Minus className="size-4" />
-            </button>
-            <span className="w-10 text-center text-base font-bold">{qty}</span>
-            <button
-              type="button"
-              aria-label="Tăng"
-              className="grid size-11 place-items-center text-muted-foreground"
-              onClick={() => setQty((q) => Math.min(500, q + 1))}
-            >
-              <Plus className="size-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Thành tiền</p>
-            <p className="text-lg font-extrabold text-primary">
-              {price === null ? "Liên hệ" : formatVnd(price * qty)}
-            </p>
-          </div>
-          <Button
-            className="min-h-12 shrink-0 bg-accent text-accent-foreground hover:bg-accent/90"
-            disabled={!variant}
-            onClick={() => variant && onAdd(variant.id, qty, `${product.name} — ${variant.name}`)}
-          >
-            <ShoppingBag className="size-4" /> Thêm vào đơn
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

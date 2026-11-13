@@ -7,6 +7,8 @@ export const BRAND = {
   region: "Xuân Lộc, Đồng Nai",
   address: "Số 67 Đường Ngô Quyền, Khu Phố 4, Xã Xuân Lộc, Đồng Nai",
   shopeeUrl: "https://shopee.vn/nhainthienthien",
+  /** Nút "Chat ngay": Messenger của Page Nhà In Thiên Thiên. */
+  messengerUrl: "https://m.me/61595796658051",
 } as const;
 
 /** Link sản phẩm trên TikTok Shop theo nhóm web. */

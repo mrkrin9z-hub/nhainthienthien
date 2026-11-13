@@ -14,6 +14,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BangGiaRouteImport } from './routes/bang-gia'
 import { Route as ChinhSachRouteImport } from './routes/chinh-sach'
 import { Route as DatInRouteImport } from './routes/dat-in'
+import { Route as GioHangRouteImport } from './routes/gio-hang'
 import { Route as HuongDanRouteImport } from './routes/huong-dan'
 import { Route as LienHeRouteImport } from './routes/lien-he'
 import { Route as OrdersRouteImport } from './routes/orders'
@@ -67,6 +68,7 @@ import { Route as DanhGiaTokenRouteImport } from './routes/danh-gia.$token'
 import { Route as GuiAnhIndexRouteImport } from './routes/gui-anh.index'
 import { Route as GuiAnhTokenRouteImport } from './routes/gui-anh.$token'
 import { Route as OrdersCreateRouteImport } from './routes/orders.create'
+import { Route as SanPhamSlugRouteImport } from './routes/san-pham_.$slug'
 import { Route as UCodeRouteImport } from './routes/u.$code'
 import { Route as AdminAlbumIndexRouteImport } from './routes/admin.album.index'
 import { Route as AdminAlbumIdRouteImport } from './routes/admin.album.$id'
@@ -122,6 +124,11 @@ const ChinhSachRoute = ChinhSachRouteImport.update({
 const DatInRoute = DatInRouteImport.update({
   id: '/dat-in',
   path: '/dat-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GioHangRoute = GioHangRouteImport.update({
+  id: '/gio-hang',
+  path: '/gio-hang',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HuongDanRoute = HuongDanRouteImport.update({
@@ -389,6 +396,11 @@ const OrdersCreateRoute = OrdersCreateRouteImport.update({
   path: '/create',
   getParentRoute: () => OrdersRoute,
 } as any)
+const SanPhamSlugRoute = SanPhamSlugRouteImport.update({
+  id: '/san-pham_/$slug',
+  path: '/san-pham/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UCodeRoute = UCodeRouteImport.update({
   id: '/u/$code',
   path: '/u/$code',
@@ -554,6 +566,7 @@ export interface FileRoutesByFullPath {
   '/bang-gia': typeof BangGiaRoute
   '/chinh-sach': typeof ChinhSachRoute
   '/dat-in': typeof DatInRoute
+  '/gio-hang': typeof GioHangRoute
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
   '/orders': typeof OrdersRouteWithChildren
@@ -605,6 +618,7 @@ export interface FileRoutesByFullPath {
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/orders/create': typeof OrdersCreateRoute
+  '/san-pham/$slug': typeof SanPhamSlugRoute
   '/u/$code': typeof UCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/gui-anh/': typeof GuiAnhIndexRoute
@@ -644,6 +658,7 @@ export interface FileRoutesByTo {
   '/bang-gia': typeof BangGiaRoute
   '/chinh-sach': typeof ChinhSachRoute
   '/dat-in': typeof DatInRoute
+  '/gio-hang': typeof GioHangRoute
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
   '/orders': typeof OrdersRouteWithChildren
@@ -695,6 +710,7 @@ export interface FileRoutesByTo {
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/orders/create': typeof OrdersCreateRoute
+  '/san-pham/$slug': typeof SanPhamSlugRoute
   '/u/$code': typeof UCodeRoute
   '/admin': typeof AdminIndexRoute
   '/gui-anh': typeof GuiAnhIndexRoute
@@ -736,6 +752,7 @@ export interface FileRoutesById {
   '/bang-gia': typeof BangGiaRoute
   '/chinh-sach': typeof ChinhSachRoute
   '/dat-in': typeof DatInRoute
+  '/gio-hang': typeof GioHangRoute
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
   '/orders': typeof OrdersRouteWithChildren
@@ -787,6 +804,7 @@ export interface FileRoutesById {
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/orders/create': typeof OrdersCreateRoute
+  '/san-pham_/$slug': typeof SanPhamSlugRoute
   '/u/$code': typeof UCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/gui-anh/': typeof GuiAnhIndexRoute
@@ -829,6 +847,7 @@ export interface FileRouteTypes {
     | '/bang-gia'
     | '/chinh-sach'
     | '/dat-in'
+    | '/gio-hang'
     | '/huong-dan'
     | '/lien-he'
     | '/orders'
@@ -880,6 +899,7 @@ export interface FileRouteTypes {
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/orders/create'
+    | '/san-pham/$slug'
     | '/u/$code'
     | '/admin/'
     | '/gui-anh/'
@@ -919,6 +939,7 @@ export interface FileRouteTypes {
     | '/bang-gia'
     | '/chinh-sach'
     | '/dat-in'
+    | '/gio-hang'
     | '/huong-dan'
     | '/lien-he'
     | '/orders'
@@ -970,6 +991,7 @@ export interface FileRouteTypes {
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/orders/create'
+    | '/san-pham/$slug'
     | '/u/$code'
     | '/admin'
     | '/gui-anh'
@@ -1010,6 +1032,7 @@ export interface FileRouteTypes {
     | '/bang-gia'
     | '/chinh-sach'
     | '/dat-in'
+    | '/gio-hang'
     | '/huong-dan'
     | '/lien-he'
     | '/orders'
@@ -1061,6 +1084,7 @@ export interface FileRouteTypes {
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/orders/create'
+    | '/san-pham_/$slug'
     | '/u/$code'
     | '/admin/'
     | '/gui-anh/'
@@ -1102,6 +1126,7 @@ export interface RootRouteChildren {
   BangGiaRoute: typeof BangGiaRoute
   ChinhSachRoute: typeof ChinhSachRoute
   DatInRoute: typeof DatInRoute
+  GioHangRoute: typeof GioHangRoute
   HuongDanRoute: typeof HuongDanRoute
   LienHeRoute: typeof LienHeRoute
   OrdersRoute: typeof OrdersRouteWithChildren
@@ -1110,6 +1135,7 @@ export interface RootRouteChildren {
   TraCuuRoute: typeof TraCuuRoute
   DanhGiaTokenRoute: typeof DanhGiaTokenRoute
   GuiAnhTokenRoute: typeof GuiAnhTokenRoute
+  SanPhamSlugRoute: typeof SanPhamSlugRoute
   UCodeRoute: typeof UCodeRoute
   GuiAnhIndexRoute: typeof GuiAnhIndexRoute
   ApiAdminProductPhotoRoute: typeof ApiAdminProductPhotoRoute
@@ -1171,6 +1197,13 @@ declare module '@tanstack/react-router' {
       path: '/dat-in'
       fullPath: '/dat-in'
       preLoaderRoute: typeof DatInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gio-hang': {
+      id: '/gio-hang'
+      path: '/gio-hang'
+      fullPath: '/gio-hang'
+      preLoaderRoute: typeof GioHangRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/huong-dan': {
@@ -1544,6 +1577,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrdersCreateRouteImport
       parentRoute: typeof OrdersRoute
     }
+    '/san-pham_/$slug': {
+      id: '/san-pham_/$slug'
+      path: '/san-pham/$slug'
+      fullPath: '/san-pham/$slug'
+      preLoaderRoute: typeof SanPhamSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/u/$code': {
       id: '/u/$code'
       path: '/u/$code'
@@ -1891,6 +1931,7 @@ const rootRouteChildren: RootRouteChildren = {
   BangGiaRoute: BangGiaRoute,
   ChinhSachRoute: ChinhSachRoute,
   DatInRoute: DatInRoute,
+  GioHangRoute: GioHangRoute,
   HuongDanRoute: HuongDanRoute,
   LienHeRoute: LienHeRoute,
   OrdersRoute: OrdersRouteWithChildren,
@@ -1899,6 +1940,7 @@ const rootRouteChildren: RootRouteChildren = {
   TraCuuRoute: TraCuuRoute,
   DanhGiaTokenRoute: DanhGiaTokenRoute,
   GuiAnhTokenRoute: GuiAnhTokenRoute,
+  SanPhamSlugRoute: SanPhamSlugRoute,
   UCodeRoute: UCodeRoute,
   GuiAnhIndexRoute: GuiAnhIndexRoute,
   ApiAdminProductPhotoRoute: ApiAdminProductPhotoRoute,

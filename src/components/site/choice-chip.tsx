@@ -16,8 +16,8 @@ export function ChoiceChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`min-h-11 rounded-2xl border px-3 py-2 text-left text-sm transition active:scale-95 ${
-        active ? "border-accent bg-accent/10 text-accent" : "border-border bg-card text-foreground/80"
+      className={`min-h-11 rounded-sm border px-3 py-2 text-left text-sm transition active:scale-95 ${
+        active ? "border-sale bg-sale-soft text-sale" : "border-border bg-card text-foreground/80"
       }`}
     >
       <span className="flex items-center gap-1.5 font-semibold">
