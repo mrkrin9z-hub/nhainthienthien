@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -129,11 +130,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  // Trang khách: CSS chặn render để không chớp trang chưa có giao diện rồi nhảy bố cục (CLS).
+  // Trang quản trị giữ cách tải CSS không chặn như cũ.
+  const admin = useRouterState({ select: (state) => state.location.pathname.startsWith("/admin") });
   return (
     <html lang="vi">
       <head>
         <style>{`body{margin:0;background:#f7f4ee;color:#243044;font-family:ui-sans-serif,system-ui,sans-serif}`}</style>
-        <link rel="stylesheet" href={appCss} media="print" data-app-css="1" />
+        <link rel="stylesheet" href={appCss} data-app-css="1" {...(admin ? { media: "print" } : {})} />
         <HeadContent />
       </head>
       <body>
@@ -155,15 +159,22 @@ function RootComponent() {
   const router = useRouter();
   useEffect(() => {
     installMotion();
+    // CSS trang quản trị tải không chặn (media=print); đổi trang bằng router thì bật lại ngay.
+    const unsubCss = router.subscribe("onResolved", () => {
+      for (const link of document.querySelectorAll<HTMLLinkElement>("link[data-app-css]")) link.media = "all";
+    });
     if ("startViewTransition" in document) {
       // Chỉ dùng chuyển trang mượt cho các lần bấm sau, không áp cho lần tải đầu.
       const timer = window.setTimeout(() => {
         router.options.defaultViewTransition = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       }, 0);
-      return () => window.clearTimeout(timer);
+      return () => {
+        window.clearTimeout(timer);
+        unsubCss();
+      };
     }
     // Trình duyệt chưa có View Transitions: trượt nhẹ nội dung khi đổi trang.
-    return router.subscribe("onResolved", (event) => {
+    const unsubPage = router.subscribe("onResolved", (event) => {
       if (!event.pathChanged) return;
       const root = document.documentElement;
       root.classList.remove("page-enter");
@@ -171,6 +182,10 @@ function RootComponent() {
       root.classList.add("page-enter");
       window.setTimeout(() => root.classList.remove("page-enter"), 400);
     });
+    return () => {
+      unsubCss();
+      unsubPage();
+    };
   }, [router]);
   useEffect(() => {
     const link = document.querySelector("link[data-fonts]");
