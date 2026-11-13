@@ -36,12 +36,21 @@ export async function putDriveFile(uploadUrl: string, file: File, mime: string, 
 export function postFormWithProgress(url: string, body: FormData, onProgress?: UploadProgress): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    // Mạng đứng (không nhích) quá 60 giây thì báo lỗi để khách bấm gửi lại, không quay mãi.
+    let stall = 0;
+    const arm = () => {
+      window.clearTimeout(stall);
+      stall = window.setTimeout(() => xhr.abort(), 60_000);
+    };
+    const done = () => window.clearTimeout(stall);
     xhr.open("POST", url);
     xhr.upload.onprogress = (event) => {
+      arm();
       if (!event.lengthComputable) return;
       onProgress?.(event.loaded, event.total || 1);
     };
     xhr.onload = () => {
+      done();
       if (xhr.status >= 200 && xhr.status < 300) {
         onProgress?.(1, 1);
         resolve();
@@ -49,7 +58,15 @@ export function postFormWithProgress(url: string, body: FormData, onProgress?: U
       }
       reject(new Error(xhr.responseText || "Không tải được ảnh."));
     };
-    xhr.onerror = () => reject(new Error("Không tải được ảnh."));
+    xhr.onerror = () => {
+      done();
+      reject(new Error("Mất kết nối mạng khi tải ảnh"));
+    };
+    xhr.onabort = () => {
+      done();
+      reject(new Error("Mạng chậm quá, ảnh chưa tải lên được"));
+    };
+    arm();
     xhr.send(body);
   });
 }

@@ -216,6 +216,13 @@ function OrderPage() {
     void item;
   }
 
+  function friendly(err: unknown, fallback: string): string {
+    const message = err instanceof Error ? err.message : "";
+    if (!message) return fallback;
+    if (/failed to fetch|networkerror|load failed|network request failed|mạng/i.test(message)) return "Mất kết nối mạng. Kiểm tra mạng rồi bấm thử lại";
+    return message;
+  }
+
   async function handleSubmit(opts: { sendLater?: boolean } = {}) {
     if (submitting.current) return; // chặn bấm 2 lần
     setError(null);
@@ -307,7 +314,7 @@ function OrderPage() {
             } catch (err) {
               failed += 1;
               loadedBy.set(item.key, 0);
-              const message = err instanceof Error ? err.message : "Không tải được ảnh.";
+              const message = friendly(err, "Không tải được ảnh.");
               firstError = firstError ?? message;
               setFiles((prev) => prev.map((f) => (f.key === item.key ? { ...f, status: "error", message } : f)));
             }
@@ -328,7 +335,7 @@ function OrderPage() {
       setProgress(null);
       if (src === "cart") cart.clear();
     } catch (err) {
-      const message = (err as Error).message || "Có lỗi, vui lòng thử lại.";
+      const message = friendly(err, "Có lỗi, vui lòng thử lại.");
       setProgress((p) => ({ step: "error", done: p?.done ?? 0, total: files.length, failed: p?.failed ?? 0, percent: p?.percent ?? 0, message, orderOnly: !orderRef.current }));
     } finally {
       submitting.current = false;
