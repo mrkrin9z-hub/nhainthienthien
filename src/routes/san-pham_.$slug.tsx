@@ -423,7 +423,7 @@ function Gallery({ items }: { items: MediaItem[] }) {
               {item.kind === "video" ? (
                 <span className="grid size-full place-items-center bg-black text-xs text-white">Video</span>
               ) : (
-                <img src={item.src} alt="" loading="lazy" className="size-full object-cover" />
+                <img src={item.src} alt="" loading="lazy" width={900} height={900} className="size-full object-cover" />
               )}
             </button>
           ))}

@@ -128,6 +128,7 @@ import { createGhnWaybill, createGhtkWaybill, createJtWaybill, quoteGhtkFee, tra
 import { integrationStatus, readIntegrationSecret, saveIntegrationSecret } from "@/server/secrets";
 import { deleteFromDrive, downloadDriveThumbnail, downloadFromDrive, driveConnected, inspectDriveUpload, openDriveUpload, uploadToDrive } from "@/server/drive";
 import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
+import { mediaFor } from "@/lib/product-media";
 
 export type Actor = Pick<Staff, "id" | "name" | "email" | "role" | "mustChangePassword"> & {
   totpEnabled: boolean;
@@ -388,9 +389,8 @@ export async function publicCatalog() {
       slug: group.slug,
       category: group.category,
       description: group.description,
-      cover_path: state.settings.productPhotos?.[group.slug]
-        ? `/api/public/product-photo/${group.slug}`
-        : null,
+      cover_path: mediaFor(group.slug).listingCover
+        ?? (state.settings.productPhotos?.[group.slug] ? `/api/public/product-photo/${group.slug}` : null),
       turnaround_text: group.turnaround,
       sort_order: group.sort,
       variants: state.skus

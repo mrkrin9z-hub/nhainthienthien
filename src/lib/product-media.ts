@@ -9,6 +9,8 @@ export type MediaItem = { kind: "image"; src: string; alt: string } | { kind: "v
 export type DesignOption = { key: string; label: string; image: string };
 
 type ProductMedia = {
+  /** Ảnh bìa lưới trang chủ / danh mục (ưu tiên hơn ảnh KV admin). */
+  listingCover?: string;
   /** Ảnh chung cho mọi lựa chọn. */
   gallery?: string[];
   /** Ảnh theo khổ, khóa "13x18". Khổ không có bộ riêng thì dùng `sizeFallback`. */
@@ -25,6 +27,8 @@ type ProductMedia = {
 };
 
 const sp = (name: string, count: number) => Array.from({ length: count }, (_, i) => `/media/sp/${name}-${i + 1}.webp`);
+const ai = (name: string, count: number) => Array.from({ length: count }, (_, i) => `/media/sp/${name}-ai-${i + 1}.webp`);
+const withAi = (name: string, aiCount: number, existingCount: number) => [...ai(name, aiCount), ...sp(name, existingCount)];
 
 const TKB_NAMES = [
   "Khủng long",
@@ -43,21 +47,22 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 export const PRODUCT_MEDIA: Record<string, ProductMedia> = {
   "trang-guong": {
+    listingCover: "/media/sp/cover-trang-guong.webp",
     bySize: {
-      "13x18": sp("tg-13x18", 4),
-      "15x21": sp("tg-15x21", 3),
-      "20x30": sp("tg-20x30", 4),
-      "40x60": sp("tg-40x60", 4),
-      "50x75": sp("tg-50x75", 5),
-      "60x90": sp("tg-60x90", 5),
+      "13x18": withAi("tg-13x18", 3, 4),
+      "15x21": withAi("tg-15x21", 2, 3),
+      "20x30": withAi("tg-20x30", 2, 4),
+      "30x45": ["/media/sp/tg-30x45-ai-1.webp", "/media/sp/tg-30x45-real-1.webp"],
+      "40x60": withAi("tg-40x60", 2, 4),
+      "50x75": withAi("tg-50x75", 2, 5),
+      "60x90": withAi("tg-60x90", 1, 5),
     },
-    // 30×45 trên TikTok đang dùng chung bộ ảnh 20×30.
-    sizeFallback: { "30x45": "20x30" },
     video: null,
     printsCustomerPhotos: true,
   },
   "nam-cham-xe": {
-    gallery: sp("lai-moi", 9),
+    listingCover: "/media/sp/lai-moi-ai-1.webp",
+    gallery: withAi("lai-moi", 2, 9),
     video: null,
     designs: {
       title: "Chọn mẫu",
@@ -69,7 +74,8 @@ export const PRODUCT_MEDIA: Record<string, ProductMedia> = {
     },
   },
   "thoi-khoa-bieu": {
-    gallery: sp("tkb", 7),
+    listingCover: "/media/sp/tkb-ai-1.webp",
+    gallery: withAi("tkb", 1, 7),
     video: null,
     designs: {
       title: "Chọn mẫu",
@@ -80,10 +86,13 @@ export const PRODUCT_MEDIA: Record<string, ProductMedia> = {
       })),
     },
   },
-  // Ảnh bìa hiện là ảnh TKB ép gỗ, không đúng sản phẩm mica. Chờ ảnh thật.
-  "thoi-khoa-bieu-boc-dan": { placeholderCover: true, video: null },
-  "nam-cham-tu-lanh": { gallery: sp("nct", 9), video: null, printsCustomerPhotos: true },
-  "anh-lua-6x9": { gallery: sp("lua", 5), video: null, printsCustomerPhotos: true },
+  "thoi-khoa-bieu-boc-dan": {
+    listingCover: "/media/sp/tkb-bd-ai-1.webp",
+    gallery: ["/media/sp/tkb-bd-ai-1.webp", "/media/sp/tkb-bd-real-1.webp"],
+    video: null,
+  },
+  "nam-cham-tu-lanh": { listingCover: "/media/sp/nct-ai-1.webp", gallery: withAi("nct", 2, 9), video: null, printsCustomerPhotos: true },
+  "anh-lua-6x9": { listingCover: "/media/sp/lua-ai-1.webp", gallery: withAi("lua", 2, 5), video: null, printsCustomerPhotos: true },
 };
 
 export function mediaFor(slug: string): ProductMedia {
