@@ -49,6 +49,7 @@ type Migratable = {
   settings: Settings | {
     showZalo?: boolean;
     zaloDefaultMigrated?: boolean;
+    zaloHidden20261113?: boolean;
     groupListed?: Record<string, boolean>;
     sepay?: SePayConfig;
     notifyPrefs?: NotifyPrefs;
@@ -105,6 +106,11 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (state.settings.zaloDefaultMigrated !== true) {
     state.settings.showZalo = false;
     state.settings.zaloDefaultMigrated = true;
+    changed = true;
+  }
+  if (state.settings.zaloHidden20261113 !== true) {
+    state.settings.showZalo = false;
+    state.settings.zaloHidden20261113 = true;
     changed = true;
   }
   const groups = state.groups ?? [];

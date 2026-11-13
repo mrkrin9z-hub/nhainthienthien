@@ -5,7 +5,7 @@ export const BRAND = {
   message: "Bảng giá công khai cho mọi nhà.",
   website: "nhainthienthien.com",
   region: "Xuân Lộc, Đồng Nai",
-  address: "67 Ngô Quyền, Xuân Lộc, Đồng Nai",
+  address: "Số 67 Đường Ngô Quyền, Khu Phố 4, Xã Xuân Lộc, Đồng Nai",
   shopeeUrl: "https://shopee.vn/nhainthienthien",
 } as const;
 

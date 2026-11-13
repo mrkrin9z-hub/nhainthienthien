@@ -113,7 +113,7 @@ function ContactPage() {
               .finally(() => setBusy(false));
           }}
         >
-          <h2 className="text-lg font-bold text-foreground">Gửi tin cho xưởng</h2>
+          <h2 className="text-lg font-bold text-foreground">Gửi tin cho tiệm</h2>
           <p className="text-sm text-muted-foreground">Để lại tin, tiệm gọi hoặc nhắn lại cho bạn.</p>
           <div>
             <Label htmlFor="ten">Tên</Label>
@@ -134,7 +134,7 @@ function ContactPage() {
             </div>
           </div>
           {error ? <p className="text-sm font-semibold text-destructive">{error}</p> : null}
-          {sent ? <p className="text-sm font-semibold text-primary">Đã gửi. Xưởng sẽ xem tin này.</p> : null}
+          {sent ? <p className="text-sm font-semibold text-primary">Đã gửi. Tiệm sẽ xem tin này.</p> : null}
           <Button type="submit" className="min-h-11" disabled={busy}>
             {busy ? "Đang gửi…" : "Gửi tin"}
           </Button>

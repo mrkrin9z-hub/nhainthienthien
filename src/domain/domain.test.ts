@@ -402,6 +402,7 @@ test("web ẩn số Zalo khi tắt hoặc sổ cũ chưa ghi", () => {
 
 test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của chủ", () => {
   assert.equal(DEFAULT_SETTINGS.zaloDefaultMigrated, true);
+  assert.equal(DEFAULT_SETTINGS.zaloHidden20261113, true);
   assert.equal(DEFAULT_SETTINGS.showZalo, false);
   const state = {
     settings: { showZalo: true, zaloPhone: "0778662227" },
@@ -422,12 +423,25 @@ test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của 
   state.settings.showZalo = true;
   assert.equal(applyStoreMigrations(state), false);
   assert.equal(state.settings.showZalo, true);
+  assert.equal(state.settings.zaloHidden20261113, true);
 
   const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
   for (const file of ["../routes/index.tsx", "../routes/huong-dan.tsx", "./seed.ts"]) {
     const source = read(file);
     assert.doesNotMatch(source, /miễn phí|Miễn phí|24–48|ít phút|Có liền|\btặng\b/i, file);
   }
+});
+
+test("ẩn số Zalo đang hiện trên web một lần ngày 13/11/2026, sau đó giữ ô của chủ", () => {
+  const live = {
+    settings: { showZalo: true, zaloPhone: "0778662227", zaloDefaultMigrated: true },
+  };
+  assert.equal(applyStoreMigrations(live), true);
+  assert.equal(live.settings.showZalo, false);
+  assert.equal(live.settings.zaloHidden20261113, true);
+  live.settings.showZalo = true;
+  assert.equal(applyStoreMigrations(live), false);
+  assert.equal(live.settings.showZalo, true);
 });
 
 test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và định mức giữ nguyên", async () => {

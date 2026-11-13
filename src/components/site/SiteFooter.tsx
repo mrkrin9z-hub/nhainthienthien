@@ -39,6 +39,9 @@ export function SiteFooter() {
           <Link to="/lien-he" className="block text-foreground/80 hover:text-primary">
             Liên hệ
           </Link>
+          <Link to="/chinh-sach" className="block text-foreground/80 hover:text-primary">
+            Chính sách
+          </Link>
           {showZalo ? (
             <a href={zalo} className="block font-semibold text-primary">
               Zalo {phone}

@@ -137,6 +137,8 @@ export type Settings = {
   showZalo?: boolean;
   /** Đã tắt Zalo một lần trên sổ seed cũ. Sau mốc này, ô trong Cài đặt được giữ nguyên. */
   zaloDefaultMigrated?: boolean;
+  /** Đã ẩn số Zalo cũ trên web một lần ngày 13/11/2026 (chủ đang đổi sim). Sau mốc này, ô trong Cài đặt được giữ nguyên. */
+  zaloHidden20261113?: boolean;
   publicHours: string;
   /** Đã nhập bảng giá 22/10 một lần. Không chạy lại. */
   catalogImport20261022?: boolean;

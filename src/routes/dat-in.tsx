@@ -398,7 +398,7 @@ function OrderPage() {
                   <div className="flex gap-2">
                     {(
                       [
-                        ["pickup", "Nhận tại xưởng"],
+                        ["pickup", "Nhận tại tiệm"],
                         ["delivery", "Giao hàng"],
                       ] as const
                     ).map(([value, label]) => (
@@ -417,6 +417,9 @@ function OrderPage() {
                     ))}
                   </div>
                 </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Nhận tại tiệm: 0đ phí ship. Giao ảnh nhỏ (13×18 đến 40×60, thời khóa biểu, ảnh lụa, nam châm): 25.000đ, đơn từ 300.000đ thì 0đ phí ship. Ảnh 50×75 và 60×90: 30.000đ, đơn từ 450.000đ thì 0đ phí ship. Nhận COD. Đơn từ 300.000đ hoặc có ảnh từ 40×60 trở lên cần cọc 50%.
+                </p>
                 {fulfillment === "delivery" ? (
                   <div className="space-y-1.5">
                     <Label htmlFor="addr">Địa chỉ nhận hàng</Label>

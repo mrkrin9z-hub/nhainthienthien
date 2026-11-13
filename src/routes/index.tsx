@@ -62,7 +62,7 @@ const STEPS = [
 
 const BENEFITS = [
   { icon: ShieldCheck, title: "Bảng giá công khai", desc: "Giá trên web lấy từ bảng tại tiệm." },
-  { icon: Clock, title: "Xưởng nhận in", desc: "Xưởng xem ảnh rồi báo lại trên đơn." },
+  { icon: Clock, title: "Tiệm nhận in", desc: "Tiệm xem ảnh rồi báo lại trên đơn." },
   { icon: Truck, title: "Nhận tại tiệm", desc: "Hoặc giao hàng theo địa chỉ trên đơn." },
   { icon: Heart, title: "Kiểm ảnh thủ công", desc: "Chỉnh sáng, canh nét trước khi in." },
 ];
@@ -70,22 +70,30 @@ const BENEFITS = [
 const REASONS = [
   "Xem trước giá từng kích thước, không cần hỏi tới lui.",
   "Kỹ thuật viên kiểm tra độ phân giải và báo lại nếu ảnh chưa đủ nét.",
-  "In lại nếu lỗi do xưởng.",
+  "In lại không tính tiền nếu lỗi do xưởng, khách báo trong 3 ngày và có video mở hàng. Không đổi trả vì đổi ý.",
   "Ảnh gốc của bạn được lưu riêng tư, lưu 6 tháng rồi xoá.",
 ];
 
 const FAQS = [
   {
     q: "Ảnh chụp bằng điện thoại in được không?",
-    a: "Được. Ảnh điện thoại đời mới in tốt tới khổ 40×60 cm. Xưởng sẽ kiểm tra và báo trước nếu ảnh chưa đủ nét cho khổ bạn chọn.",
+    a: "Được. Ảnh điện thoại đời mới in tốt tới khổ 40×60 cm. Tiệm sẽ kiểm tra và báo trước nếu ảnh chưa đủ nét cho khổ bạn chọn.",
   },
   {
     q: "Thanh toán như thế nào?",
-    a: "Bạn đặt đơn trước, xưởng xác nhận rồi mới thanh toán. Nhận tại tiệm hoặc chuyển khoản trước khi giao.",
+    a: "Nhận COD khi giao hàng. Tại tiệm thanh toán tiền mặt hoặc chuyển khoản. Đơn từ 300.000đ hoặc có ảnh từ 40×60 trở lên cần cọc 50% trước khi làm hàng.",
+  },
+  {
+    q: "Phí ship bao nhiêu?",
+    a: "Ảnh 13×18 đến 40×60, thời khóa biểu, ảnh lụa, nam châm: 25.000đ, đơn từ 300.000đ thì 0đ phí ship. Ảnh 50×75 và 60×90: 30.000đ, đơn từ 450.000đ thì 0đ phí ship. Nhận tại tiệm: 0đ.",
+  },
+  {
+    q: "In lại hoặc đổi trả thế nào?",
+    a: "Lỗi do xưởng (in sai, trầy, bể khi giao, có video mở hàng): in lại không tính tiền nếu khách báo trong 3 ngày sau khi nhận. Hàng in theo yêu cầu không đổi trả vì đổi ý.",
   },
   {
     q: "Khi nào thì biết tiến trình đơn?",
-    a: "Sau khi nhận đơn, xưởng cập nhật từng bước trên trang tra cứu. Tiệm hỗ trợ chỉnh sửa ảnh cơ bản.",
+    a: "Sau khi nhận đơn, tiệm cập nhật từng bước trên trang tra cứu. Tiệm hỗ trợ chỉnh sửa ảnh cơ bản.",
   },
 ];
 
@@ -294,7 +302,7 @@ function HomePage() {
               Sẵn sàng in kỷ niệm của bạn?
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground md:text-base">
-              Gửi ảnh khi sẵn sàng. Xưởng xem ảnh và báo lại.
+              Gửi ảnh khi sẵn sàng. Tiệm xem ảnh và báo lại.
             </p>
             <div className="mx-auto mt-6 flex max-w-md flex-col gap-3 sm:flex-row sm:justify-center">
               <Button
