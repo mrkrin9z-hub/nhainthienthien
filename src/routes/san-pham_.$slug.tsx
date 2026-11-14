@@ -21,10 +21,14 @@ export const Route = createFileRoute("/san-pham_/$slug")({
   validateSearch: (search: Record<string, unknown>): { v?: string } =>
     typeof search["v"] === "string" ? { v: search["v"] } : {},
   loader: async ({ context, params }) => {
-    const products = await context.queryClient.ensureQueryData(catalogQueryOptions);
+    const [products, config] = await Promise.all([
+      context.queryClient.ensureQueryData(catalogQueryOptions),
+      context.queryClient.ensureQueryData(publicConfigQueryOptions),
+    ]);
     const product = products.find((p) => p.slug === params.slug);
     if (!product) throw notFound();
-    return { name: product.name, description: product.description, slug: product.slug, prices: product.variants.map((v) => v.price).filter((p): p is number => typeof p === "number") };
+    const phoneRaw = config.showZalo && config.phoneRaw ? config.phoneRaw : "";
+    return { name: product.name, description: product.description, slug: product.slug, prices: product.variants.map((v) => v.price).filter((p): p is number => typeof p === "number"), phoneRaw };
   },
   head: ({ loaderData }) => {
     if (!loaderData) return {};
@@ -38,6 +42,16 @@ export const Route = createFileRoute("/san-pham_/$slug")({
       description: loaderData.description,
       brand: { "@type": "Brand", name: "Nhà In Thiên Thiên" },
       url,
+      ...(loaderData.phoneRaw
+        ? {
+            seller: {
+              "@type": "Organization",
+              name: "Nhà In Thiên Thiên",
+              telephone: loaderData.phoneRaw.startsWith("0") ? `+84${loaderData.phoneRaw.slice(1)}` : `+${loaderData.phoneRaw}`,
+              url: "https://nhainthienthien.com",
+            },
+          }
+        : {}),
       ...(low !== null
         ? {
             offers: {
@@ -80,6 +94,11 @@ function ProductPage() {
   const { v: presetVariant } = Route.useSearch();
   const { data: products } = useSuspenseQuery(catalogQueryOptions);
   const config = useQuery(publicConfigQueryOptions);
+  const showZalo = config.data?.showZalo === true && Boolean(config.data.zalo);
+  const phone = showZalo ? config.data?.phone ?? "" : "";
+  const zalo = showZalo ? config.data?.zalo ?? "" : "";
+  const chatUrl = showZalo ? zalo : BRAND.messengerUrl;
+  const chatLabel = showZalo ? `Nhắn Zalo${phone ? ` ${phone}` : ""}` : "Chat ngay";
   const product = products.find((p) => p.slug === slug) as CatalogProduct;
   const navigate = useNavigate();
   const cart = useCart();
@@ -271,8 +290,8 @@ function ProductPage() {
               ) : null}
 
               <div className="mt-5 hidden gap-3 md:flex">
-                <a href={BRAND.messengerUrl} target="_blank" rel="noopener" className="btn-ghost flex min-h-12 items-center gap-1.5 px-5 text-sm font-semibold">
-                  <MessageCircle className="size-5 text-brand-blue" aria-hidden /> Chat ngay
+                <a href={chatUrl} target="_blank" rel="noopener noreferrer" className="btn-ghost flex min-h-12 items-center gap-1.5 px-5 text-sm font-semibold">
+                  <MessageCircle className="size-5 text-brand-blue" aria-hidden /> {chatLabel}
                 </a>
                 {buyButtons}
               </div>
@@ -281,7 +300,7 @@ function ProductPage() {
         </div>
 
         <div className="mx-2.5 mt-3 md:mx-0">
-          <ShopInfoBlock hours={config.data?.hours} />
+          <ShopInfoBlock hours={config.data?.hours} phone={phone} zalo={zalo} />
         </div>
 
         <div className="card mx-2.5 mt-3 px-3.5 py-3 md:mx-0 md:px-5">
@@ -324,8 +343,8 @@ function ProductPage() {
 
       {/* Thanh mua cố định trên điện thoại */}
       <div className="glass-bar fixed inset-x-0 bottom-0 z-50 flex gap-2 px-2.5 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 md:hidden">
-        <a href={BRAND.messengerUrl} target="_blank" rel="noopener" className="flex min-h-12 w-14 shrink-0 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-brand-blue">
-          <MessageCircle className="size-5" aria-hidden /> Chat ngay
+        <a href={chatUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-12 w-14 shrink-0 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-brand-blue">
+          <MessageCircle className="size-5" aria-hidden /> {showZalo ? "Zalo" : "Chat"}
         </a>
         {buyButtons}
       </div>

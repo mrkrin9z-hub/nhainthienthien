@@ -1,4 +1,7 @@
+import { useQuery } from "@tanstack/react-query";
+
 import { BRAND } from "@/lib/brand";
+import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 
 /** Biểu tượng nền tảng, vẽ lại đơn giản (không dùng file logo của sàn). */
 export function FacebookIcon({ className = "size-6" }: { className?: string }) {
@@ -45,6 +48,22 @@ export function ShopeeIcon({ className = "size-6" }: { className?: string }) {
   );
 }
 
+export function ZaloIcon({ className = "size-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <rect width="24" height="24" rx="6" fill="#0068FF" />
+      <path
+        fill="#fff"
+        d="M7.2 8.2c0-1.4 1.5-2.6 4.8-2.6s4.8 1.2 4.8 2.6v5.2c0 1.3-1.3 2.4-3.9 2.55l-2.5 1.85c-.28.2-.7 0-.7-.35v-1.5c-1.7-.4-2.5-1.4-2.5-2.55z"
+      />
+      <path
+        fill="#0068FF"
+        d="M10.15 9.15h1.12c.9 0 1.42.38 1.42 1.08 0 .5-.28.86-.74 1.02l.86 1.55h-1.06l-.74-1.4H11.2v1.4h-.96zm1.05 1.72c.32 0 .48-.16.48-.4s-.16-.4-.48-.4h-.17v.8z"
+      />
+    </svg>
+  );
+}
+
 export const SHOP_LINKS = [
   { key: "facebook", label: "Fanpage", sub: "Nhà In Thiên Thiên", href: BRAND.facebookPageUrl, Icon: FacebookIcon },
   { key: "tiktok", label: "TikTok Shop", sub: "@xuonginthienthien", href: BRAND.tiktokShopUrl, Icon: TikTokIcon },
@@ -53,13 +72,20 @@ export const SHOP_LINKS = [
 
 /** Khối "Liên hệ & mua tại": 3 ô to, dễ bấm trên điện thoại. */
 export function ShopLinksBlock({ title = "Liên hệ & mua tại", className = "" }: { title?: string; className?: string }) {
+  const config = useQuery(publicConfigQueryOptions);
+  const showZalo = config.data?.showZalo === true && Boolean(config.data.zalo);
+  const phone = showZalo ? config.data?.phone ?? "" : "";
+  const zalo = showZalo ? config.data?.zalo ?? "" : "";
+  const links = showZalo
+    ? [...SHOP_LINKS, { key: "zalo", label: "Zalo", sub: phone, href: zalo, Icon: ZaloIcon }]
+    : SHOP_LINKS;
   return (
     <div className={className}>
       {title ? (
         <h2 className="font-sans text-xs font-bold tracking-[0.16em] text-foreground uppercase">{title}</h2>
       ) : null}
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        {SHOP_LINKS.map(({ key, label, sub, href, Icon }) => (
+      <div className={`mt-3 grid gap-2 ${showZalo ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
+        {links.map(({ key, label, sub, href, Icon }) => (
           <a
             key={key}
             href={href}

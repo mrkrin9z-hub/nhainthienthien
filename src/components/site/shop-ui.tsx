@@ -107,7 +107,7 @@ export function PolicyChips({ className = "" }: { className?: string }) {
   );
 }
 
-export function ShopInfoBlock({ hours }: { hours?: string | undefined }) {
+export function ShopInfoBlock({ hours, phone, zalo }: { hours?: string | undefined; phone?: string | undefined; zalo?: string | undefined }) {
   return (
     <section className="card flex items-center gap-3 p-3 md:p-4">
       <img src="/brand/logo-vuong.png" alt="" className="size-14 shrink-0 rounded-full bg-white object-contain p-1 shadow-[0_0_0_1px_rgb(18_48_71/0.08),0_6px_14px_-8px_rgb(18_48_71/0.4)]" />
@@ -115,6 +115,11 @@ export function ShopInfoBlock({ hours }: { hours?: string | undefined }) {
         <p className="font-semibold text-foreground">Nhà In Thiên Thiên</p>
         <p className="mt-0.5 text-xs text-muted-foreground">{BRAND.address}</p>
         {hours ? <p className="text-xs text-muted-foreground">Mở cửa {hours}</p> : null}
+        {phone && zalo ? (
+          <a href={zalo} target="_blank" rel="noopener noreferrer" className="mt-0.5 block text-xs font-semibold text-sale">
+            Zalo {phone}
+          </a>
+        ) : null}
       </div>
       <Link to="/" className="btn-soft shrink-0 px-4 py-2 text-xs">
         Xem shop

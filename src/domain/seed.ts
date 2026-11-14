@@ -72,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showZalo: false,
   zaloDefaultMigrated: true,
   zaloHidden20261113: true,
+  zaloShown20261114: true,
   publicHours: "08:00–18:00",
   catalogImport20261022: true,
   tiktokPrice20261023: true,

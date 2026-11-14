@@ -15,3 +15,12 @@ export function publicContact(settings: { showZalo?: boolean; zaloPhone?: string
     zalo: show ? `https://zalo.me/${digits}` : "",
   };
 }
+
+/** Số điện thoại quốc tế cho SEO / tel:, ví dụ 0778662227 → +84778662227. */
+export function telE164(digits: string): string {
+  const raw = digits.replace(/\D/g, "");
+  if (!raw) return "";
+  if (raw.startsWith("84")) return `+${raw}`;
+  if (raw.startsWith("0")) return `+84${raw.slice(1)}`;
+  return `+84${raw}`;
+}

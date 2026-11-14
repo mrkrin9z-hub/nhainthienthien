@@ -296,7 +296,7 @@ function SettingsBody() {
         <StorePanel
           data={data}
           onSave={async (patch) => {
-            await storeSettings({ data: { ...patch, showZalo: false } });
+            await storeSettings({ data: patch });
             toast.success("Đã lưu thông tin cửa hàng");
             await queryClient.invalidateQueries({ queryKey: ["settings"] });
           }}
@@ -538,6 +538,8 @@ function StorePanel({
     workStart: string;
     workEnd: string;
     weeklyOff: number[];
+    zaloPhone: string;
+    showZalo: boolean;
     showAnhThe: boolean;
     showAlbum: boolean;
     groupListed: Record<string, boolean>;
@@ -547,6 +549,8 @@ function StorePanel({
 }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [zaloPhone, setZaloPhone] = useState(data.settings.zaloPhone ?? "");
+  const [showZalo, setShowZalo] = useState(data.settings.showZalo === true);
   const [hours, setHours] = useState(data.settings.publicHours);
   const [workStart, setWorkStart] = useState(data.settings.workStart);
   const [workEnd, setWorkEnd] = useState(data.settings.workEnd);
@@ -561,6 +565,8 @@ function StorePanel({
   const bankName = TRANSFER_BANKS.find((bank) => bank.id === data.settings.bank?.id)?.label ?? "Chưa gắn";
 
   function begin() {
+    setZaloPhone(data.settings.zaloPhone ?? "");
+    setShowZalo(data.settings.showZalo === true);
     setHours(data.settings.publicHours);
     setWorkStart(data.settings.workStart);
     setWorkEnd(data.settings.workEnd);
@@ -583,6 +589,8 @@ function StorePanel({
         workStart,
         workEnd,
         weeklyOff: weeklyOff.split(",").map((part) => part.trim()).filter(Boolean).map(Number),
+        zaloPhone,
+        showZalo,
         showAnhThe: anhThe,
         showAlbum: album,
         groupListed: listed,
@@ -604,6 +612,8 @@ function StorePanel({
         <Button type="button" className="min-h-11" onClick={begin}>Sửa</Button>
       </div>
       <dl className="divide-y rounded-md border text-sm">
+        <Info label="Số Zalo" value={data.settings.zaloPhone ? data.settings.zaloPhone : "Chưa có"} />
+        <Info label="Hiện số Zalo trên web" value={data.settings.showZalo === true ? "Hiện" : "Ẩn"} />
         <Info label="Giờ mở cửa" value={data.settings.publicHours || "Chưa có"} />
         <Info label="Giờ ca" value={`${data.settings.workStart} – ${data.settings.workEnd}`} />
         <Info label="Ngày nghỉ" value={data.settings.weeklyOff.length ? data.settings.weeklyOff.join(", ") : "Làm cả tuần"} />
@@ -623,6 +633,13 @@ function StorePanel({
             <DialogTitle>Sửa thông tin cửa hàng</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <label className="block text-sm font-semibold">
+              Số Zalo
+              <Input className="mt-1 min-h-11" inputMode="tel" autoComplete="tel" value={zaloPhone} onChange={(event) => setZaloPhone(event.target.value)} />
+            </label>
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={showZalo} onChange={(event) => setShowZalo(event.target.checked)} /> Hiện số Zalo trên web
+            </label>
             <label className="block text-sm font-semibold">
               Giờ mở cửa (hiện trên web)
               <Input className="mt-1 min-h-11" value={hours} onChange={(event) => setHours(event.target.value)} />

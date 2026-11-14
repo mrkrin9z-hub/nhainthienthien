@@ -1,10 +1,12 @@
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, Home, LayoutGrid, ReceiptText, Search, ShoppingCart } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { LOGO_SQUARE } from "@/lib/assets";
 import { BRAND } from "@/lib/brand";
 import { useCart } from "@/lib/cart";
+import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 
 const TOP_LINKS = [
   { to: "/chinh-sach", label: "Chính sách" },
@@ -71,12 +73,21 @@ function SearchBox({ defaultValue = "" }: { defaultValue?: string | undefined })
  */
 export function SiteHeader({ back, title, hideTabs, query }: { back?: boolean; title?: string; hideTabs?: boolean; query?: string | undefined }) {
   const router = useRouter();
+  const config = useQuery(publicConfigQueryOptions);
+  const showZalo = config.data?.showZalo === true && Boolean(config.data.zalo);
+  const phone = showZalo ? config.data?.phone ?? "" : "";
+  const zalo = showZalo ? config.data?.zalo ?? "" : "";
   return (
     <>
       <header className="glass-header sticky top-0 z-40 text-white">
         <div className="mx-auto hidden h-8 max-w-6xl items-center justify-between px-6 text-xs md:flex">
           <span className="opacity-85">{BRAND.address}</span>
           <nav className="flex items-center gap-5">
+            {showZalo ? (
+              <a href={zalo} target="_blank" rel="noopener noreferrer" className="opacity-90 hover:opacity-100">
+                Zalo {phone}
+              </a>
+            ) : null}
             <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="opacity-90 hover:opacity-100">
               Shopee: nhainthienthien
             </a>

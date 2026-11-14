@@ -18,6 +18,9 @@ const FONT_STYLESHEET =
 import appCss from "../styles.css?url";
 import { installMotion } from "../lib/motion";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { publicConfigQueryOptions, type PublicConfig } from "@/lib/catalog.functions";
+import { BRAND } from "@/lib/brand";
+import { telE164 } from "@/domain/public-contact";
 
 function NotFoundComponent() {
   return (
@@ -80,7 +83,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: ({ matches }) => {
+  loader: ({ context }) => context.queryClient.ensureQueryData(publicConfigQueryOptions),
+  head: ({ matches, loaderData }) => {
     const path = matches[matches.length - 1]?.pathname ?? "/";
     const admin = path.startsWith("/admin");
     const links: Array<Record<string, string>> = [
@@ -97,6 +101,29 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { rel: "apple-touch-icon", href: "/brand/apple-touch-icon.png?v=2" },
       );
     }
+    const contact = loaderData as PublicConfig | undefined;
+    const telephone = contact?.showZalo && contact.phoneRaw ? telE164(contact.phoneRaw) : "";
+    const scripts = admin
+      ? []
+      : [
+          {
+            type: "application/ld+json",
+            children: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "LocalBusiness",
+              name: BRAND.name,
+              url: `https://${BRAND.website}`,
+              address: {
+                "@type": "PostalAddress",
+                streetAddress: "Số 67 Đường Ngô Quyền, Khu Phố 4",
+                addressLocality: "Xuân Lộc",
+                addressRegion: "Đồng Nai",
+                addressCountry: "VN",
+              },
+              ...(telephone ? { telephone } : {}),
+            }),
+          },
+        ];
     return {
     meta: [
       { charSet: "utf-8" },
@@ -121,6 +148,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links,
+    scripts,
     };
   },
   shellComponent: RootShell,

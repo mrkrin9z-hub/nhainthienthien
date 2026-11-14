@@ -403,6 +403,7 @@ test("web ẩn số Zalo khi tắt hoặc sổ cũ chưa ghi", () => {
 test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của chủ", () => {
   assert.equal(DEFAULT_SETTINGS.zaloDefaultMigrated, true);
   assert.equal(DEFAULT_SETTINGS.zaloHidden20261113, true);
+  assert.equal(DEFAULT_SETTINGS.zaloShown20261114, true);
   assert.equal(DEFAULT_SETTINGS.showZalo, false);
   const state = {
     settings: { showZalo: true, zaloPhone: "0778662227" },
@@ -415,8 +416,11 @@ test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của 
     ],
   };
   assert.equal(applyStoreMigrations(state), true);
-  assert.equal(state.settings.showZalo, false);
+  assert.equal(state.settings.showZalo, true);
+  assert.equal(state.settings.zaloPhone, "0778662227");
   assert.equal(state.settings.zaloDefaultMigrated, true);
+  assert.equal(state.settings.zaloHidden20261113, true);
+  assert.equal(state.settings.zaloShown20261114, true);
   assert.equal(state.groups[0]?.description, "Ảnh thờ. Hỗ trợ chỉnh sửa ảnh cơ bản.");
   assert.equal(state.groups[0]?.turnaround, "Theo đơn");
   assert.ok(Array.isArray((state as { roleModules?: unknown[] }).roleModules));
@@ -437,11 +441,27 @@ test("ẩn số Zalo đang hiện trên web một lần ngày 13/11/2026, sau đ
     settings: { showZalo: true, zaloPhone: "0778662227", zaloDefaultMigrated: true },
   };
   assert.equal(applyStoreMigrations(live), true);
-  assert.equal(live.settings.showZalo, false);
+  // Bước 13/11 ẩn số, rồi bước 14/11 bật lại số đã chốt.
   assert.equal(live.settings.zaloHidden20261113, true);
-  live.settings.showZalo = true;
-  assert.equal(applyStoreMigrations(live), false);
+  assert.equal(live.settings.zaloShown20261114, true);
   assert.equal(live.settings.showZalo, true);
+  assert.equal(live.settings.zaloPhone, "0778662227");
+  live.settings.showZalo = false;
+  assert.equal(applyStoreMigrations(live), false);
+  assert.equal(live.settings.showZalo, false);
+});
+
+test("bật lại số Zalo trên web một lần ngày 14/11/2026, sau đó giữ ô của chủ", () => {
+  const live = {
+    settings: { showZalo: false, zaloPhone: "", zaloDefaultMigrated: true, zaloHidden20261113: true },
+  };
+  assert.equal(applyStoreMigrations(live), true);
+  assert.equal(live.settings.showZalo, true);
+  assert.equal(live.settings.zaloPhone, "0778662227");
+  assert.equal(live.settings.zaloShown20261114, true);
+  live.settings.showZalo = false;
+  assert.equal(applyStoreMigrations(live), false);
+  assert.equal(live.settings.showZalo, false);
 });
 
 test("ảnh ép gỗ và ảnh bo viền gộp một sản phẩm, mã EG và định mức giữ nguyên", async () => {

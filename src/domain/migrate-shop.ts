@@ -48,8 +48,10 @@ type ShopGroup = {
 type Migratable = {
   settings: Settings | {
     showZalo?: boolean;
+    zaloPhone?: string;
     zaloDefaultMigrated?: boolean;
     zaloHidden20261113?: boolean;
+    zaloShown20261114?: boolean;
     groupListed?: Record<string, boolean>;
     sepay?: SePayConfig;
     notifyPrefs?: NotifyPrefs;
@@ -111,6 +113,13 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (state.settings.zaloHidden20261113 !== true) {
     state.settings.showZalo = false;
     state.settings.zaloHidden20261113 = true;
+    changed = true;
+  }
+  // Bật lại số Zalo trên web sau khi chủ chốt sim mới 14/11/2026. Chạy sau bước ẩn 13/11.
+  if (state.settings.zaloShown20261114 !== true) {
+    state.settings.zaloPhone = "0778662227";
+    state.settings.showZalo = true;
+    state.settings.zaloShown20261114 = true;
     changed = true;
   }
   const groups = state.groups ?? [];

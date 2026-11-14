@@ -1,11 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { BRAND } from "@/lib/brand";
+import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 import { DEPOSIT, NO_RETURN, PAYMENT, PUBLIC_HOURS, REPRINT, SHIP_LARGE, SHIP_PICKUP, SHIP_SMALL } from "@/lib/public-policy";
 
 export const Route = createFileRoute("/chinh-sach")({
+  loader: ({ context }) => context.queryClient.ensureQueryData(publicConfigQueryOptions),
   head: () => ({
     meta: [
       { title: "Chính sách bán hàng — Nhà In Thiên Thiên" },
@@ -38,6 +41,10 @@ const SECTIONS = [
 ];
 
 function PolicyPage() {
+  const config = useQuery(publicConfigQueryOptions);
+  const showZalo = config.data?.showZalo === true && Boolean(config.data.zalo);
+  const phone = showZalo ? config.data?.phone ?? "" : "";
+  const zalo = showZalo ? config.data?.zalo ?? "" : "";
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
@@ -47,6 +54,13 @@ function PolicyPage() {
           Áp dụng khi đặt trên web, Facebook hoặc Zalo của {BRAND.shortName}. Đơn TikTok và Shopee theo quy định của sàn.
         </p>
         <p className="mt-1 text-sm text-muted-foreground">{BRAND.address}</p>
+        {showZalo ? (
+          <p className="mt-1 text-sm">
+            <a href={zalo} target="_blank" rel="noopener noreferrer" className="font-semibold text-sale">
+              Zalo {phone}
+            </a>
+          </p>
+        ) : null}
 
         <div className="mt-8 space-y-5">
           {SECTIONS.map((section) => (

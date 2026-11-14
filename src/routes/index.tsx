@@ -10,7 +10,11 @@ import { HERO_MAIN_DESKTOP, HERO_MAIN_MOBILE, HomeHero } from "@/components/site
 import { BRAND } from "@/lib/brand";
 
 export const Route = createFileRoute("/")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(catalogQueryOptions),
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(catalogQueryOptions),
+      context.queryClient.ensureQueryData(publicConfigQueryOptions),
+    ]),
   head: () => ({
     meta: [
       { title: "Nhà In Thiên Thiên — Gửi ảnh online" },
@@ -70,6 +74,7 @@ function HomePage() {
   const config = useQuery(publicConfigQueryOptions);
   const showZalo = config.data?.showZalo === true && Boolean(config.data.zalo);
   const zalo = showZalo ? (config.data?.zalo ?? "") : "";
+  const phone = showZalo ? (config.data?.phone ?? "") : "";
   const categories = [...new Set(products.map((product) => product.category).filter(Boolean))];
 
   return (
@@ -156,7 +161,7 @@ function HomePage() {
         </section>
 
         <div className="mt-3">
-          <ShopInfoBlock hours={config.data?.hours} />
+          <ShopInfoBlock hours={config.data?.hours} phone={phone} zalo={zalo} />
         </div>
 
         {/* FAQ */}
@@ -175,7 +180,7 @@ function HomePage() {
           </div>
           {showZalo ? (
             <a href={zalo} className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-sale">
-              <MessageCircle className="size-4" /> Nhắn Zalo
+              <MessageCircle className="size-4" /> Nhắn Zalo {phone}
             </a>
           ) : (
             <a href={BRAND.messengerUrl} target="_blank" rel="noopener" className="btn-soft mt-3 inline-flex min-h-10 items-center gap-2 px-4 text-sm">

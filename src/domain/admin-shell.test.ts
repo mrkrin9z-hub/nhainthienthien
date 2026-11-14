@@ -22,8 +22,9 @@ test("cài đặt là hub nút truy cập; giá vốn trong chi phí; có kênh 
   assert.match(hub, /title: "Cài đặt chi phí"/);
   assert.match(hub, /title: "Kênh cửa hàng"/);
   assert.doesNotMatch(hub, /title: "Kết nối SePay"/);
-  assert.doesNotMatch(src, /id="zalo"/);
-  assert.match(src, /showZalo: false/);
+  assert.match(src, /Hiện số Zalo trên web/);
+  assert.match(src, /zaloPhone/);
+  assert.doesNotMatch(src, /showZalo: false/);
   assert.match(src, /COST_KEYS/);
   assert.match(src, /Mực không tính vào giá vốn/);
   assert.doesNotMatch(src, /Mực \(% giá bán\)/);
