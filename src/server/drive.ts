@@ -233,3 +233,122 @@ export async function downloadFromDrive(fileId: string): Promise<Uint8Array> {
   if (!res.ok) throw new Error(`Không tải được ảnh từ Drive (${res.status}).`);
   return new Uint8Array(await res.arrayBuffer());
 }
+
+export type DriveListedFile = {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  modifiedTime: string | null;
+  thumbnailLink: string | null;
+};
+
+/** Liệt kê con trực tiếp trong chuỗi thư mục (tạo thư mục nếu chưa có). */
+export async function listDriveFolder(folders: readonly string[]): Promise<{
+  folderId: string;
+  files: DriveListedFile[];
+}> {
+  const { token, folderId } = await folderFor(folders);
+  const q = `'${folderId}' in parents and trashed = false`;
+  const fields = "files(id,name,mimeType,size,modifiedTime,thumbnailLink),nextPageToken";
+  const files: DriveListedFile[] = [];
+  let pageToken = "";
+  for (let page = 0; page < 20; page += 1) {
+    const url = new URL(FILES_URL);
+    url.searchParams.set("q", q);
+    url.searchParams.set("spaces", "drive");
+    url.searchParams.set("pageSize", "100");
+    url.searchParams.set("fields", fields);
+    url.searchParams.set("orderBy", "folder,name");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`Không đọc thư mục Drive (${res.status}).`);
+    const json = (await res.json()) as {
+      files?: { id?: string; name?: string; mimeType?: string; size?: string; modifiedTime?: string; thumbnailLink?: string }[];
+      nextPageToken?: string;
+    };
+    for (const file of json.files ?? []) {
+      if (!file.id || !file.name) continue;
+      files.push({
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType || "application/octet-stream",
+        size: Number(file.size || 0),
+        modifiedTime: file.modifiedTime ?? null,
+        thumbnailLink: file.thumbnailLink ?? null,
+      });
+    }
+    pageToken = json.nextPageToken || "";
+    if (!pageToken) break;
+  }
+  return { folderId, files };
+}
+
+export async function createDriveFolder(folders: readonly string[], name: string): Promise<{ id: string; name: string }> {
+  const clean = name.replace(/[\\/]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  if (!clean) throw new Error("Nhập tên thư mục.");
+  return oneFolderAtATime(async () => {
+    const token = await accessToken();
+    let parent = "root";
+    for (const part of folders) parent = await ensureFolder(token, part, parent);
+    const existing = await findFolder(token, clean, parent);
+    if (existing) return { id: existing, name: clean };
+    const id = await createFolder(token, clean, parent);
+    return { id, name: clean };
+  });
+}
+
+/** Chuyển file/thư mục vào thư mục đích (cùng cây MEDIA). */
+export async function moveDriveItem(input: {
+  fileId: string;
+  fromFolders: readonly string[];
+  toFolders: readonly string[];
+}): Promise<void> {
+  if (!/^[A-Za-z0-9_-]{8,200}$/.test(input.fileId)) throw new Error("Mã file Drive không đúng.");
+  const from = await folderFor(input.fromFolders);
+  const to = await folderFor(input.toFolders);
+  if (from.folderId === to.folderId) return;
+  const token = from.token;
+  const metaRes = await fetch(`${FILES_URL}/${encodeURIComponent(input.fileId)}?fields=id,parents`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!metaRes.ok) throw new Error(`Không thấy file trên Drive (${metaRes.status}).`);
+  const meta = (await metaRes.json()) as { parents?: string[] };
+  const parents = meta.parents ?? [];
+  if (!parents.includes(from.folderId)) throw new Error("File không nằm trong thư mục hiện tại.");
+  const url = `${FILES_URL}/${encodeURIComponent(input.fileId)}?addParents=${encodeURIComponent(to.folderId)}&removeParents=${encodeURIComponent(from.folderId)}&fields=id`;
+  const res = await fetch(url, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`Không chuyển được file (${res.status}).`);
+}
+
+export async function streamDriveFile(fileId: string): Promise<{ body: ReadableStream<Uint8Array>; mime: string; name: string; size: number }> {
+  if (!/^[A-Za-z0-9_-]{8,200}$/.test(fileId)) throw new Error("Mã file Drive không đúng.");
+  const token = await accessToken();
+  const metaRes = await fetch(`${FILES_URL}/${encodeURIComponent(fileId)}?fields=id,name,mimeType,size`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!metaRes.ok) throw new Error(`Không thấy file trên Drive (${metaRes.status}).`);
+  const meta = (await metaRes.json()) as { name?: string; mimeType?: string; size?: string };
+  if ((meta.mimeType || "").includes("folder")) throw new Error("Không tải thư mục.");
+  const res = await fetch(`${FILES_URL}/${encodeURIComponent(fileId)}?alt=media`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok || !res.body) throw new Error(`Không tải được file từ Drive (${res.status}).`);
+  return {
+    body: res.body,
+    mime: meta.mimeType || "application/octet-stream",
+    name: meta.name || "file",
+    size: Number(meta.size || 0),
+  };
+}
+
+/** Xác nhận file nằm đúng thư mục đích (không bắt buộc ảnh). */
+export async function acceptDriveMediaFile(driveFileId: string, folders: readonly string[]): Promise<{ size: number; mime: string }> {
+  if (!/^[A-Za-z0-9_-]{8,200}$/.test(driveFileId)) throw new Error("Mã file Drive không đúng.");
+  const seen = await inspectDriveUpload(driveFileId, folders);
+  if (!seen.inFolder || seen.size < 1) {
+    await deleteFromDrive(driveFileId).catch(() => undefined);
+    throw new Error("File không nằm đúng thư mục MEDIA.");
+  }
+  return { size: seen.size, mime: seen.mime };
+}

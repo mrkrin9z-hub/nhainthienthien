@@ -1459,3 +1459,71 @@ export const saveChecklistStatus = createServerFn({ method: "POST" })
     await setChecklistStatus(await actor(), data);
     return { ok: true };
   });
+
+const mediaPathSchema = z.array(z.string().trim().min(1).max(80)).max(8);
+
+export const getMediaLibraryStatus = createServerFn({ method: "GET" }).handler(async () => {
+  const { mediaLibraryStatus } = await import("@/server/media-library");
+  return mediaLibraryStatus(await actor());
+});
+
+export const listMediaLibrary = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ path: mediaPathSchema.optional().default([]) }).parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const { listMediaLibrary: list } = await import("@/server/media-library");
+    return list(await actor(), data.path);
+  });
+
+export const createMediaFolder = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ path: mediaPathSchema.optional().default([]), name: z.string().trim().min(1).max(80) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { createMediaFolder: create } = await import("@/server/media-library");
+    return create(await actor(), data.path, data.name);
+  });
+
+export const moveMediaItem = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        fileId: z.string().regex(/^[A-Za-z0-9_-]{8,200}$/),
+        fromPath: mediaPathSchema.optional().default([]),
+        toPath: mediaPathSchema.optional().default([]),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { moveMediaItem: move } = await import("@/server/media-library");
+    return move(await actor(), data);
+  });
+
+export const prepareStaffMediaUpload = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        fileName: z.string().min(1).max(200),
+        mimeType: z.string().min(3).max(120),
+        sizeBytes: z.number().int().min(1),
+        path: mediaPathSchema.optional().default([]),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { prepareMediaDriveUpload } = await import("@/server/media-library");
+    return prepareMediaDriveUpload(await actor(), data);
+  });
+
+export const finishStaffMediaUpload = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        driveFileId: z.string().regex(/^[A-Za-z0-9_-]{8,200}$/),
+        path: mediaPathSchema.optional().default([]),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { finishMediaDriveUpload } = await import("@/server/media-library");
+    return finishMediaDriveUpload(await actor(), data);
+  });

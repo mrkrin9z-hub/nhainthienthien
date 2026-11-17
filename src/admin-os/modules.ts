@@ -36,6 +36,10 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
     items: [{ to: "/admin/album", label: "Hình ảnh", roles: ["owner", "sale", "production"], mode: "live" }],
   },
   {
+    title: "Data",
+    items: [{ to: "/admin/media", label: "Data", roles: ["owner", "sale", "production"], mode: "live" }],
+  },
+  {
     title: "Sản xuất",
     items: [{ to: "/admin/san-xuat", label: "Sản xuất", roles: ["owner", "production"], mode: "live" }],
   },

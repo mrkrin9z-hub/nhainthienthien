@@ -238,3 +238,27 @@ export const lookupOrder = createServerFn({ method: "POST" })
     const { lookupOrder: lookup } = await import("@/server/service");
     return lookup(data.code, data.phone);
   });
+
+export const preparePublicMediaUpload = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        fileName: z.string().min(1).max(200),
+        mimeType: z.string().min(3).max(120),
+        sizeBytes: z.number().int().min(1),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { prepareMediaDriveUpload } = await import("@/server/media-library");
+    return prepareMediaDriveUpload(null, data);
+  });
+
+export const finishPublicMediaUpload = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ driveFileId: z.string().regex(/^[A-Za-z0-9_-]{8,200}$/) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { finishMediaDriveUpload } = await import("@/server/media-library");
+    return finishMediaDriveUpload(null, data);
+  });
