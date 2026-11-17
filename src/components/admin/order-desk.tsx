@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { vnYmd } from "@/domain/calc";
 import { skuSoldOn } from "@/domain/mohome";
-import { isMarketplace, PAYMENT_METHODS, type PaymentMethod } from "@/domain/order-desk";
+import { depositMethodLabel, isMarketplace, PAYMENT_METHODS, RETAIL_PAYMENT_METHODS, type PaymentMethod } from "@/domain/order-desk";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { getCustomers } from "@/lib/admin.functions";
 import { formatMaybe, formatVnd } from "@/lib/brand";
@@ -56,6 +56,7 @@ export type DeskSave = {
   paymentMethod?: PaymentMethod;
   netAmount?: number | null;
   designFileUrl?: string | null;
+  albumId?: string | null;
   items?: { skuId: string; quantity: number; variant?: string; unitPrice?: number; priceReason?: string }[];
 };
 
@@ -83,6 +84,7 @@ export function OrderDesk({
   catalog,
   channelOptions,
   retail = false,
+  albumId = null,
   initial,
   paidSoFar,
   payments = [],
@@ -99,6 +101,8 @@ export function OrderDesk({
   channelOptions?: { id: Channel; label: string }[];
   /** Khách lẻ: form ngắn. TikTok và Shopee không tạo tay. */
   retail?: boolean;
+  /** Album ảnh gắn vào đơn khi lưu (từ quản lý hình ảnh). */
+  albumId?: string | null;
   initial: {
     channel: Channel;
     fullName: string;
@@ -130,8 +134,7 @@ export function OrderDesk({
   const [priceReason, setPriceReason] = useState("");
   const [marketplaceCode, setMarketplaceCode] = useState(initial.marketplaceCode);
   const [shipBy, setShipBy] = useState("");
-  const [autoCancelAt, setAutoCancelAt] = useState("");
-  const [commercePay, setCommercePay] = useState<PaymentMethod>("");
+  const [commercePay, setCommercePay] = useState<PaymentMethod>(mode === "create" ? "tien_mat" : "");
   const [netAmount, setNetAmount] = useState("");
   const [designFileUrl, setDesignFileUrl] = useState("");
   const [lines, setLines] = useState<Line[]>(
@@ -145,6 +148,8 @@ export function OrderDesk({
   const [method, setMethod] = useState(mode === "create" ? "Tiền mặt" : "chuyển khoản");
   const [saving, setSaving] = useState(false);
   const [collecting, setCollecting] = useState(false);
+  const payChoices = retail ? RETAIL_PAYMENT_METHODS : PAYMENT_METHODS;
+  const isCodPay = commercePay === "cod";
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const customers = useQuery({
@@ -245,6 +250,11 @@ export function OrderDesk({
       toast.error("Sửa giá cần ghi lý do.");
       return;
     }
+    if (mode === "create" && !commercePay) {
+      toast.error("Chọn hình thức thanh toán.");
+      return;
+    }
+    const payLabel = depositMethodLabel(commercePay);
     setSaving(true);
     try {
       await onSave({
@@ -256,15 +266,16 @@ export function OrderDesk({
         note,
         dueDate: dueDate || null,
         marketplaceCode,
-        depositPaid: draftPaid,
-        depositMethod: draftPaid > 0 ? method : "",
+        depositPaid: isCodPay ? 0 : draftPaid,
+        depositMethod: isCodPay || draftPaid <= 0 ? "" : payLabel || method,
         discount: discount.trim() === "" ? null : digits(discount),
         customerShip: customerShip.trim() === "" ? null : digits(customerShip),
         shipBy: localIso(shipBy),
-        autoCancelAt: localIso(autoCancelAt),
+        autoCancelAt: null,
         paymentMethod: commercePay,
         netAmount: netAmount.trim() === "" ? null : digits(netAmount),
         designFileUrl: designFileUrl.trim() || null,
+        albumId: albumId || null,
         ...(itemsLocked ? {} : { items }),
       });
     } catch (error) {
@@ -462,7 +473,7 @@ export function OrderDesk({
       </div>
 
       <aside className="space-y-4 xl:sticky xl:top-4">
-        <MaybeDetails compact={compact}>
+        <section className={card}>
           <h2 className="text-base font-bold">Lịch trình đơn hàng</h2>
           <Field label="Ngày hẹn giao / nhận" required={mode === "create" && !compact}>
             <Input className="min-h-11" type="date" min={vnYmd()} value={dueDate} disabled={fieldsLocked} onChange={(event) => setDueDate(event.target.value)} />
@@ -475,17 +486,6 @@ export function OrderDesk({
               <Field label="Hạn gửi">
                 <Input className="min-h-11" type="datetime-local" value={shipBy} onChange={(event) => setShipBy(event.target.value)} />
               </Field>
-              <Field label="Tự hủy">
-                <Input className="min-h-11" type="datetime-local" value={autoCancelAt} onChange={(event) => setAutoCancelAt(event.target.value)} />
-              </Field>
-              <Field label="Thanh toán">
-                <select className={control} value={commercePay} onChange={(event) => setCommercePay(event.target.value as PaymentMethod)}>
-                  <option value="">Chưa chọn</option>
-                  {PAYMENT_METHODS.map((item) => (
-                    <option key={item.id} value={item.id}>{item.label}</option>
-                  ))}
-                </select>
-              </Field>
               <Field label="Thực nhận ước tính">
                 <Input className="min-h-11" inputMode="numeric" value={netAmount} placeholder="Để trống thì tự tính" onChange={(event) => setNetAmount(event.target.value.replace(/[^\d]/g, ""))} />
               </Field>
@@ -494,7 +494,7 @@ export function OrderDesk({
               </Field>
             </div>
           ) : null}
-        </MaybeDetails>
+        </section>
 
         <section className={card}>
           <h2 className="text-base font-bold">Tổng thanh toán</h2>
@@ -511,7 +511,7 @@ export function OrderDesk({
             )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Đã thanh toán</span>
-              <span className="font-medium">{formatVnd(paid)}</span>
+              <span className="font-medium">{formatVnd(isCodPay && mode === "create" ? 0 : paid)}</span>
             </div>
             {payments.length > 0 ? (
               <ul className="space-y-1 border-t pt-2 text-xs text-muted-foreground">
@@ -541,25 +541,41 @@ export function OrderDesk({
               <span className="font-semibold">{remain === null ? "—" : formatVnd(Math.abs(remain))}</span>
             </div>
           </div>
-          {compact ? null : mode === "create" ? (
+          {mode === "create" ? (
             <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
-              <p className="text-sm font-medium">Thanh toán lần 1</p>
-              <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn.</p>
-              <div className="flex items-end gap-2">
-                <div className="min-w-0 flex-1">
-                  <Field label="Số tiền">
+              <p className="text-sm font-medium">Thanh toán đơn hàng</p>
+              <Field label="Hình thức" required>
+                <select
+                  className={control}
+                  value={commercePay}
+                  disabled={fieldsLocked}
+                  onChange={(event) => {
+                    const next = event.target.value as PaymentMethod;
+                    setCommercePay(next);
+                    const label = depositMethodLabel(next);
+                    if (label) setMethod(label);
+                    if (next === "cod") setDeposit("");
+                  }}
+                >
+                  {payChoices.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {isCodPay ? (
+                <p className="text-[12px] text-muted-foreground">
+                  COD không thu ngay khi tạo đơn. Tiền thu hộ ghi sau khi đối soát với vận chuyển tại mục Đối soát COD — không tự cộng ví lúc lưu.
+                </p>
+              ) : (
+                <>
+                  <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn. Để 0 nếu chưa thu.</p>
+                  <Field label="Số tiền thu lần 1">
                     <Input inputMode="numeric" placeholder="0" value={deposit} disabled={fieldsLocked} onChange={(event) => setDeposit(event.target.value.replace(/[^\d]/g, ""))} />
                   </Field>
-                </div>
-                <div className="w-36 shrink-0">
-                  <Field label="Hình thức">
-                    <select className={control} value={method} disabled={fieldsLocked} onChange={(event) => setMethod(event.target.value)}>
-                      <option>Tiền mặt</option>
-                      <option>Chuyển khoản</option>
-                    </select>
-                  </Field>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
@@ -597,31 +613,22 @@ export function OrderDesk({
               </Button>
             </div>
           )}
-          {compact ? null : (
-            <p className="text-[11px] text-muted-foreground">
-              {fieldsLocked
-                ? "Đơn sàn không thu thêm và không sửa giá trên web."
+          <p className="text-[11px] text-muted-foreground">
+            {fieldsLocked
+              ? "Đơn sàn không thu thêm và không sửa giá trên web."
+              : isCodPay
+                ? "COD: sau khi ship trả tiền, đánh dấu đã nhận tại Đối soát COD."
                 : channel === "facebook"
                   ? "Đơn Facebook có thể cần cọc trước khi in."
                   : "Cọc có thể để trống, ghi thêm được sau khi mở đơn."}
-            </p>
-          )}
+          </p>
+          {albumId ? <p className="text-[11px] font-medium text-primary">Ảnh từ album sẽ gắn vào đơn khi lưu.</p> : null}
           <Button type="submit" className="min-h-12 w-full text-base font-bold" disabled={saving || fieldsLocked}>
             {saving ? "Đang lưu..." : mode === "create" ? "Lưu đơn hàng" : "Cập nhật"}
           </Button>
         </section>
       </aside>
     </form>
-  );
-}
-
-function MaybeDetails({ compact, children }: { compact: boolean; children: ReactNode }) {
-  if (!compact) return <section className={card}>{children}</section>;
-  return (
-    <details className={card}>
-      <summary className="cursor-pointer text-sm font-semibold">Thêm</summary>
-      <div className="mt-3 space-y-3">{children}</div>
-    </details>
   );
 }
 

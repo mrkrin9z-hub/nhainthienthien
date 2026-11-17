@@ -896,6 +896,21 @@ export async function getPhotoAlbum(actor: Actor, albumId: string) {
   };
 }
 
+/** Sao chép ảnh album đã xong vào đơn; album vẫn giữ file. */
+function attachAlbumToOrder(state: ShopState, actor: Actor, album: PhotoAlbum, order: Order) {
+  const ready = album.files.filter((file) => !file.deletedAt && file.status === "complete");
+  if (!ready.length) throw new Error("Album chưa có ảnh.");
+  for (const file of ready) {
+    if (!order.files.some((item) => item.id === file.id)) order.files.push({ ...file });
+  }
+  album.orderId = order.id;
+  album.updatedAt = nowIso();
+  order.updatedAt = nowIso();
+  order.history.push({ at: nowIso(), from: order.status, to: order.status, by: actor.id, note: `Gắn album ${album.phone}` });
+  audit(state, actor.id, "album.link", order.id, null, { phone: album.phone, code: order.code });
+  return ready.length;
+}
+
 /** Gắn ảnh trong album vào một đơn đã có. Ảnh vẫn nằm trong album. */
 export async function linkAlbumToOrder(actor: Actor, albumId: string, code: string) {
   assertRole(actor, ["owner", "sale"]);
@@ -904,17 +919,8 @@ export async function linkAlbumToOrder(actor: Actor, albumId: string, code: stri
     const order = state.orders.find((item) => item.code.toUpperCase() === code.trim().toUpperCase());
     if (!order) throw new Error("Không thấy đơn.");
     if (order.status === "huy") throw new Error("Đơn đã hủy. Chọn đơn khác.");
-    const ready = album.files.filter((file) => !file.deletedAt && file.status === "complete");
-    if (!ready.length) throw new Error("Album chưa có ảnh.");
-    for (const file of ready) {
-      if (!order.files.some((item) => item.id === file.id)) order.files.push({ ...file });
-    }
-    album.orderId = order.id;
-    album.updatedAt = nowIso();
-    order.updatedAt = nowIso();
-    order.history.push({ at: nowIso(), from: order.status, to: order.status, by: actor.id, note: `Gắn album ${album.phone}` });
-    audit(state, actor.id, "album.link", order.id, null, { phone: album.phone, code: order.code });
-    return { orderCode: order.code, phone: album.phone, fileCount: ready.length };
+    const fileCount = attachAlbumToOrder(state, actor, album, order);
+    return { orderCode: order.code, phone: album.phone, fileCount };
   });
 }
 
@@ -1285,6 +1291,7 @@ export async function createManualOrder(
     paymentMethod?: PaymentMethod;
     netAmount?: number | null;
     designFileUrl?: string | null;
+    albumId?: string | null;
     items: { skuId: string; quantity: number; variant?: string; unitPrice?: number | null; priceReason?: string }[];
   },
 ) {
@@ -1292,10 +1299,22 @@ export async function createManualOrder(
   if (input.channel === "mo_home") assertRole(actor, ["owner"]);
   else assertRole(actor, ["owner", "sale"]);
   if (input.dueDate && input.dueDate < vnParts().ymd) throw new Error("Ngày hẹn không được ở quá khứ.");
+  const pay = input.paymentMethod || "";
+  const isCod = pay === "cod";
   return mutate(async (state) => {
     const customer = upsertCustomer(state, { name: input.fullName, phone: input.phone, address: input.address });
     const items = buildItems(state, input.channel, actor.role, input.items);
     const totals = sumItems(items);
+    const ship = {
+      ...blankShipping(),
+      carrier: defaultCarrier({ channel: input.channel, source: "manual", fulfillment: input.fulfillment }),
+      customerShip: input.customerShip ?? null,
+    };
+    if (isCod && totals.total != null) {
+      const discount = input.discount ?? 0;
+      const remain = Math.max(0, totals.total - discount + (input.customerShip ?? 0));
+      ship.codAmount = remain;
+    }
     const order: Order = {
       id: nid(),
       code: nextCode(state, input.channel),
@@ -1313,14 +1332,10 @@ export async function createManualOrder(
       shipBy: input.shipBy ?? null,
       autoCancelAt: input.autoCancelAt ?? null,
       shipMode: isMarketplace(input.channel) ? "san" : input.fulfillment === "pickup" ? "pickup" : "tu_giao",
-      paymentMethod: input.paymentMethod || "",
+      paymentMethod: pay,
       netAmount: input.netAmount ?? null,
       designFileUrl: input.designFileUrl?.trim() || null,
-      shipping: {
-        ...blankShipping(),
-        carrier: defaultCarrier({ channel: input.channel, source: "manual", fulfillment: input.fulfillment }),
-        customerShip: input.customerShip ?? null,
-      },
+      shipping: ship,
       items,
       subtotal: totals.subtotal,
       total: totals.total,
@@ -1343,7 +1358,8 @@ export async function createManualOrder(
     };
     await ensureUploadCredentials(state, order);
     refreshDeposit(state, order);
-    if (input.depositPaid > 0) {
+    // COD không thu ngay — ghi nhận sau khi đối soát vận chuyển (markCodReceived).
+    if (!isCod && input.depositPaid > 0) {
       order.depositPaid = Math.round(input.depositPaid);
       order.depositMethod = input.depositMethod.trim() || "Tiền mặt";
       order.depositBy = actor.id;
@@ -1357,9 +1373,14 @@ export async function createManualOrder(
         },
       ];
     }
+    let albumFiles = 0;
+    if (input.albumId) {
+      const album = findAlbum(state, input.albumId);
+      albumFiles = attachAlbumToOrder(state, actor, album, order);
+    }
     state.orders.unshift(order);
-    audit(state, actor.id, "order.create", order.id, null, { code: order.code, channel: order.channel });
-    return { code: order.code };
+    audit(state, actor.id, "order.create", order.id, null, { code: order.code, channel: order.channel, albumFiles });
+    return { code: order.code, albumFiles };
   });
 }
 

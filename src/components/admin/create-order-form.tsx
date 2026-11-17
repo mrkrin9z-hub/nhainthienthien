@@ -11,10 +11,12 @@ export function CreateOrderForm({
   onCreated,
   initialPhone = "",
   initialName = "",
+  albumId = null,
 }: {
   onCreated: (code: string) => void;
   initialPhone?: string;
   initialName?: string;
+  albumId?: string | null;
 }) {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const skus = useQuery({ queryKey: ["sku-options"], queryFn: () => getSkuOptions() });
@@ -28,10 +30,11 @@ export function CreateOrderForm({
     <OrderDesk
       mode="create"
       retail
+      albumId={albumId}
       owner={me.data?.role === "owner"}
       fieldsLocked={false}
       itemsLocked={false}
-      lockNote=""
+      lockNote={albumId ? "Ảnh từ album sẽ gắn vào mục Hình ảnh của đơn khi lưu." : ""}
       catalog={catalog}
       channelOptions={channels.length ? channels : undefined}
       paidSoFar={0}
@@ -66,10 +69,12 @@ export function CreateOrderForm({
             paymentMethod: value.paymentMethod,
             netAmount: value.netAmount,
             designFileUrl: value.designFileUrl,
+            albumId: value.albumId ?? albumId,
             items: (value.items ?? []).map((item) => ({ ...item, variant: item.variant ?? "" })),
           },
         });
-        toast.success(`Đã tạo ${result.code}`);
+        const attached = "albumFiles" in result ? Number(result.albumFiles ?? 0) : 0;
+        toast.success(attached > 0 ? `Đã tạo ${result.code} và gắn ${attached} ảnh` : `Đã tạo ${result.code}`);
         onCreated(result.code);
       }}
     />

@@ -20,11 +20,15 @@ export const DESK_CHANNEL_LABEL: Record<Channel, string> = {
 };
 
 export const PAYMENT_METHODS = [
-  { id: "cod", label: "COD" },
-  { id: "chuyen_khoan", label: "Chuyển khoản" },
   { id: "tien_mat", label: "Tiền mặt" },
+  { id: "chuyen_khoan", label: "Chuyển khoản" },
+  { id: "vi_cua_hang", label: "Ví cửa hàng" },
+  { id: "cod", label: "COD" },
   { id: "vi_san", label: "Ví sàn" },
 ] as const;
+
+/** Phương thức khi tạo đơn khách lẻ — không gồm ví sàn. */
+export const RETAIL_PAYMENT_METHODS = PAYMENT_METHODS.filter((item) => item.id !== "vi_san");
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]["id"] | "";
 export type ShipMode = "pickup" | "tu_giao" | "san";
@@ -150,10 +154,17 @@ export function paymentMethodFromText(value: string): PaymentMethod {
   const text = value.trim().toLowerCase();
   if (!text) return "";
   if (text.includes("cod")) return "cod";
-  if (text.includes("ví") || text.includes("vi san") || text.includes("vi_san")) return "vi_san";
+  if (text.includes("cửa hàng") || text.includes("cua hang") || text.includes("vi_cua_hang")) return "vi_cua_hang";
+  if (text.includes("ví sàn") || text.includes("vi san") || text.includes("vi_san")) return "vi_san";
   if (text.includes("chuyển") || text.includes("chuyen") || text.includes("ck")) return "chuyen_khoan";
   if (text.includes("mặt") || text.includes("mat") || text.includes("tiền mặt")) return "tien_mat";
+  if (text.includes("ví") || text.includes("vi ")) return "vi_cua_hang";
   return "";
+}
+
+export function depositMethodLabel(method: PaymentMethod): string {
+  if (method === "cod") return "";
+  return PAYMENT_METHODS.find((item) => item.id === method)?.label ?? "Tiền mặt";
 }
 
 /** Thực nhận. Số đã nhập thì giữ. Chưa nhập thì trừ phí kênh, không cộng affiliate. */

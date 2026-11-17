@@ -534,7 +534,7 @@ export type Order = {
   autoCancelAt?: string | null;
   /** pickup = lấy tại xưởng, tu_giao = shop tự giao, san = nhãn TikTok/Shopee. */
   shipMode?: "pickup" | "tu_giao" | "san";
-  paymentMethod?: "" | "cod" | "chuyen_khoan" | "tien_mat" | "vi_san";
+  paymentMethod?: "" | "cod" | "chuyen_khoan" | "tien_mat" | "vi_san" | "vi_cua_hang";
   /** Thực nhận ước tính sau phí. Thiếu thì trang đơn tự tính từ phí kênh. */
   netAmount?: number | null;
   /** Link Drive của file thiết kế. */

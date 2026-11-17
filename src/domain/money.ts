@@ -64,6 +64,10 @@ export function walletOfMethod(method: string): WalletId {
     text.includes("khoan") ||
     text.includes("ngân") ||
     text.includes("ngan") ||
+    text.includes("ví cửa") ||
+    text.includes("vi cua") ||
+    text.includes("cửa hàng") ||
+    text.includes("cua hang") ||
     text === "ck"
   ) {
     return "chuyen_khoan";
