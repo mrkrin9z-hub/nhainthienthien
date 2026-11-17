@@ -1,8 +1,11 @@
-/** Link/QR công khai gửi media vào Inbox Drive. */
+/** Link/QR công khai gửi media vào Inbox (Drive nếu nối, không thì SHOP_KV / máy). */
 export const MEDIA_UPLOAD_PATH = "/gui-media";
 
 /** Giới hạn khi Drive nhận trực tiếp (ảnh + video source). */
 export const MEDIA_MAX_BYTES = 1024 * 1024 * 1024;
+
+/** Giới hạn khi chưa nối Drive — cùng mức ảnh đơn trên web (SHOP_KV). */
+export const MEDIA_KV_MAX_BYTES = 10 * 1024 * 1024;
 
 export function mediaMimeAllowed(mime: string): boolean {
   const kind = mime.trim().toLowerCase();

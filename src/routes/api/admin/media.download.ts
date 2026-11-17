@@ -18,8 +18,8 @@ export const Route = createFileRoute("/api/admin/media/download")({
           return new Response("Chưa đăng nhập.", { status: 401 });
         }
         try {
-          const { streamDriveFile } = await import("@/server/drive");
-          const file = await streamDriveFile(fileId);
+          const { streamMediaFile } = await import("@/server/media-library");
+          const file = await streamMediaFile(person, fileId);
           const headers = new Headers({
             "Content-Type": file.mime || "application/octet-stream",
             "Content-Disposition": contentDisposition(file.name, true),

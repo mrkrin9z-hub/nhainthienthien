@@ -1510,8 +1510,8 @@ export const prepareStaffMediaUpload = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const { prepareMediaDriveUpload } = await import("@/server/media-library");
-    return prepareMediaDriveUpload(await actor(), data);
+    const { prepareMediaUpload } = await import("@/server/media-library");
+    return prepareMediaUpload(await actor(), data);
   });
 
 export const finishStaffMediaUpload = createServerFn({ method: "POST" })

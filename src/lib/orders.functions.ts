@@ -250,8 +250,8 @@ export const preparePublicMediaUpload = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const { prepareMediaDriveUpload } = await import("@/server/media-library");
-    return prepareMediaDriveUpload(null, data);
+    const { prepareMediaUpload } = await import("@/server/media-library");
+    return prepareMediaUpload(null, data);
   });
 
 export const finishPublicMediaUpload = createServerFn({ method: "POST" })
