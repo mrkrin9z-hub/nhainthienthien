@@ -14,6 +14,15 @@ export type FeedbackLine =
       showAvatar?: boolean;
     }
   | { id: string; kind: "sticker"; side: FeedbackSide; sticker: "thumb" | "1010"; hearts?: number }
+  | {
+      id: string;
+      kind: "image";
+      side: FeedbackSide;
+      /** data: URL local — không upload server. */
+      src: string;
+      hearts?: number;
+      showAvatar?: boolean;
+    }
   | { id: string; kind: "status"; text: string };
 
 export type FeedbackDraft = {

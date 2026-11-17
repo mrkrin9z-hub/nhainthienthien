@@ -718,7 +718,7 @@ function Header({ draft, live, onChange }: Props) {
 function showCustomerAvatar(lines: FeedbackLine[], index: number): boolean {
   const line = lines[index];
   if (!line || line.kind === "date" || line.kind === "status" || line.side !== "customer") return false;
-  if (line.kind === "text" && line.showAvatar === false) return false;
+  if ((line.kind === "text" || line.kind === "image") && line.showAvatar === false) return false;
   for (let i = index + 1; i < lines.length; i += 1) {
     const next = lines[i]!;
     if (next.kind === "date" || next.kind === "status") break;
@@ -849,6 +849,22 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
               <div className="relative max-w-[78%]">
                 {line.kind === "sticker" ? (
                   <Sticker sticker={line.sticker} />
+                ) : line.kind === "image" ? (
+                  <div
+                    className="overflow-hidden"
+                    style={{
+                      borderRadius: radius,
+                      maxWidth: 220,
+                      boxShadow: mine ? "none" : "0 0.5px 1px rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    <img
+                      src={line.src}
+                      alt=""
+                      className="block max-h-[280px] w-full object-cover"
+                      draggable={false}
+                    />
+                  </div>
                 ) : (
                   <div
                     className="px-[12px] py-[8px] text-[15px] leading-[1.35]"
@@ -877,7 +893,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                     ) : null}
                   </div>
                 )}
-                {line.hearts ? (
+                {"hearts" in line && line.hearts ? (
                   <HeartReaction
                     count={line.hearts}
                     live={live}

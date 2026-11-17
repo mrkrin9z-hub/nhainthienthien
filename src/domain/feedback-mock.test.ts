@@ -30,4 +30,6 @@ test("trang admin feedback-gia xuất JPG kiểu iPhone", () => {
   assert.match(phone, /contentEditable/);
   assert.match(phone, /VerifiedBadge/);
   assert.match(phone, /IconMessengerPhone|IconLikeThumb|GỌI LẠI|DoubleCheck/);
+  assert.match(phone, /kind === \"image\"|line\.kind === \"image\"/);
+  assert.match(page, /ImagePlus|sendImage|Gửi ảnh local/);
 });
