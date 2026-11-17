@@ -10,7 +10,6 @@ import {
   FileSpreadsheet,
   FolderOpen,
   HandCoins,
-  MessageSquareQuote,
   Image,
   Images,
   Landmark,
@@ -78,7 +77,6 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin/khach": Users,
   "/admin/album": Images,
   "/admin/media": FolderOpen,
-  "/admin/feedback-gia": MessageSquareQuote,
   "/admin/nhac-khach": Bell,
   "/admin/gia": Tags,
   "/admin/kho": Package,
@@ -122,6 +120,9 @@ function pathActive(pathname: string, to: string) {
       (path) => pathname === path || pathname.startsWith(`${path}/`),
     );
   }
+  if (to === "/admin/media") {
+    return pathname === "/admin/media" || pathname.startsWith("/admin/media/") || pathname.startsWith("/admin/feedback-gia");
+  }
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
@@ -143,6 +144,8 @@ function pageTitle(pathname: string, role: Role, search: Record<string, unknown>
   if (pathname.startsWith("/admin/don-hang/") && pathname !== "/admin/don-hang" && pathname !== "/admin/don-hang/") return "Chi tiết đơn";
   if (pathname.startsWith("/admin/khach/") && pathname !== "/admin/khach" && pathname !== "/admin/khach/") return "Hồ sơ khách";
   if (pathname.startsWith("/admin/album/") && pathname !== "/admin/album" && pathname !== "/admin/album/") return "Album ảnh";
+  if (pathname.startsWith("/admin/feedback-gia")) return "Tạo feedback giả";
+  if (pathname.startsWith("/admin/media") && search.m === "drive") return "Kho Drive source";
   const items = ADMIN_MODULE_GROUPS.flatMap((group) => group.items).filter((item) => item.roles.includes(role));
   const match = items
     .filter((item) => itemActive(pathname, search, item, items))
