@@ -2,12 +2,15 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 import type { FeedbackDraft, FeedbackLine } from "@/domain/feedback-mock";
 
+type DraftUpdater = FeedbackDraft | ((prev: FeedbackDraft) => FeedbackDraft);
+
 type Props = {
   draft: FeedbackDraft;
   live?: boolean | undefined;
-  onChange?: ((next: FeedbackDraft) => void) | undefined;
+  onChange?: ((next: DraftUpdater) => void) | undefined;
   onSelectLine?: ((id: string) => void) | undefined;
   selectedId?: string | null | undefined;
+  onDeleteLine?: ((id: string) => void) | undefined;
 };
 
 const MODERN_BLUE = "#006AFF";
@@ -319,6 +322,10 @@ function Avatar({
   );
 }
 
+function readEditableText(node: HTMLElement): string {
+  return node.innerText.replace(/\u00a0/g, " ").replace(/\n$/, "");
+}
+
 function Editable({
   value,
   live,
@@ -334,6 +341,15 @@ function Editable({
   multiline?: boolean | undefined;
   onCommit: (next: string) => void;
 }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const focused = useRef(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!live || !node || focused.current) return;
+    if (readEditableText(node) !== value) node.textContent = value;
+  }, [live, value]);
+
   if (!live) {
     return (
       <span className={className} style={style}>
@@ -350,13 +366,19 @@ function Editable({
   }
   return (
     <span
-      key={value}
+      ref={ref}
       className={`${className ?? ""} outline-none focus:bg-black/[0.04]`}
       style={style}
       contentEditable
       suppressContentEditableWarning
+      data-editable="1"
+      data-editable-value={value}
+      onFocus={() => {
+        focused.current = true;
+      }}
       onBlur={(event) => {
-        const text = event.currentTarget.innerText.replace(/\u00a0/g, " ").replace(/\n$/, "");
+        focused.current = false;
+        const text = readEditableText(event.currentTarget);
         if (text !== value) onCommit(text);
       }}
       onKeyDown={(event) => {
@@ -604,7 +626,7 @@ function Header({ draft, live, onChange }: Props) {
               live={live}
               value={draft.customerName}
               className="block truncate text-[17px] font-semibold leading-tight"
-              onCommit={(customerName) => onChange?.({ ...draft, customerName })}
+              onCommit={(customerName) => onChange?.((current) => ({ ...current, customerName }))}
             />
             {draft.stranger ? (
               <span className="mt-[3px] inline-block rounded-full bg-[#3A3A3C]/75 px-2 py-[1px] text-[10px] font-semibold tracking-wide text-white">
@@ -615,7 +637,7 @@ function Header({ draft, live, onChange }: Props) {
                 live={live}
                 value={draft.statusText}
                 className="mt-[1px] block truncate text-[12px] text-white/85"
-                onCommit={(statusText) => onChange?.({ ...draft, statusText })}
+                onCommit={(statusText) => onChange?.((current) => ({ ...current, statusText }))}
               />
             )}
           </div>
@@ -661,13 +683,13 @@ function Header({ draft, live, onChange }: Props) {
             live={live}
             value={draft.customerName}
             className="block truncate text-[16px] font-semibold text-black"
-            onCommit={(customerName) => onChange?.({ ...draft, customerName })}
+            onCommit={(customerName) => onChange?.((current) => ({ ...current, customerName }))}
           />
           <Editable
             live={live}
             value={draft.statusText || "Đang hoạt động"}
             className="block truncate text-[12px] font-normal text-[#8E8E93]"
-            onCommit={(statusText) => onChange?.({ ...draft, statusText })}
+            onCommit={(statusText) => onChange?.((current) => ({ ...current, statusText }))}
           />
         </div>
         <div className="flex items-center gap-2 pr-1">
@@ -695,7 +717,7 @@ function Header({ draft, live, onChange }: Props) {
             live={live}
             value={draft.customerName}
             className="truncate text-[15px] font-semibold text-black"
-            onCommit={(customerName) => onChange?.({ ...draft, customerName })}
+            onCommit={(customerName) => onChange?.((current) => ({ ...current, customerName }))}
           />
           <VerifiedBadge />
         </div>
@@ -703,7 +725,7 @@ function Header({ draft, live, onChange }: Props) {
           live={live}
           value={draft.statusText || "Đang hoạt động"}
           className="block truncate text-[11px] font-normal text-[#8E8E93]"
-          onCommit={(statusText) => onChange?.({ ...draft, statusText })}
+          onCommit={(statusText) => onChange?.((current) => ({ ...current, statusText }))}
         />
       </div>
       <div className="flex items-center gap-[9px] pr-1">
@@ -737,7 +759,7 @@ function gapBefore(lines: FeedbackLine[], index: number): number {
   return 14;
 }
 
-export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selectedId }: Props) {
+export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selectedId, onDeleteLine }: Props) {
   const classic = draft.platform === "zalo_classic";
   const messenger = draft.platform === "messenger";
   const shopBg = classic ? CLASSIC_BUBBLE : messenger ? MESSENGER_BLUE : MODERN_BLUE;
@@ -770,7 +792,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
           value={draft.clock}
           className="min-w-[52px] tracking-tight"
           style={{ color: classic ? "#fff" : "#111" }}
-          onCommit={(clock) => onChange?.({ ...draft, clock })}
+          onCommit={(clock) => onChange?.((current) => ({ ...current, clock }))}
         />
         <div className="flex items-center gap-[6px] pb-[1px]">
           <Signal light={statusLight} />
@@ -783,6 +805,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
 
       <div
         ref={threadRef}
+        data-thread-scroll="1"
         className="flex max-h-[460px] min-h-[320px] flex-col overflow-y-auto px-2 pb-3 pt-1"
         style={{ background: chatBg }}
       >
@@ -799,7 +822,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                       ? "rounded-full bg-[#B5B8BF] px-2.5 py-[2px] text-[11px] text-white"
                       : "px-1 text-[12px] text-[#8E8E93]"
                   }
-                  onCommit={(text) => onChange?.(patchLine(draft, line.id, { text }))}
+                  onCommit={(text) => onChange?.((current) => patchLine(current, line.id, { text }))}
                 />
               </div>
             );
@@ -814,7 +837,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                     <Editable
                       live={live}
                       value={line.text}
-                      onCommit={(text) => onChange?.(patchLine(draft, line.id, { text }))}
+                      onCommit={(text) => onChange?.((current) => patchLine(current, line.id, { text }))}
                     />
                   </span>
                 ) : (
@@ -822,7 +845,9 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                     live={live}
                     value={`✓ ${line.text}`}
                     className="text-[11px] text-black/40"
-                    onCommit={(text) => onChange?.(patchLine(draft, line.id, { text: text.replace(/^✓\s*/, "") }))}
+                    onCommit={(text) =>
+                      onChange?.((current) => patchLine(current, line.id, { text: text.replace(/^✓\s*/, "") }))
+                    }
                   />
                 )}
               </div>
@@ -880,7 +905,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                       multiline
                       value={line.text}
                       className="block whitespace-pre-wrap break-words"
-                      onCommit={(text) => onChange?.(patchLine(draft, line.id, { text }))}
+                      onCommit={(text) => onChange?.((current) => patchLine(current, line.id, { text }))}
                     />
                     {line.time ? (
                       <Editable
@@ -888,7 +913,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                         value={line.time}
                         className="mt-[2px] block text-[10px] text-black/35"
                         style={{ textAlign: mine ? "right" : "left" }}
-                        onCommit={(time) => onChange?.(patchLine(draft, line.id, { time }))}
+                        onCommit={(time) => onChange?.((current) => patchLine(current, line.id, { time }))}
                       />
                     ) : null}
                   </div>
@@ -898,8 +923,22 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                     count={line.hearts}
                     live={live}
                     classic={classic}
-                    onCommit={(hearts) => onChange?.(patchLine(draft, line.id, { hearts }))}
+                    onCommit={(hearts) => onChange?.((current) => patchLine(current, line.id, { hearts }))}
                   />
+                ) : null}
+                {selected && live && onDeleteLine ? (
+                  <button
+                    type="button"
+                    data-export-hide="1"
+                    className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-[#FF3B30] text-[11px] font-bold text-white shadow"
+                    title="Xóa tin này"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDeleteLine(line.id);
+                    }}
+                  >
+                    ×
+                  </button>
                 ) : null}
               </div>
             </div>
@@ -911,7 +950,11 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
         <div className="flex items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
           <IconCamera />
           <div className="flex min-h-[36px] flex-1 items-center rounded-full bg-[#F0F0F0] px-3 text-[15px] text-black/45">
-            <Editable live={live} value={draft.inputHint || "Aa"} onCommit={(inputHint) => onChange?.({ ...draft, inputHint })} />
+            <Editable
+              live={live}
+              value={draft.inputHint || "Aa"}
+              onCommit={(inputHint) => onChange?.((current) => ({ ...current, inputHint }))}
+            />
             {live ? <span className="ml-[1px] inline-block h-[16px] w-[2px] bg-[#0084FF]" /> : null}
           </div>
           <IconLikeThumb />
@@ -924,7 +967,11 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
               classic ? "rounded-md bg-white" : "rounded-full bg-[#EFEFF0]"
             }`}
           >
-            <Editable live={live} value={draft.inputHint} onCommit={(inputHint) => onChange?.({ ...draft, inputHint })} />
+            <Editable
+              live={live}
+              value={draft.inputHint}
+              onCommit={(inputHint) => onChange?.((current) => ({ ...current, inputHint }))}
+            />
             {live ? <span className="ml-[1px] inline-block h-[16px] w-[2px] bg-[#006AFF]" /> : null}
           </div>
           {!classic && !draft.showKeyboard ? (
