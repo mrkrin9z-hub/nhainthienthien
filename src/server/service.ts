@@ -1396,6 +1396,9 @@ export async function reviseOrder(
     dueDate: string | null;
     discount?: number | null;
     customerShip?: number | null;
+    shipBy?: string | null;
+    paymentMethod?: PaymentMethod;
+    designFileUrl?: string | null;
     items?: { skuId: string; quantity: number; variant?: string; unitPrice?: number | null; priceReason?: string }[];
   },
 ) {
@@ -1424,6 +1427,9 @@ export async function reviseOrder(
     if (input.customerShip !== undefined) {
       order.shipping = { ...orderShipping(order), customerShip: input.customerShip };
     }
+    if (input.shipBy !== undefined) order.shipBy = input.shipBy;
+    if (input.paymentMethod !== undefined) order.paymentMethod = input.paymentMethod || "";
+    if (input.designFileUrl !== undefined) order.designFileUrl = input.designFileUrl?.trim() || null;
     if (input.items) {
       const items = input.items.map((item) => {
         const sku = skuOrThrow(state, item.skuId);

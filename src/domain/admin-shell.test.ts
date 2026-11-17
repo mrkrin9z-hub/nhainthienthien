@@ -69,11 +69,12 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../components/admin/product-picker.tsx", import.meta.url), "utf8"), /Chọn sản phẩm/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Ví của tôi/);
   const detail = readFileSync(new URL("../routes/admin.don-hang.$code.tsx", import.meta.url), "utf8");
-  assert.match(detail, /Khách hàng/);
   assert.match(detail, /Hình ảnh/);
   assert.doesNotMatch(detail, /\["trang-thai", "Tình trạng"\]/);
+  assert.doesNotMatch(detail, /\["khach", "Khách hàng"\]/);
   assert.match(detail, /listStatusChoices/);
-  assert.match(detail, /Chờ khách duyệt|STATUS_LABEL|statusOptionLabel/);
+  assert.match(detail, /retail=\{retail\}/);
+  assert.match(detail, /Thêm · QR ảnh/);
   assert.match(detail, /OrderDesk/);
   assert.match(detail, /deleteDeskOrder/);
   assert.match(detail, /Xóa đơn/);
