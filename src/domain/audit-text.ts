@@ -11,6 +11,7 @@ export const AUDIT_ACTIONS: { action: string; label: string }[] = [
   { action: "staff.update", label: "Tài khoản" },
   { action: "order.create", label: "Tạo đơn" },
   { action: "order.revise", label: "Sửa đơn" },
+  { action: "order.delete", label: "Xóa đơn" },
   { action: "order.upload_link", label: "Mã gửi ảnh" },
   { action: "album.link", label: "Gắn album" },
   { action: "order.status", label: "Chuyển bước" },
@@ -193,6 +194,8 @@ function detailOf(item: Pick<Audit, "action" | "entity" | "before" | "after">, s
       return `tạo đơn ${text(after?.code) || orderCode(shop, item.entity)}${channelBit(after?.channel)}`;
     case "order.revise":
       return `sửa đơn ${orderCode(shop, item.entity)}${after?.items ? `: ${text(after.items)}` : ""}`;
+    case "order.delete":
+      return `xóa đơn ${text(before?.code) || orderCode(shop, item.entity)}${channelBit(before?.channel)}`;
     case "order.upload_link":
       return `${after?.rotated ? "đổi" : "tạo"} mã gửi ảnh đơn ${text(after?.code) || orderCode(shop, item.entity)}`;
     case "album.link":

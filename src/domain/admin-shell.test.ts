@@ -73,6 +73,12 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(detail, /Hình ảnh/);
   assert.match(detail, /Tình trạng/);
   assert.match(detail, /OrderDesk/);
+  assert.match(detail, /deleteDeskOrder/);
+  assert.match(detail, /Xóa đơn/);
+  assert.match(detail, /role === "owner"/);
+  assert.match(readFileSync(new URL("../lib/admin.functions.ts", import.meta.url), "utf8"), /deleteDeskOrder/);
+  assert.match(readFileSync(new URL("../server/service.ts", import.meta.url), "utf8"), /export async function deleteOrder/);
+  assert.match(readFileSync(new URL("./audit-text.ts", import.meta.url), "utf8"), /order\.delete/);
   assert.match(form, /Cập nhật/);
   assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Thêm nhân viên/);
   assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Phân quyền/);

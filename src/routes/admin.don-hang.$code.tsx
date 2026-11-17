@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import { MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
-import { changeStatus, getMe, getOrderDetail, getSkuOptions, markApproval, orderUploadLink, recordDeposit, reviseOrder, saveNote, savePackCheck, saveReprint, setPrintChoice, storeShipping } from "@/lib/admin.functions";
+import { changeStatus, deleteDeskOrder, getMe, getOrderDetail, getSkuOptions, markApproval, orderUploadLink, recordDeposit, reviseOrder, saveNote, savePackCheck, saveReprint, setPrintChoice, storeShipping } from "@/lib/admin.functions";
 import { isMergedWoodAlias, isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
 import { marketplaceEditLocked } from "@/domain/order-edit";
 import { JT_CARRIER, jtOrder } from "@/domain/jt";
@@ -43,6 +43,7 @@ const FILE_KIND: Record<string, string> = {
 
 function OrderDetailPage() {
   const { code } = Route.useParams();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
@@ -55,6 +56,7 @@ function OrderDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [savingFiles, setSavingFiles] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const skus = useQuery({ queryKey: ["sku-options"], queryFn: () => getSkuOptions(), enabled: me.data?.role !== "production" });
   const data = order.data;
   const role = me.data?.role;
@@ -64,6 +66,27 @@ function OrderDetailPage() {
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["order", code] });
+  }
+
+  async function removeOrder() {
+    if (!data || role !== "owner") return;
+    const typed = window.prompt(`Xóa hẳn đơn ${data.code}? Nhập đúng mã đơn để xác nhận. Không hoàn tác.`);
+    if (typed == null) return;
+    if (typed.trim().toUpperCase() !== data.code.toUpperCase()) {
+      toast.error("Mã đơn không khớp. Chưa xóa.");
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteDeskOrder({ data: { orderId: data.id } });
+      toast.success(`Đã xóa ${data.code}`);
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void router.navigate({ to: "/admin/don-hang" });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không xóa được đơn.");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   if (!data) return <p className="text-muted-foreground">{order.isError ? (order.error as Error).message : "Đang tải đơn…"}</p>;
@@ -87,6 +110,15 @@ function OrderDetailPage() {
               {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
                 <DropdownMenuItem asChild>
                   <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
+                </DropdownMenuItem>
+              ) : null}
+              {role === "owner" ? (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  disabled={deleting}
+                  onClick={() => void removeOrder()}
+                >
+                  {deleting ? "Đang xóa…" : "Xóa đơn"}
                 </DropdownMenuItem>
               ) : null}
             </DropdownMenuContent>
@@ -311,6 +343,14 @@ function OrderDetailPage() {
                 ? "Đơn đã hủy hoặc đã xong. Chỉ chủ mở lại, và phải ghi lý do."
                 : "Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."}
         </p>
+        {role === "owner" ? (
+          <div className="mt-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm text-muted-foreground">Xóa hẳn đơn khỏi sổ (khác hủy). Hoàn kho đã trừ. Chỉ chủ được xóa.</p>
+            <Button type="button" variant="destructive" className="mt-2 min-h-11" disabled={deleting} onClick={() => void removeOrder()}>
+              {deleting ? "Đang xóa…" : "Xóa đơn"}
+            </Button>
+          </div>
+        ) : null}
         {role === "owner" ? (
           <label className="mt-2 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
