@@ -36,6 +36,7 @@ import { Route as AdminCongViecRouteImport } from './routes/admin.cong-viec'
 import { Route as AdminDanhGiaRouteImport } from './routes/admin.danh-gia'
 import { Route as AdminDonMoiRouteImport } from './routes/admin.don-moi'
 import { Route as AdminDuyetChiRouteImport } from './routes/admin.duyet-chi'
+import { Route as AdminFeedbackGiaRouteImport } from './routes/admin.feedback-gia'
 import { Route as AdminGiaRouteImport } from './routes/admin.gia'
 import { Route as AdminGiaoHangRouteImport } from './routes/admin.giao-hang'
 import { Route as AdminGoiRouteImport } from './routes/admin.goi'
@@ -234,6 +235,11 @@ const AdminDonMoiRoute = AdminDonMoiRouteImport.update({
 const AdminDuyetChiRoute = AdminDuyetChiRouteImport.update({
   id: '/duyet-chi',
   path: '/duyet-chi',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFeedbackGiaRoute = AdminFeedbackGiaRouteImport.update({
+  id: '/feedback-gia',
+  path: '/feedback-gia',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminGiaRoute = AdminGiaRouteImport.update({
@@ -587,6 +593,7 @@ export interface FileRoutesByFullPath {
   '/admin/danh-gia': typeof AdminDanhGiaRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
   '/admin/duyet-chi': typeof AdminDuyetChiRoute
+  '/admin/feedback-gia': typeof AdminFeedbackGiaRoute
   '/admin/gia': typeof AdminGiaRoute
   '/admin/giao-hang': typeof AdminGiaoHangRoute
   '/admin/goi': typeof AdminGoiRoute
@@ -679,6 +686,7 @@ export interface FileRoutesByTo {
   '/admin/danh-gia': typeof AdminDanhGiaRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
   '/admin/duyet-chi': typeof AdminDuyetChiRoute
+  '/admin/feedback-gia': typeof AdminFeedbackGiaRoute
   '/admin/gia': typeof AdminGiaRoute
   '/admin/giao-hang': typeof AdminGiaoHangRoute
   '/admin/goi': typeof AdminGoiRoute
@@ -773,6 +781,7 @@ export interface FileRoutesById {
   '/admin/danh-gia': typeof AdminDanhGiaRoute
   '/admin/don-moi': typeof AdminDonMoiRoute
   '/admin/duyet-chi': typeof AdminDuyetChiRoute
+  '/admin/feedback-gia': typeof AdminFeedbackGiaRoute
   '/admin/gia': typeof AdminGiaRoute
   '/admin/giao-hang': typeof AdminGiaoHangRoute
   '/admin/goi': typeof AdminGoiRoute
@@ -868,6 +877,7 @@ export interface FileRouteTypes {
     | '/admin/danh-gia'
     | '/admin/don-moi'
     | '/admin/duyet-chi'
+    | '/admin/feedback-gia'
     | '/admin/gia'
     | '/admin/giao-hang'
     | '/admin/goi'
@@ -960,6 +970,7 @@ export interface FileRouteTypes {
     | '/admin/danh-gia'
     | '/admin/don-moi'
     | '/admin/duyet-chi'
+    | '/admin/feedback-gia'
     | '/admin/gia'
     | '/admin/giao-hang'
     | '/admin/goi'
@@ -1053,6 +1064,7 @@ export interface FileRouteTypes {
     | '/admin/danh-gia'
     | '/admin/don-moi'
     | '/admin/duyet-chi'
+    | '/admin/feedback-gia'
     | '/admin/gia'
     | '/admin/giao-hang'
     | '/admin/goi'
@@ -1350,6 +1362,13 @@ declare module '@tanstack/react-router' {
       path: '/duyet-chi'
       fullPath: '/admin/duyet-chi'
       preLoaderRoute: typeof AdminDuyetChiRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/feedback-gia': {
+      id: '/admin/feedback-gia'
+      path: '/feedback-gia'
+      fullPath: '/admin/feedback-gia'
+      preLoaderRoute: typeof AdminFeedbackGiaRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/gia': {
@@ -1819,6 +1838,7 @@ interface AdminRouteChildren {
   AdminDanhGiaRoute: typeof AdminDanhGiaRoute
   AdminDonMoiRoute: typeof AdminDonMoiRoute
   AdminDuyetChiRoute: typeof AdminDuyetChiRoute
+  AdminFeedbackGiaRoute: typeof AdminFeedbackGiaRoute
   AdminGiaRoute: typeof AdminGiaRoute
   AdminGiaoHangRoute: typeof AdminGiaoHangRoute
   AdminGoiRoute: typeof AdminGoiRoute
@@ -1874,6 +1894,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDanhGiaRoute: AdminDanhGiaRoute,
   AdminDonMoiRoute: AdminDonMoiRoute,
   AdminDuyetChiRoute: AdminDuyetChiRoute,
+  AdminFeedbackGiaRoute: AdminFeedbackGiaRoute,
   AdminGiaRoute: AdminGiaRoute,
   AdminGiaoHangRoute: AdminGiaoHangRoute,
   AdminGoiRoute: AdminGoiRoute,
