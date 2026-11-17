@@ -152,6 +152,8 @@ export type Settings = {
   menuLinks20261022?: boolean;
   /** Đã thêm việc hằng ngày (in đơn, chuyển nộp, duyệt chi, thưởng) vào menu một lần. */
   taskMenu20261023?: boolean;
+  /** Đã thêm Media (kho source + feedback) vào menu một lần. */
+  mediaMenu20261117?: boolean;
   /** Đã gắn gỗ cho ảnh TG, định mức nam châm theo khổ, và 9 lọ mực. Không chạy lại. */
   deskBom20261023?: boolean;
   /** Đã đổ checklist sheet vào sổ việc. */

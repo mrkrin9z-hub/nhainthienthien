@@ -160,6 +160,7 @@ test("migration gắn cờ bán kênh và không ghi giá Mơ Home", () => {
       checklist20261023: true,
       menuLinks20261022: true,
       taskMenu20261023: true,
+      mediaMenu20261117: true,
       fixedCosts: DEFAULT_SETTINGS.fixedCosts,
       sepay: DEFAULT_SETTINGS.sepay,
       notifyPrefs: DEFAULT_SETTINGS.notifyPrefs,
