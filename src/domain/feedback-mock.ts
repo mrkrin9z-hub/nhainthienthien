@@ -58,7 +58,7 @@ export const FEEDBACK_TEMPLATES: FeedbackTemplate[] = [
       platform: "zalo",
       customerName: "Dương Trang",
       customerAvatar: "",
-      statusText: "vừa mới xem lúc 20:03",
+      statusText: "vừa Đã xem lúc 20:03",
       stranger: false,
       showKeyboard: true,
       clock: "20:03",
