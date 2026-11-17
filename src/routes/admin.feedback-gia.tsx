@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { toJpeg } from "html-to-image";
-import { Send, Trash2 } from "lucide-react";
+import { ImagePlus, Send, Trash2 } from "lucide-react";
 
 import { HubBack } from "@/components/admin/access-hub";
 import { FeedbackMockPhone } from "@/components/admin/feedback-mock-phone";
@@ -35,6 +35,8 @@ function FeedbackMockPage() {
   const [shopDraft, setShopDraft] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const customerImageRef = useRef<HTMLInputElement>(null);
+  const shopImageRef = useRef<HTMLInputElement>(null);
 
   const template = useMemo(
     () => FEEDBACK_TEMPLATES.find((item) => item.id === templateId) ?? FEEDBACK_TEMPLATES[0]!,
@@ -79,6 +81,45 @@ function FeedbackMockPage() {
     setSelectedId(id);
   }
 
+  function sendImage(side: FeedbackSide, file: File | null) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Chọn file ảnh.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Ảnh quá lớn (tối đa 8MB, chỉ lưu local).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = String(reader.result || "");
+      if (!src) {
+        toast.error("Không đọc được ảnh.");
+        return;
+      }
+      const id = newLineId();
+      setDraft((current) => ({
+        ...current,
+        lines: [
+          ...current.lines.filter((line) => line.kind !== "status"),
+          {
+            id,
+            kind: "image" as const,
+            side,
+            src,
+            showAvatar: side === "customer",
+          },
+          ...(side === "shop" ? [{ id: newLineId(), kind: "status" as const, text: "Đã gửi" }] : []),
+        ],
+      }));
+      setSelectedId(id);
+      toast.success("Đã gắn ảnh local (không lưu server).");
+    };
+    reader.onerror = () => toast.error("Không đọc được ảnh.");
+    reader.readAsDataURL(file);
+  }
+
   function addDate() {
     const id = newLineId();
     setDraft((current) => ({
@@ -96,7 +137,7 @@ function FeedbackMockPage() {
     setDraft((current) => ({
       ...current,
       lines: current.lines.map((line) =>
-        line.id === selectedId && (line.kind === "text" || line.kind === "sticker")
+        line.id === selectedId && (line.kind === "text" || line.kind === "sticker" || line.kind === "image")
           ? { ...line, hearts: (line.hearts ?? 0) + 1 }
           : line,
       ),
@@ -226,6 +267,14 @@ function FeedbackMockPage() {
           Người lạ
         </label>
         <label className="flex items-center gap-2 px-2 text-sm">
+          <input
+            type="checkbox"
+            checked={draft.callbackBanner}
+            onChange={(event) => setDraft((current) => ({ ...current, callbackBanner: event.target.checked }))}
+          />
+          Gọi lại
+        </label>
+        <label className="flex items-center gap-2 px-2 text-sm">
           Pin
           <Input
             className="min-h-9 w-16"
@@ -283,12 +332,31 @@ function FeedbackMockPage() {
                 />
                 <Button
                   type="button"
+                  variant="outline"
+                  className="min-h-11 shrink-0"
+                  title="Gửi ảnh local (không lưu server)"
+                  onClick={() => customerImageRef.current?.click()}
+                >
+                  <ImagePlus className="size-4" />
+                </Button>
+                <Button
+                  type="button"
                   className="min-h-11 shrink-0"
                   onClick={() => send("customer", customerDraft, () => setCustomerDraft(""))}
                 >
                   <Send className="size-4" />
                 </Button>
               </div>
+              <input
+                ref={customerImageRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  sendImage("customer", event.target.files?.[0] ?? null);
+                  event.target.value = "";
+                }}
+              />
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {["Ảnh đẹp lắm ạ", "Ưng lắm e", "Nhận rồi ạ"].map((phrase) => (
                   <Button
@@ -323,10 +391,29 @@ function FeedbackMockPage() {
                     if (event.key === "Enter") send("shop", shopDraft, () => setShopDraft(""));
                   }}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11 shrink-0 bg-white"
+                  title="Gửi ảnh local (không lưu server)"
+                  onClick={() => shopImageRef.current?.click()}
+                >
+                  <ImagePlus className="size-4" />
+                </Button>
                 <Button type="button" className="min-h-11 shrink-0 bg-[#0068ff] hover:bg-[#0056d6]" onClick={() => send("shop", shopDraft, () => setShopDraft(""))}>
                   <Send className="size-4" />
                 </Button>
               </div>
+              <input
+                ref={shopImageRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  sendImage("shop", event.target.files?.[0] ?? null);
+                  event.target.value = "";
+                }}
+              />
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {["dạ em cảm ơn ạ", "có dịp ủng hộ tiệm em nhé ạ"].map((phrase) => (
                   <Button
@@ -347,8 +434,8 @@ function FeedbackMockPage() {
           <div className="rounded-xl border bg-card p-3 text-sm text-muted-foreground">
             <p className="font-semibold text-foreground">Sửa live trên khung xuất</p>
             <p className="mt-1">
-              Chạm vào tên, trạng thái, giờ, hoặc nội dung bong bóng để gõ trực tiếp. Chạm một tin rồi bấm ❤️ / Xóa. Hai ô chat phía trên
-              để gửi nhanh qua lại như đang nhắn thật.
+              Chạm vào tên, trạng thái, giờ, hoặc nội dung bong bóng để gõ trực tiếp. Chạm một tin rồi bấm ❤️ / Xóa. Nút ảnh ở hai ô
+              chat chỉ giữ local trên máy để xuất JPG — không upload / không lưu data.
             </p>
           </div>
         </section>

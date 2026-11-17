@@ -5,11 +5,15 @@ import { readFileSync } from "node:fs";
 import { FEEDBACK_TEMPLATES, platformLabel } from "./feedback-mock.ts";
 
 test("có mẫu Zalo và Messenger để tạo feedback giả", () => {
-  assert.ok(FEEDBACK_TEMPLATES.length >= 4);
+  assert.ok(FEEDBACK_TEMPLATES.length >= 7);
   assert.ok(FEEDBACK_TEMPLATES.some((item) => item.draft.platform === "zalo"));
   assert.ok(FEEDBACK_TEMPLATES.some((item) => item.draft.platform === "zalo_classic"));
   assert.ok(FEEDBACK_TEMPLATES.some((item) => item.draft.platform === "messenger"));
+  assert.ok(FEEDBACK_TEMPLATES.every((item) => typeof item.draft.callbackBanner === "boolean"));
+  assert.ok(FEEDBACK_TEMPLATES.some((item) => item.draft.callbackBanner));
+  assert.ok(FEEDBACK_TEMPLATES.some((item) => item.draft.stranger));
   assert.equal(platformLabel("zalo_classic"), "Zalo (header xanh)");
+  assert.equal(platformLabel("messenger"), "Messenger");
 });
 
 test("trang admin feedback-gia xuất JPG kiểu iPhone", () => {
@@ -25,4 +29,7 @@ test("trang admin feedback-gia xuất JPG kiểu iPhone", () => {
   assert.match(phone, /IosKeyboard/);
   assert.match(phone, /contentEditable/);
   assert.match(phone, /VerifiedBadge/);
+  assert.match(phone, /IconMessengerPhone|IconLikeThumb|GỌI LẠI|DoubleCheck/);
+  assert.match(phone, /kind === \"image\"|line\.kind === \"image\"/);
+  assert.match(page, /ImagePlus|sendImage|Gửi ảnh local/);
 });

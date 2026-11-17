@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 import type { FeedbackDraft, FeedbackLine } from "@/domain/feedback-mock";
 
@@ -10,11 +10,16 @@ type Props = {
   selectedId?: string | null | undefined;
 };
 
-const MODERN_BLUE = "#1874FC";
-const CLASSIC_BLUE = "#0091FF";
-const CLASSIC_BUBBLE = "#D2F0FE";
-const MODERN_CHAT_BG = "#F4F3F9";
-const CLASSIC_CHAT_BG = "#E3EAF2";
+const MODERN_BLUE = "#006AFF";
+const CLASSIC_BLUE = "#0084FF";
+const CLASSIC_BUBBLE = "#D1F0FF";
+const MODERN_CHAT_BG = "#F2F1F6";
+const CLASSIC_CHAT_BG = "#E2E9F1";
+const MESSENGER_BLUE = "#0084FF";
+const ICON_STROKE = "#1C1C1E";
+const KEY_MUTED = "#AEB3BC";
+const KEY_RETURN = "#8E9299";
+const KEYBOARD_BG = "#D1D3D9";
 
 function patchLine(draft: FeedbackDraft, id: string, partial: Partial<FeedbackLine>): FeedbackDraft {
   return {
@@ -36,7 +41,16 @@ function Battery({ percent, charging, light }: { percent: number; charging: bool
           <span className="absolute inset-y-0 left-0 rounded-[2.5px]" style={{ width: `${fill}%`, background: body }} />
         </span>
         <span className="absolute inset-0 grid place-items-center text-[9px] font-bold leading-none tabular-nums text-white">
-          {percent}
+          {charging ? (
+            <span className="inline-flex items-center gap-[1px]">
+              <svg width="6" height="9" viewBox="0 0 6 9" aria-hidden>
+                <path d="M3.6 0 0 5h2.4L2.2 9 6 3.8H3.4L3.6 0Z" fill="#fff" />
+              </svg>
+              {percent}
+            </span>
+          ) : (
+            percent
+          )}
         </span>
       </span>
       <span className="ml-[1px] h-[5px] w-[1.6px] rounded-r-[1px]" style={{ background: tip }} />
@@ -51,7 +65,7 @@ function Signal({ light }: { light?: boolean }) {
       <rect x="0" y="3.5" width="3" height="7.5" rx="0.7" fill={fill} />
       <rect x="4.5" y="2" width="3" height="9" rx="0.7" fill={fill} />
       <rect x="9" y="0.5" width="3" height="10.5" rx="0.7" fill={fill} />
-      <rect x="13.5" y="0" width="3" height="11" rx="0.7" fill={fill} opacity="0.35" />
+      <rect x="13.5" y="0" width="3" height="11" rx="0.7" fill={fill} />
     </svg>
   );
 }
@@ -69,18 +83,19 @@ function Wifi({ light }: { light?: boolean }) {
 
 function Chevron({ light }: { light?: boolean }) {
   return (
-    <svg width="12" height="20" viewBox="0 0 12 20" aria-hidden>
-      <path d="M10 1 2 10l8 9" fill="none" stroke={light ? "#fff" : "#111"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="10" height="18" viewBox="0 0 10 18" aria-hidden>
+      <path d="M8.5 1 1.5 9l7 8" fill="none" stroke={light ? "#fff" : ICON_STROKE} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
+/** Zalo verified (ảnh thật): ô xanh + ống nghe trắng. */
 function VerifiedBadge() {
   return (
     <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden className="shrink-0">
-      <rect width="13" height="13" rx="2.8" fill="#2A9160" />
+      <rect width="13" height="13" rx="2.6" fill="#2ECC71" />
       <path
-        d="M4.1 3.4c.25-.25.65-.25.9 0l.85.85c.25.25.25.6.05.85L5.4 5.7c.4.8 1.05 1.45 1.85 1.85l.7-.55c.25-.2.6-.2.85.05l.85.85c.25.25.25.65 0 .9l-.6.6c-.3.3-.75.4-1.15.25-1.75-.6-3.25-2.1-3.85-3.85-.15-.4-.05-.85.25-1.15l.6-.6Z"
+        d="M3.55 3.9c.2-.2.52-.2.72 0l.9.9c.2.2.2.5.04.7L4.7 6c.4.8 1.05 1.45 1.85 1.85l.5-.5c.2-.16.5-.16.7.04l.9.9c.2.2.2.52 0 .72l-.48.48c-.24.24-.6.32-.92.2-1.7-.6-3.15-2.05-3.75-3.75-.12-.32-.04-.68.2-.92L3.55 3.9Z"
         fill="#fff"
       />
     </svg>
@@ -89,18 +104,19 @@ function VerifiedBadge() {
 
 function IconTag() {
   return (
-    <span className="relative inline-flex">
-      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+    <span className="relative inline-flex h-[22px] w-[22px] items-center justify-center">
+      {/* Ảnh thật: thẻ giá nghiêng ~45° */}
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden style={{ transform: "rotate(45deg)" }}>
         <path
-          d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V4h9l8.6 8.6a2 2 0 0 1 0 2.8Z"
+          d="M4 3.2h8.2l8.4 8.4a1.9 1.9 0 0 1 0 2.7l-5.3 5.3a1.9 1.9 0 0 1-2.7 0L4 11.2V3.2Z"
           fill="none"
-          stroke="#3A3A3C"
-          strokeWidth="1.7"
+          stroke={ICON_STROKE}
+          strokeWidth="1.45"
           strokeLinejoin="round"
         />
-        <circle cx="8.2" cy="8.2" r="1.2" fill="#3A3A3C" />
+        <circle cx="8.2" cy="7.4" r="1.35" fill="none" stroke={ICON_STROKE} strokeWidth="1.35" />
       </svg>
-      <span className="absolute -right-1.5 -top-1 grid h-[14px] min-w-[14px] place-items-center rounded-full bg-[#1874FC] px-[3px] text-[9px] font-bold leading-none text-white">
+      <span className="absolute -right-[3px] -top-[4px] grid h-[13px] min-w-[13px] place-items-center rounded-full bg-[#64B5F6] px-[3px] text-[8px] font-bold leading-none text-white">
         1
       </span>
     </span>
@@ -108,78 +124,143 @@ function IconTag() {
 }
 
 function IconNote() {
+  /** Ảnh thật: hình vuông, góc dưới-phải gập. */
   return (
-    <svg width="18" height="20" viewBox="0 0 18 20" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
       <path
-        d="M2.2 1.4h9.2L16.2 6.2V17.6c0 .9-.7 1.6-1.6 1.6H3.8c-.9 0-1.6-.7-1.6-1.6V3c0-.9.7-1.6 1.6-1.6Z"
+        d="M3.2 2.2h11.6c.7 0 1.2.5 1.2 1.2v8.4L12.2 15.8H3.2c-.7 0-1.2-.5-1.2-1.2V3.4c0-.7.5-1.2 1.2-1.2Z"
         fill="none"
-        stroke="#3A3A3C"
-        strokeWidth="1.55"
+        stroke={ICON_STROKE}
+        strokeWidth="1.4"
         strokeLinejoin="round"
       />
-      <path d="M11.2 1.5V6h4.7" fill="none" stroke="#3A3A3C" strokeWidth="1.55" strokeLinejoin="round" />
-      <path d="M5.2 10.2h7.2M5.2 13.4h5.2" stroke="#3A3A3C" strokeWidth="1.35" strokeLinecap="round" />
+      <path d="M16 11.8H12.4V15.4" fill="none" stroke={ICON_STROKE} strokeWidth="1.4" strokeLinejoin="round" />
     </svg>
   );
 }
 
 function IconMenu({ light, plain }: { light?: boolean; plain?: boolean }) {
-  const stroke = light ? "#fff" : "#3A3A3C";
+  const stroke = light ? "#fff" : ICON_STROKE;
   if (plain) {
     return (
       <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden>
-        <path d="M1 2h16M1 7h16M1 12h16" stroke={stroke} strokeWidth="1.9" strokeLinecap="round" />
+        <path d="M1 2h16M1 7h16M1 12h16" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" />
       </svg>
     );
   }
+  /** Zalo: ba gạch + chấm vuông bên trái. */
   return (
-    <svg width="20" height="16" viewBox="0 0 20 16" aria-hidden>
-      <circle cx="2" cy="2.5" r="1.3" fill={stroke} />
-      <path d="M6 2.5h12" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="2" cy="8" r="1.3" fill={stroke} />
-      <path d="M6 8h12" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="2" cy="13.5" r="1.3" fill={stroke} />
-      <path d="M6 13.5h12" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+    <svg width="19" height="15" viewBox="0 0 19 15" aria-hidden>
+      <rect x="1.1" y="1.5" width="2.2" height="2.2" rx="0.45" fill={stroke} />
+      <path d="M5.6 2.6h12" stroke={stroke} strokeWidth="1.55" strokeLinecap="round" />
+      <rect x="1.1" y="6.4" width="2.2" height="2.2" rx="0.45" fill={stroke} />
+      <path d="M5.6 7.5h12" stroke={stroke} strokeWidth="1.55" strokeLinecap="round" />
+      <rect x="1.1" y="11.3" width="2.2" height="2.2" rx="0.45" fill={stroke} />
+      <path d="M5.6 12.4h12" stroke={stroke} strokeWidth="1.55" strokeLinecap="round" />
     </svg>
   );
 }
 
-function IconPhone({ light }: { light?: boolean }) {
+function IconPhone({ light, solid }: { light?: boolean; solid?: boolean }) {
+  const fill = light || solid ? (light ? "#fff" : MESSENGER_BLUE) : "none";
+  const stroke = light ? "#fff" : solid ? MESSENGER_BLUE : "#3A3A3C";
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
       <path
         d="M6.6 3.8c.5-.5 1.3-.5 1.8 0l1.7 1.7c.5.5.5 1.2.1 1.7L8.8 9.1c.8 1.6 2.1 2.9 3.7 3.7l1.9-1.4c.5-.4 1.2-.4 1.7.1l1.7 1.7c.5.5.5 1.3 0 1.8l-1.2 1.2c-.6.6-1.5.8-2.3.5-3.5-1.2-6.5-4.2-7.7-7.7-.3-.8-.1-1.7.5-2.3L6.6 3.8Z"
-        fill="none"
-        stroke={light ? "#fff" : "#3A3A3C"}
-        strokeWidth="1.7"
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={solid || light ? 0.4 : 1.7}
         strokeLinejoin="round"
       />
     </svg>
   );
 }
 
-function IconVideo({ light }: { light?: boolean }) {
+function IconVideo({ light, solid }: { light?: boolean; solid?: boolean }) {
+  const stroke = light ? "#fff" : solid ? MESSENGER_BLUE : "#3A3A3C";
+  const fill = light || solid ? stroke : "none";
   return (
     <svg width="20" height="16" viewBox="0 0 22 16" aria-hidden>
-      <rect x="1" y="2" width="13" height="12" rx="2.5" fill="none" stroke={light ? "#fff" : "#3A3A3C"} strokeWidth="1.7" />
-      <path d="M15 6.2 20.5 3.5v9L15 9.8Z" fill="none" stroke={light ? "#fff" : "#3A3A3C"} strokeWidth="1.7" strokeLinejoin="round" />
+      <rect x="1" y="2" width="13" height="12" rx="2.5" fill={fill === "none" ? "none" : "none"} stroke={stroke} strokeWidth="1.7" />
+      <path d="M15 6.2 20.5 3.5v9L15 9.8Z" fill={fill === "none" ? "none" : stroke} stroke={stroke} strokeWidth="1.7" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconMessengerPhone() {
+  return (
+    <span className="grid h-[34px] w-[34px] place-items-center rounded-full bg-[#E7F3FF]">
+      <IconPhone solid />
+    </span>
+  );
+}
+
+function IconMessengerVideo() {
+  return (
+    <span className="grid h-[34px] w-[34px] place-items-center rounded-full bg-[#E7F3FF]">
+      <IconVideo solid />
+    </span>
+  );
+}
+
+function IconCamera() {
+  return (
+    <svg width="24" height="20" viewBox="0 0 24 20" aria-hidden>
+      <rect x="1.5" y="4" width="16" height="13" rx="3" fill="none" stroke="#8E8E93" strokeWidth="1.5" />
+      <circle cx="9.5" cy="10.5" r="3.2" fill="none" stroke="#8E8E93" strokeWidth="1.5" />
+      <path d="M17.5 8.2 22 5.5v11l-4.5-2.7Z" fill="none" stroke="#8E8E93" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconGallery() {
+  return (
+    <svg width="22" height="20" viewBox="0 0 22 20" aria-hidden>
+      <rect x="1.2" y="2.2" width="19.6" height="15.6" rx="2.4" fill="none" stroke="#8E8E93" strokeWidth="1.45" />
+      <circle cx="7.2" cy="7.4" r="1.7" fill="#8E8E93" />
+      <path d="M2.8 15.2 8.2 9.6l3.2 3.2 3.4-4.2 4.2 6.6" fill="none" stroke="#8E8E93" strokeWidth="1.45" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconMoreCircle() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="9.2" fill="none" stroke="#8E8E93" strokeWidth="1.45" />
+      <path d="M8 10.2h8M8 13.8h8" stroke="#8E8E93" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconLikeThumb() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden>
+      <path
+        d="M5.2 11.2h3.6V20H5.2c-.9 0-1.6-.7-1.6-1.6v-5.6c0-.9.7-1.6 1.6-1.6Z"
+        fill={MESSENGER_BLUE}
+      />
+      <path
+        d="M8.8 11.2 11.2 4.4c.3-.8 1.3-1.1 2-.6l1.1.8c.5.35.65 1 .4 1.55L13.4 9.2h7.2c1.15 0 2 1.05 1.7 2.15l-1.7 6.2c-.25.9-1.1 1.5-2 1.5H8.8V11.2Z"
+        fill={MESSENGER_BLUE}
+      />
     </svg>
   );
 }
 
 function IconSend({ color = MODERN_BLUE }: { color?: string }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
-      <path d="M3.2 11.2 20.5 3.5 12.8 20.8l-1.7-7.2-7.9-2.4Z" fill={color} />
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+      <path d="M3.2 11.15 20.6 3.55c.7-.3 1.35.4 1 1.1L14.2 21.6c-.28.62-1.18.55-1.35-.1l-1.7-5.95-5.95-1.7c-.65-.18-.72-1.08-.1-1.35Z" fill={color} />
     </svg>
   );
 }
 
 function IconPlus() {
   return (
-    <span className="grid h-[28px] w-[28px] place-items-center rounded-full bg-[#AAAEB1]">
+    <span className="grid h-[28px] w-[28px] place-items-center rounded-full bg-[#AEB2B6]">
       <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
-        <path d="M7 2v10M2 7h10" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M7 2v10M2 7h10" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" />
       </svg>
     </span>
   );
@@ -196,27 +277,44 @@ function IconStickerFace() {
   );
 }
 
-function Avatar({ src, name, size }: { src: string; name: string; size: number }) {
+function Avatar({
+  src,
+  name,
+  size,
+  online,
+}: {
+  src: string;
+  name: string;
+  size: number;
+  online?: boolean;
+}) {
   const letter = (name.trim()[0] || "K").toUpperCase();
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt=""
-        width={size}
-        height={size}
-        className="shrink-0 rounded-full object-cover"
-        style={{ width: size, height: size }}
-        draggable={false}
-      />
-    );
-  }
   return (
-    <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full bg-[#7aa2ff] font-bold text-white"
-      style={{ width: size, height: size, fontSize: size * 0.4 }}
-    >
-      {letter}
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          width={size}
+          height={size}
+          className="rounded-full object-cover"
+          style={{ width: size, height: size }}
+          draggable={false}
+        />
+      ) : (
+        <span
+          className="inline-flex items-center justify-center rounded-full bg-[#7aa2ff] font-bold text-white"
+          style={{ width: size, height: size, fontSize: size * 0.4 }}
+        >
+          {letter}
+        </span>
+      )}
+      {online ? (
+        <span
+          className="absolute bottom-0 right-0 rounded-full border-2 border-white bg-[#31A24C]"
+          style={{ width: Math.max(8, size * 0.28), height: Math.max(8, size * 0.28) }}
+        />
+      ) : null}
     </span>
   );
 }
@@ -276,24 +374,35 @@ function Editable({
 function Sticker({ sticker }: { sticker: "thumb" | "1010" }) {
   if (sticker === "1010") {
     return (
-      <div className="relative h-[108px] w-[108px] overflow-hidden rounded-[18px] bg-gradient-to-b from-[#5eb0ff] to-[#1874FC] shadow-sm">
+      <div className="relative h-[108px] w-[108px] overflow-hidden rounded-[18px] bg-gradient-to-b from-[#5eb0ff] to-[#006AFF] shadow-sm">
         <div className="absolute left-2 top-2 rounded-md bg-[#ff3b30] px-1.5 py-0.5 text-[13px] font-black text-white shadow">10</div>
         <div className="absolute right-2 top-2 rounded-md bg-[#ff3b30] px-1.5 py-0.5 text-[13px] font-black text-white shadow">10</div>
         <div className="absolute inset-x-0 bottom-2 text-center text-[42px] leading-none">😎</div>
       </div>
     );
   }
+  /** Flat Messenger/Zalo Like trên nền trắng — khớp ảnh thật. */
   return (
-    <div className="relative grid h-[118px] w-[118px] place-items-center">
-      <div
-        className="grid h-[108px] w-[108px] place-items-center rounded-full"
-        style={{
-          background: "radial-gradient(circle at 35% 30%, #4aa3ff 0%, #0380FF 55%, #0060d6 100%)",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.18), inset 0 2px 0 rgba(255,255,255,0.35)",
-        }}
-      >
-        <span className="translate-y-[2px] text-[58px] leading-none drop-shadow">👍</span>
-      </div>
+    <div
+      className="grid h-[118px] w-[118px] place-items-center rounded-[16px] bg-white"
+      style={{ boxShadow: "0 0.5px 1px rgba(0,0,0,0.10)" }}
+    >
+      <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden>
+        <path
+          d="M17 37h12.2V67H17c-2.4 0-4.3-1.9-4.3-4.3V41.3c0-2.4 1.9-4.3 4.3-4.3Z"
+          fill="#0084FF"
+          stroke="#fff"
+          strokeWidth="2.4"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M29.2 37 37.8 12.6c.9-2.5 4-3.5 6.1-2l3.5 2.4c1.5 1.1 2.1 3.1 1.3 4.8L44.2 30.5H68c3.7 0 6.4 3.5 5.4 7.1l-5.7 21c-.8 2.7-3.3 4.6-6.1 4.6H29.2V37Z"
+          fill="#0084FF"
+          stroke="#fff"
+          strokeWidth="2.4"
+          strokeLinejoin="round"
+        />
+      </svg>
     </div>
   );
 }
@@ -301,12 +410,34 @@ function Sticker({ sticker }: { sticker: "thumb" | "1010" }) {
 function HeartReaction({
   count,
   live,
+  classic,
   onCommit,
 }: {
   count: number;
   live?: boolean | undefined;
+  classic?: boolean;
   onCommit: (n: number) => void;
 }) {
+  if (classic) {
+    return (
+      <span className="absolute -bottom-[10px] right-0 inline-flex items-center gap-[3px]">
+        <span className="inline-flex items-center gap-[2px] rounded-full bg-white px-[5px] py-[2px] shadow-[0_0.5px_1.5px_rgba(0,0,0,0.18)]">
+          <span className="text-[12px] leading-none">❤️</span>
+          {count > 1 ? (
+            <Editable
+              live={live}
+              value={String(count)}
+              className="text-[10px] font-semibold text-black/70"
+              onCommit={(value) => onCommit(Number(value) || 1)}
+            />
+          ) : null}
+        </span>
+        <span className="grid h-[18px] w-[18px] place-items-center rounded-full bg-white shadow-[0_0.5px_1.5px_rgba(0,0,0,0.18)] text-[11px] text-[#C7C7CC]">
+          ♡
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="absolute -bottom-[8px] right-1 inline-flex items-center gap-[2px] rounded-full border border-black/10 bg-white px-[5px] py-[1px] shadow-sm">
       <span className="text-[11px] leading-none">❤️</span>
@@ -322,40 +453,136 @@ function HeartReaction({
   );
 }
 
-function IosKeyboard() {
-  const key = (label: string, wide?: number, muted?: boolean) => (
+function DoubleCheck() {
+  return (
+    <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden className="shrink-0">
+      <path d="M1.2 5.2 3.6 7.6 8.4 1.8" fill="none" stroke="#8E8E93" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.2 5.2 7.6 7.6 12.8 1.6" fill="none" stroke="#8E8E93" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function KeyShell({
+  children,
+  wide,
+  muted,
+  dark,
+  className,
+}: {
+  children: ReactNode;
+  wide?: number;
+  muted?: boolean;
+  dark?: boolean;
+  className?: string;
+}) {
+  const background = dark ? KEY_RETURN : muted ? KEY_MUTED : "#fff";
+  return (
     <div
-      key={label}
-      className="grid h-[42px] place-items-center rounded-[5px] text-[20px] text-black shadow-[0_1px_0_rgba(0,0,0,0.25)]"
+      className={`grid h-[42px] place-items-center rounded-[5.5px] text-black ${className ?? ""}`}
       style={{
         flex: wide ?? 1,
-        background: muted ? "#A8AEB8" : "#fff",
-        fontSize: muted || label.length > 1 ? 14 : 20,
-        fontWeight: muted ? 600 : 400,
+        background,
+        boxShadow: "0 1px 0 rgba(0,0,0,0.30)",
       }}
     >
-      {label}
+      {children}
     </div>
   );
+}
+
+function IconBackspace() {
   return (
-    <div className="select-none bg-[#D3D2D7] px-[3px] pb-[4px] pt-[6px]">
-      <div className="mb-[6px] flex gap-[5px]">{["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((k) => key(k))}</div>
-      <div className="mb-[6px] flex gap-[5px]">{["-", "/", ":", ";", "(", ")", "đ", "&", "@", "”"].map((k) => key(k))}</div>
-      <div className="mb-[6px] flex gap-[5px]">
-        {key("#+=", 1.15, true)}
-        {[".", ",", "?", "!", "'"].map((k) => key(k))}
-        {key("⌫", 1.15, true)}
+    <svg width="23" height="17" viewBox="0 0 23 17" aria-hidden>
+      <path
+        d="M8.2 1.35h12A1.9 1.9 0 0 1 22.1 3.25v10.5a1.9 1.9 0 0 1-1.9 1.9H8.2L1.55 8.6 8.2 1.35Z"
+        fill="none"
+        stroke={ICON_STROKE}
+        strokeWidth="1.35"
+        strokeLinejoin="round"
+      />
+      <path d="M11.35 5.2 16.4 11.1M16.4 5.2 11.35 11.1" stroke={ICON_STROKE} strokeWidth="1.45" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconEmojiKey() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+      <circle cx="11" cy="11" r="7.6" fill="none" stroke={ICON_STROKE} strokeWidth="1.35" />
+      <circle cx="8.1" cy="9.3" r="1.05" fill={ICON_STROKE} />
+      <circle cx="13.9" cy="9.3" r="1.05" fill={ICON_STROKE} />
+      <path d="M7.6 13.2c1.15 1.55 2.55 2.25 3.4 2.25s2.25-.7 3.4-2.25" fill="none" stroke={ICON_STROKE} strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconGlobe() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+      <circle cx="11" cy="11" r="7.6" fill="none" stroke="#636366" strokeWidth="1.25" />
+      <path
+        d="M3.4 11h15.2M11 3.4c2.45 2.5 2.45 12.7 0 15.2M11 3.4c-2.45 2.5-2.45 12.7 0 15.2"
+        fill="none"
+        stroke="#636366"
+        strokeWidth="1.15"
+      />
+      <ellipse cx="11" cy="11" rx="3.4" ry="7.6" fill="none" stroke="#636366" strokeWidth="1.1" />
+    </svg>
+  );
+}
+
+function IconMic() {
+  return (
+    <svg width="15" height="22" viewBox="0 0 15 22" aria-hidden>
+      <rect x="4.4" y="1.6" width="6.2" height="11" rx="3.1" fill="none" stroke="#636366" strokeWidth="1.3" />
+      <path
+        d="M2.2 10.4c0 3 2.4 5.4 5.3 5.4s5.3-2.4 5.3-5.4M7.5 15.8v3.5M4.5 19.3h6"
+        fill="none"
+        stroke="#636366"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function IosKeyboard() {
+  const char = (label: string) => (
+    <KeyShell key={label}>
+      <span className="text-[22px] font-light leading-none tracking-tight">{label}</span>
+    </KeyShell>
+  );
+  return (
+    <div className="select-none px-[3px] pb-[1px] pt-[8px]" style={{ background: KEYBOARD_BG }}>
+      <div className="mb-[8px] flex gap-[6px] px-[3px]">{["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map(char)}</div>
+      <div className="mb-[8px] flex gap-[6px] px-[3px]">{["-", "/", ":", ";", "(", ")", "đ", "&", "@", '"'].map(char)}</div>
+      <div className="mb-[8px] flex gap-[6px] px-[3px]">
+        <KeyShell wide={1.35} muted>
+          <span className="text-[14px] font-normal">#+=</span>
+        </KeyShell>
+        {[".", ",", "?", "!", "'"].map(char)}
+        <KeyShell wide={1.35} muted>
+          <IconBackspace />
+        </KeyShell>
       </div>
-      <div className="mb-[4px] flex gap-[5px]">
-        {key("ABC", 1.15, true)}
-        {key("😊", 0.9, true)}
-        {key("VI EN", 3.2)}
-        {key("Nhập", 1.35, true)}
+      <div className="mb-[4px] flex gap-[6px] px-[3px]">
+        <KeyShell wide={1.25} muted>
+          <span className="text-[14px] font-normal">ABC</span>
+        </KeyShell>
+        <KeyShell wide={0.95} muted>
+          <IconEmojiKey />
+        </KeyShell>
+        <KeyShell wide={3.35} className="relative">
+          <span className="absolute bottom-[5px] right-[7px] text-[9px] font-medium tracking-[0.04em] text-black/30">VI EN</span>
+        </KeyShell>
+        <KeyShell wide={1.35} dark>
+          <span className="text-[15px] font-normal text-black">Nhập</span>
+        </KeyShell>
       </div>
-      <div className="flex items-center justify-between px-4 pt-1 text-[17px] text-black/55">
-        <span>🌐</span>
-        <span className="h-[5px] w-[120px] rounded-full bg-black" />
-        <span>🎤</span>
+      <div className="flex items-end justify-between px-[18px] pb-[6px] pt-[6px]">
+        <IconGlobe />
+        <span className="mb-[2px] h-[5px] w-[128px] rounded-full bg-black" />
+        <IconMic />
       </div>
     </div>
   );
@@ -380,7 +607,7 @@ function Header({ draft, live, onChange }: Props) {
               onCommit={(customerName) => onChange?.({ ...draft, customerName })}
             />
             {draft.stranger ? (
-              <span className="mt-[3px] inline-block rounded-full bg-black/20 px-2 py-[1px] text-[10px] font-semibold tracking-wide">
+              <span className="mt-[3px] inline-block rounded-full bg-[#3A3A3C]/75 px-2 py-[1px] text-[10px] font-semibold tracking-wide text-white">
                 NGƯỜI LẠ
               </span>
             ) : (
@@ -395,11 +622,11 @@ function Header({ draft, live, onChange }: Props) {
           <div className="flex items-center gap-3.5 pr-2">
             <IconPhone light />
             <IconVideo light />
-            <IconMenu light plain />
+            <IconMenu light />
           </div>
         </div>
         {draft.stranger ? (
-          <div className="flex justify-center border-b border-black/5 bg-white py-[9px]">
+          <div className="flex justify-center border-b border-black/5 bg-[#F7F7F8] py-[9px]">
             <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-black">
               <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
                 <circle cx="7" cy="5.5" r="2.4" fill="none" stroke="#111" strokeWidth="1.4" />
@@ -410,6 +637,43 @@ function Header({ draft, live, onChange }: Props) {
             </span>
           </div>
         ) : null}
+        {draft.callbackBanner ? (
+          <div className="flex justify-center bg-transparent py-[10px]" style={{ background: CLASSIC_CHAT_BG }}>
+            <span className="rounded-full bg-white px-4 py-[6px] text-[13px] font-semibold tracking-wide text-[#0084FF] shadow-[0_0.5px_1.5px_rgba(0,0,0,0.12)]">
+              GỌI LẠI
+            </span>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (messenger) {
+    const online = /đang hoạt động/i.test(draft.statusText);
+    return (
+      <div className="flex items-center gap-2 border-b border-[#E5E5EA] bg-white px-2 py-[8px]">
+        <span className="pl-1">
+          <Chevron />
+        </span>
+        <Avatar src={draft.customerAvatar} name={draft.customerName} size={36} online={online} />
+        <div className="min-w-0 flex-1">
+          <Editable
+            live={live}
+            value={draft.customerName}
+            className="block truncate text-[16px] font-semibold text-black"
+            onCommit={(customerName) => onChange?.({ ...draft, customerName })}
+          />
+          <Editable
+            live={live}
+            value={draft.statusText || "Đang hoạt động"}
+            className="block truncate text-[12px] font-normal text-[#8E8E93]"
+            onCommit={(statusText) => onChange?.({ ...draft, statusText })}
+          />
+        </div>
+        <div className="flex items-center gap-2 pr-1">
+          <IconMessengerPhone />
+          <IconMessengerVideo />
+        </div>
       </div>
     );
   }
@@ -430,31 +694,22 @@ function Header({ draft, live, onChange }: Props) {
           <Editable
             live={live}
             value={draft.customerName}
-            className="truncate text-[15px] font-bold text-black"
+            className="truncate text-[15px] font-semibold text-black"
             onCommit={(customerName) => onChange?.({ ...draft, customerName })}
           />
-          {!messenger ? <VerifiedBadge /> : null}
+          <VerifiedBadge />
         </div>
         <Editable
           live={live}
           value={draft.statusText || "Đang hoạt động"}
-          className="block truncate text-[11px] text-[#8E8E93]"
+          className="block truncate text-[11px] font-normal text-[#8E8E93]"
           onCommit={(statusText) => onChange?.({ ...draft, statusText })}
         />
       </div>
-      <div className="flex items-center gap-3 pr-1">
-        {messenger ? (
-          <>
-            <IconPhone />
-            <IconVideo />
-          </>
-        ) : (
-          <>
-            <IconTag />
-            <IconNote />
-            <IconMenu />
-          </>
-        )}
+      <div className="flex items-center gap-[9px] pr-1">
+        <IconTag />
+        <IconNote />
+        <IconMenu />
       </div>
     </div>
   );
@@ -463,7 +718,7 @@ function Header({ draft, live, onChange }: Props) {
 function showCustomerAvatar(lines: FeedbackLine[], index: number): boolean {
   const line = lines[index];
   if (!line || line.kind === "date" || line.kind === "status" || line.side !== "customer") return false;
-  if (line.kind === "text" && line.showAvatar === false) return false;
+  if ((line.kind === "text" || line.kind === "image") && line.showAvatar === false) return false;
   for (let i = index + 1; i < lines.length; i += 1) {
     const next = lines[i]!;
     if (next.kind === "date" || next.kind === "status") break;
@@ -478,15 +733,16 @@ function gapBefore(lines: FeedbackLine[], index: number): number {
   const prev = lines[index - 1]!;
   const curr = lines[index]!;
   if (prev.kind === "date" || curr.kind === "date" || prev.kind === "status" || curr.kind === "status") return 12;
-  if ("side" in prev && "side" in curr && prev.side === curr.side) return 3;
+  if ("side" in prev && "side" in curr && prev.side === curr.side) return 5;
   return 14;
 }
 
 export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selectedId }: Props) {
   const classic = draft.platform === "zalo_classic";
-  const shopBg = classic ? CLASSIC_BUBBLE : MODERN_BLUE;
+  const messenger = draft.platform === "messenger";
+  const shopBg = classic ? CLASSIC_BUBBLE : messenger ? MESSENGER_BLUE : MODERN_BLUE;
   const shopColor = classic ? "#111" : "#fff";
-  const chatBg = classic ? CLASSIC_CHAT_BG : MODERN_CHAT_BG;
+  const chatBg = classic ? CLASSIC_CHAT_BG : messenger ? "#fff" : MODERN_CHAT_BG;
   const statusLight = classic;
   const threadRef = useRef<HTMLDivElement>(null);
 
@@ -549,14 +805,26 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
             );
           }
           if (line.kind === "status") {
+            const classicRead = classic || /nhận/i.test(line.text);
             return (
               <div key={line.id} className="flex justify-end pr-1" style={{ marginTop: 4 }}>
-                <Editable
-                  live={live}
-                  value={`✓ ${line.text}`}
-                  className="text-[11px] text-black/40"
-                  onCommit={(text) => onChange?.(patchLine(draft, line.id, { text: text.replace(/^✓\s*/, "") }))}
-                />
+                {classicRead ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#E8EAED] px-2 py-[2px] text-[11px] text-[#6C6C70]">
+                    <DoubleCheck />
+                    <Editable
+                      live={live}
+                      value={line.text}
+                      onCommit={(text) => onChange?.(patchLine(draft, line.id, { text }))}
+                    />
+                  </span>
+                ) : (
+                  <Editable
+                    live={live}
+                    value={`✓ ${line.text}`}
+                    className="text-[11px] text-black/40"
+                    onCommit={(text) => onChange?.(patchLine(draft, line.id, { text: text.replace(/^✓\s*/, "") }))}
+                  />
+                )}
               </div>
             );
           }
@@ -564,6 +832,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
           const mine = line.side === "shop";
           const selected = selectedId === line.id;
           const avatar = !mine && showCustomerAvatar(draft.lines, index);
+          const radius = classic ? 14 : messenger ? 20 : 18;
 
           return (
             <div
@@ -580,14 +849,30 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
               <div className="relative max-w-[78%]">
                 {line.kind === "sticker" ? (
                   <Sticker sticker={line.sticker} />
+                ) : line.kind === "image" ? (
+                  <div
+                    className="overflow-hidden"
+                    style={{
+                      borderRadius: radius,
+                      maxWidth: 220,
+                      boxShadow: mine ? "none" : "0 0.5px 1px rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    <img
+                      src={line.src}
+                      alt=""
+                      className="block max-h-[280px] w-full object-cover"
+                      draggable={false}
+                    />
+                  </div>
                 ) : (
                   <div
                     className="px-[12px] py-[8px] text-[15px] leading-[1.35]"
                     style={{
-                      background: mine ? shopBg : "#fff",
+                      background: mine ? shopBg : messenger ? "#F0F0F0" : "#fff",
                       color: mine ? shopColor : "#111",
-                      borderRadius: classic ? 14 : 18,
-                      boxShadow: mine ? "none" : "0 0.5px 0 rgba(0,0,0,0.06)",
+                      borderRadius: radius,
+                      boxShadow: "none",
                     }}
                   >
                     <Editable
@@ -602,16 +887,17 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                         live={live}
                         value={line.time}
                         className="mt-[2px] block text-[10px] text-black/35"
-                        style={{ textAlign: classic ? "left" : "right" }}
+                        style={{ textAlign: mine ? "right" : "left" }}
                         onCommit={(time) => onChange?.(patchLine(draft, line.id, { time }))}
                       />
                     ) : null}
                   </div>
                 )}
-                {line.hearts ? (
+                {"hearts" in line && line.hearts ? (
                   <HeartReaction
                     count={line.hearts}
                     live={live}
+                    classic={classic}
                     onCommit={(hearts) => onChange?.(patchLine(draft, line.id, { hearts }))}
                   />
                 ) : null}
@@ -621,20 +907,38 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
         })}
       </div>
 
-      <div className="flex items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
-        {classic ? <IconStickerFace /> : <IconPlus />}
-        <div
-          className={`flex min-h-[36px] flex-1 items-center px-3 text-[14px] text-black/55 ${
-            classic ? "rounded-md bg-white" : "rounded-full bg-[#EFEFEF]"
-          }`}
-        >
-          <Editable live={live} value={draft.inputHint} onCommit={(inputHint) => onChange?.({ ...draft, inputHint })} />
-          <span className="ml-[1px] inline-block h-[16px] w-[2px] bg-[#1874FC]" />
+      {messenger ? (
+        <div className="flex items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
+          <IconCamera />
+          <div className="flex min-h-[36px] flex-1 items-center rounded-full bg-[#F0F0F0] px-3 text-[15px] text-black/45">
+            <Editable live={live} value={draft.inputHint || "Aa"} onCommit={(inputHint) => onChange?.({ ...draft, inputHint })} />
+            {live ? <span className="ml-[1px] inline-block h-[16px] w-[2px] bg-[#0084FF]" /> : null}
+          </div>
+          <IconLikeThumb />
         </div>
-        <span className="pr-1">
-          <IconSend color={classic ? CLASSIC_BLUE : MODERN_BLUE} />
-        </span>
-      </div>
+      ) : (
+        <div className="flex items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
+          {classic ? <IconStickerFace /> : <IconPlus />}
+          <div
+            className={`flex min-h-[36px] flex-1 items-center px-3 text-[14px] text-black/55 ${
+              classic ? "rounded-md bg-white" : "rounded-full bg-[#EFEFF0]"
+            }`}
+          >
+            <Editable live={live} value={draft.inputHint} onCommit={(inputHint) => onChange?.({ ...draft, inputHint })} />
+            {live ? <span className="ml-[1px] inline-block h-[16px] w-[2px] bg-[#006AFF]" /> : null}
+          </div>
+          {!classic && !draft.showKeyboard ? (
+            <span className="flex items-center gap-2 pr-1">
+              <IconGallery />
+              <IconMoreCircle />
+            </span>
+          ) : (
+            <span className="pr-1">
+              <IconSend color={classic ? CLASSIC_BLUE : MODERN_BLUE} />
+            </span>
+          )}
+        </div>
+      )}
 
       {draft.showKeyboard ? (
         <IosKeyboard />
