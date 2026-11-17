@@ -185,6 +185,7 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (renameDeskStaff(state)) changed = true;
   if (grantDeskLinks(state)) changed = true;
   if (grantTaskMenu(state)) changed = true;
+  if (grantMediaMenu(state)) changed = true;
   if (applyDeskSupplies(state as unknown as Parameters<typeof applyDeskSupplies>[0])) changed = true;
   if (ensureGroupSupplies(state as unknown as Parameters<typeof ensureGroupSupplies>[0])) changed = true;
   if (ensureInkMillilitres(state as unknown as Parameters<typeof ensureInkMillilitres>[0])) changed = true;
@@ -430,5 +431,25 @@ function grantTaskMenu(state: Migratable): boolean {
     }
   }
   settings.taskMenu20261023 = true;
+  return true;
+}
+
+const MEDIA_MENU_LINKS: Record<string, string[]> = {
+  owner: ["/admin/media", "/admin/feedback-gia"],
+  sale: ["/admin/media", "/admin/feedback-gia"],
+  production: ["/admin/media"],
+};
+
+/** Sổ cũ chưa có Media trong roleModules → menu slide ẩn hết nhóm Media. */
+function grantMediaMenu(state: Migratable): boolean {
+  const settings = state.settings as Settings;
+  if (settings.mediaMenu20261117) return false;
+  if (!state.roleModules?.length) return false;
+  for (const row of state.roleModules) {
+    for (const path of MEDIA_MENU_LINKS[row.role] ?? []) {
+      if (!row.modules.includes(path)) row.modules.push(path);
+    }
+  }
+  settings.mediaMenu20261117 = true;
   return true;
 }

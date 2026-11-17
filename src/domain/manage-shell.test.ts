@@ -3,6 +3,8 @@ import test from "node:test";
 
 import { STUDIO_BRIDGES } from "../admin-os/bridges.ts";
 import { ADMIN_MODULE_GROUPS, MANAGE_SKIP, modulesForRole } from "../admin-os/modules.ts";
+import { applyStoreMigrations } from "./migrate-shop.ts";
+import type { RoleModules, Settings } from "./types.ts";
 
 test("menu phẳng có Hình ảnh và Media mở rộng trên slide", () => {
   const titles = ADMIN_MODULE_GROUPS.map((group) => group.title);
@@ -82,4 +84,48 @@ test("owner thấy đủ mục kể cả Hình ảnh và Feedback; không thấy
   assert.equal(owner.includes("/admin/danh-gia"), false);
   assert.equal(owner.includes("/admin/thong-bao"), false);
   assert.equal(owner.includes("/admin/tin-mau"), false);
+});
+
+test("migration gắn Media vào roleModules sổ cũ một lần", () => {
+  const roleModules: RoleModules[] = [
+    { role: "owner", modules: ["/admin", "/admin/album"] },
+    { role: "sale", modules: ["/admin", "/admin/album"] },
+    { role: "production", modules: ["/admin", "/admin/album"] },
+  ];
+  const state = {
+    settings: {
+      zaloDefaultMigrated: true,
+      mediaMenu20261117: false,
+      menuLinks20261022: true,
+      taskMenu20261023: true,
+      catalogImport20261022: true,
+      hrApproved20261022: true,
+      orderDesk20261024: true,
+      deskBom20261023: true,
+      groupSupply20261024: true,
+      inkMl20261024: true,
+      inkExpense20261024: true,
+      checklist20261023: true,
+      fixedCosts: [{ key: "x", label: "x", amount: 1 }],
+    } as unknown as Settings,
+    roleModules,
+    groups: [],
+    skus: [],
+    prices: [],
+    materials: [],
+    boms: [],
+    orders: [],
+    staff: [],
+  };
+  assert.equal(applyStoreMigrations(state), true);
+  assert.equal(state.settings.mediaMenu20261117, true);
+  assert.ok(roleModules[0]!.modules.includes("/admin/media"));
+  assert.ok(roleModules[0]!.modules.includes("/admin/feedback-gia"));
+  assert.ok(roleModules[1]!.modules.includes("/admin/feedback-gia"));
+  assert.ok(roleModules[2]!.modules.includes("/admin/media"));
+  assert.equal(roleModules[2]!.modules.includes("/admin/feedback-gia"), false);
+  // Chạy lại không gắn trùng.
+  const before = roleModules[0]!.modules.filter((path) => path === "/admin/media").length;
+  applyStoreMigrations(state);
+  assert.equal(roleModules[0]!.modules.filter((path) => path === "/admin/media").length, before);
 });
