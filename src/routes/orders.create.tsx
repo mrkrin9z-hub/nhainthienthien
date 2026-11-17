@@ -9,6 +9,7 @@ export const Route = createFileRoute("/orders/create")({
     phone: typeof search.phone === "string" ? search.phone : undefined,
     name: typeof search.name === "string" ? search.name : undefined,
     chat: typeof search.chat === "string" ? search.chat : undefined,
+    album: typeof search.album === "string" ? search.album : undefined,
   }),
   component: CreateOrderPage,
 });
@@ -38,13 +39,16 @@ function CreateOrderBody() {
         <div>
           <h1 className="text-2xl font-extrabold text-primary">Tạo đơn hàng mới</h1>
           <p className="text-sm text-muted-foreground">
-            Tên và số là đủ để tạo đơn lấy mã QR gửi ảnh. Sản phẩm có thể thêm sau.
+            {search.album
+              ? "Ảnh album sẽ gắn vào đơn khi lưu. Tên, số và thanh toán; sản phẩm có thể thêm sau."
+              : "Tên và số là đủ để tạo đơn lấy mã QR gửi ảnh. Sản phẩm có thể thêm sau."}
           </p>
         </div>
       </div>
       <CreateOrderForm
         initialPhone={search.phone}
         initialName={search.name}
+        albumId={search.album ?? null}
         onCreated={(code) => void router.navigate({ to: "/admin/don-hang/$code", params: { code } })}
       />
     </div>

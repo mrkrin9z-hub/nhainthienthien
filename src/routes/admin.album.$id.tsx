@@ -51,7 +51,7 @@ function AlbumDetailPage() {
           ) : (
             <div className="flex flex-wrap gap-2">
               <Button asChild className="min-h-11">
-                <Link to="/orders/create" search={{ phone: data.phone, name: data.customerName || undefined }}>
+                <Link to="/orders/create" search={{ phone: data.phone, name: data.customerName || undefined, album: data.id }}>
                   Tạo đơn mới
                 </Link>
               </Button>

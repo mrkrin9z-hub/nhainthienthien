@@ -144,7 +144,10 @@ function AlbumHome() {
               </Button>
               {!row.orderId ? (
                 <Button asChild className="min-h-10">
-                  <Link to="/orders/create" search={{ phone: row.phone, name: row.customerName || undefined }}>
+                  <Link
+                    to="/orders/create"
+                    search={{ phone: row.phone, name: row.customerName || undefined, album: row.id }}
+                  >
                     Tạo đơn
                   </Link>
                 </Button>
