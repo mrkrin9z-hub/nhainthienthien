@@ -79,7 +79,7 @@ function GuidePage() {
 
         <div className="mt-8">
           <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-            <Link to="/dat-in">Bắt đầu đặt in</Link>
+            <Link to="/admin">Bắt đầu đặt in</Link>
           </Button>
         </div>
       </main>

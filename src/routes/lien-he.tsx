@@ -57,10 +57,10 @@ function ContactPage() {
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <Link to="/dat-in" className="glass-card rounded-3xl p-5">
+          <Link to="/admin" className="glass-card rounded-3xl p-5">
             <UploadCloud className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Đặt in online</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Chọn quy cách, gửi ảnh và nhận mã đơn.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Vào bàn làm việc để tạo đơn hoặc lấy mã gửi ảnh.</p>
           </Link>
           <Link to="/tra-cuu" className="glass-card rounded-3xl p-5">
             <PackageSearch className="size-6 text-accent" />

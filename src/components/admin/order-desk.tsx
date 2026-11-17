@@ -240,10 +240,7 @@ export function OrderDesk({
         variant: line.variant.trim(),
         ...(line.unit !== null ? { unitPrice: line.unit, ...(line.priceTouched ? { priceReason } : {}) } : {}),
       }));
-    if (!itemsLocked && !items.length) {
-      toast.error("Chọn ít nhất một sản phẩm.");
-      return;
-    }
+    // Cho phép tạo đơn không sản phẩm để lấy mã QR gửi ảnh trước.
     if (priced.some((line) => line.priceTouched) && !priceReason.trim()) {
       toast.error("Sửa giá cần ghi lý do.");
       return;
@@ -403,7 +400,11 @@ export function OrderDesk({
           </div>
           {priced.length === 0 ? (
             <div className="rounded-xl border border-dashed px-3 py-10 text-center">
-              <p className="text-sm text-muted-foreground">Chưa có sản phẩm trong đơn.</p>
+              <p className="text-sm text-muted-foreground">
+                {mode === "create"
+                  ? "Có thể lưu đơn trống để lấy mã QR gửi ảnh trước, rồi thêm sản phẩm sau."
+                  : "Chưa có sản phẩm trong đơn."}
+              </p>
               {itemsLocked ? null : (
                 <Button type="button" className="mt-3" onClick={() => setPickerOpen(true)}>
                   <Plus className="mr-1 size-4" />

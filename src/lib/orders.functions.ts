@@ -120,6 +120,7 @@ export type OrderLookupResult = {
 
 const albumTicketSchema = z.object({
   phone: z.string().trim().min(8).max(20),
+  customerName: z.string().trim().max(80).optional().default(""),
   fileName: z.string().min(1).max(200),
   mimeType: z.string().min(3).max(100),
   sizeBytes: z.number().int().min(1),

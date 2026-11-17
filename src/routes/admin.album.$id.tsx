@@ -30,14 +30,16 @@ function AlbumDetailPage() {
     <div className="space-y-4">
       <div>
         <Link to="/admin/album" className="text-sm text-muted-foreground">
-          Quay lại album
+          Quay lại quản lý hình ảnh
         </Link>
-        <h1 className="text-2xl font-extrabold text-primary">{data.phone}</h1>
-        <p className="text-sm text-muted-foreground">Album này là thư mục ảnh của số {data.phone}.</p>
+        <h1 className="text-2xl font-extrabold text-primary">
+          {data.customerName ? `${data.customerName} · ${data.phone}` : data.phone}
+        </h1>
+        <p className="text-sm text-muted-foreground">Ảnh khách gửi theo tên và số điện thoại — có thể tạo đơn hoặc gắn vào đơn có sẵn.</p>
       </div>
       {canLink ? (
         <section className="glass-card space-y-3 rounded-3xl p-4">
-          <h2 className="font-bold text-primary">Liên kết đơn</h2>
+          <h2 className="font-bold text-primary">Đơn hàng</h2>
           {data.orderCode ? (
             <p className="text-sm">
               Đang gắn với{" "}
@@ -47,7 +49,14 @@ function AlbumDetailPage() {
               . Có thể gắn sang đơn khác.
             </p>
           ) : (
-            <p className="text-sm text-muted-foreground">Ảnh sẽ được đưa vào mục Ảnh khách của đơn.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild className="min-h-11">
+                <Link to="/orders/create" search={{ phone: data.phone, name: data.customerName || undefined }}>
+                  Tạo đơn mới
+                </Link>
+              </Button>
+              <p className="w-full text-sm text-muted-foreground">Hoặc gắn ảnh vào đơn đã có bằng mã đơn bên dưới.</p>
+            </div>
           )}
           <div className="flex flex-wrap items-end gap-2">
             <label className="min-w-0 flex-1 text-sm font-semibold">

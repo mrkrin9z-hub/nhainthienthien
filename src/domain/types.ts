@@ -726,6 +726,8 @@ export type Audit = {
 export type PhotoAlbum = {
   id: string;
   phone: string;
+  /** Tên khách khi gửi ảnh qua mã QR chung. Thiếu trên album cũ. */
+  customerName?: string;
   createdAt: string;
   updatedAt: string;
   orderId: string | null;

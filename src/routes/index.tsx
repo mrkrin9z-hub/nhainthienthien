@@ -126,7 +126,7 @@ function ShopCard({ product }: { product: CatalogProduct }) {
           )}
         </p>
         <Button asChild className="mt-3 min-h-12 w-full bg-accent text-accent-foreground hover:bg-accent/90">
-          <Link to="/dat-in" search={{ product: product.slug }}>
+          <Link to="/admin">
             Chọn sản phẩm <ArrowRight className="size-4" />
           </Link>
         </Button>
@@ -165,7 +165,7 @@ function HomePage() {
                   Xem gian hàng <ArrowRight className="size-4" />
                 </a>
               </Button>
-              <Link to="/dat-in" className="min-h-11 text-center text-sm font-semibold text-primary sm:text-left">
+              <Link to="/admin" className="min-h-11 text-center text-sm font-semibold text-primary sm:text-left">
                 Đặt in ngay
               </Link>
             </div>
@@ -301,7 +301,7 @@ function HomePage() {
                 size="lg"
                 className="min-h-12 w-full bg-accent text-accent-foreground hover:bg-accent/90 sm:w-auto"
               >
-                <Link to="/dat-in">
+                <Link to="/admin">
                   Đặt in <ArrowRight className="size-4" />
                 </Link>
               </Button>

@@ -24,7 +24,7 @@ export function SiteFooter() {
           <Link to="/san-pham" className="block text-foreground/80 hover:text-primary">
             Sản phẩm và giá
           </Link>
-          <Link to="/dat-in" className="block text-foreground/80 hover:text-primary">
+          <Link to="/admin" className="block text-foreground/80 hover:text-primary">
             Đặt in
           </Link>
           <Link to="/huong-dan" className="block text-foreground/80 hover:text-primary">
