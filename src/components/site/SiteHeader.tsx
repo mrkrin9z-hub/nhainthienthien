@@ -15,7 +15,7 @@ const NAV = [
 const TABS = [
   { to: "/", label: "Trang chủ", icon: Home, exact: true },
   { to: "/san-pham", label: "Sản phẩm", icon: Images, exact: false },
-  { to: "/dat-in", label: "Đặt in", icon: UploadCloud, exact: false },
+  { to: "/admin", label: "Đặt in", icon: UploadCloud, exact: false },
   { to: "/tra-cuu", label: "Tra cứu", icon: Search, exact: false },
 ] as const;
 
@@ -50,7 +50,7 @@ export function SiteHeader() {
             ))}
           </nav>
           <Link
-            to="/dat-in"
+            to="/admin"
             className="ml-auto hidden min-h-11 items-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground md:inline-flex"
           >
             Đặt in

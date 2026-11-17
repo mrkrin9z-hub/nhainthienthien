@@ -483,7 +483,7 @@ function buildItems(
   actorRole: Role | "web",
   items: { skuId: string; quantity: number; variant?: string; unitPrice?: number | null; priceReason?: string }[],
 ) {
-  if (!items.length) throw new Error("Đơn chưa có sản phẩm.");
+  /** Đơn trống được phép — tạo nhanh để lấy mã QR gửi ảnh trước. */
   return items.map((item) => {
     const sku = skuOrThrow(state, item.skuId);
     if (!skuSoldOn(sku, channel)) throw new Error("Sản phẩm này không bán ở kênh đang chọn.");
@@ -748,9 +748,16 @@ function findAlbum(state: ShopState, albumId: string): PhotoAlbum {
   return album;
 }
 
-/** Khách gửi ảnh vào album mang tên số điện thoại. Cùng số thì vào cùng album. */
-export async function createAlbumTicket(input: { phone: string; fileName: string; mimeType: string; sizeBytes: number }) {
+/** Khách gửi ảnh vào album theo SĐT (+ tên). Cùng số thì vào cùng album. */
+export async function createAlbumTicket(input: {
+  phone: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  customerName?: string;
+}) {
   const phone = albumPhone(input.phone);
+  const customerName = (input.customerName || "").trim().slice(0, 80);
   if (!imageMimeAllowed(input.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
   const limit = await photoByteLimit();
   if (photoTooBig(input.sizeBytes, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
@@ -760,8 +767,18 @@ export async function createAlbumTicket(input: { phone: string; fileName: string
     const albums = albumsOf(state);
     let album = albums.find((item) => item.phone === phone);
     if (!album) {
-      album = { id: nid(), phone, createdAt: nowIso(), updatedAt: nowIso(), orderId: null, files: [] };
+      album = {
+        id: nid(),
+        phone,
+        ...(customerName ? { customerName } : {}),
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        orderId: null,
+        files: [],
+      };
       albums.unshift(album);
+    } else if (customerName) {
+      album.customerName = customerName;
     }
     album.files.push({
       id: fileId,
@@ -777,7 +794,7 @@ export async function createAlbumTicket(input: { phone: string; fileName: string
       deletedAt: null,
     });
     album.updatedAt = nowIso();
-    return { albumId: album.id, fileId, phone };
+    return { albumId: album.id, fileId, phone, customerName: album.customerName || "" };
   });
 }
 
@@ -852,6 +869,7 @@ export async function listPhotoAlbums(actor: Actor) {
     .map((album) => ({
       id: album.id,
       phone: album.phone,
+      customerName: album.customerName || "",
       fileCount: album.files.filter((file) => !file.deletedAt && file.status === "complete").length,
       updatedAt: album.updatedAt,
       orderId: album.orderId,
@@ -868,6 +886,7 @@ export async function getPhotoAlbum(actor: Actor, albumId: string) {
   return {
     id: album.id,
     phone: album.phone,
+    customerName: album.customerName || "",
     updatedAt: album.updatedAt,
     orderId: album.orderId,
     orderCode: order?.code ?? "",

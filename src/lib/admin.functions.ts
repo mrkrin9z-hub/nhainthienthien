@@ -132,7 +132,7 @@ export const createDeskOrder = createServerFn({ method: "POST" })
         netAmount: z.number().int().min(0).max(100_000_000).nullable().optional().default(null),
         designFileUrl: z.string().max(500).nullable().optional().default(null),
         ...moneyAdjust,
-        items: z.array(itemSchema).min(1),
+        items: z.array(itemSchema).default([]),
       })
       .parse(data),
   )

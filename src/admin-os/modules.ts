@@ -1,7 +1,7 @@
 import type { Role } from "@/domain/types";
 
 /**
- * Menu quản trị — bảy mục, một lần bấm. Việc phụ nằm trong tab của trang.
+ * Menu quản trị — một lần bấm. Việc phụ nằm trong tab của trang.
  *
  * @see docs/MANAGE_OS.md
  */
@@ -30,6 +30,10 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
   {
     title: "Đơn hàng",
     items: [{ to: "/admin/don-hang", label: "Đơn hàng", roles: ["owner", "sale", "production"], managePath: "/manage/orders", mode: "live" }],
+  },
+  {
+    title: "Hình ảnh",
+    items: [{ to: "/admin/album", label: "Hình ảnh", roles: ["owner", "sale", "production"], mode: "live" }],
   },
   {
     title: "Sản xuất",
