@@ -81,7 +81,7 @@ test("nhận tại tiệm vào bảng giao; khách đã nhận không vượt c�
   assert.equal(onDeliveryDesk({ status: "nhan_don", fulfillment: "pickup" }), false);
   assert.equal(onDeliveryDesk({ status: "huy", fulfillment: "pickup" }), false);
   assert.equal(onDeliveryDesk({ status: "giao", fulfillment: "pickup", isTest: true }), false);
-  assert.match(
+  assert.equal(
     statusChangeError({
       role: "sale",
       ownerOverride: false,
@@ -90,8 +90,8 @@ test("nhận tại tiệm vào bảng giao; khách đã nhận không vượt c�
       depositRequired: 0,
       depositPaid: 0,
       approvalReady: false,
-    }) ?? "",
-    /ảnh khách đã duyệt/,
+    }),
+    null,
   );
   assert.match(
     statusChangeError({

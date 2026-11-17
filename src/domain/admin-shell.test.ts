@@ -85,7 +85,7 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(form, /Cập nhật/);
   assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Thêm nhân viên/);
   assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Phân quyền/);
-  assert.match(readFileSync(new URL("../components/admin/production-page.tsx", import.meta.url), "utf8"), /Lệnh sản xuất/);
+  assert.match(readFileSync(new URL("../components/admin/production-page.tsx", import.meta.url), "utf8"), /nhận đơn → đã in → đã gói → đã giao/);
   const money = readFileSync(new URL("../components/admin/sections.tsx", import.meta.url), "utf8");
   assert.match(money, /Thu tiền/);
   assert.match(money, /Chi phí/);

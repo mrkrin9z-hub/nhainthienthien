@@ -12,15 +12,18 @@ export const OPS_OPEN_STATUSES: OrderStatus[] = [
   "giao",
 ];
 
-/** Cột công việc — pipeline in ấn. */
+/** Cột công việc — pipeline tinh gọn. */
 export const TASK_COLUMNS: { id: OrderStatus; label: string }[] = [
-  { id: "nhan_don", label: "Nhận file / đơn" },
-  { id: "thiet_ke", label: "Xử lý trước in" },
-  { id: "cho_duyet", label: "Khách duyệt" },
-  { id: "in", label: "Đang in" },
-  { id: "dong_goi", label: "Đóng gói" },
-  { id: "giao", label: "Chờ giao" },
+  { id: "nhan_don", label: "Nhận đơn" },
+  { id: "in", label: "Đã in" },
+  { id: "dong_goi", label: "Đã gói" },
+  { id: "giao", label: "Đã giao" },
 ];
+
+const TASK_STATUS_ALIAS: Record<string, OrderStatus> = {
+  thiet_ke: "nhan_don",
+  cho_duyet: "nhan_don",
+};
 
 export type OpsOrderRow = {
   id: string;
@@ -72,7 +75,7 @@ export function groupOrdersByTaskColumn(orders: OpsOrderRow[]): { id: OrderStatu
   return TASK_COLUMNS.map((col) => ({
     ...col,
     orders: orders
-      .filter((order) => order.status === col.id)
+      .filter((order) => (TASK_STATUS_ALIAS[order.status] ?? order.status) === col.id)
       .slice()
       .sort((a, b) => {
         const da = opsCalendarDay(a);

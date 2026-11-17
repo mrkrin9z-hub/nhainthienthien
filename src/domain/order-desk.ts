@@ -36,6 +36,7 @@ export type DeskIssue = "giao_that_bai" | "tra_hang";
 
 const PROCESSING = new Set(["draft_upload", "upload_error", "nhan_don", "thiet_ke", "cho_duyet"]);
 const TO_SHIP = new Set(["in", "dong_goi"]);
+const LEGACY_PREPRESS = new Set(["thiet_ke", "cho_duyet"]);
 
 export function deskTabOf(order: { status: string; deskIssue?: string | null }): DeskTab {
   if (order.status === "huy" || order.status === "xong") return "xong_huy";
@@ -46,7 +47,8 @@ export function deskTabOf(order: { status: string; deskIssue?: string | null }):
   return "can_lam";
 }
 
-const FLOW: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
+/** Nhận đơn → in → gói → giao → xong (bỏ thiết kế / chờ duyệt). */
+const FLOW: OrderStatus[] = ["nhan_don", "in", "dong_goi", "giao", "xong"];
 
 /** Bước được chọn trên danh sách: chỉ kế trước, kế sau, hoặc hủy. Không nhảy bước. */
 export function listStatusChoices(input: {
@@ -59,6 +61,14 @@ export function listStatusChoices(input: {
   if (status === "huy") return input.role === "owner" ? ["nhan_don"] : [];
   if (status === "draft_upload" || status === "upload_error") {
     return input.role === "production" ? [] : ["nhan_don", "huy"];
+  }
+  if (LEGACY_PREPRESS.has(status)) {
+    const escape: OrderStatus[] = ["nhan_don", "in"];
+    if (input.role === "production" && input.channel !== "mo_home") {
+      return escape.filter((item) => (PRODUCTION_STEPS as readonly string[]).includes(item));
+    }
+    if (input.role === "production") return escape;
+    return [...escape, "huy"];
   }
   const index = FLOW.indexOf(status);
   if (index < 0) return [];
@@ -76,19 +86,19 @@ export function deskTabMeta(id: DeskTab) {
 
 /** Bảng việc xưởng. Cột bám đúng trạng thái đơn, không tạo trạng thái riêng. */
 export const PRODUCTION_LANES = [
-  { id: "chua", label: "Chưa làm", statuses: ["nhan_don", "thiet_ke", "cho_duyet"] },
+  { id: "chua", label: "Nhận đơn", statuses: ["nhan_don", "thiet_ke", "cho_duyet"] },
   { id: "in", label: "Đã in", statuses: ["in"] },
-  { id: "goi", label: "Đã đóng gói", statuses: ["dong_goi"] },
+  { id: "goi", label: "Đã gói", statuses: ["dong_goi"] },
   { id: "giao", label: "Đã giao", statuses: ["giao"] },
 ] as const;
 
 export type ProductionLane = (typeof PRODUCTION_LANES)[number]["id"];
 
 const LANE_NEXT: Partial<Record<OrderStatus, string>> = {
-  thiet_ke: "Thiết kế",
-  cho_duyet: "Chờ duyệt",
+  thiet_ke: "Nhận đơn",
+  cho_duyet: "Nhận đơn",
   in: "Đã in",
-  dong_goi: "Đã đóng gói",
+  dong_goi: "Đã gói",
   giao: "Đã giao",
   xong: "Xong",
   nhan_don: "Nhận đơn",
@@ -106,6 +116,16 @@ export function productionMove(input: { status: string; role: "owner" | "sale" |
   backLabel: string;
 } {
   const choices = listStatusChoices(input).filter((status) => status !== "huy");
+  if (LEGACY_PREPRESS.has(input.status)) {
+    const next = choices.includes("in") ? ("in" as OrderStatus) : null;
+    const back = choices.includes("nhan_don") ? ("nhan_don" as OrderStatus) : null;
+    return {
+      next,
+      back,
+      nextLabel: next ? LANE_NEXT[next] ?? next : "",
+      backLabel: back ? "Quay lại" : "",
+    };
+  }
   const flow = FLOW;
   const index = flow.indexOf(input.status as OrderStatus);
   const next = index >= 0 ? choices.find((status) => flow.indexOf(status) === index + 1) ?? null : null;

@@ -103,7 +103,7 @@ export function hasPackingPhoto(files: { kind: string; status: string; deletedAt
 /** Sang Giao hoặc Xong từ bước trước Giao thì phải xong checklist. */
 export function needsPackCheck(current: OrderStatus, next: OrderStatus): boolean {
   if (next !== "giao" && next !== "xong") return false;
-  const order = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
+  const order = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"]; // legacy prepress vẫn trước cổng giao
   const from = order.indexOf(current);
   const gate = order.indexOf("giao");
   if (from < 0) return false;
