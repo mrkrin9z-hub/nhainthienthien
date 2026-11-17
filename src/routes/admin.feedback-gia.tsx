@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { toJpeg } from "html-to-image";
 
+import { HubBack } from "@/components/admin/access-hub";
 import { FeedbackMockPhone } from "@/components/admin/feedback-mock-phone";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
@@ -117,7 +118,8 @@ function FeedbackMockPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-primary">Tạo feedback giả</h1>
+          <HubBack to="/admin/media" label="Media" />
+          <h1 className="mt-2 text-2xl font-extrabold text-primary">Tạo feedback giả</h1>
           <p className="text-sm text-muted-foreground">
             Giả lập chat Zalo / Messenger kiểu ảnh chụp iPhone. Chọn mẫu, sửa tên·avatar·tin nhắn, xuất JPG.
           </p>

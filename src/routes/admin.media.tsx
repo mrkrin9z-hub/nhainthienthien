@@ -1,8 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Download, FolderPlus, Loader2, UploadCloud } from "lucide-react";
+import { Download, FolderPlus, HardDrive, Loader2, MessageSquareQuote, UploadCloud } from "lucide-react";
 
+import { parseMediaMode } from "@/admin-os/media-hub";
+import { AccessHub, HubBack } from "@/components/admin/access-hub";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +20,7 @@ import {
 import {
   createMediaFolder,
   finishStaffMediaUpload,
+  getMe,
   getMediaLibraryStatus,
   listMediaLibrary,
   moveMediaItem,
@@ -25,19 +29,67 @@ import {
 import { putDriveFile } from "@/lib/drive-put";
 
 export const Route = createFileRoute("/admin/media")({
+  validateSearch: (search: Record<string, unknown>): { m: ReturnType<typeof parseMediaMode> } => ({
+    m: parseMediaMode(search.m),
+  }),
+  beforeLoad: ({ search }) => {
+    if (search.m === "feedback") {
+      throw redirect({ to: "/admin/feedback-gia" });
+    }
+  },
   component: () => (
     <RoleGate allow={["owner", "sale", "production"]}>
-      <MediaLibraryPage />
+      <MediaPage />
     </RoleGate>
   ),
 });
+
+function MediaPage() {
+  const { m } = Route.useSearch();
+  if (!m) return <MediaHub />;
+  return <MediaDrivePage />;
+}
+
+function MediaHub() {
+  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
+  return (
+    <AccessHub
+      title="Media"
+      hint="Kho source trên Drive và tạo ảnh feedback giả — mở từng mục bằng nút truy cập."
+      role={me.data?.role}
+      groups={[
+        {
+          title: "Source & feedback",
+          cards: [
+            {
+              id: "drive",
+              title: "Kho Drive source",
+              blurb: "QR/link gửi ảnh·video vào NHÀ IN THIÊN THIÊN / MEDIA. Phân loại thư mục và tải về.",
+              to: "/admin/media",
+              search: { m: "drive" },
+              icon: HardDrive,
+            },
+            {
+              id: "feedback",
+              title: "Tạo feedback giả",
+              blurb: "Giả lập chat Zalo / Messenger kiểu ảnh chụp iPhone, xuất JPG.",
+              to: "/admin/feedback-gia",
+              icon: MessageSquareQuote,
+              roles: ["owner", "sale"],
+            },
+          ],
+        },
+      ]}
+    />
+  );
+}
 
 type Library = {
   path: string[];
   entries: MediaEntry[];
 };
 
-function MediaLibraryPage() {
+function MediaDrivePage() {
   const [status, setStatus] = useState<{ connected: boolean; root: string; inbox: string; maxLabel: string } | null>(null);
   const [library, setLibrary] = useState<Library | null>(null);
   const [path, setPath] = useState<string[]>([]);
@@ -166,7 +218,8 @@ function MediaLibraryPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-extrabold text-primary">Data / MEDIA</h1>
+        <HubBack to="/admin/media" label="Media" />
+        <h1 className="mt-2 text-2xl font-extrabold text-primary">Kho Drive source</h1>
         <p className="text-sm text-muted-foreground">
           Lưu trên Drive: <span className="font-semibold">{status?.root ?? "NHÀ IN THIÊN THIÊN / MEDIA"}</span>. QR gửi vào Inbox; nhân viên
           tự tạo thư mục, chuyển file và tải về.

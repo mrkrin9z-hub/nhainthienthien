@@ -34,14 +34,18 @@ test("cho phép ảnh video zip, chặn html/js", () => {
   assert.equal(MEDIA_UPLOAD_PATH, "/gui-media");
 });
 
-test("admin có trang Data và QR gui-media", () => {
+test("admin có hub Media và QR gui-media", () => {
   const modules = readFileSync(new URL("../admin-os/modules.ts", import.meta.url), "utf8");
   assert.match(modules, /\/admin\/media/);
-  assert.match(modules, /label: "Data"/);
+  assert.match(modules, /label: "Media"/);
+  assert.doesNotMatch(modules, /label: "Data"/);
+  assert.doesNotMatch(modules, /label: "Feedback"/);
   const page = readFileSync(new URL("../routes/admin.media.tsx", import.meta.url), "utf8");
+  assert.match(page, /AccessHub/);
+  assert.match(page, /Kho Drive source/);
+  assert.match(page, /Tạo feedback giả/);
   assert.match(page, /MEDIA_UPLOAD_PATH/);
   assert.match(page, /createMediaFolder/);
-  assert.match(page, /moveMediaItem/);
   const upload = readFileSync(new URL("../routes/gui-media.tsx", import.meta.url), "utf8");
   assert.match(upload, /preparePublicMediaUpload/);
   assert.match(upload, /Inbox/);
