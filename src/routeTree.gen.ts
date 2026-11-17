@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BangGiaRouteImport } from './routes/bang-gia'
 import { Route as DatInRouteImport } from './routes/dat-in'
+import { Route as GuiMediaRouteImport } from './routes/gui-media'
 import { Route as HuongDanRouteImport } from './routes/huong-dan'
 import { Route as LienHeRouteImport } from './routes/lien-he'
 import { Route as OrdersRouteImport } from './routes/orders'
@@ -45,6 +46,7 @@ import { Route as AdminKpiRouteImport } from './routes/admin.kpi'
 import { Route as AdminLichRouteImport } from './routes/admin.lich'
 import { Route as AdminLoiNhuanRouteImport } from './routes/admin.loi-nhuan'
 import { Route as AdminLuongRouteImport } from './routes/admin.luong'
+import { Route as AdminMediaRouteImport } from './routes/admin.media'
 import { Route as AdminMucTieuRouteImport } from './routes/admin.muc-tieu'
 import { Route as AdminNhacKhachRouteImport } from './routes/admin.nhac-khach'
 import { Route as AdminNhanVienRouteImport } from './routes/admin.nhan-vien'
@@ -88,6 +90,7 @@ import { Route as ApiStaffTaskPhotoRouteImport } from './routes/api/staff/task-p
 import { Route as QDonTokenRouteImport } from './routes/q_.don.$token'
 import { Route as ApiAdminDriveCallbackRouteImport } from './routes/api/admin/drive.callback'
 import { Route as ApiAdminDriveStartRouteImport } from './routes/api/admin/drive.start'
+import { Route as ApiAdminMediaDownloadRouteImport } from './routes/api/admin/media.download'
 import { Route as ApiAdminMetaCallbackRouteImport } from './routes/api/admin/meta.callback'
 import { Route as ApiAdminMetaStartRouteImport } from './routes/api/admin/meta.start'
 import { Route as ApiAdminShopeeCallbackRouteImport } from './routes/api/admin/shopee.callback'
@@ -116,6 +119,11 @@ const BangGiaRoute = BangGiaRouteImport.update({
 const DatInRoute = DatInRouteImport.update({
   id: '/dat-in',
   path: '/dat-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuiMediaRoute = GuiMediaRouteImport.update({
+  id: '/gui-media',
+  path: '/gui-media',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HuongDanRoute = HuongDanRouteImport.update({
@@ -276,6 +284,11 @@ const AdminLoiNhuanRoute = AdminLoiNhuanRouteImport.update({
 const AdminLuongRoute = AdminLuongRouteImport.update({
   id: '/luong',
   path: '/luong',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMediaRoute = AdminMediaRouteImport.update({
+  id: '/media',
+  path: '/media',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminMucTieuRoute = AdminMucTieuRouteImport.update({
@@ -494,6 +507,11 @@ const ApiAdminDriveStartRoute = ApiAdminDriveStartRouteImport.update({
   path: '/api/admin/drive/start',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminMediaDownloadRoute = ApiAdminMediaDownloadRouteImport.update({
+  id: '/api/admin/media/download',
+  path: '/api/admin/media/download',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminMetaCallbackRoute = ApiAdminMetaCallbackRouteImport.update({
   id: '/api/admin/meta/callback',
   path: '/api/admin/meta/callback',
@@ -547,6 +565,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/bang-gia': typeof BangGiaRoute
   '/dat-in': typeof DatInRoute
+  '/gui-media': typeof GuiMediaRoute
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
   '/orders': typeof OrdersRouteWithChildren
@@ -578,6 +597,7 @@ export interface FileRoutesByFullPath {
   '/admin/lich': typeof AdminLichRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/media': typeof AdminMediaRoute
   '/admin/muc-tieu': typeof AdminMucTieuRoute
   '/admin/nhac-khach': typeof AdminNhacKhachRoute
   '/admin/nhan-vien': typeof AdminNhanVienRoute
@@ -622,6 +642,7 @@ export interface FileRoutesByFullPath {
   '/admin/khach/': typeof AdminKhachIndexRoute
   '/api/admin/drive/callback': typeof ApiAdminDriveCallbackRoute
   '/api/admin/drive/start': typeof ApiAdminDriveStartRoute
+  '/api/admin/media/download': typeof ApiAdminMediaDownloadRoute
   '/api/admin/meta/callback': typeof ApiAdminMetaCallbackRoute
   '/api/admin/meta/start': typeof ApiAdminMetaStartRoute
   '/api/admin/shopee/callback': typeof ApiAdminShopeeCallbackRoute
@@ -636,6 +657,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bang-gia': typeof BangGiaRoute
   '/dat-in': typeof DatInRoute
+  '/gui-media': typeof GuiMediaRoute
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
   '/orders': typeof OrdersRouteWithChildren
@@ -667,6 +689,7 @@ export interface FileRoutesByTo {
   '/admin/lich': typeof AdminLichRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/media': typeof AdminMediaRoute
   '/admin/muc-tieu': typeof AdminMucTieuRoute
   '/admin/nhac-khach': typeof AdminNhacKhachRoute
   '/admin/nhan-vien': typeof AdminNhanVienRoute
@@ -711,6 +734,7 @@ export interface FileRoutesByTo {
   '/admin/khach': typeof AdminKhachIndexRoute
   '/api/admin/drive/callback': typeof ApiAdminDriveCallbackRoute
   '/api/admin/drive/start': typeof ApiAdminDriveStartRoute
+  '/api/admin/media/download': typeof ApiAdminMediaDownloadRoute
   '/api/admin/meta/callback': typeof ApiAdminMetaCallbackRoute
   '/api/admin/meta/start': typeof ApiAdminMetaStartRoute
   '/api/admin/shopee/callback': typeof ApiAdminShopeeCallbackRoute
@@ -727,6 +751,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/bang-gia': typeof BangGiaRoute
   '/dat-in': typeof DatInRoute
+  '/gui-media': typeof GuiMediaRoute
   '/huong-dan': typeof HuongDanRoute
   '/lien-he': typeof LienHeRoute
   '/orders': typeof OrdersRouteWithChildren
@@ -758,6 +783,7 @@ export interface FileRoutesById {
   '/admin/lich': typeof AdminLichRoute
   '/admin/loi-nhuan': typeof AdminLoiNhuanRoute
   '/admin/luong': typeof AdminLuongRoute
+  '/admin/media': typeof AdminMediaRoute
   '/admin/muc-tieu': typeof AdminMucTieuRoute
   '/admin/nhac-khach': typeof AdminNhacKhachRoute
   '/admin/nhan-vien': typeof AdminNhanVienRoute
@@ -802,6 +828,7 @@ export interface FileRoutesById {
   '/admin/khach/': typeof AdminKhachIndexRoute
   '/api/admin/drive/callback': typeof ApiAdminDriveCallbackRoute
   '/api/admin/drive/start': typeof ApiAdminDriveStartRoute
+  '/api/admin/media/download': typeof ApiAdminMediaDownloadRoute
   '/api/admin/meta/callback': typeof ApiAdminMetaCallbackRoute
   '/api/admin/meta/start': typeof ApiAdminMetaStartRoute
   '/api/admin/shopee/callback': typeof ApiAdminShopeeCallbackRoute
@@ -819,6 +846,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/bang-gia'
     | '/dat-in'
+    | '/gui-media'
     | '/huong-dan'
     | '/lien-he'
     | '/orders'
@@ -850,6 +878,7 @@ export interface FileRouteTypes {
     | '/admin/lich'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/media'
     | '/admin/muc-tieu'
     | '/admin/nhac-khach'
     | '/admin/nhan-vien'
@@ -894,6 +923,7 @@ export interface FileRouteTypes {
     | '/admin/khach/'
     | '/api/admin/drive/callback'
     | '/api/admin/drive/start'
+    | '/api/admin/media/download'
     | '/api/admin/meta/callback'
     | '/api/admin/meta/start'
     | '/api/admin/shopee/callback'
@@ -908,6 +938,7 @@ export interface FileRouteTypes {
     | '/'
     | '/bang-gia'
     | '/dat-in'
+    | '/gui-media'
     | '/huong-dan'
     | '/lien-he'
     | '/orders'
@@ -939,6 +970,7 @@ export interface FileRouteTypes {
     | '/admin/lich'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/media'
     | '/admin/muc-tieu'
     | '/admin/nhac-khach'
     | '/admin/nhan-vien'
@@ -983,6 +1015,7 @@ export interface FileRouteTypes {
     | '/admin/khach'
     | '/api/admin/drive/callback'
     | '/api/admin/drive/start'
+    | '/api/admin/media/download'
     | '/api/admin/meta/callback'
     | '/api/admin/meta/start'
     | '/api/admin/shopee/callback'
@@ -998,6 +1031,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/bang-gia'
     | '/dat-in'
+    | '/gui-media'
     | '/huong-dan'
     | '/lien-he'
     | '/orders'
@@ -1029,6 +1063,7 @@ export interface FileRouteTypes {
     | '/admin/lich'
     | '/admin/loi-nhuan'
     | '/admin/luong'
+    | '/admin/media'
     | '/admin/muc-tieu'
     | '/admin/nhac-khach'
     | '/admin/nhan-vien'
@@ -1073,6 +1108,7 @@ export interface FileRouteTypes {
     | '/admin/khach/'
     | '/api/admin/drive/callback'
     | '/api/admin/drive/start'
+    | '/api/admin/media/download'
     | '/api/admin/meta/callback'
     | '/api/admin/meta/start'
     | '/api/admin/shopee/callback'
@@ -1089,6 +1125,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   BangGiaRoute: typeof BangGiaRoute
   DatInRoute: typeof DatInRoute
+  GuiMediaRoute: typeof GuiMediaRoute
   HuongDanRoute: typeof HuongDanRoute
   LienHeRoute: typeof LienHeRoute
   OrdersRoute: typeof OrdersRouteWithChildren
@@ -1112,6 +1149,7 @@ export interface RootRouteChildren {
   QDonTokenRoute: typeof QDonTokenRoute
   ApiAdminDriveCallbackRoute: typeof ApiAdminDriveCallbackRoute
   ApiAdminDriveStartRoute: typeof ApiAdminDriveStartRoute
+  ApiAdminMediaDownloadRoute: typeof ApiAdminMediaDownloadRoute
   ApiAdminMetaCallbackRoute: typeof ApiAdminMetaCallbackRoute
   ApiAdminMetaStartRoute: typeof ApiAdminMetaStartRoute
   ApiAdminShopeeCallbackRoute: typeof ApiAdminShopeeCallbackRoute
@@ -1151,6 +1189,13 @@ declare module '@tanstack/react-router' {
       path: '/dat-in'
       fullPath: '/dat-in'
       preLoaderRoute: typeof DatInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gui-media': {
+      id: '/gui-media'
+      path: '/gui-media'
+      fullPath: '/gui-media'
+      preLoaderRoute: typeof GuiMediaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/huong-dan': {
@@ -1375,6 +1420,13 @@ declare module '@tanstack/react-router' {
       path: '/luong'
       fullPath: '/admin/luong'
       preLoaderRoute: typeof AdminLuongRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/media': {
+      id: '/admin/media'
+      path: '/media'
+      fullPath: '/admin/media'
+      preLoaderRoute: typeof AdminMediaRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/muc-tieu': {
@@ -1678,6 +1730,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminDriveStartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/media/download': {
+      id: '/api/admin/media/download'
+      path: '/api/admin/media/download'
+      fullPath: '/api/admin/media/download'
+      preLoaderRoute: typeof ApiAdminMediaDownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/meta/callback': {
       id: '/api/admin/meta/callback'
       path: '/api/admin/meta/callback'
@@ -1770,6 +1829,7 @@ interface AdminRouteChildren {
   AdminLichRoute: typeof AdminLichRoute
   AdminLoiNhuanRoute: typeof AdminLoiNhuanRoute
   AdminLuongRoute: typeof AdminLuongRoute
+  AdminMediaRoute: typeof AdminMediaRoute
   AdminMucTieuRoute: typeof AdminMucTieuRoute
   AdminNhacKhachRoute: typeof AdminNhacKhachRoute
   AdminNhanVienRoute: typeof AdminNhanVienRoute
@@ -1824,6 +1884,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminLichRoute: AdminLichRoute,
   AdminLoiNhuanRoute: AdminLoiNhuanRoute,
   AdminLuongRoute: AdminLuongRoute,
+  AdminMediaRoute: AdminMediaRoute,
   AdminMucTieuRoute: AdminMucTieuRoute,
   AdminNhacKhachRoute: AdminNhacKhachRoute,
   AdminNhanVienRoute: AdminNhanVienRoute,
@@ -1870,6 +1931,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   BangGiaRoute: BangGiaRoute,
   DatInRoute: DatInRoute,
+  GuiMediaRoute: GuiMediaRoute,
   HuongDanRoute: HuongDanRoute,
   LienHeRoute: LienHeRoute,
   OrdersRoute: OrdersRouteWithChildren,
@@ -1893,6 +1955,7 @@ const rootRouteChildren: RootRouteChildren = {
   QDonTokenRoute: QDonTokenRoute,
   ApiAdminDriveCallbackRoute: ApiAdminDriveCallbackRoute,
   ApiAdminDriveStartRoute: ApiAdminDriveStartRoute,
+  ApiAdminMediaDownloadRoute: ApiAdminMediaDownloadRoute,
   ApiAdminMetaCallbackRoute: ApiAdminMetaCallbackRoute,
   ApiAdminMetaStartRoute: ApiAdminMetaStartRoute,
   ApiAdminShopeeCallbackRoute: ApiAdminShopeeCallbackRoute,

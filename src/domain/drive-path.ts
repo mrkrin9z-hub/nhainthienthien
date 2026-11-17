@@ -20,6 +20,30 @@ export function albumFolderParts(phone: string): [string, string] {
   return ["Album khách", phone];
 }
 
+/** Thư mục media dùng chung của tiệm trên Drive. */
+export const MEDIA_ROOT = "NHÀ IN THIÊN THIÊN" as const;
+export const MEDIA_DIR = "MEDIA" as const;
+export const MEDIA_INBOX = "Inbox" as const;
+
+/** `NHÀ IN THIÊN THIÊN / MEDIA`. */
+export function mediaRootParts(): [string, string] {
+  return [MEDIA_ROOT, MEDIA_DIR];
+}
+
+/** `NHÀ IN THIÊN THIÊN / MEDIA / Inbox` — file mới từ QR/link. */
+export function mediaInboxParts(): [string, string, string] {
+  return [MEDIA_ROOT, MEDIA_DIR, MEDIA_INBOX];
+}
+
+/** `NHÀ IN THIÊN THIÊN / MEDIA / …subfolders`. */
+export function mediaFolderParts(subfolders: readonly string[] = []): string[] {
+  const clean = subfolders
+    .map((part) => part.replace(/[\\/]/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  return [...mediaRootParts(), ...clean];
+}
+
 /** Thư mục con trong đơn, theo SOP: ảnh gốc, bản sửa, file in, duyệt và video. */
 export function orderKindFolder(kind: string): string {
   if (kind === "original") return "1-anh-goc";
