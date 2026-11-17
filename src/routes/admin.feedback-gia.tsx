@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { toJpeg } from "html-to-image";
-import { ImagePlus, Send, Trash2 } from "lucide-react";
+import { ImagePlus, Send, Trash2, Undo2 } from "lucide-react";
 
 import { HubBack } from "@/components/admin/access-hub";
 import { FeedbackMockPhone } from "@/components/admin/feedback-mock-phone";
@@ -34,19 +34,49 @@ function FeedbackMockPage() {
   const [customerDraft, setCustomerDraft] = useState("");
   const [shopDraft, setShopDraft] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const customerImageRef = useRef<HTMLInputElement>(null);
   const shopImageRef = useRef<HTMLInputElement>(null);
+  const historyRef = useRef<FeedbackDraft[]>([]);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
 
   const template = useMemo(
     () => FEEDBACK_TEMPLATES.find((item) => item.id === templateId) ?? FEEDBACK_TEMPLATES[0]!,
     [templateId],
   );
 
+  function pushHistory(snapshot: FeedbackDraft) {
+    historyRef.current = [...historyRef.current.slice(-39), cloneDraft(snapshot)];
+    setCanUndo(true);
+  }
+
+  function mutateDraft(recipe: (current: FeedbackDraft) => FeedbackDraft) {
+    const current = draftRef.current;
+    pushHistory(current);
+    const next = recipe(current);
+    draftRef.current = next;
+    setDraft(next);
+  }
+
+  function undoLast() {
+    const prev = historyRef.current.pop();
+    setCanUndo(historyRef.current.length > 0);
+    if (!prev) {
+      toast.error("Không còn thao tác để quay lại.");
+      return;
+    }
+    draftRef.current = prev;
+    setDraft(prev);
+    setSelectedId(null);
+    toast.success("Đã hoàn tác.");
+  }
+
   function applyTemplate(id: string) {
     const next = FEEDBACK_TEMPLATES.find((item) => item.id === id) ?? FEEDBACK_TEMPLATES[0]!;
     setTemplateId(next.id);
-    setDraft(cloneDraft(next.draft));
+    mutateDraft(() => cloneDraft(next.draft));
     setSelectedId(null);
   }
 
@@ -54,7 +84,7 @@ function FeedbackMockPage() {
     const value = text.trim();
     if (!value) return;
     const id = newLineId();
-    setDraft((current) => ({
+    mutateDraft((current) => ({
       ...current,
       lines: [
         ...current.lines.filter((line) => line.kind !== "status"),
@@ -74,7 +104,7 @@ function FeedbackMockPage() {
 
   function addSticker(side: FeedbackSide) {
     const id = newLineId();
-    setDraft((current) => ({
+    mutateDraft((current) => ({
       ...current,
       lines: [...current.lines, { id, kind: "sticker", side, sticker: "thumb" }],
     }));
@@ -99,7 +129,7 @@ function FeedbackMockPage() {
         return;
       }
       const id = newLineId();
-      setDraft((current) => ({
+      mutateDraft((current) => ({
         ...current,
         lines: [
           ...current.lines.filter((line) => line.kind !== "status"),
@@ -122,7 +152,7 @@ function FeedbackMockPage() {
 
   function addDate() {
     const id = newLineId();
-    setDraft((current) => ({
+    mutateDraft((current) => ({
       ...current,
       lines: [...current.lines, { id, kind: "date", text: "Hôm nay" }],
     }));
@@ -134,7 +164,7 @@ function FeedbackMockPage() {
       toast.error("Chạm một tin trên khung xuất trước.");
       return;
     }
-    setDraft((current) => ({
+    mutateDraft((current) => ({
       ...current,
       lines: current.lines.map((line) =>
         line.id === selectedId && (line.kind === "text" || line.kind === "sticker" || line.kind === "image")
@@ -144,13 +174,20 @@ function FeedbackMockPage() {
     }));
   }
 
+  function removeLine(id: string) {
+    mutateDraft((current) => ({
+      ...current,
+      lines: current.lines.filter((line) => line.id !== id),
+    }));
+    setSelectedId((current) => (current === id ? null : current));
+  }
+
   function removeSelected() {
     if (!selectedId) {
       toast.error("Chạm một tin trên khung xuất trước.");
       return;
     }
-    setDraft((current) => ({ ...current, lines: current.lines.filter((line) => line.id !== selectedId) }));
-    setSelectedId(null);
+    removeLine(selectedId);
   }
 
   function onAvatar(file: File | null) {
@@ -160,8 +197,16 @@ function FeedbackMockPage() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setDraft((current) => ({ ...current, customerAvatar: String(reader.result || "") }));
+    reader.onload = () => {
+      mutateDraft((current) => ({ ...current, customerAvatar: String(reader.result || "") }));
+    };
     reader.readAsDataURL(file);
+  }
+
+  /** Blur contentEditable để commit chữ đang sửa vào state trước khi xuất. */
+  function flushLiveEdits(root: HTMLElement) {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && root.contains(active)) active.blur();
   }
 
   async function exportJpg() {
@@ -171,24 +216,71 @@ function FeedbackMockPage() {
       return;
     }
     setExporting(true);
-    setSelectedId(null);
+    flushLiveEdits(node);
+    // Không setSelectedId trước capture — tránh remount/reset chữ live.
     await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    const thread = node.querySelector<HTMLElement>("[data-thread-scroll='1']");
+    const threadPrev = thread
+      ? {
+          maxHeight: thread.style.maxHeight,
+          overflow: thread.style.overflow,
+          minHeight: thread.style.minHeight,
+        }
+      : null;
+    const hidden: Array<{ el: HTMLElement; display: string }> = [];
+    node.querySelectorAll<HTMLElement>("[data-export-hide='1']").forEach((el) => {
+      hidden.push({ el, display: el.style.display });
+      el.style.display = "none";
+    });
+    const rings: Array<{ el: HTMLElement; className: string }> = [];
+    node.querySelectorAll<HTMLElement>(".ring-2").forEach((el) => {
+      rings.push({ el, className: el.className });
+      el.classList.remove("ring-2", "ring-[#1874FC]/35");
+    });
+    if (thread) {
+      thread.style.maxHeight = "none";
+      thread.style.overflow = "visible";
+      thread.style.minHeight = "0";
+    }
+
     try {
       const dataUrl = await toJpeg(node, {
         quality: 0.96,
         pixelRatio: 3,
         cacheBust: true,
         backgroundColor: "#eef1f5",
+        width: node.scrollWidth,
+        height: node.scrollHeight,
+        style: {
+          transform: "none",
+          overflow: "visible",
+        },
       });
       const link = document.createElement("a");
-      const safe = draft.customerName.replace(/[^\w\u00C0-\u024F\s-]/gi, "").trim().replace(/\s+/g, "-") || "feedback";
+      const safe =
+        draftRef.current.customerName.replace(/[^\w\u00C0-\u024F\s-]/gi, "").trim().replace(/\s+/g, "-") ||
+        "feedback";
       link.download = `feedback-${safe}-${Date.now()}.jpg`;
       link.href = dataUrl;
       link.click();
-      toast.success("Đã xuất JPG.");
+      toast.success("Đã xuất JPG đúng khung live.");
+      setSelectedId(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không xuất được ảnh.");
     } finally {
+      if (thread && threadPrev) {
+        thread.style.maxHeight = threadPrev.maxHeight;
+        thread.style.overflow = threadPrev.overflow;
+        thread.style.minHeight = threadPrev.minHeight;
+      }
+      hidden.forEach(({ el, display }) => {
+        el.style.display = display;
+      });
+      rings.forEach(({ el, className }) => {
+        el.className = className;
+      });
       setExporting(false);
     }
   }
@@ -203,9 +295,14 @@ function FeedbackMockPage() {
             Chat live 2 phía → sửa chữ trực tiếp trên khung iPhone → xuất JPG. Mẫu: {template.label}
           </p>
         </div>
-        <Button type="button" className="min-h-11" disabled={exporting} onClick={() => void exportJpg()}>
-          {exporting ? "Đang xuất…" : "Xuất JPG"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" className="min-h-11" disabled={!canUndo} onClick={undoLast}>
+            <Undo2 className="mr-1 size-4" /> Quay lại
+          </Button>
+          <Button type="button" className="min-h-11" disabled={exporting} onClick={() => void exportJpg()}>
+            {exporting ? "Đang xuất…" : "Xuất JPG"}
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 rounded-xl border bg-card p-3">
@@ -304,6 +401,9 @@ function FeedbackMockPage() {
         </Button>
         <Button type="button" variant="outline" className="min-h-11 text-destructive" onClick={removeSelected}>
           <Trash2 className="mr-1 size-4" /> Xóa tin chọn
+        </Button>
+        <Button type="button" variant="outline" className="min-h-11" disabled={!canUndo} onClick={undoLast}>
+          <Undo2 className="mr-1 size-4" /> Quay lại / hoàn tác
         </Button>
       </div>
 
@@ -434,13 +534,28 @@ function FeedbackMockPage() {
           <div className="rounded-xl border bg-card p-3 text-sm text-muted-foreground">
             <p className="font-semibold text-foreground">Sửa live trên khung xuất</p>
             <p className="mt-1">
-              Chạm vào tên, trạng thái, giờ, hoặc nội dung bong bóng để gõ trực tiếp. Chạm một tin rồi bấm ❤️ / Xóa. Nút ảnh ở hai ô
-              chat chỉ giữ local trên máy để xuất JPG — không upload / không lưu data.
+              Chạm vào tên, trạng thái, giờ, hoặc nội dung bong bóng để gõ trực tiếp. Chạm một tin rồi bấm nút × trên tin / Xóa tin
+              chọn, hoặc Quay lại để hoàn tác tin vừa gửi. Ảnh chỉ giữ local để xuất JPG.
             </p>
           </div>
         </section>
 
         <section className="xl:sticky xl:top-4 xl:self-start">
+          <div className="mb-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" className="min-h-9" disabled={!canUndo} onClick={undoLast}>
+              <Undo2 className="mr-1 size-4" /> Quay lại
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-9 text-destructive"
+              disabled={!selectedId}
+              onClick={removeSelected}
+            >
+              <Trash2 className="mr-1 size-4" /> Xóa tin đang chọn
+            </Button>
+          </div>
           <div className="overflow-auto rounded-xl border bg-slate-300/50 p-3">
             <FeedbackMockPhone
               draft={draft}
@@ -448,6 +563,7 @@ function FeedbackMockPage() {
               selectedId={selectedId}
               onSelectLine={setSelectedId}
               onChange={setDraft}
+              onDeleteLine={removeLine}
             />
           </div>
         </section>
