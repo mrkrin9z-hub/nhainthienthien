@@ -156,7 +156,7 @@ function FeedbackMockPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <HubBack to="/admin/media" label="Media" />
+          <HubBack to="/admin/media" label="Kho source" search={{ m: "drive" }} />
           <h1 className="mt-2 text-2xl font-extrabold text-primary">Tạo feedback giả</h1>
           <p className="text-sm text-muted-foreground">
             Chat live 2 phía → sửa chữ trực tiếp trên khung iPhone → xuất JPG. Mẫu: {template.label}

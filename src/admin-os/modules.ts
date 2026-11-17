@@ -37,7 +37,10 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
   },
   {
     title: "Media",
-    items: [{ to: "/admin/media", label: "Media", roles: ["owner", "sale", "production"], mode: "live" }],
+    items: [
+      { to: "/admin/media", label: "Kho source", roles: ["owner", "sale", "production"], search: { m: "drive" }, mode: "live" },
+      { to: "/admin/feedback-gia", label: "Feedback", roles: ["owner", "sale"], mode: "live" },
+    ],
   },
   {
     title: "Sản xuất",

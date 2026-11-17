@@ -1,16 +1,16 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Download, FolderPlus, HardDrive, Loader2, MessageSquareQuote, UploadCloud } from "lucide-react";
+import { Download, FolderPlus, Loader2, UploadCloud } from "lucide-react";
 
 import { parseMediaMode } from "@/admin-os/media-hub";
-import { AccessHub, HubBack } from "@/components/admin/access-hub";
+import { HubBack } from "@/components/admin/access-hub";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   formatMediaBytes,
+  MEDIA_KV_MAX_BYTES,
   MEDIA_MAX_BYTES,
   MEDIA_UPLOAD_PATH,
   mediaKindLabel,
@@ -20,7 +20,6 @@ import {
 import {
   createMediaFolder,
   finishStaffMediaUpload,
-  getMe,
   getMediaLibraryStatus,
   listMediaLibrary,
   moveMediaItem,
@@ -30,67 +29,48 @@ import { putDriveFile } from "@/lib/drive-put";
 
 export const Route = createFileRoute("/admin/media")({
   validateSearch: (search: Record<string, unknown>): { m: ReturnType<typeof parseMediaMode> } => ({
-    m: parseMediaMode(search.m),
+    m: parseMediaMode(search["m"]),
   }),
   beforeLoad: ({ search }) => {
-    if (search.m === "feedback") {
+    if (search["m"] === "feedback") {
       throw redirect({ to: "/admin/feedback-gia" });
+    }
+    if (!search["m"]) {
+      throw redirect({ to: "/admin/media", search: { m: "drive" } });
     }
   },
   component: () => (
-    <RoleGate allow={["owner", "sale", "production"]}>
-      <MediaPage />
+    <RoleGate allow={["owner", "sale", "production"]} deny="Chỉ nhân viên nội bộ xem kho media.">
+      <MediaDrivePage />
     </RoleGate>
   ),
 });
-
-function MediaPage() {
-  const { m } = Route.useSearch();
-  if (!m) return <MediaHub />;
-  return <MediaDrivePage />;
-}
-
-function MediaHub() {
-  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
-  return (
-    <AccessHub
-      title="Media"
-      hint="Kho source trên Drive và tạo ảnh feedback giả — mở từng mục bằng nút truy cập."
-      role={me.data?.role}
-      groups={[
-        {
-          title: "Source & feedback",
-          cards: [
-            {
-              id: "drive",
-              title: "Kho Drive source",
-              blurb: "QR/link gửi ảnh·video vào NHÀ IN THIÊN THIÊN / MEDIA. Phân loại thư mục và tải về.",
-              to: "/admin/media",
-              search: { m: "drive" },
-              icon: HardDrive,
-            },
-            {
-              id: "feedback",
-              title: "Tạo feedback giả",
-              blurb: "Giả lập chat Zalo / Messenger kiểu ảnh chụp iPhone, xuất JPG.",
-              to: "/admin/feedback-gia",
-              icon: MessageSquareQuote,
-              roles: ["owner", "sale"],
-            },
-          ],
-        },
-      ]}
-    />
-  );
-}
 
 type Library = {
   path: string[];
   entries: MediaEntry[];
 };
 
+type Status = {
+  connected: boolean;
+  backend: "drive" | "kv" | "local";
+  root: string;
+  inbox: string;
+  maxLabel: string;
+  maxBytes: number;
+};
+
+async function postServerUpload(file: File, session: { uploadPath: string; fileName: string; path: string[] }) {
+  const body = new FormData();
+  body.set("file", file);
+  body.set("fileName", session.fileName);
+  body.set("path", JSON.stringify(session.path ?? []));
+  const res = await fetch(session.uploadPath, { method: "POST", body });
+  if (!res.ok) throw new Error((await res.text()) || "Không tải được file.");
+}
+
 function MediaDrivePage() {
-  const [status, setStatus] = useState<{ connected: boolean; root: string; inbox: string; maxLabel: string } | null>(null);
+  const [status, setStatus] = useState<Status | null>(null);
   const [library, setLibrary] = useState<Library | null>(null);
   const [path, setPath] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +84,7 @@ function MediaDrivePage() {
     setLoading(true);
     try {
       const [meta, list] = await Promise.all([getMediaLibraryStatus(), listMediaLibrary({ data: { path: nextPath } })]);
-      setStatus(meta);
+      setStatus(meta as Status);
       setLibrary({ path: list.path, entries: list.entries });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không tải được MEDIA.");
@@ -133,6 +113,8 @@ function MediaDrivePage() {
   }, []);
 
   const foldersHere = useMemo(() => library?.entries.filter((item) => item.isFolder) ?? [], [library]);
+  const maxBytes = status?.maxBytes ?? (status?.connected ? MEDIA_MAX_BYTES : MEDIA_KV_MAX_BYTES);
+  const canWrite = Boolean(status);
 
   async function makeFolder() {
     const name = folderName.trim();
@@ -178,10 +160,6 @@ function MediaDrivePage() {
 
   async function uploadFiles(list: FileList | null) {
     if (!list?.length) return;
-    if (!status?.connected) {
-      toast.error("Chưa kết nối Google Drive.");
-      return;
-    }
     setBusy(true);
     let ok = 0;
     try {
@@ -191,16 +169,20 @@ function MediaDrivePage() {
           toast.error(`${file.name}: định dạng không hỗ trợ`);
           continue;
         }
-        if (file.size > MEDIA_MAX_BYTES) {
-          toast.error(`${file.name}: quá ${formatMediaBytes(MEDIA_MAX_BYTES)}`);
+        if (file.size > maxBytes) {
+          toast.error(`${file.name}: quá ${formatMediaBytes(maxBytes)}`);
           continue;
         }
         try {
           const session = await prepareStaffMediaUpload({
             data: { fileName: file.name, mimeType: mime, sizeBytes: file.size, path },
           });
-          const driveFileId = await putDriveFile(session.uploadUrl, file, mime);
-          await finishStaffMediaUpload({ data: { driveFileId, path } });
+          if (session.mode === "drive") {
+            const driveFileId = await putDriveFile(session.uploadUrl, file, mime);
+            await finishStaffMediaUpload({ data: { driveFileId, path } });
+          } else {
+            await postServerUpload(file, session);
+          }
           ok += 1;
         } catch (error) {
           toast.error(error instanceof Error ? `${file.name}: ${error.message}` : `${file.name}: lỗi`);
@@ -218,21 +200,22 @@ function MediaDrivePage() {
   return (
     <div className="space-y-4">
       <div>
-        <HubBack to="/admin/media" label="Media" />
-        <h1 className="mt-2 text-2xl font-extrabold text-primary">Kho Drive source</h1>
+        <HubBack to="/admin" label="Tổng quan" />
+        <h1 className="mt-2 text-2xl font-extrabold text-primary">Kho source</h1>
         <p className="text-sm text-muted-foreground">
-          Lưu trên Drive: <span className="font-semibold">{status?.root ?? "NHÀ IN THIÊN THIÊN / MEDIA"}</span>. QR gửi vào Inbox; nhân viên
-          tự tạo thư mục, chuyển file và tải về.
+          {status?.connected
+            ? <>Lưu trên Drive: <span className="font-semibold">{status.root}</span>. QR gửi vào Inbox.</>
+            : <>Chưa nối Drive — lưu trên web ({status?.backend === "kv" ? "SHOP_KV" : "máy local"}), tối đa {status?.maxLabel ?? formatMediaBytes(MEDIA_KV_MAX_BYTES)}/file. Nối Drive ở Cài đặt → Kết nối nếu cần file lớn.</>}
         </p>
       </div>
 
       {status && !status.connected ? (
-        <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
-          Chưa kết nối Google Drive.{" "}
+        <section className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm">
+          Vẫn gửi/xem được trên web.{" "}
           <Link to="/admin/ket-noi" className="font-semibold text-primary underline">
             Kết nối Drive
           </Link>{" "}
-          rồi dùng trang này.
+          khi muốn Inbox vào Google Drive và file tới {formatMediaBytes(MEDIA_MAX_BYTES)}.
         </section>
       ) : null}
 
@@ -244,7 +227,9 @@ function MediaDrivePage() {
         )}
         <div className="min-w-0 flex-1 space-y-2">
           <h2 className="font-semibold text-primary">QR / link gửi source</h2>
-          <p className="text-xs text-muted-foreground">File mới vào {status?.inbox ?? "… / Inbox"}. Tối đa {status?.maxLabel ?? formatMediaBytes(MEDIA_MAX_BYTES)} / file.</p>
+          <p className="text-xs text-muted-foreground">
+            File mới vào {status?.inbox ?? "Inbox"}. Tối đa {status?.maxLabel ?? formatMediaBytes(maxBytes)} / file.
+          </p>
           <p className="break-all font-mono text-sm font-semibold text-primary">{link || MEDIA_UPLOAD_PATH}</p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -294,13 +279,13 @@ function MediaDrivePage() {
             className="min-h-11 max-w-xs"
             placeholder="Tên thư mục mới"
             value={folderName}
-            disabled={busy || !status?.connected}
+            disabled={busy || !canWrite}
             onChange={(event) => setFolderName(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") void makeFolder();
             }}
           />
-          <Button type="button" className="min-h-11" disabled={busy || !status?.connected} onClick={() => void makeFolder()}>
+          <Button type="button" className="min-h-11" disabled={busy || !canWrite} onClick={() => void makeFolder()}>
             <FolderPlus className="mr-1 size-4" /> Tạo thư mục
           </Button>
           <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-semibold">
@@ -311,7 +296,7 @@ function MediaDrivePage() {
               accept="image/*,video/*,.zip,.rar"
               multiple
               className="hidden"
-              disabled={busy || !status?.connected}
+              disabled={busy || !canWrite}
               onChange={(event) => {
                 void uploadFiles(event.target.files);
                 event.target.value = "";

@@ -4,7 +4,7 @@ import { CheckCircle2, Loader2, UploadCloud } from "lucide-react";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
-import { formatMediaBytes, MEDIA_MAX_BYTES, mediaMimeAllowed } from "@/domain/media-library";
+import { formatMediaBytes, MEDIA_KV_MAX_BYTES, MEDIA_MAX_BYTES, mediaMimeAllowed } from "@/domain/media-library";
 import { putDriveFile } from "@/lib/drive-put";
 import { finishPublicMediaUpload, preparePublicMediaUpload } from "@/lib/orders.functions";
 
@@ -42,6 +42,30 @@ function guessMime(file: File): string {
   if (name.endsWith(".rar")) return "application/vnd.rar";
   if (/\.(jpe?g)$/.test(name)) return "image/jpeg";
   return "application/octet-stream";
+}
+
+async function postServerUpload(
+  file: File,
+  session: { uploadPath: string; fileName: string; path: string[] },
+  report: (loaded: number, total: number) => void,
+) {
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", session.uploadPath);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) report(event.loaded, event.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(xhr.responseText || "Không tải được file."));
+    };
+    xhr.onerror = () => reject(new Error("Mạng lỗi khi tải file."));
+    const body = new FormData();
+    body.set("file", file);
+    body.set("fileName", session.fileName);
+    body.set("path", JSON.stringify(session.path ?? []));
+    xhr.send(body);
+  });
 }
 
 function MediaUploadPage() {
@@ -101,7 +125,12 @@ function MediaUploadPage() {
           continue;
         }
         setRows((current) =>
-          current.map((item) => (item.key === row.key ? { ...item, status: "uploading", progress: 0, message: undefined } : item)),
+          current.map((item) => {
+            if (item.key !== row.key) return item;
+            const next: Row = { ...item, status: "uploading", progress: 0 };
+            delete next.message;
+            return next;
+          }),
         );
         const baseLoaded = loadedBytes;
         const report = (loaded: number, total: number) => {
@@ -114,8 +143,12 @@ function MediaUploadPage() {
           const session = await preparePublicMediaUpload({
             data: { fileName: row.file.name, mimeType: mime, sizeBytes: row.file.size },
           });
-          const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime, report);
-          await finishPublicMediaUpload({ data: { driveFileId } });
+          if (session.mode === "drive") {
+            const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime, report);
+            await finishPublicMediaUpload({ data: { driveFileId } });
+          } else {
+            await postServerUpload(row.file, session, report);
+          }
           loadedBytes += row.file.size;
           saved += 1;
           setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "complete", progress: 100 } : item)));
@@ -127,7 +160,7 @@ function MediaUploadPage() {
       }
       if (saved) setDone(true);
       if (failed) setError("Một số file chưa lên. Có thể gửi tiếp.");
-      if (!saved && failed) setError("Chưa gửi được file. Kiểm tra kết nối Drive của tiệm.");
+      if (!saved && failed) setError("Chưa gửi được file.");
       if (!failed) setBatchProgress(100);
     } finally {
       setBusy(false);
@@ -141,10 +174,9 @@ function MediaUploadPage() {
         <div>
           <h1 className="text-2xl font-extrabold text-primary">Gửi media source</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ảnh và video vào thư mục <span className="font-semibold">NHÀ IN THIÊN THIÊN / MEDIA / Inbox</span>. Nhân viên phân loại
-            trong /admin.
+            Ảnh và video vào kho MEDIA của tiệm. Có Drive thì vào thư mục Inbox trên Drive; chưa nối Drive thì lưu trên web (tối đa{" "}
+            {formatMediaBytes(MEDIA_KV_MAX_BYTES)}/file).
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">Tối đa {formatMediaBytes(MEDIA_MAX_BYTES)} / file · tải thẳng lên Drive.</p>
         </div>
 
         <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center">
@@ -178,7 +210,7 @@ function MediaUploadPage() {
                 ) : null}
                 {row.status === "complete" ? (
                   <p className="mt-1 flex items-center gap-1 text-xs text-emerald-700">
-                    <CheckCircle2 className="size-3.5" /> Đã lên Inbox
+                    <CheckCircle2 className="size-3.5" /> Đã gửi
                   </p>
                 ) : null}
                 {row.status === "error" ? <p className="mt-1 text-xs text-destructive">{row.message}</p> : null}
@@ -193,11 +225,11 @@ function MediaUploadPage() {
           </p>
         ) : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {done && !error ? <p className="text-sm font-semibold text-emerald-700">Đã gửi xong. Nhân viên lấy trong Data → Inbox.</p> : null}
+        {done && !error ? <p className="text-sm font-semibold text-emerald-700">Đã gửi xong. Nhân viên lấy trong Media → Kho source.</p> : null}
 
         <div className="flex flex-wrap gap-2">
           <Button type="button" className="min-h-11 flex-1" disabled={busy || !rows.length} onClick={() => void send()}>
-            Gửi lên Drive
+            Gửi media
           </Button>
           <Button type="button" variant="outline" className="min-h-11" asChild>
             <Link to="/">Về trang chủ</Link>
