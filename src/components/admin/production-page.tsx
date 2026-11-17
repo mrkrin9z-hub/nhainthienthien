@@ -69,7 +69,7 @@ export function ProductionPage() {
     <div className="space-y-4 bg-slate-50">
       <PageToolbar
         title="Sản xuất"
-        hint="Lệnh sản xuất lấy từ Đơn hàng. Một nút chuyển bước kế, trạng thái đơn đổi theo."
+        hint="Sale gửi đơn sang xưởng. Quy trình: nhận đơn → đã in → đã gói → đã giao."
         search={q}
         onSearch={setQ}
         searchPlaceholder="Tìm mã, hàng…"

@@ -153,6 +153,9 @@ export const reviseOrder = createServerFn({ method: "POST" })
         fulfillment: z.enum(["pickup", "delivery"]),
         note: z.string().optional().default(""),
         dueDate: z.string().nullable().optional().default(null),
+        shipBy: z.string().nullable().optional(),
+        paymentMethod: z.enum(["", "cod", "chuyen_khoan", "tien_mat", "vi_san", "vi_cua_hang"]).optional(),
+        designFileUrl: z.string().max(500).nullable().optional(),
         ...moneyAdjust,
         items: z.array(itemSchema).min(1).optional(),
       })

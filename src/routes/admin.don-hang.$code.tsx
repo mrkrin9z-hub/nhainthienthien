@@ -9,30 +9,32 @@ import { OrderQrDialog, OrderUploadCard } from "@/components/admin/order-qr-dial
 import { WaybillBox } from "@/components/admin/waybill-box";
 import { canPreviewPhoto, PhotoViewer, saveStaffFile, saveStaffFiles, staffThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
 import { changeStatus, deleteDeskOrder, getMe, getOrderDetail, getSkuOptions, markApproval, orderUploadLink, recordDeposit, reviseOrder, saveNote, savePackCheck, saveReprint, setPrintChoice, storeShipping } from "@/lib/admin.functions";
-import { isMergedWoodAlias, isProductionStep, PRODUCTION_STEPS } from "@/domain/calc";
+import { isMergedWoodAlias } from "@/domain/calc";
+import { isMarketplace, listStatusChoices, type PaymentMethod } from "@/domain/order-desk";
 import { marketplaceEditLocked } from "@/domain/order-edit";
 import { JT_CARRIER, jtOrder } from "@/domain/jt";
 import { CHANNEL_LABEL, STATUS_LABEL, type OrderStatus } from "@/domain/types";
-import { channelLabelOf, statusLabelOf } from "@/lib/display-labels";
+import { channelLabelOf } from "@/lib/display-labels";
+
+function localDateTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
 
 export const Route = createFileRoute("/admin/don-hang/$code")({
   component: OrderDetailPage,
 });
 
-const NEXT: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"];
-const FLOW: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
-
-function stepChoices(current: OrderStatus): OrderStatus[] {
-  const index = FLOW.indexOf(current);
-  const near = index < 0 ? [] : [FLOW[index - 1], FLOW[index + 1]].filter((item): item is OrderStatus => Boolean(item));
-  return [...near, "huy"];
-}
 const FILE_KIND: Record<string, string> = {
   original: "Ảnh gốc",
   design: "Thiết kế",
@@ -40,6 +42,11 @@ const FILE_KIND: Record<string, string> = {
   packing_video: "Video đóng gói",
   packing_photo: "Ảnh gói hàng",
 };
+
+function statusOptionLabel(shipMode: string | undefined, status: OrderStatus): string {
+  if (status === "xong") return shipMode === "pickup" ? "Khách đã nhận" : "Đã giao";
+  return STATUS_LABEL[status];
+}
 
 function OrderDetailPage() {
   const { code } = Route.useParams();
@@ -52,8 +59,9 @@ function OrderDetailPage() {
   const [tab, setTab] = useState("thong-tin");
   const [override, setOverride] = useState(false);
   const [reason, setReason] = useState("");
-  const [reopenReason, setReopenReason] = useState("");
-  const [cancelReason, setCancelReason] = useState("");
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<OrderStatus | null>(null);
+  const [statusReason, setStatusReason] = useState("");
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [savingFiles, setSavingFiles] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -61,11 +69,35 @@ function OrderDetailPage() {
   const data = order.data;
   const role = me.data?.role;
   const closed = data?.status === "huy" || data?.status === "xong";
-  const moHomeProduction = Boolean(data && role === "production" && data.channel === "mo_home");
-  const productionCanMove = Boolean(data && role === "production" && (data.channel === "mo_home" || isProductionStep(data.status)));
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["order", code] });
+  }
+
+  async function applyStatus(status: OrderStatus, noteText: string) {
+    if (!data) return;
+    setStatusBusy(true);
+    try {
+      await changeStatus({
+        data: { orderId: data.id, status, note: noteText, ownerOverride: override },
+      });
+      toast.success(statusOptionLabel(data.shipMode, status));
+      await refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không đổi được trạng thái.");
+    } finally {
+      setStatusBusy(false);
+    }
+  }
+
+  function requestStatus(status: OrderStatus) {
+    if (!data || status === data.status) return;
+    if (status === "huy" || data.status === "xong" || data.status === "huy") {
+      setStatusReason("");
+      setPendingStatus(status);
+      return;
+    }
+    void applyStatus(status, "");
   }
 
   async function removeOrder() {
@@ -91,11 +123,43 @@ function OrderDetailPage() {
 
   if (!data) return <p className="text-muted-foreground">{order.isError ? (order.error as Error).message : "Đang tải đơn…"}</p>;
 
+  const statusRole = role === "production" ? "production" : role === "sale" ? "sale" : "owner";
+  const statusChoices = listStatusChoices({ status: data.status, role: statusRole, channel: data.channel });
+  const currentStatus = (data.status in STATUS_LABEL ? data.status : "nhan_don") as OrderStatus;
+  const retail = !isMarketplace(data.channel);
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
+          <p className="mt-1 truncate text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{data.customerName}</span>
+            {" · "}
+            {data.phone}
+            {" · "}
+            {channelLabelOf(data.channel, data.channelLabel)}
+            {data.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
+            {data.stockWarning ? <span className="text-amber-700"> · {data.stockWarning}</span> : null}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="h-11 min-w-[10rem] rounded-md border bg-background px-2 text-sm font-semibold"
+            aria-label={`Trạng thái ${data.code}`}
+            value={currentStatus}
+            disabled={statusBusy || statusChoices.length === 0}
+            onChange={(event) => requestStatus(event.target.value as OrderStatus)}
+          >
+            <option value={currentStatus}>{statusOptionLabel(data.shipMode, currentStatus)}</option>
+            {statusChoices
+              .filter((status) => status !== currentStatus)
+              .map((status) => (
+                <option key={status} value={status}>
+                  {statusOptionLabel(data.shipMode, status)}
+                </option>
+              ))}
+          </select>
           <Button asChild className="min-h-11">
             <Link to="/admin/phieu/$code" params={{ code: data.code }}>In K80</Link>
           </Button>
@@ -106,10 +170,14 @@ function OrderDetailPage() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setTab("trang-thai")}>Chuyển bước</DropdownMenuItem>
               {role !== "production" && (data.channel === "tai_tiem" || data.channel === "facebook") ? (
                 <DropdownMenuItem asChild>
                   <Link to="/admin/tem/$code" params={{ code: data.code }}>In tem 100×150</Link>
+                </DropdownMenuItem>
+              ) : null}
+              {role !== "production" ? (
+                <DropdownMenuItem asChild>
+                  <Link to="/admin/khach/$id" params={{ id: data.customerId }}>Hồ sơ khách</Link>
                 </DropdownMenuItem>
               ) : null}
               {role === "owner" ? (
@@ -125,26 +193,18 @@ function OrderDetailPage() {
           </DropdownMenu>
         </div>
       </div>
-      <OrderUploadCard orderId={data.id} code={data.code} cancelled={data.status === "huy"} />
-      <p className="break-words text-sm">
-        {data.customerName} · {data.phone} · {channelLabelOf(data.channel, data.channelLabel)} · {statusLabelOf(data.status, data.statusLabel)}
-        {data.recipientName && data.recipientName !== data.customerName ? ` · Người nhận: ${data.recipientName}` : ""}
-        {data.late ? <strong className="text-destructive"> · Trễ mốc</strong> : null}
-      </p>
-      {data.address ? <p className="break-words text-sm">Địa chỉ: {data.address}</p> : null}
-      {data.marketplaceCode ? <p className="text-sm">Mã sàn: {data.marketplaceCode}</p> : null}
-      {data.stockWarning ? <p className="rounded-2xl bg-accent/30 px-3 py-2 text-sm font-semibold">{data.stockWarning}</p> : null}
-      <p className="text-xs text-muted-foreground">
-        Kho in: {data.printDeducted ? "đã trừ" : "chưa trừ"} · Kho đóng gói: {data.packDeducted ? "đã trừ" : "chưa trừ"}
-      </p>
+      {role === "owner" ? (
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
+          Bỏ qua cọc / checklist khi đổi trạng thái
+        </label>
+      ) : null}
       <div className="flex gap-1 overflow-x-auto border-b">
         {(
           [
             ["thong-tin", "Thông tin"],
-            ["khach", "Khách hàng"],
             ["anh", "Hình ảnh"],
             ["giao", "Giao hàng"],
-            ["trang-thai", "Tình trạng"],
             ["lich-su", "Lịch sử"],
           ] as const
         ).map(([id, label]) => (
@@ -161,7 +221,6 @@ function OrderDetailPage() {
 
       {tab === "thong-tin" ? (
         <>
-        <OrderCommercePanel order={data} money={role !== "production"} />
         {role === "production" ? (
           <section className="rounded-md border bg-card p-4">
             <h2 className="font-semibold text-primary">Sản phẩm</h2>
@@ -177,6 +236,7 @@ function OrderDetailPage() {
           <OrderDesk
             key={data.id}
             mode="edit"
+            retail={retail}
             owner={role === "owner"}
             fieldsLocked={marketplaceEditLocked(data.channel)}
             itemsLocked={marketplaceEditLocked(data.channel) || data.printDeducted || data.packDeducted || data.status === "xong" || data.status === "huy"}
@@ -184,9 +244,9 @@ function OrderDetailPage() {
               marketplaceEditLocked(data.channel)
                 ? "Đơn TikTok hoặc Shopee lấy từ sàn. Khách, sản phẩm, giá và thu tiền bị khóa."
                 : data.status === "xong" || data.status === "huy"
-                  ? "Đơn đã hủy hoặc đã xong. Mở lại ở tab Tình trạng rồi mới sửa sản phẩm."
+                  ? "Đơn đã hủy hoặc đã xong. Đổi trạng thái ở select phía trên rồi mới sửa sản phẩm."
                   : data.printDeducted || data.packDeducted
-                    ? "Đơn đã trừ kho. Lùi về trước bước In rồi mới sửa sản phẩm. Tên, số và địa chỉ vẫn lưu được."
+                    ? "Đơn đã trừ kho. Lùi về trước bước In rồi mới sửa sản phẩm."
                     : ""
             }
             catalog={((skus.data ?? []) as DeskSku[]).filter((sku) => !isMergedWoodAlias(sku) || data.items.some((item) => item.skuId === sku.id))}
@@ -204,6 +264,9 @@ function OrderDetailPage() {
               marketplaceCode: data.marketplaceCode,
               discount: data.discount,
               customerShip: data.shipping?.customerShip ?? null,
+              shipBy: localDateTime(data.shipBy),
+              designFileUrl: data.designFileUrl || "",
+              paymentMethod: (data.paymentMethod as PaymentMethod) || "",
               lines: data.items.map((item) => ({
                 key: item.id,
                 skuId: item.skuId,
@@ -224,6 +287,9 @@ function OrderDetailPage() {
                   dueDate: value.dueDate,
                   discount: value.discount,
                   customerShip: value.customerShip,
+                  shipBy: value.shipBy ?? null,
+                  paymentMethod: value.paymentMethod,
+                  designFileUrl: value.designFileUrl ?? null,
                   ...(value.items ? { items: value.items } : {}),
                 },
               });
@@ -237,219 +303,158 @@ function OrderDetailPage() {
             }}
           />
         )}
+        {!retail && role !== "production" ? (
+          <details className="rounded-md border bg-card p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-primary">Thông tin sàn</summary>
+            <div className="mt-3">
+              <OrderCommercePanel order={data} money={role !== "production"} />
+            </div>
+          </details>
+        ) : null}
+        <details className="rounded-md border bg-card p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-primary">Thêm · QR ảnh · trả lời · ghi chú</summary>
+          <div className="mt-3 space-y-4">
+            <OrderUploadCard orderId={data.id} code={data.code} cancelled={data.status === "huy"} />
+            <div>
+              <p className="text-sm">{data.reply}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  className="min-h-10"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(data.reply);
+                    toast.success("Đã chép câu trả lời");
+                  }}
+                >
+                  Chép câu trả lời
+                </Button>
+                {role !== "production" && (data.status === "giao" || data.status === "xong") ? (
+                  <Button
+                    variant="outline"
+                    className="min-h-10"
+                    onClick={() => {
+                      void orderUploadLink({ data: { orderId: data.id, rotate: false } })
+                        .then(async (result) => {
+                          const link = `${window.location.origin}/danh-gia/${result.token}`;
+                          await navigator.clipboard.writeText(link);
+                          toast.success("Đã chép câu hỏi cho khách");
+                        })
+                        .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không tạo được link."));
+                    }}
+                  >
+                    Chép câu hỏi đánh giá
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            {role !== "production" ? (
+              <div>
+                <p className="text-sm font-semibold">Ghi chú nội bộ</p>
+                <Textarea className="mt-2" value={note ?? data.internalNote} onChange={(e) => setNote(e.target.value)} />
+                <Button
+                  className="mt-2 min-h-10"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await saveNote({ data: { orderId: data.id, note: note ?? data.internalNote } });
+                      toast.success("Đã lưu ghi chú");
+                      await refresh();
+                    } catch (error) {
+                      toast.error((error as Error).message);
+                    }
+                  }}
+                >
+                  Lưu ghi chú
+                </Button>
+              </div>
+            ) : null}
+            {role !== "production" ? (
+              <div>
+                <p className="text-sm font-semibold">In lại</p>
+                <p className="text-xs text-muted-foreground">Trong 3 ngày sau giao, in lại nếu lỗi xưởng.</p>
+                <Textarea className="mt-2" placeholder="Lý do khách báo" value={reason} onChange={(e) => setReason(e.target.value)} />
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    className="min-h-10"
+                    onClick={async () => {
+                      await saveReprint({ data: { orderId: data.id, reason, decision: "reprint", extraCost: null, uses: [] } });
+                      toast.success("Đã ghi in lại");
+                      setReason("");
+                      await refresh();
+                    }}
+                  >
+                    In lại
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="min-h-10"
+                    onClick={async () => {
+                      await saveReprint({ data: { orderId: data.id, reason, decision: "reject", extraCost: null, uses: [] } });
+                      toast.success("Đã từ chối");
+                      await refresh();
+                    }}
+                  >
+                    Từ chối
+                  </Button>
+                </div>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {data.reprints.map((item) => (
+                    <li key={item.id}>
+                      {item.decision === "reprint" ? "In lại" : item.decision === "reject" ? "Từ chối" : "Chờ"} · {item.reason}
+                      {item.overdue ? <strong className="text-destructive"> · Quá hạn</strong> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {role === "owner" && data.quote ? (
+              <div>
+                <p className="text-sm font-semibold">Lãi gộp (định mức hiện tại)</p>
+                <ul className="mt-1 space-y-1 text-sm">
+                  {data.quote.map((quote, index) =>
+                    quote ? (
+                      <li key={index}>
+                        {quote.profit === null ? "Chưa đủ số" : `${formatMaybe(quote.profit)} (${quote.marginPercent}%)`}
+                        {quote.tone === "red" ? " · LỖ" : quote.tone === "yellow" ? " · dưới ngưỡng" : ""}
+                      </li>
+                    ) : null,
+                  )}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </details>
         </>
       ) : null}
 
-      {tab === "khach" ? (
-        <section className="rounded-md border bg-card p-4">
-          <h2 className="font-semibold text-primary">Khách hàng</h2>
-          <dl className="mt-3 grid gap-3 text-sm md:grid-cols-2">
-            <div>
-              <dt className="text-muted-foreground">Tên</dt>
-              <dd className="text-base font-semibold">{data.customerName}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Số điện thoại</dt>
-              <dd className="text-base font-semibold">{data.phone}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Kênh</dt>
-              <dd>{CHANNEL_LABEL[data.channel]}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Nhận hàng</dt>
-              <dd>{data.fulfillment === "delivery" ? "Giao hàng" : "Tại tiệm"}</dd>
-            </div>
-            <div className="md:col-span-2">
-              <dt className="text-muted-foreground">Địa chỉ</dt>
-              <dd>{data.address || "Chưa có địa chỉ"}</dd>
-            </div>
-            {data.customerNote ? (
-              <div className="md:col-span-2">
-                <dt className="text-muted-foreground">Ghi chú khách</dt>
-                <dd>{data.customerNote}</dd>
-              </div>
-            ) : null}
-          </dl>
-          {role === "production" ? null : (
-            <Link to="/admin/khach/$id" params={{ id: data.customerId }} className="mt-3 inline-block text-sm font-semibold text-primary">
-              Hồ sơ khách
-            </Link>
-          )}
-        </section>
-      ) : null}
-
       {tab === "giao" ? (
-        role !== "production" ? (
-          <ShippingForm
+        <div className="space-y-4">
+          <PackBox
             orderId={data.id}
-            shipping={data.shipping}
-            channel={data.channel}
-            source={data.source}
-            fulfillment={data.fulfillment}
-            status={data.status}
-            address={data.address}
+            check={data.packCheck}
+            hasPhoto={data.hasPackingPhoto}
+            photoId={data.files.find((file) => file.kind === "packing_photo")?.id ?? null}
+            closed={closed}
             onDone={refresh}
           />
-        ) : (
-          <p className="text-sm">
-            Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}
-            {data.shipping?.carrierStatus ? ` · ${data.shipping.carrierStatus}` : ""}
-          </p>
-        )
-      ) : null}
-
-      {tab === "trang-thai" ? (
-      <>
-      <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Quy trình</h2>
-        {data.status === "huy" ? (
-          <p className="mt-2 text-sm font-semibold text-destructive">Đơn đang Hủy. Chỉ chủ mở lại, và phải ghi lý do.</p>
-        ) : (
-          <ol className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {(["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"] as OrderStatus[]).map((status, index) => (
-              <li
-                key={status}
-                className={`min-w-24 shrink-0 rounded-2xl px-3 py-2 text-center text-xs font-bold ${data.status === status ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}
-              >
-                {index + 1}. {STATUS_LABEL[status]}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-
-      <PackBox
-        orderId={data.id}
-        check={data.packCheck}
-        hasPhoto={data.hasPackingPhoto}
-        photoId={data.files.find((file) => file.kind === "packing_photo")?.id ?? null}
-        closed={data.status === "huy" || data.status === "xong"}
-        onDone={refresh}
-      />
-
-      <section className="glass-card rounded-3xl p-4">
-        <h2 className="font-bold text-primary">Chuyển bước</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {role === "production"
-            ? moHomeProduction
-              ? "Đơn Mơ Home: sản xuất chuyển từng bước, không hủy đơn. Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."
-              : productionCanMove
-              ? "Sản xuất chỉ chuyển đơn đang In, Đóng gói hoặc Giao giữa ba bước đó. Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."
-              : "Đơn này không nằm ở In, Đóng gói hoặc Giao. Sản xuất không chuyển bước."
-            : closed && role === "owner"
-              ? "Mở lại đơn đã hủy hoặc đã xong cần ghi lý do. Lý do được lưu vào lịch sử."
-              : closed
-                ? "Đơn đã hủy hoặc đã xong. Chỉ chủ mở lại, và phải ghi lý do."
-                : "Vào In thì trừ vật tư in. Sang Giao thì trừ túi, xốp, carton, băng keo, tem."}
-        </p>
-        {role === "owner" ? (
-          <div className="mt-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-3">
-            <p className="text-sm text-muted-foreground">Xóa hẳn đơn khỏi sổ (khác hủy). Hoàn kho đã trừ. Chỉ chủ được xóa.</p>
-            <Button type="button" variant="destructive" className="mt-2 min-h-11" disabled={deleting} onClick={() => void removeOrder()}>
-              {deleting ? "Đang xóa…" : "Xóa đơn"}
-            </Button>
-          </div>
-        ) : null}
-        {role === "owner" ? (
-          <label className="mt-2 flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
-            Chủ bỏ qua cọc và checklist giao
-          </label>
-        ) : null}
-        {role === "owner" && closed ? (
-          <Textarea className="mt-2" placeholder="Lý do mở lại" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} />
-        ) : null}
-        {role !== "production" && !closed ? (
-          <Textarea className="mt-2" placeholder="Lý do nếu hủy đơn" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
-        ) : null}
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          {(role === "production" ? (moHomeProduction ? (closed ? [] : stepChoices(data.status).filter((status) => status !== "huy")) : productionCanMove ? [...PRODUCTION_STEPS] : []) : closed && role !== "owner" ? [] : closed ? NEXT.filter((status) => status !== "huy") : stepChoices(data.status)).map((status) => (
-            <Button
-              key={status}
-              variant={data.status === status ? "default" : "outline"}
-              className="min-h-12 w-full sm:w-auto"
-              onClick={async () => {
-                const reopening = closed && status !== data.status;
-                if (reopening && !reopenReason.trim()) {
-                  toast.error("Mở lại đơn đã hủy hoặc đã xong cần ghi lý do.");
-                  return;
-                }
-                if (status === "huy" && !cancelReason.trim()) {
-                  toast.error("Hủy đơn cần ghi lý do.");
-                  return;
-                }
-                if (status === "huy" && !window.confirm("Hủy đơn này? Đơn hủy không tính công nợ.")) return;
-                try {
-                  await changeStatus({
-                    data: { orderId: data.id, status, note: reopening ? reopenReason.trim() : status === "huy" ? cancelReason.trim() : "", ownerOverride: override },
-                  });
-                  toast.success(STATUS_LABEL[status]);
-                  if (reopening) setReopenReason("");
-                  await refresh();
-                } catch (error) {
-                  toast.error((error as Error).message);
-                }
-              }}
-            >
-              {STATUS_LABEL[status]}
-            </Button>
-          ))}
+          {role !== "production" ? (
+            <ShippingForm
+              orderId={data.id}
+              shipping={data.shipping}
+              channel={data.channel}
+              source={data.source}
+              fulfillment={data.fulfillment}
+              status={data.status}
+              address={data.address}
+              onDone={refresh}
+            />
+          ) : (
+            <p className="text-sm">
+              Hãng: {data.shipping?.carrier || "chưa ghi"} · Vận đơn: {data.shipping?.tracking || "chưa có"}
+              {data.shipping?.carrierStatus ? ` · ${data.shipping.carrierStatus}` : ""}
+            </p>
+          )}
         </div>
-        <div className="mt-3 rounded-2xl bg-background p-3 text-sm">
-          <p>{data.reply}</p>
-          <Button
-            variant="outline"
-            className="mt-2 min-h-11"
-            onClick={() => {
-              void navigator.clipboard.writeText(data.reply);
-              toast.success("Đã chép câu trả lời");
-            }}
-          >
-            Chép câu trả lời
-          </Button>
-          {role !== "production" && (data.status === "giao" || data.status === "xong") ? (
-            <Button
-              variant="outline"
-              className="mt-2 min-h-11"
-              onClick={() => {
-                void orderUploadLink({ data: { orderId: data.id, rotate: false } })
-                  .then(async (result) => {
-                    const link = `${window.location.origin}/danh-gia/${result.token}`;
-                    await navigator.clipboard.writeText(link);
-                    toast.success("Đã chép câu hỏi cho khách");
-                  })
-                  .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không tạo được link."));
-              }}
-            >
-              Chép câu hỏi đánh giá
-            </Button>
-          ) : null}
-        </div>
-      </section>
-
-      {role !== "production" ? (
-        <section className="mt-4 rounded-md border bg-card p-4">
-          <h2 className="font-bold text-primary">Ghi chú nội bộ</h2>
-          <Textarea className="mt-2" value={note ?? data.internalNote} onChange={(e) => setNote(e.target.value)} />
-          <Button
-            className="mt-2 min-h-11"
-            variant="outline"
-            onClick={async () => {
-              try {
-                await saveNote({ data: { orderId: data.id, note: note ?? data.internalNote } });
-                toast.success("Đã lưu ghi chú");
-                await refresh();
-              } catch (error) {
-                toast.error((error as Error).message);
-              }
-            }}
-          >
-            Lưu ghi chú
-          </Button>
-        </section>
-      ) : null}
-      </>
       ) : null}
 
       {tab === "anh" ? (
@@ -567,62 +572,6 @@ function OrderDetailPage() {
       </>
       ) : null}
 
-      {tab === "trang-thai" && role !== "production" ? (
-        <section className="rounded-md border bg-card p-4">
-          <h2 className="font-bold text-primary">In lại</h2>
-          <p className="text-sm text-muted-foreground">Trong 3 ngày sau khi giao, in lại nếu lỗi do xưởng. Quá hạn web sẽ cảnh báo.</p>
-          <Textarea className="mt-2" placeholder="Lý do khách báo" value={reason} onChange={(e) => setReason(e.target.value)} />
-          <div className="mt-2 flex gap-2">
-            <Button
-              className="min-h-11"
-              onClick={async () => {
-                await saveReprint({ data: { orderId: data.id, reason, decision: "reprint", extraCost: null, uses: [] } });
-                toast.success("Đã ghi in lại");
-                setReason("");
-                await refresh();
-              }}
-            >
-              In lại
-            </Button>
-            <Button
-              variant="outline"
-              className="min-h-11"
-              onClick={async () => {
-                await saveReprint({ data: { orderId: data.id, reason, decision: "reject", extraCost: null, uses: [] } });
-                toast.success("Đã từ chối");
-                await refresh();
-              }}
-            >
-              Từ chối
-            </Button>
-          </div>
-          <ul className="mt-3 space-y-1 text-sm">
-            {data.reprints.map((item) => (
-              <li key={item.id}>
-                {item.decision === "reprint" ? "In lại" : item.decision === "reject" ? "Từ chối" : "Chờ"} · {item.reason}
-                {item.overdue ? <strong className="text-destructive"> · Quá hạn in lại</strong> : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {tab === "trang-thai" && role === "owner" && data.quote ? (
-        <section className="rounded-md border bg-card p-4">
-          <h2 className="font-bold text-primary">Lãi gộp theo định mức hiện tại</h2>
-          <ul className="mt-2 space-y-1 text-sm">
-            {data.quote.map((quote, index) =>
-              quote ? (
-                <li key={index}>
-                  {quote.profit === null ? "Chưa đủ số" : `${formatMaybe(quote.profit)} (${quote.marginPercent}%)`}
-                  {quote.tone === "red" ? " · LỖ" : quote.tone === "yellow" ? " · dưới ngưỡng vàng" : ""}
-                </li>
-              ) : null,
-            )}
-          </ul>
-        </section>
-      ) : null}
-
       {tab === "lich-su" ? (
       <section className="rounded-md border bg-card p-4">
         <h2 className="font-bold text-primary">Lịch sử</h2>
@@ -645,6 +594,42 @@ function OrderDetailPage() {
         </ul>
       </section>
       ) : null}
+
+      <Dialog
+        open={pendingStatus != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingStatus(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pendingStatus ? `${data.code} · ${statusOptionLabel(data.shipMode, pendingStatus)}` : "Đổi trạng thái"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {pendingStatus === "huy" ? "Hủy đơn cần ghi lý do." : "Mở lại đơn cần ghi lý do."}
+          </p>
+          <Input
+            value={statusReason}
+            placeholder="Lý do"
+            aria-label="Lý do đổi trạng thái"
+            onChange={(event) => setStatusReason(event.target.value)}
+          />
+          <Button
+            type="button"
+            disabled={!statusReason.trim() || !pendingStatus || statusBusy}
+            onClick={() => {
+              if (!pendingStatus) return;
+              const next = pendingStatus;
+              setPendingStatus(null);
+              void applyStatus(next, statusReason.trim());
+            }}
+          >
+            Xác nhận
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -137,29 +137,28 @@ test("combo đắt hơn trên mỗi tấm thì cảnh báo, bằng nhau thì đ�
   assert.match(warnings[0]!, /13x18/);
 });
 
-test("cọc Facebook chặn thiết kế và in, chủ được ghi đè", () => {
+test("cọc Facebook chặn sang in, chủ được ghi đè", () => {
   const base = { settings: DEFAULT_SETTINGS, channel: "facebook" as const };
   assert.equal(depositFor({ ...base, total: null, items: [{ size: "40x60" }] }), null);
   assert.equal(depositFor({ ...base, total: null, items: [{ size: "13x18" }] }), 0);
   assert.equal(depositFor({ ...base, total: 299999, items: [{ size: "13x18" }] }), 0);
   assert.equal(depositFor({ ...base, total: 300000, items: [{ size: "13x18" }] }), 150000);
   assert.equal(depositBlocks("nhan_don", null, 0), false);
-  assert.equal(depositBlocks("thiet_ke", null, 0), true);
   assert.equal(depositBlocks("in", null, 0), true);
   assert.equal(depositBlocks("xong", 150000, 0), true);
   assert.equal(depositBlocks("in", 150000, 150000), false);
   assert.equal(depositBlocks("in", 0, 0), false);
   assert.match(
-    statusChangeError({ role: "sale", ownerOverride: false, current: "nhan_don", next: "thiet_ke", depositRequired: null, depositPaid: 0 }) ?? "",
+    statusChangeError({ role: "sale", ownerOverride: false, current: "nhan_don", next: "in", depositRequired: null, depositPaid: 0 }) ?? "",
     /chưa có giá/,
   );
-  assert.match(
-    statusChangeError({ role: "owner", ownerOverride: true, current: "nhan_don", next: "in", depositRequired: null, depositPaid: 0 }) ?? "",
-    /Không nhảy bước/,
+  assert.equal(
+    statusChangeError({ role: "owner", ownerOverride: true, current: "nhan_don", next: "in", depositRequired: null, depositPaid: 0 }),
+    null,
   );
-  assert.match(
-    statusChangeError({ role: "sale", ownerOverride: false, current: "nhan_don", next: "in", depositRequired: 0, depositPaid: 0 }) ?? "",
-    /Không nhảy bước/,
+  assert.equal(
+    statusChangeError({ role: "sale", ownerOverride: false, current: "nhan_don", next: "in", depositRequired: 0, depositPaid: 0 }),
+    null,
   );
   assert.match(
     statusChangeError({ role: "production", ownerOverride: false, current: "in", next: "xong", depositRequired: 0, depositPaid: 0 }) ?? "",
@@ -167,13 +166,13 @@ test("cọc Facebook chặn thiết kế và in, chủ được ghi đè", () =>
   );
 });
 
-test("sản xuất chỉ chuyển đơn đang in, đóng gói hoặc giao; chỉ chủ mở lại hủy hoặc xong", () => {
+test("sản xuất nhận đơn → in → gói → giao; chỉ chủ mở lại hủy hoặc xong", () => {
   const move = (partial: Parameters<typeof statusChangeError>[0]) => statusChangeError(partial);
   const base = { ownerOverride: false, depositRequired: 0, depositPaid: 0 };
   assert.match(move({ ...base, role: "production", current: "huy", next: "in" }) ?? "", /Chỉ chủ/);
   assert.match(move({ ...base, role: "production", current: "xong", next: "in" }) ?? "", /Chỉ chủ/);
-  assert.match(move({ ...base, role: "production", current: "nhan_don", next: "in" }) ?? "", /Sản xuất/);
-  assert.match(move({ ...base, role: "production", current: "thiet_ke", next: "in" }) ?? "", /Sản xuất/);
+  assert.equal(move({ ...base, role: "production", current: "nhan_don", next: "in" }), null);
+  assert.equal(move({ ...base, role: "production", current: "thiet_ke", next: "in" }), null);
   assert.equal(move({ ...base, role: "production", current: "in", next: "dong_goi" }), null);
   assert.equal(move({ ...base, role: "production", current: "dong_goi", next: "giao" }), null);
   assert.match(move({ ...base, role: "production", current: "giao", next: "in" }) ?? "", /Không nhảy bước/);
@@ -187,10 +186,7 @@ test("sản xuất chỉ chuyển đơn đang in, đóng gói hoặc giao; chỉ
   assert.match(move({ ...base, role: "sale", current: "in", next: "xong" }) ?? "", /Không nhảy bước/);
   assert.match(move({ ...base, role: "sale", current: "nhan_don", next: "huy" }) ?? "", /lý do/);
   assert.equal(move({ ...base, role: "sale", current: "nhan_don", next: "huy", reason: "khách hủy" }), null);
-  assert.match(
-    move({ ...base, role: "sale", current: "cho_duyet", next: "in", approvalReady: false }) ?? "",
-    /ảnh khách đã duyệt/,
-  );
+  assert.equal(move({ ...base, role: "sale", current: "cho_duyet", next: "in", approvalReady: false }), null);
   assert.equal(move({ ...base, role: "owner", ownerOverride: true, current: "cho_duyet", next: "in", approvalReady: false }), null);
 });
 
@@ -292,7 +288,7 @@ test("nhật ký đọc bằng tiếng Việt", () => {
   };
   assert.equal(
     describeAudit({ action: "order.status", entity: "order-1", actorId: "sale-1", before: { status: "in" }, after: { status: "dong_goi" } }, shop),
-    "Sale Lan chuyển đơn TT261017-001: In → Đóng gói",
+    "Sale Lan chuyển đơn TT261017-001: Đã in → Đã gói",
   );
   assert.equal(
     describeAudit(

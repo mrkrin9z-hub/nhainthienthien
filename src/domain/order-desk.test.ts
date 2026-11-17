@@ -6,12 +6,13 @@ import { applyOrderDesk, deskAlerts, deskTabMeta, deskTabOf, estimateNet, listSt
 import { DEFAULT_SETTINGS } from "./seed.ts";
 
 test("danh sách chỉ đưa bước kế, không nhảy", () => {
-  assert.deepEqual(listStatusChoices({ status: "nhan_don", role: "owner", channel: "tai_tiem" }), ["thiet_ke", "huy"]);
-  assert.deepEqual(listStatusChoices({ status: "in", role: "owner", channel: "tai_tiem" }), ["cho_duyet", "dong_goi", "huy"]);
+  assert.deepEqual(listStatusChoices({ status: "nhan_don", role: "owner", channel: "tai_tiem" }), ["in", "huy"]);
+  assert.deepEqual(listStatusChoices({ status: "in", role: "owner", channel: "tai_tiem" }), ["nhan_don", "dong_goi", "huy"]);
   assert.equal(listStatusChoices({ status: "in", role: "owner", channel: "tai_tiem" }).includes("xong"), false);
-  assert.deepEqual(listStatusChoices({ status: "in", role: "production", channel: "tai_tiem" }), ["dong_goi"]);
-  assert.deepEqual(listStatusChoices({ status: "nhan_don", role: "production", channel: "facebook" }), []);
+  assert.deepEqual(listStatusChoices({ status: "in", role: "production", channel: "tai_tiem" }), ["nhan_don", "dong_goi"]);
+  assert.deepEqual(listStatusChoices({ status: "nhan_don", role: "production", channel: "facebook" }), ["in"]);
   assert.deepEqual(listStatusChoices({ status: "dong_goi", role: "production", channel: "mo_home" }), ["in", "giao"]);
+  assert.deepEqual(listStatusChoices({ status: "cho_duyet", role: "sale", channel: "tai_tiem" }), ["nhan_don", "in", "huy"]);
   assert.deepEqual(listStatusChoices({ status: "xong", role: "sale", channel: "tai_tiem" }), []);
   assert.deepEqual(listStatusChoices({ status: "xong", role: "owner", channel: "tai_tiem" }), ["giao"]);
 });
@@ -33,9 +34,10 @@ test("bốn tab làm việc, không nhảy bước xưởng", () => {
   assert.equal(productionLane("giao"), "giao");
   assert.equal(productionLane("xong"), null);
   assert.equal(productionMove({ status: "in", role: "production", channel: "tai_tiem" }).next, "dong_goi");
-  assert.equal(productionMove({ status: "in", role: "production", channel: "tai_tiem" }).back, null);
+  assert.equal(productionMove({ status: "in", role: "production", channel: "tai_tiem" }).back, "nhan_don");
   assert.equal(productionMove({ status: "dong_goi", role: "owner", channel: "tai_tiem" }).back, "in");
-  assert.equal(productionMove({ status: "nhan_don", role: "production", channel: "facebook" }).next, null);
+  assert.equal(productionMove({ status: "nhan_don", role: "production", channel: "facebook" }).next, "in");
+  assert.equal(productionMove({ status: "thiet_ke", role: "production", channel: "tai_tiem" }).next, "in");
   assert.equal(deskTabMeta("can_gui").label, "Cần gửi");
   assert.equal(deskTabMeta("xong_huy").label, "Xong/Hủy");
   assert.equal(shipModeOf({ channel: "tiktok", fulfillment: "delivery" }), "san");

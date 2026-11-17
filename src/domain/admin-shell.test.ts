@@ -69,9 +69,12 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(readFileSync(new URL("../components/admin/product-picker.tsx", import.meta.url), "utf8"), /Chọn sản phẩm/);
   assert.match(readFileSync(new URL("../routes/admin.vi.tsx", import.meta.url), "utf8"), /Ví của tôi/);
   const detail = readFileSync(new URL("../routes/admin.don-hang.$code.tsx", import.meta.url), "utf8");
-  assert.match(detail, /Khách hàng/);
   assert.match(detail, /Hình ảnh/);
-  assert.match(detail, /Tình trạng/);
+  assert.doesNotMatch(detail, /\["trang-thai", "Tình trạng"\]/);
+  assert.doesNotMatch(detail, /\["khach", "Khách hàng"\]/);
+  assert.match(detail, /listStatusChoices/);
+  assert.match(detail, /retail=\{retail\}/);
+  assert.match(detail, /Thêm · QR ảnh/);
   assert.match(detail, /OrderDesk/);
   assert.match(detail, /deleteDeskOrder/);
   assert.match(detail, /Xóa đơn/);
@@ -82,7 +85,7 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(form, /Cập nhật/);
   assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Thêm nhân viên/);
   assert.match(readFileSync(new URL("../components/admin/staff-desk.tsx", import.meta.url), "utf8"), /Phân quyền/);
-  assert.match(readFileSync(new URL("../components/admin/production-page.tsx", import.meta.url), "utf8"), /Lệnh sản xuất/);
+  assert.match(readFileSync(new URL("../components/admin/production-page.tsx", import.meta.url), "utf8"), /nhận đơn → đã in → đã gói → đã giao/);
   const money = readFileSync(new URL("../components/admin/sections.tsx", import.meta.url), "utf8");
   assert.match(money, /Thu tiền/);
   assert.match(money, /Chi phí/);

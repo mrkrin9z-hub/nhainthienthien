@@ -362,16 +362,20 @@ export function depositFor(order: {
   return money((order.total * order.settings.depositPercent) / 100);
 }
 
-const PROGRESS: OrderStatus[] = ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
+/** Luồng tinh gọn: nhận đơn → in → gói → giao → xong. Bỏ thiết kế / chờ duyệt. */
+const PROGRESS: OrderStatus[] = ["nhan_don", "in", "dong_goi", "giao", "xong"];
+
+/** Đơn cũ còn kẹt ở thiết kế / chờ duyệt — chỉ thoát về nhận đơn hoặc sang in. */
+const LEGACY_PREPRESS = new Set<OrderStatus>(["thiet_ke", "cho_duyet"]);
 
 export function statusRank(status: OrderStatus): number {
   return PROGRESS.indexOf(status);
 }
 
-const DEPOSIT_GATE: OrderStatus[] = ["thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong"];
+const DEPOSIT_GATE: OrderStatus[] = ["in", "dong_goi", "giao", "xong"];
 
-/** Sản xuất chỉ thấy và chỉ chuyển giữa ba bước này. */
-export const PRODUCTION_STEPS = ["in", "dong_goi", "giao"] as const;
+/** Sản xuất: nhận đơn → đã in → đã gói → đã giao. */
+export const PRODUCTION_STEPS = ["nhan_don", "in", "dong_goi", "giao"] as const;
 
 export function isProductionStep(status: string): boolean {
   return (PRODUCTION_STEPS as readonly string[]).includes(status);
@@ -394,7 +398,7 @@ export function statusChangeError(input: {
   depositPaid: number;
   /** false khi checklist đóng gói chưa xong. Thiếu thì không chặn, để đơn cũ vẫn chuyển được trong kiểm thử. */
   packReady?: boolean;
-  /** false khi sang in từ chờ duyệt mà chưa có ảnh khách duyệt. Thiếu thì không chặn. */
+  /** Giữ tham số cho API cũ; luồng mới không yêu cầu ảnh duyệt. */
   approvalReady?: boolean;
   /** Đơn Mơ Home: sản xuất được chuyển hết các bước, trừ hủy. */
   channel?: Channel;
@@ -407,26 +411,34 @@ export function statusChangeError(input: {
   if (input.next === "huy" && input.role === "production") return "Sản xuất không hủy đơn.";
   if (input.next === "huy" && input.current !== "huy" && !input.reason?.trim()) return "Hủy đơn cần ghi lý do.";
   const internal = input.channel === "mo_home";
-  if (input.role === "production" && !internal && (!isProductionStep(input.current) || !isProductionStep(input.next))) {
-    return "Sản xuất chỉ chuyển đơn đang in, đóng gói hoặc giao giữa ba bước đó.";
+  const legacyOut =
+    LEGACY_PREPRESS.has(input.current) && (input.next === "nhan_don" || input.next === "in" || input.next === "huy");
+  if (
+    input.role === "production" &&
+    !internal &&
+    !(isProductionStep(input.current) && isProductionStep(input.next)) &&
+    !legacyOut
+  ) {
+    return "Sản xuất chỉ chuyển nhận đơn, đã in, đã gói hoặc đã giao.";
   }
-  if (!reopening && input.current !== input.next && PROGRESS.includes(input.current) && PROGRESS.includes(input.next)) {
-    const delta = statusRank(input.next) - statusRank(input.current);
-    if (Math.abs(delta) !== 1) return "Chỉ chuyển sang bước kế trước hoặc kế sau. Không nhảy bước.";
+  if (LEGACY_PREPRESS.has(input.current) && input.next !== input.current && !legacyOut) {
+    return "Đơn cũ bước thiết kế/duyệt: chỉ về nhận đơn hoặc sang in.";
   }
   if (
-    input.current === "cho_duyet" &&
-    input.next === "in" &&
-    input.approvalReady === false &&
-    !(input.role === "owner" && input.ownerOverride)
+    !reopening &&
+    !LEGACY_PREPRESS.has(input.current) &&
+    input.current !== input.next &&
+    PROGRESS.includes(input.current) &&
+    PROGRESS.includes(input.next)
   ) {
-    return "Chuyển sang in cần một ảnh khách đã duyệt, hoặc chủ ghi đè.";
+    const delta = statusRank(input.next) - statusRank(input.current);
+    if (Math.abs(delta) !== 1) return "Chỉ chuyển sang bước kế trước hoặc kế sau. Không nhảy bước.";
   }
   if (depositBlocks(input.next, input.depositRequired, input.depositPaid) && !(input.role === "owner" && input.ownerOverride)) {
     if (input.depositRequired === null) {
       return "Đơn Facebook có khổ từ 40×60 cần cọc 50%, nhưng chưa có giá bán để tính số cọc.";
     }
-    return "Đơn Facebook chưa ghi đủ cọc 50%. Chưa chuyển sang thiết kế hoặc in.";
+    return "Đơn Facebook chưa ghi đủ cọc 50%. Chưa chuyển sang in.";
   }
   if (input.packReady === false && needsPackCheck(input.current, input.next) && !(input.role === "owner" && input.ownerOverride)) {
     return "Trước khi giao cần đánh dấu đã ép, đã bo viền, đã dán tem và có một ảnh gói hàng.";

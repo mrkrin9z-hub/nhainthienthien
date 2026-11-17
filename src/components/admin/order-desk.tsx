@@ -114,6 +114,9 @@ export function OrderDesk({
     marketplaceCode: string;
     discount?: number | null;
     customerShip?: number | null;
+    shipBy?: string;
+    designFileUrl?: string;
+    paymentMethod?: PaymentMethod;
     lines: { key: string; skuId: string; quantity: number; unitPrice: string; variant?: string }[];
   };
   paidSoFar: number;
@@ -133,10 +136,12 @@ export function OrderDesk({
   const [customerShip, setCustomerShip] = useState(initial.customerShip == null ? "" : String(initial.customerShip));
   const [priceReason, setPriceReason] = useState("");
   const [marketplaceCode, setMarketplaceCode] = useState(initial.marketplaceCode);
-  const [shipBy, setShipBy] = useState("");
-  const [commercePay, setCommercePay] = useState<PaymentMethod>(mode === "create" ? "tien_mat" : "");
+  const [shipBy, setShipBy] = useState(initial.shipBy ?? "");
+  const [commercePay, setCommercePay] = useState<PaymentMethod>(
+    initial.paymentMethod || (mode === "create" ? "tien_mat" : ""),
+  );
   const [netAmount, setNetAmount] = useState("");
-  const [designFileUrl, setDesignFileUrl] = useState("");
+  const [designFileUrl, setDesignFileUrl] = useState(initial.designFileUrl ?? "");
   const [lines, setLines] = useState<Line[]>(
     initial.lines.length
       ? initial.lines.map((line) => ({ ...line, query: "", priceTouched: line.unitPrice !== "", variant: line.variant ?? "" }))
@@ -158,15 +163,17 @@ export function OrderDesk({
     enabled: mode === "create" && fullName.trim().length >= 2,
   });
 
-  const compact = retail && mode === "create";
-  const channelList = compact
-    ? [
-        { id: "tai_tiem" as const, label: "Trực tiếp" },
-        { id: "facebook" as const, label: "Facebook" },
-      ]
-    : channelOptions?.length
-      ? channelOptions
-      : (Object.keys(CHANNEL_LABEL) as Channel[]).map((id) => ({ id, label: CHANNEL_LABEL[id] }));
+  /** Form khách lẻ gọn như lúc tạo — ẩn địa chỉ khi lấy tại xưởng, nhãn ngắn. */
+  const compact = retail;
+  const channelList =
+    retail && mode === "create"
+      ? [
+          { id: "tai_tiem" as const, label: "Trực tiếp" },
+          { id: "facebook" as const, label: "Facebook" },
+        ]
+      : channelOptions?.length
+        ? channelOptions
+        : (Object.keys(CHANNEL_LABEL) as Channel[]).map((id) => ({ id, label: CHANNEL_LABEL[id] }));
   const sellable = useMemo(
     () => catalog.filter((sku) => skuSoldOn(sku, channel)),
     [catalog, channel],
@@ -481,19 +488,21 @@ export function OrderDesk({
           <p className="text-xs text-muted-foreground">
             {isMarketplace(channel) ? "Đơn sàn in nhãn của TikTok hoặc Shopee." : fulfillment === "delivery" ? "Tự giao — cần địa chỉ khách." : "Khách lấy tại xưởng."}
           </p>
-          {mode === "create" ? (
+          {fieldsLocked ? null : (
             <div className="space-y-3">
               <Field label="Hạn gửi">
-                <Input className="min-h-11" type="datetime-local" value={shipBy} onChange={(event) => setShipBy(event.target.value)} />
+                <Input className="min-h-11" type="datetime-local" value={shipBy} disabled={fieldsLocked} onChange={(event) => setShipBy(event.target.value)} />
               </Field>
-              <Field label="Thực nhận ước tính">
-                <Input className="min-h-11" inputMode="numeric" value={netAmount} placeholder="Để trống thì tự tính" onChange={(event) => setNetAmount(event.target.value.replace(/[^\d]/g, ""))} />
-              </Field>
+              {retail ? null : (
+                <Field label="Thực nhận ước tính">
+                  <Input className="min-h-11" inputMode="numeric" value={netAmount} disabled={fieldsLocked} placeholder="Để trống thì tự tính" onChange={(event) => setNetAmount(event.target.value.replace(/[^\d]/g, ""))} />
+                </Field>
+              )}
               <Field label="Link ảnh thiết kế">
-                <Input className="min-h-11" value={designFileUrl} placeholder="Link Google Drive" onChange={(event) => setDesignFileUrl(event.target.value)} />
+                <Input className="min-h-11" value={designFileUrl} disabled={fieldsLocked} placeholder="Link Google Drive" onChange={(event) => setDesignFileUrl(event.target.value)} />
               </Field>
             </div>
-          ) : null}
+          )}
         </section>
 
         <section className={card}>
@@ -541,10 +550,10 @@ export function OrderDesk({
               <span className="font-semibold">{remain === null ? "—" : formatVnd(Math.abs(remain))}</span>
             </div>
           </div>
-          {mode === "create" ? (
+          {mode === "create" || (retail && !fieldsLocked) ? (
             <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
               <p className="text-sm font-medium">Thanh toán đơn hàng</p>
-              <Field label="Hình thức" required>
+              <Field label="Hình thức" required={mode === "create"}>
                 <select
                   className={control}
                   value={commercePay}
@@ -557,6 +566,7 @@ export function OrderDesk({
                     if (next === "cod") setDeposit("");
                   }}
                 >
+                  {mode === "edit" && !commercePay ? <option value="">Chưa chọn</option> : null}
                   {payChoices.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.label}
@@ -564,20 +574,25 @@ export function OrderDesk({
                   ))}
                 </select>
               </Field>
-              {isCodPay ? (
-                <p className="text-[12px] text-muted-foreground">
-                  COD không thu ngay khi tạo đơn. Tiền thu hộ ghi sau khi đối soát với vận chuyển tại mục Đối soát COD — không tự cộng ví lúc lưu.
-                </p>
+              {mode === "create" ? (
+                isCodPay ? (
+                  <p className="text-[12px] text-muted-foreground">
+                    COD không thu ngay khi tạo đơn. Tiền thu hộ ghi sau khi đối soát với vận chuyển tại mục Đối soát COD — không tự cộng ví lúc lưu.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn. Để 0 nếu chưa thu.</p>
+                    <Field label="Số tiền thu lần 1">
+                      <Input inputMode="numeric" placeholder="0" value={deposit} disabled={fieldsLocked} onChange={(event) => setDeposit(event.target.value.replace(/[^\d]/g, ""))} />
+                    </Field>
+                  </>
+                )
               ) : (
-                <>
-                  <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn. Để 0 nếu chưa thu.</p>
-                  <Field label="Số tiền thu lần 1">
-                    <Input inputMode="numeric" placeholder="0" value={deposit} disabled={fieldsLocked} onChange={(event) => setDeposit(event.target.value.replace(/[^\d]/g, ""))} />
-                  </Field>
-                </>
+                <p className="text-[12px] text-muted-foreground">Đổi hình thức rồi bấm Cập nhật. Thu thêm tiền ở ô bên dưới.</p>
               )}
             </div>
-          ) : (
+          ) : null}
+          {mode === "edit" ? (
             <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
               <p className="text-sm font-medium">Thu tiền</p>
               <p className="text-[12px] text-muted-foreground">Ghi nhận sẽ cộng vào ví của bạn.</p>
@@ -612,7 +627,7 @@ export function OrderDesk({
                 {collecting ? "Đang ghi…" : "Ghi nhận vào ví của bạn"}
               </Button>
             </div>
-          )}
+          ) : null}
           <p className="text-[11px] text-muted-foreground">
             {fieldsLocked
               ? "Đơn sàn không thu thêm và không sửa giá trên web."

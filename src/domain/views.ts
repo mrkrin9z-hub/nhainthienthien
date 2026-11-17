@@ -103,9 +103,13 @@ export function extraTotal(state: ShopState, month: string): number {
 export function buildDashboard(state: ShopState, actor: Viewer) {
   const clock = vnParts();
   const visible = state.orders.filter((order) => order.status !== "draft_upload" && (actor.role !== "sale" || order.channel !== "mo_home"));
-  const byStatus = (["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao", "xong", "huy"] as OrderStatus[]).map(
-    (status) => ({ status, label: STATUS_LABEL[status], count: visible.filter((order) => order.status === status).length }),
-  );
+  const byStatus = (["nhan_don", "in", "dong_goi", "giao", "xong", "huy"] as OrderStatus[]).map((status) => {
+    const count =
+      status === "nhan_don"
+        ? visible.filter((order) => order.status === "nhan_don" || order.status === "thiet_ke" || order.status === "cho_duyet").length
+        : visible.filter((order) => order.status === status).length;
+    return { status, label: STATUS_LABEL[status], count };
+  });
   const late = visible.filter((order) => isLate(state, order, clock)).map((order) => orderSummary(state, order, actor.role));
   const prefs = state.settings.notifyPrefs;
   const alerts = deskAlerts(
@@ -134,12 +138,12 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
     return {
       role: actor.role,
       name: actor.name,
-      byStatus: byStatus.filter((row) => ["thiet_ke", "cho_duyet", "in", "dong_goi", "giao"].includes(row.status)),
+      byStatus: byStatus.filter((row) => ["nhan_don", "in", "dong_goi", "giao"].includes(row.status)),
       queue: visible
         .filter((order) =>
           order.channel === "mo_home"
-            ? !["xong", "huy", "upload_error"].includes(order.status)
-            : ["thiet_ke", "cho_duyet", "in", "dong_goi"].includes(order.status),
+            ? !["xong", "huy", "upload_error", "draft_upload"].includes(order.status)
+            : ["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao"].includes(order.status),
         )
         .map((order) => orderSummary(state, order, actor.role)),
       late,
@@ -237,7 +241,7 @@ export function buildDashboard(state: ShopState, actor: Viewer) {
 }
 
 const OPEN_STATUS = new Set(["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi", "giao"]);
-const MAKE_STATUS = new Set(["thiet_ke", "cho_duyet", "in", "dong_goi"]);
+const MAKE_STATUS = new Set(["nhan_don", "thiet_ke", "cho_duyet", "in", "dong_goi"]);
 
 /** Số trên menu. Đơn thử và đơn nháp không tính. */
 export function navCounts(state: ShopState): Record<string, number> {
