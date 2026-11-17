@@ -17,7 +17,12 @@ test("trang admin feedback-gia xuất JPG kiểu iPhone", () => {
   assert.match(page, /toJpeg/);
   assert.match(page, /FeedbackMockPhone/);
   assert.match(page, /Xuất JPG/);
+  assert.match(page, /Chat phía khách/);
+  assert.match(page, /Chat phía shop/);
+  assert.match(page, /live/);
   const phone = readFileSync(new URL("../components/admin/feedback-mock-phone.tsx", import.meta.url), "utf8");
   assert.match(phone, /feedback-mock-capture/);
   assert.match(phone, /IosKeyboard/);
+  assert.match(phone, /contentEditable/);
+  assert.match(phone, /VerifiedBadge/);
 });
