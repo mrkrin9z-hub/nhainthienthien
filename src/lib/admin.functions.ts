@@ -230,6 +230,13 @@ export const changeStatus = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const deleteDeskOrder = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid() }).parse(data))
+  .handler(async ({ data }) => {
+    const { deleteOrder } = await import("@/server/service");
+    return deleteOrder(await actor(), data.orderId);
+  });
+
 export const setPrintChoice = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid(), fileId: z.string().uuid(), print: z.boolean() }).parse(data))
   .handler(async ({ data }) => {

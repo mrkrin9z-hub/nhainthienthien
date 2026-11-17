@@ -1588,6 +1588,33 @@ export async function setOrderStatus(
   });
 }
 
+/** Xóa hẳn đơn khỏi sổ. Chỉ chủ. Hoàn kho đã trừ rồi gỡ liên kết album/in lại. */
+export async function deleteOrder(actor: Actor, orderId: string) {
+  assertRole(actor, ["owner"]);
+  return mutate(async (state) => {
+    const index = state.orders.findIndex((item) => item.id === orderId);
+    if (index < 0) throw new Error("Không tìm thấy đơn.");
+    const order = state.orders[index]!;
+    const code = order.code;
+    syncOrderStock(state, order, "huy", actor.id);
+    for (const album of state.albums ?? []) {
+      if (album.orderId === order.id) {
+        album.orderId = null;
+        album.updatedAt = nowIso();
+      }
+    }
+    for (const reprint of state.reprints ?? []) {
+      if (reprint.orderId === order.id) reprint.orderId = "";
+    }
+    for (const report of state.wasteReports ?? []) {
+      if (report.orderId === order.id) report.orderId = null;
+    }
+    state.orders.splice(index, 1);
+    audit(state, actor.id, "order.delete", orderId, { code, status: order.status, channel: order.channel }, null);
+    return { code };
+  });
+}
+
 export async function addDeposit(actor: Actor, input: { orderId: string; amount: number; method: string }) {
   assertRole(actor, ["owner", "sale"]);
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("Số tiền cọc chưa đúng.");
