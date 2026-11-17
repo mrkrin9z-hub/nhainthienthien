@@ -11,10 +11,11 @@ type Props = {
 };
 
 const MODERN_BLUE = "#006AFF";
-const CLASSIC_BLUE = "#0091FF";
-const CLASSIC_BUBBLE = "#D2F0FE";
+const CLASSIC_BLUE = "#0084FF";
+const CLASSIC_BUBBLE = "#D1F0FF";
 const MODERN_CHAT_BG = "#F2F1F6";
-const CLASSIC_CHAT_BG = "#E3EAF2";
+const CLASSIC_CHAT_BG = "#E2E9F1";
+const MESSENGER_BLUE = "#0084FF";
 const ICON_STROKE = "#1C1C1E";
 const KEY_MUTED = "#AEB3BC";
 const KEY_RETURN = "#8E9299";
@@ -40,7 +41,16 @@ function Battery({ percent, charging, light }: { percent: number; charging: bool
           <span className="absolute inset-y-0 left-0 rounded-[2.5px]" style={{ width: `${fill}%`, background: body }} />
         </span>
         <span className="absolute inset-0 grid place-items-center text-[9px] font-bold leading-none tabular-nums text-white">
-          {percent}
+          {charging ? (
+            <span className="inline-flex items-center gap-[1px]">
+              <svg width="6" height="9" viewBox="0 0 6 9" aria-hidden>
+                <path d="M3.6 0 0 5h2.4L2.2 9 6 3.8H3.4L3.6 0Z" fill="#fff" />
+              </svg>
+              {percent}
+            </span>
+          ) : (
+            percent
+          )}
         </span>
       </span>
       <span className="ml-[1px] h-[5px] w-[1.6px] rounded-r-[1px]" style={{ background: tip }} />
@@ -151,25 +161,89 @@ function IconMenu({ light, plain }: { light?: boolean; plain?: boolean }) {
   );
 }
 
-function IconPhone({ light }: { light?: boolean }) {
+function IconPhone({ light, solid }: { light?: boolean; solid?: boolean }) {
+  const fill = light || solid ? (light ? "#fff" : MESSENGER_BLUE) : "none";
+  const stroke = light ? "#fff" : solid ? MESSENGER_BLUE : "#3A3A3C";
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
       <path
         d="M6.6 3.8c.5-.5 1.3-.5 1.8 0l1.7 1.7c.5.5.5 1.2.1 1.7L8.8 9.1c.8 1.6 2.1 2.9 3.7 3.7l1.9-1.4c.5-.4 1.2-.4 1.7.1l1.7 1.7c.5.5.5 1.3 0 1.8l-1.2 1.2c-.6.6-1.5.8-2.3.5-3.5-1.2-6.5-4.2-7.7-7.7-.3-.8-.1-1.7.5-2.3L6.6 3.8Z"
-        fill="none"
-        stroke={light ? "#fff" : "#3A3A3C"}
-        strokeWidth="1.7"
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={solid || light ? 0.4 : 1.7}
         strokeLinejoin="round"
       />
     </svg>
   );
 }
 
-function IconVideo({ light }: { light?: boolean }) {
+function IconVideo({ light, solid }: { light?: boolean; solid?: boolean }) {
+  const stroke = light ? "#fff" : solid ? MESSENGER_BLUE : "#3A3A3C";
+  const fill = light || solid ? stroke : "none";
   return (
     <svg width="20" height="16" viewBox="0 0 22 16" aria-hidden>
-      <rect x="1" y="2" width="13" height="12" rx="2.5" fill="none" stroke={light ? "#fff" : "#3A3A3C"} strokeWidth="1.7" />
-      <path d="M15 6.2 20.5 3.5v9L15 9.8Z" fill="none" stroke={light ? "#fff" : "#3A3A3C"} strokeWidth="1.7" strokeLinejoin="round" />
+      <rect x="1" y="2" width="13" height="12" rx="2.5" fill={fill === "none" ? "none" : "none"} stroke={stroke} strokeWidth="1.7" />
+      <path d="M15 6.2 20.5 3.5v9L15 9.8Z" fill={fill === "none" ? "none" : stroke} stroke={stroke} strokeWidth="1.7" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconMessengerPhone() {
+  return (
+    <span className="grid h-[34px] w-[34px] place-items-center rounded-full bg-[#E7F3FF]">
+      <IconPhone solid />
+    </span>
+  );
+}
+
+function IconMessengerVideo() {
+  return (
+    <span className="grid h-[34px] w-[34px] place-items-center rounded-full bg-[#E7F3FF]">
+      <IconVideo solid />
+    </span>
+  );
+}
+
+function IconCamera() {
+  return (
+    <svg width="24" height="20" viewBox="0 0 24 20" aria-hidden>
+      <rect x="1.5" y="4" width="16" height="13" rx="3" fill="none" stroke="#8E8E93" strokeWidth="1.5" />
+      <circle cx="9.5" cy="10.5" r="3.2" fill="none" stroke="#8E8E93" strokeWidth="1.5" />
+      <path d="M17.5 8.2 22 5.5v11l-4.5-2.7Z" fill="none" stroke="#8E8E93" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconGallery() {
+  return (
+    <svg width="22" height="20" viewBox="0 0 22 20" aria-hidden>
+      <rect x="1.2" y="2.2" width="19.6" height="15.6" rx="2.4" fill="none" stroke="#8E8E93" strokeWidth="1.45" />
+      <circle cx="7.2" cy="7.4" r="1.7" fill="#8E8E93" />
+      <path d="M2.8 15.2 8.2 9.6l3.2 3.2 3.4-4.2 4.2 6.6" fill="none" stroke="#8E8E93" strokeWidth="1.45" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconMoreCircle() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="9.2" fill="none" stroke="#8E8E93" strokeWidth="1.45" />
+      <path d="M8 10.2h8M8 13.8h8" stroke="#8E8E93" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconLikeThumb() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden>
+      <path
+        d="M5.2 11.2h3.6V20H5.2c-.9 0-1.6-.7-1.6-1.6v-5.6c0-.9.7-1.6 1.6-1.6Z"
+        fill={MESSENGER_BLUE}
+      />
+      <path
+        d="M8.8 11.2 11.2 4.4c.3-.8 1.3-1.1 2-.6l1.1.8c.5.35.65 1 .4 1.55L13.4 9.2h7.2c1.15 0 2 1.05 1.7 2.15l-1.7 6.2c-.25.9-1.1 1.5-2 1.5H8.8V11.2Z"
+        fill={MESSENGER_BLUE}
+      />
     </svg>
   );
 }
@@ -203,27 +277,44 @@ function IconStickerFace() {
   );
 }
 
-function Avatar({ src, name, size }: { src: string; name: string; size: number }) {
+function Avatar({
+  src,
+  name,
+  size,
+  online,
+}: {
+  src: string;
+  name: string;
+  size: number;
+  online?: boolean;
+}) {
   const letter = (name.trim()[0] || "K").toUpperCase();
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt=""
-        width={size}
-        height={size}
-        className="shrink-0 rounded-full object-cover"
-        style={{ width: size, height: size }}
-        draggable={false}
-      />
-    );
-  }
   return (
-    <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full bg-[#7aa2ff] font-bold text-white"
-      style={{ width: size, height: size, fontSize: size * 0.4 }}
-    >
-      {letter}
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          width={size}
+          height={size}
+          className="rounded-full object-cover"
+          style={{ width: size, height: size }}
+          draggable={false}
+        />
+      ) : (
+        <span
+          className="inline-flex items-center justify-center rounded-full bg-[#7aa2ff] font-bold text-white"
+          style={{ width: size, height: size, fontSize: size * 0.4 }}
+        >
+          {letter}
+        </span>
+      )}
+      {online ? (
+        <span
+          className="absolute bottom-0 right-0 rounded-full border-2 border-white bg-[#31A24C]"
+          style={{ width: Math.max(8, size * 0.28), height: Math.max(8, size * 0.28) }}
+        />
+      ) : null}
     </span>
   );
 }
@@ -319,12 +410,34 @@ function Sticker({ sticker }: { sticker: "thumb" | "1010" }) {
 function HeartReaction({
   count,
   live,
+  classic,
   onCommit,
 }: {
   count: number;
   live?: boolean | undefined;
+  classic?: boolean;
   onCommit: (n: number) => void;
 }) {
+  if (classic) {
+    return (
+      <span className="absolute -bottom-[10px] right-0 inline-flex items-center gap-[3px]">
+        <span className="inline-flex items-center gap-[2px] rounded-full bg-white px-[5px] py-[2px] shadow-[0_0.5px_1.5px_rgba(0,0,0,0.18)]">
+          <span className="text-[12px] leading-none">❤️</span>
+          {count > 1 ? (
+            <Editable
+              live={live}
+              value={String(count)}
+              className="text-[10px] font-semibold text-black/70"
+              onCommit={(value) => onCommit(Number(value) || 1)}
+            />
+          ) : null}
+        </span>
+        <span className="grid h-[18px] w-[18px] place-items-center rounded-full bg-white shadow-[0_0.5px_1.5px_rgba(0,0,0,0.18)] text-[11px] text-[#C7C7CC]">
+          ♡
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="absolute -bottom-[8px] right-1 inline-flex items-center gap-[2px] rounded-full border border-black/10 bg-white px-[5px] py-[1px] shadow-sm">
       <span className="text-[11px] leading-none">❤️</span>
@@ -337,6 +450,15 @@ function HeartReaction({
         />
       ) : null}
     </span>
+  );
+}
+
+function DoubleCheck() {
+  return (
+    <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden className="shrink-0">
+      <path d="M1.2 5.2 3.6 7.6 8.4 1.8" fill="none" stroke="#8E8E93" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.2 5.2 7.6 7.6 12.8 1.6" fill="none" stroke="#8E8E93" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -485,7 +607,7 @@ function Header({ draft, live, onChange }: Props) {
               onCommit={(customerName) => onChange?.({ ...draft, customerName })}
             />
             {draft.stranger ? (
-              <span className="mt-[3px] inline-block rounded-full bg-black/20 px-2 py-[1px] text-[10px] font-semibold tracking-wide">
+              <span className="mt-[3px] inline-block rounded-full bg-[#3A3A3C]/75 px-2 py-[1px] text-[10px] font-semibold tracking-wide text-white">
                 NGƯỜI LẠ
               </span>
             ) : (
@@ -500,11 +622,11 @@ function Header({ draft, live, onChange }: Props) {
           <div className="flex items-center gap-3.5 pr-2">
             <IconPhone light />
             <IconVideo light />
-            <IconMenu light plain />
+            <IconMenu light />
           </div>
         </div>
         {draft.stranger ? (
-          <div className="flex justify-center border-b border-black/5 bg-white py-[9px]">
+          <div className="flex justify-center border-b border-black/5 bg-[#F7F7F8] py-[9px]">
             <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-black">
               <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
                 <circle cx="7" cy="5.5" r="2.4" fill="none" stroke="#111" strokeWidth="1.4" />
@@ -515,6 +637,43 @@ function Header({ draft, live, onChange }: Props) {
             </span>
           </div>
         ) : null}
+        {draft.callbackBanner ? (
+          <div className="flex justify-center bg-transparent py-[10px]" style={{ background: CLASSIC_CHAT_BG }}>
+            <span className="rounded-full bg-white px-4 py-[6px] text-[13px] font-semibold tracking-wide text-[#0084FF] shadow-[0_0.5px_1.5px_rgba(0,0,0,0.12)]">
+              GỌI LẠI
+            </span>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (messenger) {
+    const online = /đang hoạt động/i.test(draft.statusText);
+    return (
+      <div className="flex items-center gap-2 border-b border-[#E5E5EA] bg-white px-2 py-[8px]">
+        <span className="pl-1">
+          <Chevron />
+        </span>
+        <Avatar src={draft.customerAvatar} name={draft.customerName} size={36} online={online} />
+        <div className="min-w-0 flex-1">
+          <Editable
+            live={live}
+            value={draft.customerName}
+            className="block truncate text-[16px] font-semibold text-black"
+            onCommit={(customerName) => onChange?.({ ...draft, customerName })}
+          />
+          <Editable
+            live={live}
+            value={draft.statusText || "Đang hoạt động"}
+            className="block truncate text-[12px] font-normal text-[#8E8E93]"
+            onCommit={(statusText) => onChange?.({ ...draft, statusText })}
+          />
+        </div>
+        <div className="flex items-center gap-2 pr-1">
+          <IconMessengerPhone />
+          <IconMessengerVideo />
+        </div>
       </div>
     );
   }
@@ -538,7 +697,7 @@ function Header({ draft, live, onChange }: Props) {
             className="truncate text-[15px] font-semibold text-black"
             onCommit={(customerName) => onChange?.({ ...draft, customerName })}
           />
-          {!messenger ? <VerifiedBadge /> : null}
+          <VerifiedBadge />
         </div>
         <Editable
           live={live}
@@ -548,18 +707,9 @@ function Header({ draft, live, onChange }: Props) {
         />
       </div>
       <div className="flex items-center gap-[9px] pr-1">
-        {messenger ? (
-          <>
-            <IconPhone />
-            <IconVideo />
-          </>
-        ) : (
-          <>
-            <IconTag />
-            <IconNote />
-            <IconMenu />
-          </>
-        )}
+        <IconTag />
+        <IconNote />
+        <IconMenu />
       </div>
     </div>
   );
@@ -589,9 +739,10 @@ function gapBefore(lines: FeedbackLine[], index: number): number {
 
 export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selectedId }: Props) {
   const classic = draft.platform === "zalo_classic";
-  const shopBg = classic ? CLASSIC_BUBBLE : MODERN_BLUE;
+  const messenger = draft.platform === "messenger";
+  const shopBg = classic ? CLASSIC_BUBBLE : messenger ? MESSENGER_BLUE : MODERN_BLUE;
   const shopColor = classic ? "#111" : "#fff";
-  const chatBg = classic ? CLASSIC_CHAT_BG : MODERN_CHAT_BG;
+  const chatBg = classic ? CLASSIC_CHAT_BG : messenger ? "#fff" : MODERN_CHAT_BG;
   const statusLight = classic;
   const threadRef = useRef<HTMLDivElement>(null);
 
@@ -654,14 +805,26 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
             );
           }
           if (line.kind === "status") {
+            const classicRead = classic || /nhận/i.test(line.text);
             return (
               <div key={line.id} className="flex justify-end pr-1" style={{ marginTop: 4 }}>
-                <Editable
-                  live={live}
-                  value={`✓ ${line.text}`}
-                  className="text-[11px] text-black/40"
-                  onCommit={(text) => onChange?.(patchLine(draft, line.id, { text: text.replace(/^✓\s*/, "") }))}
-                />
+                {classicRead ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#E8EAED] px-2 py-[2px] text-[11px] text-[#6C6C70]">
+                    <DoubleCheck />
+                    <Editable
+                      live={live}
+                      value={line.text}
+                      onCommit={(text) => onChange?.(patchLine(draft, line.id, { text }))}
+                    />
+                  </span>
+                ) : (
+                  <Editable
+                    live={live}
+                    value={`✓ ${line.text}`}
+                    className="text-[11px] text-black/40"
+                    onCommit={(text) => onChange?.(patchLine(draft, line.id, { text: text.replace(/^✓\s*/, "") }))}
+                  />
+                )}
               </div>
             );
           }
@@ -669,6 +832,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
           const mine = line.side === "shop";
           const selected = selectedId === line.id;
           const avatar = !mine && showCustomerAvatar(draft.lines, index);
+          const radius = classic ? 14 : messenger ? 20 : 18;
 
           return (
             <div
@@ -689,9 +853,9 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                   <div
                     className="px-[12px] py-[8px] text-[15px] leading-[1.35]"
                     style={{
-                      background: mine ? shopBg : "#fff",
+                      background: mine ? shopBg : messenger ? "#F0F0F0" : "#fff",
                       color: mine ? shopColor : "#111",
-                      borderRadius: classic ? 14 : 18,
+                      borderRadius: radius,
                       boxShadow: "none",
                     }}
                   >
@@ -707,7 +871,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                         live={live}
                         value={line.time}
                         className="mt-[2px] block text-[10px] text-black/35"
-                        style={{ textAlign: classic ? "left" : "right" }}
+                        style={{ textAlign: mine ? "right" : "left" }}
                         onCommit={(time) => onChange?.(patchLine(draft, line.id, { time }))}
                       />
                     ) : null}
@@ -717,6 +881,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
                   <HeartReaction
                     count={line.hearts}
                     live={live}
+                    classic={classic}
                     onCommit={(hearts) => onChange?.(patchLine(draft, line.id, { hearts }))}
                   />
                 ) : null}
@@ -726,20 +891,38 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
         })}
       </div>
 
-      <div className="flex items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
-        {classic ? <IconStickerFace /> : <IconPlus />}
-        <div
-          className={`flex min-h-[36px] flex-1 items-center px-3 text-[14px] text-black/55 ${
-            classic ? "rounded-md bg-white" : "rounded-full bg-[#EFEFF0]"
-          }`}
-        >
-          <Editable live={live} value={draft.inputHint} onCommit={(inputHint) => onChange?.({ ...draft, inputHint })} />
-          {live ? <span className="ml-[1px] inline-block h-[16px] w-[2px] bg-[#006AFF]" /> : null}
+      {messenger ? (
+        <div className="flex items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
+          <IconCamera />
+          <div className="flex min-h-[36px] flex-1 items-center rounded-full bg-[#F0F0F0] px-3 text-[15px] text-black/45">
+            <Editable live={live} value={draft.inputHint || "Aa"} onCommit={(inputHint) => onChange?.({ ...draft, inputHint })} />
+            {live ? <span className="ml-[1px] inline-block h-[16px] w-[2px] bg-[#0084FF]" /> : null}
+          </div>
+          <IconLikeThumb />
         </div>
-        <span className="pr-1">
-          <IconSend color={classic ? CLASSIC_BLUE : MODERN_BLUE} />
-        </span>
-      </div>
+      ) : (
+        <div className="flex items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
+          {classic ? <IconStickerFace /> : <IconPlus />}
+          <div
+            className={`flex min-h-[36px] flex-1 items-center px-3 text-[14px] text-black/55 ${
+              classic ? "rounded-md bg-white" : "rounded-full bg-[#EFEFF0]"
+            }`}
+          >
+            <Editable live={live} value={draft.inputHint} onCommit={(inputHint) => onChange?.({ ...draft, inputHint })} />
+            {live ? <span className="ml-[1px] inline-block h-[16px] w-[2px] bg-[#006AFF]" /> : null}
+          </div>
+          {!classic && !draft.showKeyboard ? (
+            <span className="flex items-center gap-2 pr-1">
+              <IconGallery />
+              <IconMoreCircle />
+            </span>
+          ) : (
+            <span className="pr-1">
+              <IconSend color={classic ? CLASSIC_BLUE : MODERN_BLUE} />
+            </span>
+          )}
+        </div>
+      )}
 
       {draft.showKeyboard ? (
         <IosKeyboard />

@@ -226,6 +226,14 @@ function FeedbackMockPage() {
           Người lạ
         </label>
         <label className="flex items-center gap-2 px-2 text-sm">
+          <input
+            type="checkbox"
+            checked={draft.callbackBanner}
+            onChange={(event) => setDraft((current) => ({ ...current, callbackBanner: event.target.checked }))}
+          />
+          Gọi lại
+        </label>
+        <label className="flex items-center gap-2 px-2 text-sm">
           Pin
           <Input
             className="min-h-9 w-16"
