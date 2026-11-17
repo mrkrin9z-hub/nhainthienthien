@@ -71,7 +71,9 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   const detail = readFileSync(new URL("../routes/admin.don-hang.$code.tsx", import.meta.url), "utf8");
   assert.match(detail, /Khách hàng/);
   assert.match(detail, /Hình ảnh/);
-  assert.match(detail, /Tình trạng/);
+  assert.doesNotMatch(detail, /\["trang-thai", "Tình trạng"\]/);
+  assert.match(detail, /listStatusChoices/);
+  assert.match(detail, /Chờ khách duyệt|STATUS_LABEL|statusOptionLabel/);
   assert.match(detail, /OrderDesk/);
   assert.match(detail, /deleteDeskOrder/);
   assert.match(detail, /Xóa đơn/);
