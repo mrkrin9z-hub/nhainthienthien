@@ -32,6 +32,6 @@ test("trang admin feedback-gia xuất JPG kiểu iPhone", () => {
   assert.match(phone, /IconMessengerPhone|IconLikeThumb|GỌI LẠI|DoubleCheck/);
   assert.match(phone, /kind === \"image\"|line\.kind === \"image\"/);
   assert.match(page, /ImagePlus|sendImage|Gửi ảnh local/);
-  assert.match(page, /data-thread-scroll|Quay lại|undoLast|scrollHeight/);
-  assert.match(phone, /onDeleteLine|data-export-hide/);
+  assert.match(page, /data-thread-scroll|Quay lại|undoLast|FEEDBACK_PHONE_HEIGHT/);
+  assert.match(phone, /onDeleteLine|data-export-hide|FEEDBACK_PHONE_HEIGHT|844/);
 });
