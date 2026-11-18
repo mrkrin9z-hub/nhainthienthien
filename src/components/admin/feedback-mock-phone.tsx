@@ -23,6 +23,9 @@ const ICON_STROKE = "#1C1C1E";
 const KEY_MUTED = "#AEB3BC";
 const KEY_RETURN = "#8E9299";
 const KEYBOARD_BG = "#D1D3D9";
+/** iPhone 14 logical — cùng tỷ lệ khi bật/tắt bàn phím. */
+export const FEEDBACK_PHONE_WIDTH = 390;
+export const FEEDBACK_PHONE_HEIGHT = 844;
 
 function patchLine(draft: FeedbackDraft, id: string, partial: Partial<FeedbackLine>): FeedbackDraft {
   return {
@@ -777,14 +780,18 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
   return (
     <div
       id="feedback-mock-capture"
-      className="mx-auto w-[390px] overflow-hidden text-black"
+      data-phone-frame="1"
+      className="mx-auto flex flex-col overflow-hidden text-black"
       style={{
+        width: FEEDBACK_PHONE_WIDTH,
+        height: FEEDBACK_PHONE_HEIGHT,
+        minHeight: FEEDBACK_PHONE_HEIGHT,
         fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif",
         background: chatBg,
       }}
     >
       <div
-        className="flex items-end justify-between px-5 pb-[3px] pt-[14px] text-[15px] font-semibold"
+        className="flex shrink-0 items-end justify-between px-5 pb-[3px] pt-[14px] text-[15px] font-semibold"
         style={{ background: classic ? CLASSIC_BLUE : "#fff", color: classic ? "#fff" : "#111" }}
       >
         <Editable
@@ -801,12 +808,14 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
         </div>
       </div>
 
-      <Header draft={draft} live={live} onChange={onChange} />
+      <div className="shrink-0">
+        <Header draft={draft} live={live} onChange={onChange} />
+      </div>
 
       <div
         ref={threadRef}
         data-thread-scroll="1"
-        className="flex max-h-[460px] min-h-[320px] flex-col overflow-y-auto px-2 pb-3 pt-1"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-3 pt-1"
         style={{ background: chatBg }}
       >
         {draft.lines.map((line, index) => {
@@ -947,7 +956,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
       </div>
 
       {messenger ? (
-        <div className="flex items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
+        <div className="flex shrink-0 items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
           <IconCamera />
           <div className="flex min-h-[36px] flex-1 items-center rounded-full bg-[#F0F0F0] px-3 text-[15px] text-black/45">
             <Editable
@@ -960,7 +969,7 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
           <IconLikeThumb />
         </div>
       ) : (
-        <div className="flex items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
+        <div className="flex shrink-0 items-center gap-2 border-t border-black/[0.04] bg-white px-2 py-[8px]">
           {classic ? <IconStickerFace /> : <IconPlus />}
           <div
             className={`flex min-h-[36px] flex-1 items-center px-3 text-[14px] text-black/55 ${
@@ -988,10 +997,12 @@ export function FeedbackMockPhone({ draft, live, onChange, onSelectLine, selecte
       )}
 
       {draft.showKeyboard ? (
-        <IosKeyboard />
+        <div className="shrink-0">
+          <IosKeyboard />
+        </div>
       ) : (
-        <div className="bg-white pb-2 pt-1">
-          <div className="mx-auto h-[5px] w-[120px] rounded-full bg-black" />
+        <div className="shrink-0 bg-white pb-[10px] pt-2">
+          <div className="mx-auto h-[5px] w-[134px] rounded-full bg-black" />
         </div>
       )}
     </div>

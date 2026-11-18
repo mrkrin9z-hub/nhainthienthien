@@ -5,7 +5,11 @@ import { toJpeg } from "html-to-image";
 import { ImagePlus, Send, Trash2, Undo2 } from "lucide-react";
 
 import { HubBack } from "@/components/admin/access-hub";
-import { FeedbackMockPhone } from "@/components/admin/feedback-mock-phone";
+import {
+  FEEDBACK_PHONE_HEIGHT,
+  FEEDBACK_PHONE_WIDTH,
+  FeedbackMockPhone,
+} from "@/components/admin/feedback-mock-phone";
 import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -221,14 +225,6 @@ function FeedbackMockPage() {
     await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
     await new Promise((resolve) => setTimeout(resolve, 80));
 
-    const thread = node.querySelector<HTMLElement>("[data-thread-scroll='1']");
-    const threadPrev = thread
-      ? {
-          maxHeight: thread.style.maxHeight,
-          overflow: thread.style.overflow,
-          minHeight: thread.style.minHeight,
-        }
-      : null;
     const hidden: Array<{ el: HTMLElement; display: string }> = [];
     node.querySelectorAll<HTMLElement>("[data-export-hide='1']").forEach((el) => {
       hidden.push({ el, display: el.style.display });
@@ -239,11 +235,15 @@ function FeedbackMockPage() {
       rings.push({ el, className: el.className });
       el.classList.remove("ring-2", "ring-[#1874FC]/35");
     });
-    if (thread) {
-      thread.style.maxHeight = "none";
-      thread.style.overflow = "visible";
-      thread.style.minHeight = "0";
-    }
+    // Giữ đúng tỷ lệ iPhone 390×844 (có/không bàn phím như nhau).
+    const framePrev = {
+      height: node.style.height,
+      minHeight: node.style.minHeight,
+      width: node.style.width,
+    };
+    node.style.width = `${FEEDBACK_PHONE_WIDTH}px`;
+    node.style.height = `${FEEDBACK_PHONE_HEIGHT}px`;
+    node.style.minHeight = `${FEEDBACK_PHONE_HEIGHT}px`;
 
     try {
       const dataUrl = await toJpeg(node, {
@@ -251,11 +251,13 @@ function FeedbackMockPage() {
         pixelRatio: 3,
         cacheBust: true,
         backgroundColor: "#eef1f5",
-        width: node.scrollWidth,
-        height: node.scrollHeight,
+        width: FEEDBACK_PHONE_WIDTH,
+        height: FEEDBACK_PHONE_HEIGHT,
         style: {
           transform: "none",
-          overflow: "visible",
+          width: `${FEEDBACK_PHONE_WIDTH}px`,
+          height: `${FEEDBACK_PHONE_HEIGHT}px`,
+          overflow: "hidden",
         },
       });
       const link = document.createElement("a");
@@ -270,11 +272,9 @@ function FeedbackMockPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không xuất được ảnh.");
     } finally {
-      if (thread && threadPrev) {
-        thread.style.maxHeight = threadPrev.maxHeight;
-        thread.style.overflow = threadPrev.overflow;
-        thread.style.minHeight = threadPrev.minHeight;
-      }
+      node.style.height = framePrev.height;
+      node.style.minHeight = framePrev.minHeight;
+      node.style.width = framePrev.width;
       hidden.forEach(({ el, display }) => {
         el.style.display = display;
       });
