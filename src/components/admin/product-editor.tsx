@@ -62,15 +62,18 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
 
   function refreshSuggestions(next: { category?: string; width?: string; height?: string; sheets?: string }) {
     if (editing) return;
-    const cat = next.category ?? category;
+    const cat = (next.category ?? category).trim();
+    if (cat.length < 2) {
+      if (!codeTouched) setCode("");
+      if (!nameTouched) setName("");
+      return;
+    }
     const w = Number((next.width ?? width).trim());
     const h = Number((next.height ?? height).trim());
     const s = Number((next.sheets ?? sheets).trim());
     if (!(w > 0 && h > 0 && s > 0)) return;
     if (!codeTouched) setCode(suggestProductCode({ category: cat, widthCm: w, heightCm: h, sheets: s }));
-    if (!nameTouched && cat.trim().length >= 2) {
-      setName(suggestProductName({ category: cat, widthCm: w, heightCm: h, sheets: s }));
-    }
+    if (!nameTouched) setName(suggestProductName({ category: cat, widthCm: w, heightCm: h, sheets: s }));
   }
 
   useEffect(() => {
@@ -84,12 +87,11 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
         const cats = catalog.categories.map((item) => item.name);
         setCategories(cats);
         if (!groupId) {
-          const cat = cats[0] ?? "Tráng gương";
           setName("");
           setNameTouched(false);
           setCode("");
           setCodeTouched(false);
-          setCategory(cat);
+          setCategory("");
           setDescription("");
           setWidth("13");
           setHeight("18");
@@ -97,8 +99,6 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
           setSkuId(undefined);
           setQuotes(blankQuotes());
           setLegacySizes(0);
-          setCode(suggestProductCode({ category: cat, widthCm: 13, heightCm: 18, sheets: 1 }));
-          setName(suggestProductName({ category: cat, widthCm: 13, heightCm: 18, sheets: 1 }));
           return;
         }
         const product = await getWebProduct({ data: { groupId } });
@@ -163,6 +163,8 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
   async function save() {
     setSaving(true);
     try {
+      const cat = category.trim();
+      if (cat.length < 2) throw new Error("Hãy chọn nhóm sản phẩm.");
       const quoteMap: Record<string, { price: number | null; sold: boolean }> = {};
       for (const channel of CHANNELS) {
         const quote = quotes[channel];
@@ -186,7 +188,7 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
       const payload = {
         name,
         code: normalizeProductCode(code) || productCodeFromName(name),
-        category,
+        category: cat,
         description,
         turnaround: "",
         sizes: [size],
@@ -223,20 +225,20 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
             ) : null}
             <div className="space-y-2">
               <label className="block text-sm font-semibold">
-                Nhóm sản phẩm
+                Nhóm sản phẩm <span className="text-destructive">*</span>
                 <select
                   className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
                   value={categoryOptions.includes(category) ? category : ""}
+                  required={!editing}
                   onChange={(event) => {
                     const value = event.target.value;
-                    if (!value) return;
                     setCategory(value);
                     refreshSuggestions({ category: value });
                   }}
                   aria-label="Chọn nhóm sản phẩm"
                 >
-                  <option value="" disabled>
-                    {categoryOptions.length ? "Chọn nhóm…" : "Chưa có nhóm — gõ bên dưới hoặc tạo ở Quản lý nhóm"}
+                  <option value="">
+                    {categoryOptions.length ? "— Chọn nhóm —" : "Chưa có nhóm — tạo ở Quản lý nhóm trước"}
                   </option>
                   {categoryOptions.map((item) => (
                     <option key={item} value={item}>
@@ -245,27 +247,32 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
                   ))}
                 </select>
               </label>
-              <label className="block text-sm font-semibold">
-                Hoặc đổi / gõ tên nhóm
-                <Input
-                  className="mt-1 min-h-11"
-                  list="product-category-options"
-                  value={category}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setCategory(value);
-                    refreshSuggestions({ category: value });
-                  }}
-                  placeholder="Tráng gương"
-                />
-                <datalist id="product-category-options">
-                  {categoryOptions.map((item) => (
-                    <option key={item} value={item} />
-                  ))}
-                </datalist>
-              </label>
+              {editing ? (
+                <label className="block text-sm font-semibold">
+                  Hoặc gõ tên nhóm khác
+                  <Input
+                    className="mt-1 min-h-11"
+                    list="product-category-options"
+                    value={category}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setCategory(value);
+                      refreshSuggestions({ category: value });
+                    }}
+                    placeholder="Tráng gương"
+                  />
+                  <datalist id="product-category-options">
+                    {categoryOptions.map((item) => (
+                      <option key={item} value={item} />
+                    ))}
+                  </datalist>
+                </label>
+              ) : null}
               <p className="text-xs text-muted-foreground">
-                {editing ? "Có thể đổi nhóm khi sửa sản phẩm." : "Chọn nhóm có sẵn hoặc gõ tên mới."} Mỗi khổ/combo vẫn là một mã riêng.
+                {editing
+                  ? "Có thể đổi nhóm khi sửa sản phẩm."
+                  : "Bắt buộc chọn nhóm đã tạo — không tự điền sẵn."}{" "}
+                Mỗi khổ/combo vẫn là một mã riêng.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-2">
