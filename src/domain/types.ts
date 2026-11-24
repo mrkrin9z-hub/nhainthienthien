@@ -234,6 +234,8 @@ export type Settings = {
    * Hợp với category trên từng sản phẩm; thiếu thì lấy từ sản phẩm hiện có.
    */
   productCategories?: string[];
+  /** Bộ đếm mã đơn DH#### đã cấp (tránh tái sử dụng khi xóa đơn). */
+  orderSeq?: number;
 };
 
 /** Bản sao công khai của trang chủ. Không chứa giá CTV/Mơ Home. */
