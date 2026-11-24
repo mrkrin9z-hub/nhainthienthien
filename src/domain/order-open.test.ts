@@ -5,9 +5,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isMergedWoodAlias, lineAmountAfterDiscount } from "./calc.ts";
-import { addSkusToLines, deskLineAmountAfterDiscount, deskSaveItems, normalizeDeskDiscount, normalizeDeskLines, skuTitle } from "./desk-lines.ts";
+import { addSkusToLines, applyPickerSelectionToLines, deskLineAmountAfterDiscount, deskSaveItems, normalizeDeskDiscount, normalizeDeskLines, skuTitle } from "./desk-lines.ts";
 import { findOrderByRef, staffOrderHref } from "./find-order.ts";
-import { filterPickerRows, pickerCatalog, pickerGroupNames, PICKER_SEARCH_WRAP_CLASS, PICKER_TOOLBAR_CLASS, PICKER_TYPE_SELECT_CLASS } from "./product-picker.ts";
+import { bumpPickerQty, filterPickerRows, pickerCatalog, pickerChoices, pickerChoiceSummary, pickerDoneLabel, pickerGroupNames, qtyMapFromLines, PICKER_SEARCH_WRAP_CLASS, PICKER_TOOLBAR_CLASS, PICKER_TYPE_SELECT_CLASS } from "./product-picker.ts";
 import type { Channel, Order, ShopState } from "./types.ts";
 import { orderDetail } from "./views.ts";
 
@@ -166,4 +166,37 @@ test("toolbar modal chọn sản phẩm: mobile 2 hàng full-width, sm mới x�
   assert.match(PICKER_TYPE_SELECT_CLASS, /min-w-0/);
   assert.match(PICKER_TYPE_SELECT_CLASS, /sm:w-auto/);
   assert.match(PICKER_TYPE_SELECT_CLASS, /sm:min-w-\[10rem\]/);
+});
+
+test("modal chọn sản phẩm: hiện số lượng, giảm về 0 là bỏ chọn, tóm tắt Xong (N · tổng)", () => {
+  const catalog = [
+    { id: "AT-20x30-C1", code: "AT-20x30-C1", name: "20×30 cm", prices: { tai_tiem: 56000 } as Partial<Record<Channel, number | null>> },
+    { id: "TG-13x18-C1", code: "TG-13x18-C1", name: "13×18 cm", prices: { tai_tiem: 35000 } as Partial<Record<Channel, number | null>> },
+  ];
+  let selected = qtyMapFromLines([]);
+  selected = bumpPickerQty(selected, "AT-20x30-C1", 1);
+  selected = bumpPickerQty(selected, "AT-20x30-C1", 1);
+  selected = bumpPickerQty(selected, "TG-13x18-C1", 1);
+  assert.equal(selected["AT-20x30-C1"], 2);
+  assert.equal(selected["TG-13x18-C1"], 1);
+  selected = bumpPickerQty(selected, "TG-13x18-C1", -1);
+  assert.equal("TG-13x18-C1" in selected, false);
+  selected = bumpPickerQty(selected, "TG-13x18-C1", 1);
+  const choices = pickerChoices(catalog, selected, "tai_tiem");
+  assert.deepEqual(choices.map((item) => [item.skuId, item.quantity]), [["AT-20x30-C1", 2], ["TG-13x18-C1", 1]]);
+  const summary = pickerChoiceSummary(choices);
+  assert.equal(summary.count, 2);
+  assert.equal(summary.pieces, 3);
+  assert.equal(summary.total, 56000 * 2 + 35000);
+  assert.equal(pickerDoneLabel(summary, (value) => `${value}đ`), "Xong (2 sản phẩm · 147000đ)");
+  assert.equal(pickerDoneLabel({ count: 0, total: 0 }, (value) => `${value}đ`), "Xong");
+
+  let n = 0;
+  const lines = applyPickerSelectionToLines([], choices, catalog, "tai_tiem", () => `k${++n}`);
+  assert.equal(lines.length, 2);
+  assert.equal(lines[0]?.quantity, 2);
+  const updated = applyPickerSelectionToLines(lines, [{ skuId: "AT-20x30-C1", quantity: 3 }], catalog, "tai_tiem", () => `k${++n}`);
+  assert.equal(updated.length, 1);
+  assert.equal(updated[0]?.key, lines[0]?.key);
+  assert.equal(updated[0]?.quantity, 3);
 });

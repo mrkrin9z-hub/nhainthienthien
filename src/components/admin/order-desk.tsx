@@ -11,8 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { lineAmountAfterDiscount } from "@/domain/calc";
 import { vnYmd } from "@/domain/calc";
-import { addSkusToLines, normalizeDeskDiscount, normalizeDeskLines, skuTitle } from "@/domain/desk-lines";
-import { formatGroupedInt } from "@/domain/grouped-number";
+import { applyPickerSelectionToLines, normalizeDeskDiscount, normalizeDeskLines, skuTitle } from "@/domain/desk-lines";
 import { minTotalForChannel, retargetLinesForChannel } from "@/domain/desk-pricing";
 import { skuSoldOn } from "@/domain/mohome";
 import { depositMethodLabel, isMarketplace, PAYMENT_METHODS, RETAIL_PAYMENT_METHODS, type PaymentMethod } from "@/domain/order-desk";
@@ -56,7 +55,7 @@ export type DeskSave = {
   marketplaceCode: string;
   depositPaid: number;
   depositMethod: string;
-  discount: number | null;
+  discount?: number | null;
   customerShip: number | null;
   shipBy?: string | null;
   autoCancelAt?: string | null;
@@ -139,9 +138,7 @@ export function OrderDesk({
   const [fulfillment, setFulfillment] = useState(initial.fulfillment);
   const [note, setNote] = useState(initial.note);
   const [dueDate, setDueDate] = useState(initial.dueDate);
-  const [discount, setDiscount] = useState(initial.discount == null ? "" : String(initial.discount));
   const [customerShip, setCustomerShip] = useState(initial.customerShip == null ? "" : String(initial.customerShip));
-  const [priceReason, setPriceReason] = useState("");
   const [marketplaceCode, setMarketplaceCode] = useState(initial.marketplaceCode);
   const [shipBy, setShipBy] = useState(initial.shipBy ?? "");
   const [commercePay, setCommercePay] = useState<PaymentMethod>(
@@ -170,7 +167,7 @@ export function OrderDesk({
     enabled: mode === "create" && fullName.trim().length >= 2,
   });
 
-  /** Form khách lẻ gọn như lúc tạo — ẩn địa chỉ khi lấy tại xưởng, nhãn ngắn. */
+  /** Form khách lẻ gọn như lúc tạo — ẩn địa chỉ khi lấy tại tiệm, nhãn ngắn. */
   const compact = retail;
   const channelList =
     channelOptions?.length
@@ -192,7 +189,7 @@ export function OrderDesk({
       const sku = safeCatalog.find((item) => item.id === line.skuId);
       const listed = sku?.prices?.[channel] ?? null;
       const typed = digits(line.unitPrice);
-      const unit = line.priceTouched && Number.isFinite(typed) ? typed : listed;
+      const unit = Number.isFinite(typed) ? typed : listed;
       const discountText = normalizeDeskDiscount(line.discount);
       const cut = discountText === "" ? 0 : digits(discountText);
       const lineTotal =
@@ -206,17 +203,22 @@ export function OrderDesk({
   const goods = chosen.length > 0 && chosen.every((line) => line.lineTotal !== null) ? chosen.reduce((sum, line) => sum + (line.lineTotal ?? 0), 0) : null;
   const draftPaid = mode === "create" && Number.isFinite(digits(deposit)) ? digits(deposit) : 0;
   const paid = mode === "create" ? draftPaid : paidSoFar;
-  const discountAmount = discount.trim() === "" ? 0 : digits(discount);
+  const lineDiscountSum = chosen.reduce((sum, line) => {
+    const cut = normalizeDeskDiscount(line.discount);
+    const amount = cut === "" ? 0 : digits(cut);
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+  const preservedOrderDiscount = typeof initial.discount === "number" && initial.discount > 0 ? initial.discount : 0;
   const shipAmount = customerShip.trim() === "" ? 0 : digits(customerShip);
-  const remain = goods === null || !Number.isFinite(discountAmount) || !Number.isFinite(shipAmount) ? null : goods - discountAmount + shipAmount - paid;
+  const remain = goods === null || !Number.isFinite(shipAmount) ? null : goods - preservedOrderDiscount + shipAmount - paid;
   const suggestions = (customers.data ?? []).slice(0, 6);
 
   function patchLine(key: string, patch: Partial<Line>) {
     setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
   }
 
-  function addSkus(skuIds: string[]) {
-    setLines((current) => addSkusToLines(current, skuIds, safeCatalog, channel, () => crypto.randomUUID()) as Line[]);
+  function applyPicker(items: { skuId: string; quantity: number }[]) {
+    setLines((current) => applyPickerSelectionToLines(current, items, safeCatalog, channel, () => crypto.randomUUID()) as Line[]);
   }
 
   function changeChannel(next: Channel) {
@@ -232,14 +234,10 @@ export function OrderDesk({
         skuId: line.skuId,
         quantity: line.quantity,
         variant: line.variant.trim(),
-        ...(line.unit !== null ? { unitPrice: line.unit, ...(line.priceTouched ? { priceReason } : {}) } : {}),
+        ...(line.unit !== null ? { unitPrice: line.unit } : {}),
         ...(digits(normalizeDeskDiscount(line.discount)) > 0 ? { discount: digits(normalizeDeskDiscount(line.discount)) } : { discount: 0 }),
       }));
     // Cho phép tạo đơn không sản phẩm để lấy mã QR gửi ảnh trước.
-    if (priced.some((line) => line.priceTouched) && !priceReason.trim()) {
-      toast.error("Sửa giá cần ghi lý do.");
-      return;
-    }
     if (mode === "create" && !commercePay) {
       toast.error("Chọn hình thức thanh toán.");
       return;
@@ -258,7 +256,6 @@ export function OrderDesk({
         marketplaceCode,
         depositPaid: isCodPay ? 0 : draftPaid,
         depositMethod: isCodPay || draftPaid <= 0 ? "" : payLabel || method,
-        discount: discount.trim() === "" ? null : digits(discount),
         customerShip: customerShip.trim() === "" ? null : digits(customerShip),
         shipBy: localIso(shipBy),
         autoCancelAt: null,
@@ -317,7 +314,7 @@ export function OrderDesk({
                     if (next === "pickup") setAddress("");
                   }}
                 >
-                  <option value="pickup">Lấy tại xưởng</option>
+                  <option value="pickup">Lấy tại tiệm</option>
                   <option value="delivery">{compact ? "Giao" : "Tự giao"}</option>
                 </select>
               )}
@@ -388,11 +385,6 @@ export function OrderDesk({
           <Field label="Ghi chú">
             <Textarea className="min-h-28" value={note} disabled={fieldsLocked} placeholder="Ghi chú cho đơn hàng…" onChange={(event) => setNote(event.target.value)} />
           </Field>
-          {priced.some((line) => line.priceTouched) ? (
-            <Field label="Lý do sửa giá">
-              <Input className="min-h-11" value={priceReason} onChange={(event) => setPriceReason(event.target.value)} placeholder="Chỉ chủ sửa giá, và phải ghi lý do" />
-            </Field>
-          ) : null}
         </section>
 
         <section className={card}>
@@ -424,7 +416,6 @@ export function OrderDesk({
                   locked={itemsLocked}
                   canRemove={!itemsLocked}
                   onQty={(quantity) => patchLine(line.key, { quantity })}
-                  onPrice={(unitPrice) => patchLine(line.key, { unitPrice, priceTouched: true })}
                   onVariant={(variant) => patchLine(line.key, { variant })}
                   onDiscount={(discount) => patchLine(line.key, { discount })}
                   onRemove={() => setLines((current) => current.filter((item) => item.key !== line.key))}
@@ -439,40 +430,57 @@ export function OrderDesk({
             </div>
           )}
           {itemsLocked ? null : (
-            <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} catalog={sellable} channel={channel} onConfirm={addSkus} />
+            <ProductPickerDialog
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              catalog={sellable}
+              channel={channel}
+              initialSelected={lines.filter((line) => line.skuId).map((line) => ({ skuId: line.skuId, quantity: line.quantity }))}
+              onConfirm={applyPicker}
+            />
           )}
           <div className="space-y-2 border-t pt-3 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Tạm tính</span>
-              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(goods)}</span>
+              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(goods + lineDiscountSum)}</span>
             </div>
-            {fieldsLocked ? null : (
-              <label className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground">Giảm giá</span>
-                <MoneyInput className="h-9 w-32 text-right" value={discount} placeholder="0" aria-label="Giảm giá" onValueChange={(value) => setDiscount(value == null ? "" : String(value))} />
-              </label>
-            )}
+            {lineDiscountSum > 0 ? (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Giảm giá sản phẩm</span>
+                <span className="font-medium">−{formatVnd(lineDiscountSum)}</span>
+              </div>
+            ) : null}
+            {preservedOrderDiscount > 0 ? (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Giảm giá đơn</span>
+                <span className="font-medium">−{formatVnd(preservedOrderDiscount)}</span>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between border-t pt-2">
               <span className="font-semibold">Tổng</span>
-              <span className="font-semibold">{goods === null ? "—" : formatVnd(Math.max(0, goods - (Number.isFinite(discountAmount) ? discountAmount : 0)))}</span>
+              <span className="font-semibold">{goods === null ? "—" : formatVnd(Math.max(0, goods - preservedOrderDiscount))}</span>
             </div>
           </div>
         </section>
       </div>
 
       <aside className="space-y-4 xl:sticky xl:top-4">
-        <section className={card}>
+        <section className={`${card} min-w-0 max-w-full overflow-hidden`}>
           <h2 className="text-base font-bold">Lịch trình đơn hàng</h2>
           <Field label="Ngày hẹn giao / nhận" required={mode === "create" && !compact}>
-            <Input className="min-h-11" type="date" min={vnYmd()} value={dueDate} disabled={fieldsLocked} onChange={(event) => setDueDate(event.target.value)} />
+            <div className="min-w-0 max-w-full overflow-hidden">
+              <Input className="box-border min-h-11 min-w-0 max-w-full" type="date" min={vnYmd()} value={dueDate} disabled={fieldsLocked} onChange={(event) => setDueDate(event.target.value)} />
+            </div>
           </Field>
           <p className="text-xs text-muted-foreground">
-            {isMarketplace(channel) ? "Đơn sàn in nhãn của TikTok hoặc Shopee." : fulfillment === "delivery" ? "Tự giao — cần địa chỉ khách." : "Khách lấy tại xưởng."}
+            {isMarketplace(channel) ? "Đơn sàn in nhãn của TikTok hoặc Shopee." : fulfillment === "delivery" ? "Tự giao — cần địa chỉ khách." : "Khách lấy tại tiệm."}
           </p>
           {fieldsLocked ? null : (
-            <div className="space-y-3">
+            <div className="min-w-0 max-w-full space-y-3 overflow-hidden">
               <Field label="Hạn gửi">
-                <Input className="min-h-11" type="datetime-local" value={shipBy} disabled={fieldsLocked} onChange={(event) => setShipBy(event.target.value)} />
+                <div className="min-w-0 max-w-full overflow-hidden">
+                  <Input className="box-border min-h-11 min-w-0 max-w-full" type="datetime-local" value={shipBy} disabled={fieldsLocked} onChange={(event) => setShipBy(event.target.value)} />
+                </div>
               </Field>
               {retail ? null : (
                 <Field label="Thực nhận ước tính">
@@ -491,7 +499,7 @@ export function OrderDesk({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tổng thanh toán</span>
-              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(Math.max(0, goods - (Number.isFinite(discountAmount) ? discountAmount : 0) + (Number.isFinite(shipAmount) ? shipAmount : 0)))}</span>
+              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(Math.max(0, goods - preservedOrderDiscount + (Number.isFinite(shipAmount) ? shipAmount : 0)))}</span>
             </div>
             {compact ? null : (
               <label className="flex items-center justify-between gap-2">
@@ -648,7 +656,6 @@ function ProductLine({
   locked,
   canRemove,
   onQty,
-  onPrice,
   onVariant,
   onDiscount,
   onRemove,
@@ -659,7 +666,6 @@ function ProductLine({
   locked: boolean;
   canRemove: boolean;
   onQty: (quantity: number) => void;
-  onPrice: (unitPrice: string) => void;
   onVariant: (variant: string) => void;
   onDiscount: (discount: string) => void;
   onRemove: () => void;
@@ -730,19 +736,9 @@ function ProductLine({
       <div className="mt-3 grid grid-cols-3 items-end gap-2">
         <label className="min-w-0 space-y-1">
           <span className="block text-[11px] font-semibold text-muted-foreground">Giá:</span>
-          {owner && !locked ? (
-            <MoneyInput
-              className="h-9 rounded-full px-2 text-center text-sm"
-              aria-label={`Đơn giá dòng ${index + 1}`}
-              placeholder={line.listed === null ? "—" : formatGroupedInt(line.listed)}
-              value={line.unitPrice}
-              onValueChange={(value) => onPrice(value == null ? "" : String(value))}
-            />
-          ) : (
-            <p className="flex h-9 items-center justify-center text-sm font-medium">
-              {line.unit === null ? "Chưa có giá" : formatVnd(line.unit)}
-            </p>
-          )}
+          <p className="flex h-9 items-center justify-center text-sm font-medium" aria-label={`Đơn giá dòng ${index + 1}`}>
+            {line.unit === null ? "Chưa có giá" : formatVnd(line.unit)}
+          </p>
         </label>
         <label className="min-w-0 space-y-1">
           <span className="block text-[11px] font-semibold text-muted-foreground">SL:</span>

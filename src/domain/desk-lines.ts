@@ -103,3 +103,43 @@ export function deskSaveItems(
       };
     });
 }
+
+export function applyPickerSelectionToLines(
+  current: DeskLineInput[],
+  selected: Array<{ skuId: string; quantity: number }>,
+  catalog: Array<{ id: string; prices?: Partial<Record<Channel, number | null>> }> | null | undefined,
+  channel: Channel,
+  newKey: () => string,
+): DeskLineInput[] {
+  const wanted = selected.filter((item) => item.skuId && item.quantity > 0);
+  const qtyBySku = new Map(wanted.map((item) => [item.skuId, item.quantity]));
+  const used = new Set<string>();
+  const next: DeskLineInput[] = [];
+  for (const line of current) {
+    if (!line.skuId) continue;
+    const quantity = qtyBySku.get(line.skuId);
+    if (quantity == null) continue;
+    if (used.has(line.skuId)) continue;
+    used.add(line.skuId);
+    next.push({ ...line, quantity, query: line.query ?? "" });
+  }
+  const list = Array.isArray(catalog) ? catalog : [];
+  for (const item of wanted) {
+    if (used.has(item.skuId)) continue;
+    const sku = list.find((row) => row.id === item.skuId);
+    const listed = sku?.prices?.[channel] ?? null;
+    next.push({
+      key: newKey(),
+      skuId: item.skuId,
+      query: "",
+      quantity: item.quantity,
+      unitPrice: listed == null ? "" : String(listed),
+      priceTouched: false,
+      variant: "",
+      discount: "",
+    });
+    used.add(item.skuId);
+  }
+  return next;
+}
+
