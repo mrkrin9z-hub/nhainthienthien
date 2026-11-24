@@ -19,7 +19,7 @@ const LUA_KEEP = new Set(["LUA-6x9-1", "LUA-6x9-50", "LUA-6x9-100", "LUA-6x9-200
 function shouldUnsell(sku) {
   const code = sku.code || sku.id;
   if (code.startsWith("EG-")) return true;
-  if (code === "NCT-6x9-1") return true;
+  // NCT-6x9-1 được mở lại riêng cho mo_home (24/11/2026); không gỡ bán toàn kênh.
   if (code === "TKB-20x30-C4" || code === "TKB-20x30-C5") return true;
   if (code === "ATHE-4x6-C1" || code.startsWith("ALBUM")) return true;
   if (code === "NX-9x19-C1" || code === "NX-17x22-C1") return true;

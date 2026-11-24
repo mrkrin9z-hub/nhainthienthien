@@ -25,6 +25,7 @@ import {
   walkInListed,
 } from "@/domain/calc";
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
+import { channelMinTotal } from "@/domain/desk-pricing";
 import { orderCodePrefix, skuSoldOn, withChannelSold, type ReportScope } from "@/domain/mohome";
 import { applyStockCount, approveWaste, confirmWasteDay, editWaste, previousMonth, recordWaste, voidWaste, wasteDayStats, wasteDesk, wasteMonth, wasteMonthCompare, type EditWasteInput } from "@/domain/waste";
 import { workbookXml, type Sheet } from "@/domain/excel";
@@ -526,7 +527,7 @@ function buildItems(
       skuCode: sku.code,
       quantity: item.quantity,
       unitPrice,
-      lineTotal: lineAmount(unitPrice, item.quantity, priceOf(state.prices, item.skuId, channel)?.minTotal),
+      lineTotal: lineAmount(unitPrice, item.quantity, channelMinTotal(channel, priceOf(state.prices, item.skuId, channel)?.minTotal)),
       variant: item.variant?.trim() || "",
     };
   });
@@ -1554,7 +1555,7 @@ export async function reviseOrder(
           skuCode: sku.code,
           quantity: item.quantity,
           unitPrice,
-          lineTotal: lineAmount(unitPrice, item.quantity, priceOf(state.prices, item.skuId, order.channel)?.minTotal),
+          lineTotal: lineAmount(unitPrice, item.quantity, channelMinTotal(order.channel, priceOf(state.prices, item.skuId, order.channel)?.minTotal)),
           ...(previous?.listUnitPrice !== undefined ? { listUnitPrice: previous.listUnitPrice } : {}),
           ...(previous?.sellerSku ? { sellerSku: previous.sellerSku } : {}),
           variant: item.variant?.trim() || previous?.variant || "",

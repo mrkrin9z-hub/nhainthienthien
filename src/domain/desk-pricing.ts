@@ -21,10 +21,15 @@ export function listedPriceForChannel(sku: PricedSku | undefined, channel: Chann
   return typeof value === "number" ? value : null;
 }
 
+/** Kênh Mơ Home chỉ bán lẻ, không áp dụng số lượng / thành tiền tối thiểu. */
+export function channelMinTotal(channel: Channel, minTotal?: number | null): number | null {
+  if (channel === "mo_home") return null;
+  return typeof minTotal === "number" && minTotal > 0 ? minTotal : null;
+}
+
 export function minTotalForChannel(sku: PricedSku | undefined, channel: Channel): number | null {
   if (!sku) return null;
-  const value = sku.minTotals?.[channel];
-  return typeof value === "number" ? value : null;
+  return channelMinTotal(channel, sku.minTotals?.[channel]);
 }
 
 /** Khi đổi kênh, mọi dòng lấy lại giá và tối thiểu của kênh mới — không giữ giá kênh cũ. */

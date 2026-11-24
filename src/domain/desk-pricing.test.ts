@@ -33,9 +33,21 @@ test("ảnh lụa 6×9 lẻ: thành tiền tôn trọng tối thiểu theo từn
   assert.equal(lineTotalForChannel(luaLe, "tai_tiem", 5), 30000);
   assert.equal(lineTotalForChannel(luaLe, "facebook", 12), 36000);
   assert.equal(lineTotalForChannel(luaLe, "ctv", 5), 27000);
-  assert.equal(lineTotalForChannel(luaLe, "mo_home", 5), 24000);
+  assert.equal(lineTotalForChannel(luaLe, "mo_home", 1), 2400);
+  assert.equal(lineTotalForChannel(luaLe, "mo_home", 5), 12000);
   assert.equal(lineTotalForChannel(luaLe, "tiktok", 5), null);
 });
+
+test("kênh mo_home không bị ép tối thiểu dù minTotal còn trong dữ liệu", () => {
+  const namCham = {
+    id: "NCT-6x9-1",
+    prices: { mo_home: 8000, tai_tiem: 10000 },
+    minTotals: { mo_home: 80000, tai_tiem: 100000 },
+  };
+  assert.equal(lineTotalForChannel(namCham, "mo_home", 1), 8000);
+  assert.equal(lineTotalForChannel(namCham, "tai_tiem", 1), 100000);
+});
+
 
 test("đổi kênh sau khi chọn sản phẩm thì cập nhật lại đơn giá, không giữ giá kênh cũ", () => {
   const lines = [

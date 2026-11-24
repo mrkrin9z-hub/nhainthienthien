@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { lineAmount } from "@/domain/calc";
 import { vnYmd } from "@/domain/calc";
-import { retargetLinesForChannel } from "@/domain/desk-pricing";
+import { minTotalForChannel, retargetLinesForChannel } from "@/domain/desk-pricing";
 import { skuSoldOn } from "@/domain/mohome";
 import { depositMethodLabel, isMarketplace, PAYMENT_METHODS, RETAIL_PAYMENT_METHODS, type PaymentMethod } from "@/domain/order-desk";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
@@ -188,7 +188,7 @@ export function OrderDesk({
       const listed = sku?.prices?.[channel] ?? null;
       const typed = digits(line.unitPrice);
       const unit = line.priceTouched && Number.isFinite(typed) ? typed : listed;
-      const lineTotal = !sku || unit === null ? null : lineAmount(unit, line.quantity, sku.minTotals?.[channel]);
+      const lineTotal = !sku || unit === null ? null : lineAmount(unit, line.quantity, minTotalForChannel(sku, channel));
       return { ...line, sku, listed, unit, lineTotal };
     });
   }, [catalog, channel, lines]);
