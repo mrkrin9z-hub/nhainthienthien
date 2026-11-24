@@ -4640,6 +4640,84 @@ export async function listWebProducts(actor: Actor) {
     .filter((product) => product.sizes.length > 0);
 }
 
+export async function listProductCategories(actor: Actor) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const { mergeProductCategories } = await import("@/domain/product-categories");
+  const categories = mergeProductCategories(
+    state.settings.productCategories,
+    state.groups.map((group) => group.category),
+  );
+  return {
+    categories: categories.map((name) => ({
+      name,
+      productCount: state.groups.filter((group) => group.category.trim().toLocaleLowerCase("vi") === name.toLocaleLowerCase("vi")).length,
+    })),
+  };
+}
+
+export async function createProductCategory(actor: Actor, input: { name: string }) {
+  assertRole(actor, ["owner", "sale"]);
+  const { categoryExists, mergeProductCategories, normalizeCategoryName } = await import("@/domain/product-categories");
+  const name = normalizeCategoryName(input.name);
+  if (name.length < 2) throw new Error("Tên nhóm cần ít nhất 2 ký tự.");
+  if (name.length > 40) throw new Error("Tên nhóm tối đa 40 ký tự.");
+  return mutate(async (state) => {
+    const current = mergeProductCategories(
+      state.settings.productCategories,
+      state.groups.map((group) => group.category),
+    );
+    if (categoryExists(current, name)) throw new Error("Nhóm này đã có.");
+    state.settings.productCategories = [...current, name].sort((a, b) => a.localeCompare(b, "vi"));
+    audit(state, actor.id, "product.category.create", name, null, { name });
+    return { name };
+  });
+}
+
+export async function deleteProductCategory(actor: Actor, input: { name: string }) {
+  assertRole(actor, ["owner"]);
+  const { normalizeCategoryName } = await import("@/domain/product-categories");
+  const name = normalizeCategoryName(input.name);
+  if (!name) throw new Error("Thiếu tên nhóm.");
+  return mutate(async (state) => {
+    const key = name.toLocaleLowerCase("vi");
+    const inUse = state.groups.some((group) => group.category.trim().toLocaleLowerCase("vi") === key);
+    if (inUse) throw new Error("Còn sản phẩm thuộc nhóm này — đổi nhóm hoặc xóa sản phẩm trước.");
+    const next = (state.settings.productCategories ?? []).filter((item) => item.trim().toLocaleLowerCase("vi") !== key);
+    state.settings.productCategories = next;
+    audit(state, actor.id, "product.category.delete", name, { name }, null);
+    return { ok: true as const };
+  });
+}
+
+/** Xóa hẳn một mã sản phẩm (group + sku + giá). Chặn nếu còn trên đơn chưa hủy. */
+export async function deleteWebProduct(actor: Actor, groupId: string) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const group = state.groups.find((item) => item.id === groupId);
+    if (!group) throw new Error("Không thấy sản phẩm.");
+    const skuIds = new Set(state.skus.filter((sku) => sku.groupId === group.id).map((sku) => sku.id));
+    const blocked = state.orders.find(
+      (order) =>
+        order.status !== "huy" &&
+        order.status !== "draft_upload" &&
+        order.status !== "upload_error" &&
+        (order.items ?? []).some((item) => item.skuId && skuIds.has(item.skuId)),
+    );
+    if (blocked) throw new Error(`Không xóa được — còn trên đơn ${blocked.code}.`);
+    state.groups = state.groups.filter((item) => item.id !== group.id);
+    state.skus = state.skus.filter((sku) => sku.groupId !== group.id);
+    state.prices = state.prices.filter((price) => !skuIds.has(price.skuId));
+    state.groupSupplies = (state.groupSupplies ?? []).filter((item) => item.groupId !== group.id);
+    state.sizeOverrides = (state.sizeOverrides ?? []).filter((item) => item.groupId !== group.id);
+    if (state.settings.groupListed) delete state.settings.groupListed[group.id];
+    if (state.settings.productPhotos && group.slug) delete state.settings.productPhotos[group.slug];
+    if (state.settings.productGalleries && group.slug) delete state.settings.productGalleries[group.slug];
+    audit(state, actor.id, "product.delete", group.id, { name: group.name, category: group.category }, null);
+  });
+  return { ok: true as const };
+}
+
 export async function createWebProduct(actor: Actor, input: WebProductInput) {
   assertRole(actor, ["owner", "sale"]);
   return mutate(async (state) => {
@@ -4654,6 +4732,11 @@ export async function createWebProduct(actor: Actor, input: WebProductInput) {
     state.prices.push(...built.prices);
     const listed = input.listed === true;
     state.settings.groupListed = { ...state.settings.groupListed, [built.group.id]: listed };
+    const { mergeProductCategories } = await import("@/domain/product-categories");
+    state.settings.productCategories = mergeProductCategories(state.settings.productCategories, [
+      built.group.category,
+      ...state.groups.map((group) => group.category),
+    ]);
     audit(state, actor.id, "product.create", built.group.id, null, {
       name: built.group.name,
       slug: built.group.slug,

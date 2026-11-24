@@ -1148,6 +1148,32 @@ export const getWebProducts = createServerFn({ method: "GET" }).handler(async ()
   return listWebProducts(await actor());
 });
 
+export const getProductCategories = createServerFn({ method: "GET" }).handler(async () => {
+  const { listProductCategories } = await import("@/server/service");
+  return listProductCategories(await actor());
+});
+
+export const createProductCategoryFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ name: z.string().min(2).max(40) }).parse(data))
+  .handler(async ({ data }) => {
+    const { createProductCategory } = await import("@/server/service");
+    return createProductCategory(await actor(), data);
+  });
+
+export const deleteProductCategoryFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ name: z.string().min(2).max(40) }).parse(data))
+  .handler(async ({ data }) => {
+    const { deleteProductCategory } = await import("@/server/service");
+    return deleteProductCategory(await actor(), data);
+  });
+
+export const deleteWebProductFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ groupId: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { deleteWebProduct } = await import("@/server/service");
+    return deleteWebProduct(await actor(), data.groupId);
+  });
+
 const quoteMap = z.record(
   z.enum(["tai_tiem", "facebook", "tiktok", "shopee", "ctv", "mo_home"]),
   z.object({

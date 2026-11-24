@@ -75,9 +75,14 @@ test("trang quản trị quản lý sản phẩm + giá kênh, không gắn tran
   assert.match(page, /ProductEditor/);
   assert.match(page, /importWebProducts|Xuất file mẫu/);
   assert.match(page, /Mỗi mã = một khổ/);
+  assert.match(page, /Quản lý nhóm/);
+  assert.match(page, /deleteWebProductFn/);
+  assert.match(page, /categoryFilter/);
+  assert.match(page, /Tìm mã, tên, nhóm/);
   assert.match(editor, /createWebProduct/);
   assert.match(editor, /updateWebProduct/);
   assert.match(editor, /suggestProductCode/);
+  assert.match(editor, /getProductCategories/);
   assert.doesNotMatch(editor, /Hiện trên trang chủ/);
   assert.doesNotMatch(editor, /Ảnh đại diện/);
   assert.doesNotMatch(editor, /Thêm khổ/);
