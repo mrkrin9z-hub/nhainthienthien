@@ -295,12 +295,18 @@ function OrderDetailPage() {
                   ...(value.items ? { items: value.items } : {}),
                 },
               });
-              toast.success("Đã cập nhật đơn");
-              await refresh();
-            }}
-            onCollect={async (amount, payMethod) => {
-              await recordDeposit({ data: { orderId: data.id, amount, method: payMethod } });
-              toast.success("Đã ghi tiền");
+              if (value.collectAmount && value.collectAmount > 0) {
+                await recordDeposit({
+                  data: {
+                    orderId: data.id,
+                    amount: value.collectAmount,
+                    method: value.depositMethod || "Tiền mặt",
+                  },
+                });
+                toast.success("Đã cập nhật đơn và ghi tiền vào ví");
+              } else {
+                toast.success("Đã cập nhật đơn");
+              }
               await refresh();
             }}
           />
