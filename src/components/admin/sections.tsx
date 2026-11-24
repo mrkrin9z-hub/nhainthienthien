@@ -92,7 +92,6 @@ export function MoneyLinks() {
       <SectionLinks
         label="Tài chính"
         items={[
-          { to: "/admin/thu", label: "Thu tiền" },
           { to: "/admin/vi", label: "Ví tiền" },
           { to: "/admin/kpi", label: "KPI" },
         ]}
@@ -103,7 +102,6 @@ export function MoneyLinks() {
     <SectionLinks
       label="Tài chính"
       items={[
-        { to: "/admin/thu", label: "Thu tiền" },
         { to: "/admin/chi-phi", label: "Chi phí" },
         { to: "/admin/vi", label: "Ví tiền" },
         { to: "/admin/bao-cao-chi", label: "Báo cáo chi" },

@@ -55,10 +55,6 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
     items: [{ to: "/admin/kho", label: "Kho vật tư", roles: ["owner", "sale", "production"], printShopOnly: true, mode: "live" }],
   },
   {
-    title: "Tiền",
-    items: [{ to: "/admin/thu", label: "Tiền", roles: ["owner", "sale"], mode: "live" }],
-  },
-  {
     title: "Thống kê báo cáo",
     items: [{ to: "/admin/bao-cao", label: "Thống kê báo cáo", roles: ["owner"], mode: "live" }],
   },

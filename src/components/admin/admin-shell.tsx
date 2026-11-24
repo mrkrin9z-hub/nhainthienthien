@@ -171,7 +171,7 @@ function pageTitle(pathname: string, role: Role, search: Record<string, unknown>
     ["/admin/nhan-vien", "Nhân viên"],
     ["/admin/nhom-quyen", "Nhóm quyền"],
     ["/admin/ket-noi", "Kết nối"],
-    ["/admin/thu", "Thu"],
+    ["/admin/thu", "Đơn hàng"],
     ["/admin/chuyen-nop", "Chuyển nộp"],
     ["/admin/chi-phi", "Chi"],
     ["/admin/duyet-chi", "Duyệt chi"],

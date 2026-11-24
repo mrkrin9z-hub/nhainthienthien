@@ -333,8 +333,8 @@ function WalletBody() {
             </article>
             <article className="rounded-md border bg-card p-4">
               <h2 className="font-semibold">Đơn còn phải thu</h2>
-              <p className="mt-2 text-sm text-muted-foreground">Tiền khách chưa trả nằm ở danh sách thu, chưa cộng vào tổng ở trên.</p>
-              <Link to="/admin/thu" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary">Mở danh sách đơn còn nợ</Link>
+              <p className="mt-2 text-sm text-muted-foreground">Tiền khách chưa trả ghi trên từng đơn hàng, chưa cộng vào tổng ở trên.</p>
+              <Link to="/admin/don-hang" search={{ status: "can_lam", q: "" }} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary">Mở sổ đơn hàng</Link>
               <h3 className="mt-4 font-semibold">Đã nộp vào két</h3>
               {desk.data && handovers.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Chưa có lần nộp tiền mặt.</p> : null}
               <ListPager page={handoverPage.page} pages={handoverPage.pages} total={handoverPage.total} start={handoverPage.start} count={handoverPage.slice.length} noun="lần nộp" onPage={handoverPage.setPage} />
