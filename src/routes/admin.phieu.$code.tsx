@@ -60,7 +60,7 @@ function SlipBody() {
     if (!node) return;
     const mm = Math.ceil((node.scrollHeight * 25.4) / 96) + 4;
     setPageHeight(Math.max(70, mm));
-  }, [data, qr, loai]);
+  }, [data, qr, loai, data?.transfer?.image, data?.remain]);
 
   if (order.isLoading) return <p className="text-muted-foreground">Đang tải…</p>;
   if (order.isError || !data) return <p className="font-semibold text-destructive">{(order.error as Error)?.message ?? "Không thấy đơn."}</p>;
@@ -182,8 +182,25 @@ function K80Slip({
         </div>
       </dl>
       {data.customerNote ? <p className="mt-2 break-words">Ghi chú: {data.customerNote}</p> : null}
+      {data.transfer?.image && (data.remain ?? 0) > 0 ? (
+        <div className="mt-3 border-t border-black pt-2 text-center">
+          <p className="text-[12px] font-extrabold">Quét QR chuyển khoản</p>
+          <img
+            src={data.transfer.image}
+            alt={`Mã chuyển khoản ${data.transfer.content}`}
+            className="mx-auto mt-1 h-[32mm] w-[32mm]"
+          />
+          <p className="mt-1 text-[11px] leading-tight">
+            {data.transfer.bank} · {data.transfer.holder}
+          </p>
+          <p className="text-[11px] leading-tight">
+            ND: <span className="font-bold">{data.transfer.content}</span>
+          </p>
+          <p className="text-[11px] font-semibold">Số tiền: {formatMaybe(data.transfer.amount)}</p>
+        </div>
+      ) : null}
       <div className="mt-3 text-center">
-        {qr ? <img src={qr} alt={`Mã gửi ảnh thiết kế ${data.code}`} className="mx-auto h-[28mm] w-[28mm]" /> : null}
+        {qr ? <img src={qr} alt={`Mã gửi ảnh thiết kế ${data.code}`} className="mx-auto h-[22mm] w-[22mm]" /> : null}
         <p className="text-[11px] font-semibold">Gửi ảnh thiết kế</p>
         <p className="mt-2 font-semibold">Cảm ơn anh/chị.</p>
       </div>

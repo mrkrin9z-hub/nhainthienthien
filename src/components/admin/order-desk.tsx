@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { MapPin, Minus, Phone, Plus, Trash2, UserRound } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -161,9 +162,11 @@ export function OrderDesk({
         : [blankLine()],
   );
   const [deposit, setDeposit] = useState("");
+  const [payOpen, setPayOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const payChoices = retail ? RETAIL_PAYMENT_METHODS : PAYMENT_METHODS;
   const isCodPay = commercePay === "cod";
+  const canCollect = mode === "create" || (retail && !fieldsLocked);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const customers = useQuery({
@@ -571,14 +574,6 @@ export function OrderDesk({
             ) : (
               <p className="border-t pt-3 text-xs text-muted-foreground">Chưa có lần thu nào.</p>
             )}
-            {transfer ? (
-              <div className="rounded-lg border bg-background p-3 text-center">
-                <img src={transfer.image} alt={`Mã chuyển khoản ${transfer.content}`} className="mx-auto h-40 w-40" />
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {transfer.bank} · {transfer.holder}. Nội dung chuyển khoản: <strong className="text-foreground">{transfer.content}</strong>
-                </p>
-              </div>
-            ) : null}
             <div className="flex justify-between border-t pt-3 text-sm">
               <span className="font-medium text-emerald-700">Đã thanh toán</span>
               <span className="font-bold text-emerald-700">{formatVnd(isCodPay && mode === "create" ? 0 : paid)}</span>
@@ -592,9 +587,21 @@ export function OrderDesk({
               </span>
             </div>
           </div>
-          {mode === "create" || (retail && !fieldsLocked) ? (
+          {canCollect && payOpen ? (
             <div className="space-y-3 rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/5 p-3">
-              <p className="text-sm font-semibold text-[#2563eb]">Thanh toán</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-[#2563eb]">Thanh toán</p>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setPayOpen(false);
+                    setDeposit("");
+                  }}
+                >
+                  Đóng
+                </button>
+              </div>
               <Field label="Hình thức" required={mode === "create"}>
                 <select
                   className={control}
@@ -625,30 +632,53 @@ export function OrderDesk({
                       placeholder="0"
                       value={deposit}
                       disabled={fieldsLocked}
+                      autoFocus
                       onValueChange={(value) => setDeposit(value == null ? "" : String(value))}
                     />
                   </Field>
                   <p className="text-[12px] text-muted-foreground">
                     {mode === "create"
                       ? "Số tiền cộng vào ví khi bấm Lưu đơn. Để trống hoặc 0 nếu chưa thu."
-                      : "Nhập số thu thêm (nếu có) rồi bấm Cập nhật — hình thức và tiền ghi cùng lúc."}
+                      : "Nhập số thu thêm rồi bấm Cập nhật — hình thức và tiền ghi cùng lúc."}
                   </p>
                 </>
               )}
+              {transfer && !isCodPay ? (
+                <div className="rounded-lg border bg-background p-3 text-center">
+                  <img src={transfer.image} alt={`Mã chuyển khoản ${transfer.content}`} className="mx-auto h-36 w-36" />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {transfer.bank} · {transfer.holder}. Nội dung: <strong className="text-foreground">{transfer.content}</strong>
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Mã QR cũng in trên hóa đơn K80.</p>
+                </div>
+              ) : null}
             </div>
           ) : null}
-          <p className="text-[11px] text-muted-foreground">
-            {fieldsLocked
-              ? "Đơn sàn không thu thêm và không sửa giá trên web."
-              : isCodPay
-                ? "COD: sau khi ship trả tiền, đánh dấu đã nhận tại Đối soát COD."
-                : channel === "facebook"
-                  ? "Đơn Facebook có thể cần cọc trước khi in."
-                  : "Số tiền thu có thể để trống; mỗi lần thu hiện người thu và thời gian ở trên."}
-          </p>
           {albumId ? <p className="text-[11px] font-medium text-primary">Ảnh từ album sẽ gắn vào đơn khi lưu.</p> : null}
           <div className="grid gap-2">
-            <Button type="submit" className="min-h-12 w-full bg-[#2563eb] text-base font-bold text-white hover:bg-[#1d4ed8]" disabled={saving || fieldsLocked}>
+            {canCollect && !payOpen ? (
+              <Button
+                type="button"
+                className="min-h-12 w-full bg-[#2563eb] text-base font-bold text-white hover:bg-[#1d4ed8]"
+                disabled={fieldsLocked}
+                onClick={() => setPayOpen(true)}
+              >
+                Thanh toán
+              </Button>
+            ) : null}
+            {mode === "edit" && orderCode ? (
+              <Button asChild type="button" variant="outline" className="min-h-12 w-full text-base font-bold">
+                <Link to="/admin/phieu/$code" params={{ code: orderCode }}>
+                  In hóa đơn
+                </Link>
+              </Button>
+            ) : null}
+            <Button
+              type="submit"
+              variant={canCollect && !payOpen ? "outline" : "default"}
+              className={`min-h-12 w-full text-base font-bold ${canCollect && payOpen ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8]" : ""}`}
+              disabled={saving || fieldsLocked}
+            >
               {saving ? "Đang lưu..." : mode === "create" ? "Lưu đơn hàng" : "Cập nhật"}
             </Button>
           </div>

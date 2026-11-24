@@ -85,6 +85,10 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(detail, /OrderDesk/);
   assert.match(form, /Người thu/);
   assert.match(form, /Lần \{index \+ 1\}/);
+  assert.match(form, /setPayOpen\(true\)/);
+  assert.match(form, />Thanh toán</);
+  assert.match(form, /In hóa đơn/);
+  assert.match(form, /to="\/admin\/phieu\/\$code"/);
   assert.match(detail, /deleteDeskOrder/);
   assert.match(detail, /Xóa đơn/);
   assert.match(detail, /role === "owner"/);
@@ -155,6 +159,8 @@ test("admin có việc hằng ngày và đơn dạng cột", () => {
   assert.match(slip, /w-\[72mm\]/);
   assert.match(slip, /In bill K80/);
   assert.match(slip, /K80/);
+  assert.match(slip, /Quét QR chuyển khoản/);
+  assert.match(slip, /data\.transfer\?\.image/);
   assert.doesNotMatch(slip, /max-w-\[210mm\]/);
   const ketNoi = readFileSync(new URL("../routes/admin.ket-noi.tsx", import.meta.url), "utf8");
   assert.match(ketNoi, /Fanpage Nhà In/);
