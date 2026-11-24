@@ -8,7 +8,7 @@ import type { RoleModules, Settings } from "./types.ts";
 
 test("menu phẳng có Hình ảnh và Media mở rộng trên slide", () => {
   const titles = ADMIN_MODULE_GROUPS.map((group) => group.title);
-  assert.deepEqual(titles, ["Tổng quan", "Đơn hàng", "Hình ảnh", "Media", "Sản xuất", "Sản phẩm", "Kho vật tư", "Tiền", "Thống kê báo cáo", "Thống kê khách hàng", "Nhân sự", "Cài đặt"]);
+  assert.deepEqual(titles, ["Tổng quan", "Đơn hàng", "Hình ảnh", "Media", "Sản xuất", "Sản phẩm", "Kho vật tư", "Thống kê báo cáo", "Thống kê khách hàng", "Nhân sự", "Cài đặt"]);
   const media = ADMIN_MODULE_GROUPS.find((group) => group.title === "Media");
   assert.ok(media);
   assert.deepEqual(
@@ -55,11 +55,11 @@ test("không còn bridge StudioBase; menu không kéo trang phụ", () => {
 
 test("modulesForRole tôn trọng role và danh sách allowed", () => {
   const sale = modulesForRole("sale").flatMap((g) => g.items).map((i) => i.label);
-  assert.deepEqual(sale, ["Tổng quan", "Đơn hàng", "Hình ảnh", "Kho source", "Feedback", "Quản lý trang chủ", "Sản phẩm & Giá", "Bảng giá 6 kênh", "Ảnh sản phẩm", "Kho vật tư", "Tiền", "Thống kê khách hàng", "Nhân sự"]);
+  assert.deepEqual(sale, ["Tổng quan", "Đơn hàng", "Hình ảnh", "Kho source", "Feedback", "Quản lý sản phẩm", "Kho vật tư", "Thống kê khách hàng", "Nhân sự"]);
   const production = modulesForRole("production").flatMap((g) => g.items).map((i) => i.label);
   assert.deepEqual(production, ["Tổng quan", "Đơn hàng", "Hình ảnh", "Kho source", "Sản xuất", "Kho vật tư", "Nhân sự"]);
-  const trimmed = modulesForRole("sale", ["/admin/don-hang", "/admin/thu"]).flatMap((g) => g.items).map((i) => i.to);
-  assert.deepEqual(trimmed, ["/admin/don-hang", "/admin/thu"]);
+  const trimmed = modulesForRole("sale", ["/admin/don-hang", "/admin/san-pham"]).flatMap((g) => g.items).map((i) => i.to);
+  assert.deepEqual(trimmed, ["/admin/don-hang", "/admin/san-pham"]);
 });
 
 test("owner thấy đủ mục kể cả Hình ảnh và Feedback; không thấy SePay, gói hay chat trên menu", () => {
@@ -71,17 +71,14 @@ test("owner thấy đủ mục kể cả Hình ảnh và Feedback; không thấy
     "/admin/media",
     "/admin/feedback-gia",
     "/admin/san-xuat",
-    "/admin/trang-chu",
     "/admin/san-pham",
-    "/admin/gia",
-    "/admin/anh",
     "/admin/kho",
-    "/admin/thu",
     "/admin/bao-cao",
     "/admin/khach",
     "/admin/viec",
     "/admin/cai-dat",
   ]);
+  assert.equal(owner.includes("/admin/thu"), false);
   assert.equal(owner.includes("/admin/sepay"), false);
   assert.equal(owner.includes("/admin/goi"), false);
   assert.equal(owner.includes("/admin/danh-gia"), false);

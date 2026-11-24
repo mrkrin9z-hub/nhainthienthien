@@ -170,7 +170,6 @@ export function DashboardPage() {
 
       {"revenueToday" in data ? (
         <nav aria-label="Sổ tiền" className="flex flex-wrap gap-2">
-          <Link to="/admin/thu" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Thu</Link>
           <Link to="/admin/bao-cao" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Báo cáo</Link>
           <Link to="/admin/loi-nhuan" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Lợi nhuận</Link>
         </nav>
@@ -178,7 +177,6 @@ export function DashboardPage() {
 
       {"kpiPercent" in data ? (
         <nav aria-label="Sổ tiền" className="flex flex-wrap gap-2">
-          <Link to="/admin/thu" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Thu</Link>
           <Link to="/admin/cong-no" className="inline-flex h-8 items-center rounded-md bg-white px-3 text-[13px] font-semibold text-primary">Công nợ</Link>
         </nav>
       ) : null}

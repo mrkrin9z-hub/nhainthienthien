@@ -38,9 +38,8 @@ export function tabsFor(pathname: string, search: Record<string, unknown>, role:
       { key: "kn", to: "/admin/ket-noi", label: "Kết nối", active: onPath(pathname, "/admin/ket-noi") },
     ];
   }
-  if (["/admin/thu", "/admin/chuyen-nop", "/admin/chi-phi", "/admin/duyet-chi", "/admin/cong-no"].some((path) => pathname === path)) {
+  if (["/admin/chuyen-nop", "/admin/chi-phi", "/admin/duyet-chi", "/admin/cong-no"].some((path) => pathname === path)) {
     const money = [
-      { key: "thu", to: "/admin/thu", label: "Thu" },
       { key: "nop", to: "/admin/chuyen-nop", label: "Chuyển nộp" },
       { key: "chi", to: "/admin/chi-phi", label: "Chi" },
       ...(role === "owner" ? [{ key: "duyet", to: "/admin/duyet-chi", label: "Duyệt chi" }] : []),
