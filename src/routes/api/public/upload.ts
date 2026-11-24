@@ -12,9 +12,9 @@ export const Route = createFileRoute("/api/public/upload")({
         if (!(file instanceof File) || !orderId || !accessToken || !fileId) {
           return new Response("Thiếu ảnh hoặc mã đơn.", { status: 400 });
         }
-        const { saveDirectUpload } = await import("@/server/service");
+        const { storeOrderBytes } = await import("@/server/service");
         try {
-          await saveDirectUpload({
+          const saved = await storeOrderBytes({
             orderId,
             accessToken,
             fileId,
@@ -25,7 +25,7 @@ export const Route = createFileRoute("/api/public/upload")({
           const message = error instanceof Error ? error.message : "Không lưu được ảnh.";
           return new Response(message, { status: 400 });
         }
-        return Response.json({ ok: true });
+        return Response.json({ ok: true, ...saved });
       },
     },
   },

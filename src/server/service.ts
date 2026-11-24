@@ -31,6 +31,7 @@ import { applyStockCount, approveWaste, confirmWasteDay, editWaste, previousMont
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/images";
 import { albumPhone, photoTooBig, publicUploadCard, uploadKeyShape, uploadSlugFromBytes, uploadSlugShape, uploadTokenShape } from "@/domain/order-upload";
+import { applyFinishedUploads, storedUploadMeta, mapPool, type FinishedUpload } from "@/domain/upload-pool";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginIp } from "@/domain/login-limit";
 import { marketplaceEditLocked, orderRevisionBlock } from "@/domain/order-edit";
 import { fulfillmentFor, isMarketplace, paymentMethodFromText, type PaymentMethod, type ShipMode } from "@/domain/order-desk";
@@ -820,6 +821,67 @@ export async function createAlbumTicket(input: {
   });
 }
 
+/** Tạo phiếu cho cả lô ảnh trong một lần ghi sổ — tránh đọc/ghi shop_state từng tấm. */
+export async function createAlbumTickets(input: {
+  phone: string;
+  customerName?: string;
+  files: { fileName: string; mimeType: string; sizeBytes: number }[];
+}) {
+  if (!input.files.length) throw new Error("Chọn ít nhất một ảnh.");
+  if (input.files.length > 200) throw new Error("Mỗi lần gửi tối đa 200 ảnh.");
+  const phone = albumPhone(input.phone);
+  const customerName = (input.customerName || "").trim().slice(0, 80);
+  const limit = await photoByteLimit();
+  const rows = input.files.map((item) => {
+    if (!imageMimeAllowed(item.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
+    if (photoTooBig(item.sizeBytes, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
+    const fileId = nid();
+    const safe = item.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
+    return {
+      fileId,
+      fileName: item.fileName,
+      mimeType: item.mimeType,
+      sizeBytes: item.sizeBytes,
+      path: `albums/${phone}/${fileId}-${safe}`,
+    };
+  });
+  return mutate(async (state) => {
+    const albums = albumsOf(state);
+    let album = albums.find((item) => item.phone === phone);
+    if (!album) {
+      album = {
+        id: nid(),
+        phone,
+        ...(customerName ? { customerName } : {}),
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        orderId: null,
+        files: [],
+      };
+      albums.unshift(album);
+    } else if (customerName) {
+      album.customerName = customerName;
+    }
+    for (const row of rows) {
+      album.files.push({
+        id: row.fileId,
+        name: row.fileName,
+        mime: row.mimeType,
+        size: row.sizeBytes,
+        status: "uploading",
+        kind: "original",
+        storage: "local",
+        path: row.path,
+        driveFileId: null,
+        createdAt: nowIso(),
+        deletedAt: null,
+      });
+    }
+    album.updatedAt = nowIso();
+    return { albumId: album.id, phone, customerName: album.customerName || "", files: rows.map((row) => ({ fileId: row.fileId })) };
+  });
+}
+
 export async function publicAlbumReceipt(albumId: string, phone: string) {
   const state = await readState();
   const wanted = albumPhone(phone);
@@ -861,6 +923,59 @@ export async function saveAlbumUpload(input: { albumId: string; phone: string; f
   });
 }
 
+/** Ghi bytes ảnh vào KV/đĩa, không đụng shop_state — để chốt metadata một lần sau khi tải xong lô. */
+export async function storeAlbumBytes(input: { albumId: string; phone: string; fileId: string; bytes: Uint8Array; mime: string }) {
+  const phone = albumPhone(input.phone);
+  const limit = await photoByteLimit();
+  if (photoTooBig(input.bytes.byteLength, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (!imageMimeAllowed(input.mime) || !imageBytesMatch(input.mime, input.bytes)) {
+    throw new Error("Định dạng ảnh không được hỗ trợ.");
+  }
+  const state = await readState();
+  const album = (state.albums ?? []).find((item) => item.id === input.albumId);
+  if (!album || album.phone !== phone) throw new Error("Không có quyền với album này.");
+  const file = album.files.find((item) => item.id === input.fileId && !item.deletedAt);
+  if (!file) throw new Error("Không thấy file của album.");
+  if (file.status === "complete") return { fileId: file.id, storage: file.storage, path: file.path, size: file.size };
+  const slot = { ...file };
+  await putPhoto(
+    slot,
+    { orderId: `albums/${phone}`, code: phone, customerName: phone, createdAt: album.createdAt, source: "web", channel: "tai_tiem" },
+    input.bytes,
+    input.mime,
+    albumFolderParts(phone),
+  );
+  return { fileId: slot.id, storage: slot.storage, path: slot.path, driveFileId: slot.driveFileId, size: input.bytes.byteLength };
+}
+
+export async function finalizeAlbumUploads(input: { albumId: string; phone: string; files: FinishedUpload[] }) {
+  const phone = albumPhone(input.phone);
+  if (!input.files.length) return { ok: true as const, count: 0 };
+  const state = await readState();
+  const album = (state.albums ?? []).find((item) => item.id === input.albumId);
+  if (!album || album.phone !== phone) throw new Error("Không có quyền với album này.");
+  const folders = albumFolderParts(phone);
+  const verified = await mapPool(input.files, 4, async (row) => {
+    const file = album.files.find((item) => item.id === row.fileId && !item.deletedAt);
+    if (!file) throw new Error("skip");
+    if (row.driveFileId) {
+      const size = await acceptDriveImage(row.driveFileId, folders, file.mime);
+      return storedUploadMeta(row.fileId, { ...row, size, storage: "drive", path: row.driveFileId });
+    }
+    return storedUploadMeta(row.fileId, row, file);
+  });
+  const updates = verified.flatMap((row) => (row.status === "fulfilled" ? [row.value] : []));
+  if (!updates.length) throw new Error("Không chốt được ảnh đã tải.");
+  await mutate(async (next) => {
+    const current = findAlbum(next, input.albumId);
+    if (current.phone !== phone) throw new Error("Không có quyền với album này.");
+    const count = applyFinishedUploads(current.files, updates);
+    current.updatedAt = nowIso();
+    return count;
+  });
+  return { ok: true as const, count: updates.length };
+}
+
 export async function prepareAlbumDriveUpload(input: { albumId: string; phone: string; fileId: string }) {
   if (!(await driveConnected())) throw new Error("Chưa kết nối Google Drive.");
   const phone = albumPhone(input.phone);
@@ -896,6 +1011,14 @@ export async function finishAlbumDriveUpload(input: { albumId: string; phone: st
     current.updatedAt = nowIso();
   });
   return { ok: true as const };
+}
+
+export async function finishAlbumDriveUploads(input: { albumId: string; phone: string; files: { fileId: string; driveFileId: string }[] }) {
+  return finalizeAlbumUploads({
+    albumId: input.albumId,
+    phone: input.phone,
+    files: input.files.map((row) => ({ fileId: row.fileId, driveFileId: row.driveFileId })),
+  });
 }
 
 export async function listPhotoAlbums(actor: Actor) {
@@ -1011,7 +1134,7 @@ export async function createUploadTicket(input: {
 export async function createUploadTickets(input: {
   orderId: string;
   accessToken: string;
-  files: { fileName: string; mimeType: string; sizeBytes: number }[];
+  files: { fileName: string; mimeType: string; sizeBytes: number; comment?: string }[];
 }) {
   const limit = await photoByteLimit();
   const rows = input.files.map((item) => {
@@ -1021,7 +1144,8 @@ export async function createUploadTickets(input: {
     }
     const fileId = nid();
     const safe = item.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
-    return { ...item, fileId, path: `orders/${input.orderId}/originals/${fileId}-${safe}` };
+    const comment = (item.comment ?? "").trim().slice(0, 500);
+    return { ...item, fileId, path: `orders/${input.orderId}/originals/${fileId}-${safe}`, comment };
   });
   await mutate(async (state) => {
     const order = await orderByToken(state, input.orderId, input.accessToken);
@@ -1039,6 +1163,7 @@ export async function createUploadTickets(input: {
         driveFileId: null,
         createdAt: nowIso(),
         deletedAt: null,
+        ...(row.comment ? { comment: row.comment } : {}),
       });
     }
   });
@@ -1212,6 +1337,90 @@ export async function finishOrderDriveUpload(input: { orderId: string; accessTok
     saved.size = seen;
   });
   return { ok: true as const };
+}
+
+export async function storeOrderBytes(input: { orderId: string; accessToken: string; fileId: string; bytes: Uint8Array; mime: string }) {
+  const limit = await photoByteLimit();
+  if (photoTooBig(input.bytes.byteLength, limit)) throw new Error("Mỗi ảnh tối đa 10MB.");
+  if (!imageMimeAllowed(input.mime) || !imageBytesMatch(input.mime, input.bytes)) {
+    throw new Error("Định dạng ảnh không được hỗ trợ.");
+  }
+  const state = await readState();
+  const order = await orderByToken(state, input.orderId, input.accessToken);
+  if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+  const file = order.files.find((item) => item.id === input.fileId && !item.deletedAt);
+  if (!file) throw new Error("Không thấy file của đơn.");
+  if (file.status === "complete") return { fileId: file.id, storage: file.storage, path: file.path, size: file.size };
+  const customer = state.customers.find((item) => item.id === order.customerId);
+  const customerName = customer?.name ?? "";
+  const slot = { ...file };
+  await putPhoto(
+    slot,
+    {
+      orderId: order.id,
+      code: order.code,
+      customerName,
+      createdAt: order.createdAt,
+      source: order.source,
+      channel: order.channel,
+    },
+    input.bytes,
+    input.mime,
+    [
+      ...driveFolderParts({
+        code: order.code,
+        customerName,
+        createdAt: order.createdAt,
+        source: order.source,
+        channel: order.channel,
+      }),
+      orderKindFolder(file.kind),
+    ],
+  );
+  return { fileId: slot.id, storage: slot.storage, path: slot.path, driveFileId: slot.driveFileId, size: input.bytes.byteLength };
+}
+
+export async function finalizeOrderUploads(input: { orderId: string; accessToken: string; files: FinishedUpload[] }) {
+  if (!input.files.length) return { ok: true as const, count: 0 };
+  const state = await readState();
+  const order = await orderByToken(state, input.orderId, input.accessToken);
+  if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+  const customer = state.customers.find((item) => item.id === order.customerId);
+  const customerName = customer?.name ?? "";
+  const verified = await mapPool(input.files, 4, async (row) => {
+    const file = order.files.find((item) => item.id === row.fileId && !item.deletedAt);
+    if (!file) throw new Error("skip");
+    if (row.driveFileId) {
+      const folders = [
+        ...driveFolderParts({
+          code: order.code,
+          customerName,
+          createdAt: order.createdAt,
+          source: order.source,
+          channel: order.channel,
+        }),
+        orderKindFolder(file.kind),
+      ];
+      const size = await acceptDriveImage(row.driveFileId, folders, file.mime);
+      return storedUploadMeta(row.fileId, { ...row, size, storage: "drive", path: row.driveFileId });
+    }
+    return storedUploadMeta(row.fileId, row, file);
+  });
+  const updates = verified.flatMap((row) => (row.status === "fulfilled" ? [row.value] : []));
+  if (!updates.length) throw new Error("Không chốt được ảnh đã tải.");
+  await mutate(async (next) => {
+    const current = await orderByToken(next, input.orderId, input.accessToken);
+    applyFinishedUploads(current.files, updates);
+  });
+  return { ok: true as const, count: updates.length };
+}
+
+export async function finishOrderDriveUploads(input: { orderId: string; accessToken: string; files: { fileId: string; driveFileId: string }[] }) {
+  return finalizeOrderUploads({
+    orderId: input.orderId,
+    accessToken: input.accessToken,
+    files: input.files.map((row) => ({ fileId: row.fileId, driveFileId: row.driveFileId })),
+  });
 }
 
 async function acceptDriveImage(driveFileId: string, folders: readonly string[], mime: string): Promise<number> {

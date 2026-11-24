@@ -16,8 +16,9 @@ import { ChoiceChip } from "@/components/site/choice-chip";
 import { photoLimitLabel } from "@/domain/order-upload";
 import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
 import { postFormWithProgress, putDriveFile } from "@/lib/drive-put";
-import { createOrder, createUploadTickets, finishOrderDriveUpload, prepareOrderDriveUpload, submitOrder } from "@/lib/orders.functions";
-import { preparePhoto } from "@/lib/compress-image";
+import { createOrder, createUploadTickets, finalizeOrderUploads, prepareOrderDriveUpload, submitOrder } from "@/lib/orders.functions";
+import { keepScreenAwake } from "@/lib/customer-upload";
+import { UPLOAD_CONCURRENCY, withUploadRetries } from "@/domain/upload-pool";
 import { UploadOverlay, type UploadPhase } from "@/components/site/upload-overlay";
 import { lineAmount } from "@/domain/calc";
 import { BRAND, formatVnd } from "@/lib/brand";
@@ -107,7 +108,6 @@ function OrderPage() {
   const [doneCode, setDoneCode] = useState<string | null>(null);
   const [doneTotal, setDoneTotal] = useState(0);
   const idempotencyKey = useRef(crypto.randomUUID());
-  const prepared = useRef(new Map<string, Promise<File>>());
 
   const activeProduct: CatalogProduct | undefined =
     products.find((p) => p.slug === activeSlug) ?? products[0];
@@ -159,8 +159,6 @@ function OrderPage() {
       setError(`${rejected.join(", ")} lớn hơn ${limitMb}MB. Nối Google Drive để bỏ giới hạn dung lượng.`);
     }
     setFiles((prev) => [...prev, ...next]);
-    // Nén sẵn trong lúc khách điền thông tin để lúc bấm Đặt hàng gửi nhanh hơn.
-    for (const item of next) preparedFor(item);
   }
 
   const phoneDigits = phone.replace(/\D/g, "");
@@ -185,36 +183,29 @@ function OrderPage() {
   const submitting = useRef(false);
   const [progress, setProgress] = useState<UploadPhase | null>(null);
 
-  function preparedFor(item: FileState): Promise<File> {
-    let job = prepared.current.get(item.key);
-    if (!job) {
-      job = preparePhoto(item.file).then((r) => r.file);
-      prepared.current.set(item.key, job);
-    }
-    return job;
-  }
-
   async function uploadOne(
     order: { orderId: string; accessToken: string },
     item: FileState,
     fileId: string,
     upload: File,
     report: (loaded: number, total: number) => void,
-  ) {
+  ): Promise<{ driveFileId?: string; storage?: string; path?: string; size?: number } | undefined> {
     const mime = upload.type || "image/jpeg";
     if (maxPhotoBytes === null) {
       const session = await prepareOrderDriveUpload({ data: { orderId: order.orderId, accessToken: order.accessToken, fileId } });
       const driveFileId = await putDriveFile(session.uploadUrl, upload, mime, report);
-      await finishOrderDriveUpload({ data: { orderId: order.orderId, accessToken: order.accessToken, fileId, driveFileId } });
-    } else {
-      const body = new FormData();
-      body.set("orderId", order.orderId);
-      body.set("accessToken", order.accessToken);
-      body.set("fileId", fileId);
-      body.set("file", upload, upload.name);
-      await postFormWithProgress("/api/public/upload", body, report);
+      return { driveFileId, size: upload.size, storage: "drive", path: driveFileId };
     }
+    const body = new FormData();
+    body.set("orderId", order.orderId);
+    body.set("accessToken", order.accessToken);
+    body.set("fileId", fileId);
+    body.set("file", upload, upload.name);
+    const saved = (await postFormWithProgress("/api/public/upload", body, report)) as
+      | { driveFileId?: string; storage?: string; path?: string; size?: number }
+      | undefined;
     void item;
+    return saved;
   }
 
   function friendly(err: unknown, fallback: string): string {
@@ -261,10 +252,9 @@ function OrderPage() {
 
       if (pending.length && !opts.sendLater) {
         setProgress((p) => (p ? { ...p, step: "prepare" } : p));
-        // Nén ảnh (đã bắt đầu từ lúc chọn ảnh) rồi gửi.
-        const uploads = await Promise.all(pending.map((f) => preparedFor(f)));
+        const uploads = pending.map((f) => f.file);
         const tooBig = maxPhotoBytes === null ? -1 : uploads.findIndex((u) => u.size > maxPhotoBytes);
-        if (tooBig >= 0) throw new Error(`Ảnh ${pending[tooBig]!.file.name} vẫn quá lớn sau khi nén. Vui lòng chọn ảnh khác hoặc gửi qua Messenger.`);
+        if (tooBig >= 0) throw new Error(`Ảnh ${pending[tooBig]!.file.name} lớn hơn mức cho phép.`);
 
         // Lần đầu: tạo phiếu cho tất cả ảnh trong 1 lần. Ảnh lỗi gửi lại dùng lại phiếu cũ.
         const needTicket = pending.map((f, i) => ({ f, i })).filter(({ f }) => !f.fileId);
@@ -296,6 +286,7 @@ function OrderPage() {
             percent: Math.min(100, Math.round(([...loadedBy.values()].reduce((a, b) => a + b, 0) / totalBytes) * 100)),
           });
         tick();
+        const finished: { fileId: string; driveFileId?: string; size: number; storage?: string; path?: string }[] = [];
         let next = 0;
         const worker = async () => {
           while (next < pending.length) {
@@ -304,13 +295,16 @@ function OrderPage() {
             const upload = uploads[i]!;
             setFiles((prev) => prev.map((f) => (f.key === item.key ? { ...f, status: "uploading" as const, progress: 0, message: "" } : f)));
             try {
-              await uploadOne(current, item, ids.get(item.key)!, upload, (loaded, total) => {
-                loadedBy.set(item.key, Math.round((loaded / Math.max(1, total)) * upload.size));
-                setFiles((prev) => prev.map((f) => (f.key === item.key ? { ...f, progress: Math.min(100, Math.round((loaded / Math.max(1, total)) * 100)) } : f)));
-                tick();
-              });
+              const saved = await withUploadRetries(() =>
+                uploadOne(current, item, ids.get(item.key)!, upload, (loaded, total) => {
+                  loadedBy.set(item.key, Math.round((loaded / Math.max(1, total)) * upload.size));
+                  setFiles((prev) => prev.map((f) => (f.key === item.key ? { ...f, progress: Math.min(100, Math.round((loaded / Math.max(1, total)) * 100)) } : f)));
+                  tick();
+                }),
+              );
               loadedBy.set(item.key, upload.size);
               done += 1;
+              finished.push({ fileId: ids.get(item.key)!, size: saved?.size ?? upload.size, ...saved });
               setFiles((prev) => prev.map((f) => (f.key === item.key ? { ...f, status: "complete", progress: 100 } : f)));
             } catch (err) {
               failed += 1;
@@ -322,7 +316,21 @@ function OrderPage() {
             tick();
           }
         };
-        await Promise.all(Array.from({ length: Math.min(2, pending.length) }, worker));
+        const releaseWake = await keepScreenAwake();
+        try {
+          await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, pending.length) }, worker));
+        } finally {
+          releaseWake();
+        }
+        if (finished.length) {
+          await finalizeOrderUploads({
+            data: {
+              orderId: current.orderId,
+              accessToken: current.accessToken,
+              files: finished,
+            },
+          });
+        }
         if (failed) {
           setProgress({ step: "error", done, total: files.length, failed, percent: 100, message: firstError ?? undefined });
           return;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { imagePreviewable } from "@/domain/images";
 import { zipStored } from "@/domain/zip-store";
@@ -16,18 +16,45 @@ export function canPreviewPhoto(file: { name: string; mime?: string; status?: st
 
 /** Ảnh vừa chọn trên máy, trước khi gửi lên tiệm. */
 export function LocalPhotoThumb({ file, className }: { file: File; className?: string }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(false);
   const [url, setUrl] = useState("");
   const [failed, setFailed] = useState(false);
   useEffect(() => {
+    const node = box.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const show = entries.some((entry) => entry.isIntersecting);
+        setVisible(show);
+      },
+      { rootMargin: "96px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!visible) {
+      setUrl("");
+      return;
+    }
     const next = URL.createObjectURL(file);
     setUrl(next);
     setFailed(false);
     return () => URL.revokeObjectURL(next);
-  }, [file]);
-  if (!url || failed) {
-    return <span className={`grid place-items-center bg-muted text-[10px] font-semibold text-muted-foreground ${className ?? ""}`}>Ảnh</span>;
-  }
-  return <img src={url} alt="" className={className} onError={() => setFailed(true)} />;
+  }, [file, visible]);
+  return (
+    <span ref={box} className={`inline-grid overflow-hidden ${className ?? ""}`}>
+      {url && !failed ? (
+        <img src={url} alt="" className="size-full object-cover" onError={() => setFailed(true)} />
+      ) : (
+        <span className="grid size-full place-items-center bg-muted text-[10px] font-semibold text-muted-foreground">Ảnh</span>
+      )}
+    </span>
+  );
 }
 
 export function staffDownload(id: string): string {

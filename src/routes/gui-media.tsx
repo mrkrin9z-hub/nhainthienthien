@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { formatMediaBytes, MEDIA_KV_MAX_BYTES, MEDIA_MAX_BYTES, mediaMimeAllowed } from "@/domain/media-library";
 import { putDriveFile } from "@/lib/drive-put";
+import { mapPool, withUploadRetries } from "@/domain/upload-pool";
 import { finishPublicMediaUpload, preparePublicMediaUpload } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/gui-media")({
@@ -116,13 +117,14 @@ function MediaUploadPage() {
       1,
       queue.reduce((sum, row) => sum + row.file.size, 0),
     );
-    let loadedBytes = 0;
+    const loadedBy = new Map<string, number>();
+    const sumLoaded = () => [...loadedBy.values()].reduce((a, b) => a + b, 0);
     try {
-      for (const row of pending) {
+      await mapPool(pending, 3, async (row) => {
         const mime = guessMime(row.file);
         if (row.file.size > MEDIA_MAX_BYTES || !mediaMimeAllowed(mime)) {
           failed = true;
-          continue;
+          return;
         }
         setRows((current) =>
           current.map((item) => {
@@ -132,24 +134,26 @@ function MediaUploadPage() {
             return next;
           }),
         );
-        const baseLoaded = loadedBytes;
         const report = (loaded: number, total: number) => {
           const fileLoaded = total > 0 ? Math.min(row.file.size, Math.round((loaded / total) * row.file.size)) : loaded;
           const pct = Math.min(100, Math.round((fileLoaded / Math.max(row.file.size, 1)) * 100));
           setRows((current) => current.map((item) => (item.key === row.key ? { ...item, progress: pct } : item)));
-          setBatchProgress(Math.min(100, Math.round(((baseLoaded + fileLoaded) / totalBytes) * 100)));
+          loadedBy.set(row.key, fileLoaded);
+          setBatchProgress(Math.min(100, Math.round((sumLoaded() / totalBytes) * 100)));
         };
         try {
-          const session = await preparePublicMediaUpload({
-            data: { fileName: row.file.name, mimeType: mime, sizeBytes: row.file.size },
+          await withUploadRetries(async () => {
+            const session = await preparePublicMediaUpload({
+              data: { fileName: row.file.name, mimeType: mime, sizeBytes: row.file.size },
+            });
+            if (session.mode === "drive") {
+              const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime, report);
+              await finishPublicMediaUpload({ data: { driveFileId } });
+            } else {
+              await postServerUpload(row.file, session, report);
+            }
           });
-          if (session.mode === "drive") {
-            const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime, report);
-            await finishPublicMediaUpload({ data: { driveFileId } });
-          } else {
-            await postServerUpload(row.file, session, report);
-          }
-          loadedBytes += row.file.size;
+          loadedBy.set(row.key, row.file.size);
           saved += 1;
           setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "complete", progress: 100 } : item)));
         } catch (err) {
@@ -157,7 +161,7 @@ function MediaUploadPage() {
           const message = err instanceof Error ? err.message : "Không tải được file.";
           setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "error", message } : item)));
         }
-      }
+      });
       if (saved) setDone(true);
       if (failed) setError("Một số file chưa lên. Có thể gửi tiếp.");
       if (!saved && failed) setError("Chưa gửi được file.");

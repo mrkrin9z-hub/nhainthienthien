@@ -65,7 +65,14 @@ const uploadTicketsSchema = z.object({
   orderId: z.string().uuid(),
   accessToken: uploadKey,
   files: z
-    .array(z.object({ fileName: z.string().min(1).max(200), mimeType: z.string().min(3).max(100), sizeBytes: z.number().int().min(1) }))
+    .array(
+      z.object({
+        fileName: z.string().min(1).max(200),
+        mimeType: z.string().min(3).max(100),
+        sizeBytes: z.number().int().min(1),
+        comment: z.string().trim().max(500).optional(),
+      }),
+    )
     .min(1)
     .max(200),
 });
@@ -148,6 +155,48 @@ export const createAlbumTicket = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { createAlbumTicket: ticket } = await import("@/server/service");
     return ticket(data);
+  });
+
+const albumTicketsSchema = z.object({
+  phone: z.string().trim().min(8).max(20),
+  customerName: z.string().trim().max(80).optional().default(""),
+  files: z
+    .array(z.object({ fileName: z.string().min(1).max(200), mimeType: z.string().min(3).max(100), sizeBytes: z.number().int().min(1) }))
+    .min(1)
+    .max(200),
+});
+
+export const createAlbumTickets = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => albumTicketsSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { createAlbumTickets: tickets } = await import("@/server/service");
+    return tickets(data);
+  });
+
+const finishedUploadSchema = z.object({
+  fileId: z.string().uuid(),
+  driveFileId: z.string().regex(/^[A-Za-z0-9_-]{8,200}$/).optional(),
+  size: z.number().int().positive().optional(),
+  storage: z.string().max(20).optional(),
+  path: z.string().max(300).optional(),
+});
+
+export const finalizeAlbumUploads = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ albumId: z.string().uuid(), phone: z.string().trim().min(8).max(20), files: z.array(finishedUploadSchema).min(1).max(200) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { finalizeAlbumUploads: finish } = await import("@/server/service");
+    return finish(data);
+  });
+
+export const finalizeOrderUploads = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ orderId: z.string().uuid(), accessToken: uploadKey, files: z.array(finishedUploadSchema).min(1).max(200) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { finalizeOrderUploads: finish } = await import("@/server/service");
+    return finish(data);
   });
 
 const driveFileSchema = z.object({
@@ -286,3 +335,6 @@ export const getAlbumReceipt = createServerFn({ method: "GET" })
     const { publicAlbumReceipt } = await import("@/server/service");
     return publicAlbumReceipt(data.albumId, data.phone);
   });
+
+export const finishAlbumDriveUploads = finalizeAlbumUploads;
+export const finishOrderDriveUploads = finalizeOrderUploads;

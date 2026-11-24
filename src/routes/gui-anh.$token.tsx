@@ -11,13 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { photoLimitLabel, uploadKeyShape } from "@/domain/order-upload";
+import { guessImageMime } from "@/domain/upload-pool";
 import { publicStatusLabel } from "@/domain/public-status";
 import { formatMaybe } from "@/lib/brand";
-import { postFormWithProgress, putDriveFile } from "@/lib/drive-put";
+import { keepScreenAwake, uploadOriginalsInPool } from "@/lib/customer-upload";
+import { postFormWithProgress } from "@/lib/drive-put";
 import {
   acknowledgeCustomerPhotos,
-  createUploadTicket,
-  finishOrderDriveUpload,
+  createUploadTickets,
+  finalizeOrderUploads,
   getUploadTarget,
   prepareOrderDriveUpload,
   setCustomerComment,
@@ -55,16 +57,6 @@ type Row = {
   message?: string;
 };
 
-function guessMime(file: File): string {
-  if (file.type) return file.type;
-  const name = file.name.toLowerCase();
-  if (name.endsWith(".png")) return "image/png";
-  if (name.endsWith(".webp")) return "image/webp";
-  if (name.endsWith(".heic")) return "image/heic";
-  if (name.endsWith(".heif")) return "image/heif";
-  return "image/jpeg";
-}
-
 export function CustomerUploadScreen({ token }: { token: string }) {
   const valid = uploadKeyShape(token);
   const target = useQuery({
@@ -85,6 +77,7 @@ export function CustomerUploadScreen({ token }: { token: string }) {
   }, [canonicalPath]);
   const [openPhoto, setOpenPhoto] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState(0);
+  const [doneCount, setDoneCount] = useState(0);
   const [photoNotes, setPhotoNotes] = useState<Record<string, string>>({});
   const limit = target.data ? target.data.maxPhotoBytes : undefined;
   const direct = limit === null;
@@ -103,8 +96,8 @@ export function CustomerUploadScreen({ token }: { token: string }) {
 
   const overallLabel = useMemo(() => {
     if (!busy) return null;
-    return `Đang gửi… ${batchProgress}%`;
-  }, [busy, batchProgress]);
+    return `Đã tải ${doneCount} ảnh gốc`;
+  }, [busy, doneCount]);
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -135,78 +128,83 @@ export function CustomerUploadScreen({ token }: { token: string }) {
       setError("Chọn ít nhất một ảnh.");
       return;
     }
+    const queue = pending.filter((row) => !(limit != null && row.file.size > limit));
+    if (!queue.length) {
+      if (pending.length) setError("Ảnh lớn hơn mức cho phép.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setBatchProgress(0);
-    let failed = false;
-    let completed = 0;
-    const queue = pending.filter((row) => !(limit != null && row.file.size > limit));
-    const totalBytes = Math.max(1, queue.reduce((sum, row) => sum + row.file.size, 0));
-    let loadedBytes = 0;
+    setDoneCount(0);
+    const releaseWake = await keepScreenAwake();
     try {
-      for (const row of pending) {
-        if (limit != null && row.file.size > limit) {
-          failed = true;
-          continue;
-        }
-        setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "uploading", progress: 0, message: undefined } : item)));
-        const baseLoaded = loadedBytes;
-        const report = (loaded: number, total: number) => {
-          const fileLoaded = total > 0 ? Math.min(row.file.size, Math.round((loaded / total) * row.file.size)) : loaded;
-          const pct = Math.min(100, Math.round((fileLoaded / Math.max(row.file.size, 1)) * 100));
-          setRows((current) => current.map((item) => (item.key === row.key ? { ...item, progress: pct } : item)));
-          setBatchProgress(Math.min(100, Math.round(((baseLoaded + fileLoaded) / totalBytes) * 100)));
-        };
-        try {
-          const mime = guessMime(row.file);
-          const ticket = await createUploadTicket({
-            data: {
-              orderId: info.orderId,
-              accessToken: token,
-              fileName: row.file.name,
-              mimeType: mime,
-              sizeBytes: row.file.size,
-              comment: row.comment,
-            },
-          });
-          if (direct) {
-            const session = await prepareOrderDriveUpload({
-              data: { orderId: info.orderId, accessToken: token, fileId: ticket.fileId },
-            });
-            const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime, report);
-            await finishOrderDriveUpload({
-              data: { orderId: info.orderId, accessToken: token, fileId: ticket.fileId, driveFileId },
-            });
-          } else {
-            const body = new FormData();
-            body.set("orderId", info.orderId);
-            body.set("accessToken", token);
-            body.set("fileId", ticket.fileId);
-            body.set("file", row.file);
-            await postFormWithProgress("/api/public/upload", body, report);
-          }
-          loadedBytes += row.file.size;
-          completed += 1;
-          setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "complete", progress: 100 } : item)));
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Không tải được ảnh.";
-          failed = true;
-          setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "error", message } : item)));
-        }
+      const tickets = await createUploadTickets({
+        data: {
+          orderId: info.orderId,
+          accessToken: token,
+          files: queue.map((row) => ({
+            fileName: row.file.name,
+            mimeType: guessImageMime(row.file),
+            sizeBytes: row.file.size,
+            ...(row.comment.trim() ? { comment: row.comment.trim() } : {}),
+          })),
+        },
+      });
+      const idByKey = new Map(queue.map((row, index) => [row.key, tickets.fileIds[index]!]));
+      const { ok, failed } = await uploadOriginalsInPool({
+        items: queue,
+        fileIdOf: (item) => idByKey.get(item.key)!,
+        direct,
+        openSession: (_item, fileId) =>
+          prepareOrderDriveUpload({ data: { orderId: info.orderId, accessToken: token, fileId } }),
+        postForm: async (item, fileId, report) => {
+          const body = new FormData();
+          body.set("orderId", info.orderId);
+          body.set("accessToken", token);
+          body.set("fileId", fileId);
+          body.set("file", item.file);
+          return postFormWithProgress("/api/public/upload", body, report) as Promise<
+            Partial<{ driveFileId: string; storage: string; path: string; size: number }>
+          >;
+        },
+        onStatus: (key, patch) => {
+          setRows((current) => current.map((item) => (item.key === key ? { ...item, ...patch } : item)));
+        },
+        onProgress: ({ percent, done }) => {
+          setBatchProgress(percent);
+          setDoneCount(done);
+        },
+      });
+      if (ok.length) {
+        await finalizeOrderUploads({
+          data: {
+            orderId: info.orderId,
+            accessToken: token,
+            files: ok.map((row) => ({
+              fileId: row.fileId,
+              ...(row.driveFileId ? { driveFileId: row.driveFileId } : {}),
+              ...(row.storage ? { storage: row.storage } : {}),
+              ...(row.path ? { path: row.path } : {}),
+              size: row.size,
+            })),
+          },
+        });
       }
-      setBatchProgress(failed ? Math.min(99, batchProgress) : 100);
       const result = await acknowledgeCustomerPhotos({ data: { orderId: info.orderId, accessToken: token } });
       await target.refetch();
-      if (failed) {
+      if (failed.length) {
         setError("Một số ảnh chưa lên. Chọn lại ảnh lỗi rồi gửi tiếp.");
         setDone(null);
-      } else {
-        setDone({ code: result.code, fileCount: result.fileCount || completed });
-        setRows([]);
+        return;
       }
+      setBatchProgress(100);
+      setDone({ code: result.code, fileCount: result.fileCount || ok.length });
+      setRows([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chưa gửi được.");
     } finally {
+      releaseWake();
       setBusy(false);
     }
   }
@@ -442,6 +440,7 @@ export function CustomerUploadScreen({ token }: { token: string }) {
                 <div className="h-2.5 overflow-hidden rounded-full bg-background">
                   <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${batchProgress}%` }} />
                 </div>
+                <p className="text-xs text-muted-foreground">Giữ máy sáng, đừng khóa màn hình khi đang gửi nhiều ảnh. Ảnh gốc được giữ nguyên để in.</p>
               </div>
             ) : null}
             {error ? <p className="text-sm font-semibold text-destructive">{error}</p> : null}

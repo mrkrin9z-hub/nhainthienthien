@@ -33,7 +33,7 @@ export async function putDriveFile(uploadUrl: string, file: File, mime: string, 
 }
 
 /** POST multipart với thanh tiến độ (XMLHttpRequest). */
-export function postFormWithProgress(url: string, body: FormData, onProgress?: UploadProgress): Promise<void> {
+export function postFormWithProgress(url: string, body: FormData, onProgress?: UploadProgress): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     // Mạng đứng (không nhích) quá 60 giây thì báo lỗi để khách bấm gửi lại, không quay mãi.
@@ -53,7 +53,11 @@ export function postFormWithProgress(url: string, body: FormData, onProgress?: U
       done();
       if (xhr.status >= 200 && xhr.status < 300) {
         onProgress?.(1, 1);
-        resolve();
+        try {
+          resolve(xhr.responseText ? JSON.parse(xhr.responseText) : undefined);
+        } catch {
+          resolve(undefined);
+        }
         return;
       }
       reject(new Error(xhr.responseText || "Không tải được ảnh."));

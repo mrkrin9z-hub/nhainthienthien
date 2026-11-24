@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { photoLimitLabel } from "@/domain/order-upload";
+import { guessImageMime } from "@/domain/upload-pool";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
-import { postFormWithProgress, putDriveFile } from "@/lib/drive-put";
-import { createAlbumTicket, finishAlbumDriveUpload, prepareAlbumDriveUpload } from "@/lib/orders.functions";
+import { keepScreenAwake, uploadOriginalsInPool } from "@/lib/customer-upload";
+import { postFormWithProgress } from "@/lib/drive-put";
+import { createAlbumTickets, finalizeAlbumUploads, prepareAlbumDriveUpload } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/gui-anh/")({
   head: () => ({
@@ -34,16 +36,6 @@ type Row = {
   message?: string;
 };
 
-function guessMime(file: File): string {
-  if (file.type) return file.type;
-  const name = file.name.toLowerCase();
-  if (name.endsWith(".png")) return "image/png";
-  if (name.endsWith(".webp")) return "image/webp";
-  if (name.endsWith(".heic")) return "image/heic";
-  if (name.endsWith(".heif")) return "image/heif";
-  return "image/jpeg";
-}
-
 function SharedUploadPage() {
   const navigate = useNavigate();
   const config = useQuery(publicConfigQueryOptions);
@@ -56,6 +48,7 @@ function SharedUploadPage() {
   const [donePhone, setDonePhone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState(0);
+  const [doneCount, setDoneCount] = useState(0);
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -85,81 +78,82 @@ function SharedUploadPage() {
       setError("Chọn ít nhất một ảnh.");
       return;
     }
+    const queue = pending.filter((row) => !(limit != null && row.file.size > limit));
+    if (!queue.length) {
+      setError("Ảnh lớn hơn mức cho phép.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setBatchProgress(0);
-    let failed = false;
-    let savedPhone = "";
-    let savedAlbumId = "";
-    let savedCount = 0;
-    const queue = pending.filter((row) => !(limit != null && row.file.size > limit));
-    const totalBytes = Math.max(
-      1,
-      queue.reduce((sum, row) => sum + row.file.size, 0),
-    );
-    let loadedBytes = 0;
+    setDoneCount(0);
+    const releaseWake = await keepScreenAwake();
     try {
-      for (const row of pending) {
-        if (limit != null && row.file.size > limit) {
-          failed = true;
-          continue;
-        }
-        setRows((current) =>
-          current.map((item) => (item.key === row.key ? { ...item, status: "uploading", progress: 0, message: undefined } : item)),
-        );
-        const baseLoaded = loadedBytes;
-        const report = (loaded: number, total: number) => {
-          const fileLoaded = total > 0 ? Math.min(row.file.size, Math.round((loaded / total) * row.file.size)) : loaded;
-          const pct = Math.min(100, Math.round((fileLoaded / Math.max(row.file.size, 1)) * 100));
-          setRows((current) => current.map((item) => (item.key === row.key ? { ...item, progress: pct } : item)));
-          setBatchProgress(Math.min(100, Math.round(((baseLoaded + fileLoaded) / totalBytes) * 100)));
-        };
-        try {
-          const mime = guessMime(row.file);
-          const ticket = await createAlbumTicket({
-            data: {
-              phone,
-              customerName: customerName.trim(),
-              fileName: row.file.name,
-              mimeType: mime,
-              sizeBytes: row.file.size,
-            },
-          });
-          savedPhone = ticket.phone;
-          savedAlbumId = ticket.albumId;
-          if (direct) {
-            const session = await prepareAlbumDriveUpload({ data: { albumId: ticket.albumId, phone, fileId: ticket.fileId } });
-            const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime, report);
-            await finishAlbumDriveUpload({ data: { albumId: ticket.albumId, phone, fileId: ticket.fileId, driveFileId } });
-          } else {
-            const body = new FormData();
-            body.set("albumId", ticket.albumId);
-            body.set("phone", phone);
-            body.set("fileId", ticket.fileId);
-            body.set("file", row.file);
-            await postFormWithProgress("/api/public/album", body, report);
-          }
-          loadedBytes += row.file.size;
-          savedCount += 1;
-          setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "complete", progress: 100 } : item)));
-        } catch (err) {
-          failed = true;
-          const message = err instanceof Error ? err.message : "Không tải được ảnh.";
-          setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "error", message } : item)));
-        }
-      }
-      if (savedPhone) setDonePhone(savedPhone);
-      if (failed) setError("Một số ảnh chưa lên. Có thể gửi tiếp.");
-      if (!savedPhone && failed) setError("Chưa gửi được ảnh.");
-      if (!failed) setBatchProgress(100);
-      if (savedAlbumId && savedPhone && savedCount > 0 && !failed) {
-        await navigate({
-          to: "/gui-anh/phieu",
-          search: { album: savedAlbumId, phone: savedPhone, name: customerName.trim(), count: String(savedCount) },
+      const tickets = await createAlbumTickets({
+        data: {
+          phone,
+          customerName: customerName.trim(),
+          files: queue.map((row) => ({
+            fileName: row.file.name,
+            mimeType: guessImageMime(row.file),
+            sizeBytes: row.file.size,
+          })),
+        },
+      });
+      const idByKey = new Map(queue.map((row, index) => [row.key, tickets.files[index]!.fileId]));
+      const { ok, failed } = await uploadOriginalsInPool({
+        items: queue,
+        fileIdOf: (item) => idByKey.get(item.key)!,
+        direct,
+        openSession: (item, fileId) =>
+          prepareAlbumDriveUpload({ data: { albumId: tickets.albumId, phone, fileId } }),
+        postForm: async (item, fileId, report) => {
+          const body = new FormData();
+          body.set("albumId", tickets.albumId);
+          body.set("phone", phone);
+          body.set("fileId", fileId);
+          body.set("file", item.file);
+          return postFormWithProgress("/api/public/album", body, report) as Promise<Partial<{ driveFileId: string; storage: string; path: string; size: number }>>;
+        },
+        onStatus: (key, patch) => {
+          setRows((current) =>
+            current.map((item) => (item.key === key ? { ...item, ...patch, ...(patch.message === undefined ? { message: undefined } : {}) } : item)),
+          );
+        },
+        onProgress: ({ percent, done }) => {
+          setBatchProgress(percent);
+          setDoneCount(done);
+        },
+      });
+      if (ok.length) {
+        await finalizeAlbumUploads({
+          data: {
+            albumId: tickets.albumId,
+            phone,
+            files: ok.map((row) => ({
+              fileId: row.fileId,
+              ...(row.driveFileId ? { driveFileId: row.driveFileId } : {}),
+              ...(row.storage ? { storage: row.storage } : {}),
+              ...(row.path ? { path: row.path } : {}),
+              size: row.size,
+            })),
+          },
         });
+        setDonePhone(tickets.phone);
+      }
+      if (failed.length) {
+        setError(ok.length ? "Một số ảnh chưa lên. Có thể gửi tiếp các ảnh lỗi." : "Chưa gửi được ảnh.");
         return;
       }
+      setBatchProgress(100);
+      await navigate({
+        to: "/gui-anh/phieu",
+        search: { album: tickets.albumId, phone: tickets.phone, name: customerName.trim(), count: String(ok.length) },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Chưa gửi được ảnh.");
     } finally {
+      releaseWake();
       setBusy(false);
     }
   }
@@ -249,12 +243,13 @@ function SharedUploadPage() {
           {busy ? (
             <div className="space-y-2 rounded-2xl border border-border bg-muted/40 p-3">
               <div className="flex justify-between text-sm font-semibold">
-                <span>Đang gửi…</span>
+                <span>Đã tải {doneCount} ảnh gốc</span>
                 <span>{batchProgress}%</span>
               </div>
               <div className="h-2.5 overflow-hidden rounded-full bg-background">
                 <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${batchProgress}%` }} />
               </div>
+              <p className="text-xs text-muted-foreground">Giữ máy sáng, đừng khóa màn hình khi đang gửi nhiều ảnh. Ảnh gốc được giữ nguyên để in.</p>
             </div>
           ) : null}
           {error ? <p className="text-sm font-semibold text-destructive">{error}</p> : null}
