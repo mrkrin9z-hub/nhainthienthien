@@ -346,7 +346,7 @@ function ProductPage() {
       </main>
 
       {/* Thanh mua cố định trên điện thoại */}
-      <div className="glass-bar fixed inset-x-0 bottom-0 z-50 flex gap-2 px-2.5 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 md:hidden">
+      <div className="site-sticky-bottom glass-bar fixed inset-x-0 bottom-0 z-50 flex gap-2 px-2.5 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 md:hidden">
         <a href={chatUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-12 w-14 shrink-0 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold text-brand-blue">
           <MessageCircle className="size-5" aria-hidden /> {showZalo ? "Zalo" : "Chat"}
         </a>

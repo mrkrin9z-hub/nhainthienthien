@@ -594,7 +594,7 @@ function OrderPage() {
         />
       ) : null}
 
-      <div className="glass-bar fixed inset-x-0 bottom-0 z-50 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2">
+      <div className="site-sticky-bottom glass-bar fixed inset-x-0 bottom-0 z-50 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2">
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-3 md:px-6">
           <div className="min-w-0 flex-1 text-right">
             <p className="text-xs text-foreground">

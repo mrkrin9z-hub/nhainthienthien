@@ -140,7 +140,7 @@ function CartPage() {
       </main>
 
       {rows.length ? (
-        <div className="glass-bar fixed inset-x-0 bottom-0 z-50 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2">
+        <div className="site-sticky-bottom glass-bar fixed inset-x-0 bottom-0 z-50 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2">
           <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 md:px-6">
             <label className="flex shrink-0 items-center gap-1.5 text-sm">
               <input type="checkbox" checked={allOn} onChange={() => setUnselected(allOn ? new Set(rows.map((r) => r.key)) : new Set())} className="size-4 accent-[var(--brand-blue)]" />

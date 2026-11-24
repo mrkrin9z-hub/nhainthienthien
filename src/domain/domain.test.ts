@@ -25,7 +25,7 @@ import { contentDisposition, imageBytesMatch, imageMimeAllowed, servedMime } fro
 import { crc32, zipNames, zipStored } from "./zip-store.ts";
 import { LOGIN_FAIL_LIMIT, LOGIN_FAIL_TTL_SECONDS, LOGIN_IP_FAIL_LIMIT, LOGIN_LOCK_MS, loginFailIpKey, loginFailKey, loginLocked } from "./login-limit.ts";
 import { vnBackupDay } from "./guard.ts";
-import { publicContact } from "./public-contact.ts";
+import { DEFAULT_ZALO_HREF, publicContact, resolvePublicZaloHref } from "./public-contact.ts";
 import { linesForSku } from "./group-supply.ts";
 import { applyStoreMigrations } from "./migrate-shop.ts";
 import { buildSeed, DEFAULT_SETTINGS, hashPassword, PBKDF2_ITERATIONS, verifyPassword } from "./seed.ts";
@@ -421,6 +421,16 @@ test("web ẩn số Zalo khi tắt hoặc sổ cũ chưa ghi", () => {
   const body = config.slice(config.indexOf("export async function publicConfig"), config.indexOf("let lastFileSweep"));
   assert.match(body, /publicContact\(/);
   assert.doesNotMatch(body, /!== false/);
+});
+
+test("nút nổi Zalo lấy link CMS, mặc định số mới, không bao giờ dùng số cũ", () => {
+  assert.equal(resolvePublicZaloHref(), DEFAULT_ZALO_HREF);
+  assert.equal(resolvePublicZaloHref({}), DEFAULT_ZALO_HREF);
+  assert.equal(resolvePublicZaloHref({ zalo: "https://zalo.me/0901111222" }), "https://zalo.me/0901111222");
+  assert.equal(resolvePublicZaloHref({ phoneRaw: "0901111222" }), "https://zalo.me/0901111222");
+  assert.equal(resolvePublicZaloHref({ zalo: "https://zalo.me/0778662227" }), DEFAULT_ZALO_HREF);
+  assert.equal(resolvePublicZaloHref({ phoneRaw: "0778662227" }), DEFAULT_ZALO_HREF);
+  assert.equal(DEFAULT_ZALO_HREF, "https://zalo.me/0777468766");
 });
 
 test("sổ cũ đang bật Zalo bị tắt một lần, sau đó giữ ô của chủ", () => {

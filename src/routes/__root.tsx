@@ -19,6 +19,7 @@ import appCss from "../styles.css?url";
 import { installMotion } from "../lib/motion";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { publicConfigQueryOptions, type PublicConfig } from "@/lib/catalog.functions";
+import { ZaloFab } from "@/components/site/zalo-fab";
 import { BRAND } from "@/lib/brand";
 import { telE164 } from "@/domain/public-contact";
 
@@ -236,6 +237,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <ZaloFab />
       {toasts ? (
         <Suspense fallback={null}>
           <Toaster position="top-center" richColors offset={72} mobileOffset={{ top: "4.5rem" }} />
