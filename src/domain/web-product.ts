@@ -1,4 +1,3 @@
-import { comboPriceError } from "./calc.ts";
 import { CHANNELS, type Channel, type ChannelPrice, type Group, type Sku } from "./types.ts";
 
 export type WebChannelQuote = {
@@ -89,7 +88,7 @@ export function productCodeFromName(name: string): string {
   return plain.replace(/[^a-z0-9]/g, "").toUpperCase().slice(0, 16) || "SP";
 }
 
-/** Chuẩn hoá mã người nhập: chữ/số viết hoa, tối đa 24 ký tự. */
+/** Chuẩn hoá mã: chữ/số/gạch ngang, tối đa 32 ký tự (vd Combo13x18-02). */
 export function normalizeProductCode(code: string): string {
   const plain = code
     .trim()
@@ -97,8 +96,41 @@ export function normalizeProductCode(code: string): string {
     .replace(/đ/gi, "D")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^A-Z0-9]+/g, "");
-  return plain.slice(0, 24);
+    .replace(/[^A-Z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return plain.slice(0, 32);
+}
+
+/**
+ * Gợi ý mã theo nhóm + khổ: 1 tấm → TG-13x18; combo → Combo13x18-02.
+ * Mỗi khổ/combo là một sản phẩm riêng, không gộp nhiều khổ vào một mã.
+ */
+export function suggestProductCode(input: {
+  category: string;
+  widthCm: number;
+  heightCm: number;
+  sheets: number;
+}): string {
+  const width = Math.max(1, Math.round(input.widthCm) || 1);
+  const height = Math.max(1, Math.round(input.heightCm) || 1);
+  const sheets = Math.max(1, Math.round(input.sheets) || 1);
+  const size = `${width}x${height}`;
+  if (sheets > 1) {
+    return normalizeProductCode(`Combo${size}-${String(sheets).padStart(2, "0")}`);
+  }
+  const prefix = productCodeFromName(input.category) || "SP";
+  return normalizeProductCode(`${prefix}-${size}`);
+}
+
+/** Tên gợi ý theo khổ/combo. */
+export function suggestProductName(input: { category: string; widthCm: number; heightCm: number; sheets: number }): string {
+  const width = Math.max(1, Math.round(input.widthCm) || 1);
+  const height = Math.max(1, Math.round(input.heightCm) || 1);
+  const sheets = Math.max(1, Math.round(input.sheets) || 1);
+  const cat = input.category.trim() || "Sản phẩm";
+  if (sheets > 1) return `${cat} Combo ${width}×${height} · ${sheets} tấm`;
+  return `${cat} ${width}×${height} cm`;
 }
 
 export function uniqueKey(base: string, taken: Set<string>): string {
@@ -130,49 +162,35 @@ export function buildWebProduct(
   const turnaround = clean(input.turnaround ?? "", 80);
   if (name.length < 2) throw new Error("Nhập tên sản phẩm.");
   if (category.length < 2) throw new Error("Chọn hoặc nhập nhóm sản phẩm.");
-  if (!input.sizes.length) throw new Error("Thêm ít nhất một khổ và giá.");
+  if (input.sizes.length !== 1) {
+    throw new Error("Mỗi mã là một sản phẩm (một khổ hoặc một combo). Không gộp nhiều khổ vào cùng mã.");
+  }
 
-  const sizes: WebSizeInput[] = input.sizes.map((size) => {
-    const quotes = channelQuotes(size);
-    const retail =
-      quotes.tai_tiem.price
-      ?? CHANNELS.map((channel) => quotes[channel].price).find((price): price is number => price != null)
-      ?? size.price;
-    if (retail == null || !Number.isFinite(retail)) {
-      throw new Error(`Khổ ${size.widthCm}×${size.heightCm} cm cần ít nhất một giá kênh.`);
-    }
-    const next: WebSizeInput = {
-      widthCm: whole(size.widthCm, "Chiều rộng", 1, 200),
-      heightCm: whole(size.heightCm, "Chiều cao", 1, 200),
-      sheets: whole(size.sheets, "Số tấm", 1, 100),
-      price: whole(retail, "Giá", 1000, 100_000_000),
-      minTotal: size.minTotal ?? null,
-    };
-    if (size.prices) next.prices = size.prices;
-    if (size.quotes) next.quotes = size.quotes;
-    if (size.skuId) next.skuId = size.skuId;
-    return next;
-  });
-  const seen = new Set<string>();
-  for (const size of sizes) {
-    const key = `${size.widthCm}x${size.heightCm}x${size.sheets}`;
-    if (seen.has(key)) throw new Error(`Khổ ${size.widthCm}×${size.heightCm} cm đã có ${size.sheets} tấm.`);
-    seen.add(key);
+  const sizeIn = input.sizes[0]!;
+  const quotesBuilt = channelQuotes(sizeIn);
+  const retail =
+    quotesBuilt.tai_tiem.price
+    ?? CHANNELS.map((channel) => quotesBuilt[channel].price).find((price): price is number => price != null)
+    ?? sizeIn.price;
+  if (retail == null || !Number.isFinite(retail)) {
+    throw new Error(`Khổ ${sizeIn.widthCm}×${sizeIn.heightCm} cm cần ít nhất một giá kênh.`);
   }
-  const bySize = new Map<string, { sheets: number; price: number }[]>();
-  for (const size of sizes) {
-    const key = `${size.widthCm}x${size.heightCm}`;
-    const rows = bySize.get(key) ?? [];
-    rows.push({ sheets: size.sheets, price: size.price });
-    bySize.set(key, rows);
-  }
-  for (const rows of bySize.values()) {
-    const error = comboPriceError(rows);
-    if (error) throw new Error(error);
-  }
+  const size: WebSizeInput = {
+    widthCm: whole(sizeIn.widthCm, "Chiều rộng", 1, 200),
+    heightCm: whole(sizeIn.heightCm, "Chiều cao", 1, 200),
+    sheets: whole(sizeIn.sheets, "Số tấm", 1, 100),
+    price: whole(retail, "Giá", 1000, 100_000_000),
+    minTotal: sizeIn.minTotal ?? null,
+  };
+  if (sizeIn.prices) size.prices = sizeIn.prices;
+  if (sizeIn.quotes) size.quotes = sizeIn.quotes;
+  if (sizeIn.skuId) size.skuId = sizeIn.skuId;
 
   const slug = uniqueKey(slugifyProductName(name), new Set(existing.slugs));
-  const wantedCode = normalizeProductCode(input.code ?? "") || normalizeProductCode(productCodeFromName(name));
+  const wantedCode =
+    normalizeProductCode(input.code ?? "")
+    || suggestProductCode({ category, widthCm: size.widthCm, heightCm: size.heightCm, sheets: size.sheets })
+    || normalizeProductCode(productCodeFromName(name));
   const idBase = wantedCode
     ? wantedCode.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || slug.replace(/-/g, "_")
     : slug.replace(/-/g, "_");
@@ -180,39 +198,35 @@ export function buildWebProduct(
   const takenCodes = new Set(existing.codes);
   const skus: Sku[] = [];
   const prices: ChannelPrice[] = [];
-  const ordered = [...sizes].sort((a, b) => a.widthCm - b.widthCm || a.heightCm - b.heightCm || a.sheets - b.sheets);
-  ordered.forEach((size, index) => {
-    const stem = `${wantedCode || "SP"}-${size.widthCm}x${size.heightCm}-${size.sheets}`;
-    const code = uniqueKey(stem, takenCodes);
-    takenCodes.add(code);
-    const quotes = channelQuotes(size);
-    const soldOn = CHANNELS.filter((channel) => quotes[channel].sold);
-    skus.push({
-      id: code,
-      code,
-      groupId: id,
-      name: size.sheets === 1 ? `${size.widthCm}×${size.heightCm} cm` : `${size.widthCm}×${size.heightCm} cm · ${size.sheets} tấm`,
-      size: `${size.widthCm}x${size.heightCm}`,
-      widthCm: size.widthCm,
-      heightCm: size.heightCm,
-      sheets: size.sheets,
-      piecesPerPack: null,
-      sort: index + 1,
-      soldOn,
-    });
-    for (const channel of CHANNELS) {
-      const quote = quotes[channel];
-      prices.push({
-        skuId: code,
-        channel,
-        price: quote.price,
-        status: quote.sold && quote.price != null ? "dang_ban" : "nhap",
-        note: channel === "tai_tiem" ? "Thêm từ quản trị" : "",
-        ...(quote.listPrice != null ? { listPrice: quote.listPrice } : {}),
-        ...(quote.minTotal ? { minTotal: quote.minTotal } : {}),
-      });
-    }
+  const skuCode = uniqueKey(wantedCode || `SP-${size.widthCm}x${size.heightCm}`, takenCodes);
+  takenCodes.add(skuCode);
+  const quotes = channelQuotes(size);
+  const soldOn = CHANNELS.filter((channel) => quotes[channel].sold);
+  skus.push({
+    id: skuCode,
+    code: skuCode,
+    groupId: id,
+    name: size.sheets === 1 ? `${size.widthCm}×${size.heightCm} cm` : `Combo ${size.widthCm}×${size.heightCm} · ${size.sheets} tấm`,
+    size: `${size.widthCm}x${size.heightCm}`,
+    widthCm: size.widthCm,
+    heightCm: size.heightCm,
+    sheets: size.sheets,
+    piecesPerPack: null,
+    sort: 1,
+    soldOn,
   });
+  for (const channel of CHANNELS) {
+    const quote = quotes[channel];
+    prices.push({
+      skuId: skuCode,
+      channel,
+      price: quote.price,
+      status: quote.sold && quote.price != null ? "dang_ban" : "nhap",
+      note: channel === "tai_tiem" ? "Thêm từ quản trị" : "",
+      ...(quote.listPrice != null ? { listPrice: quote.listPrice } : {}),
+      ...(quote.minTotal ? { minTotal: quote.minTotal } : {}),
+    });
+  }
 
   const group: Group = {
     id,

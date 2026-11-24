@@ -1,21 +1,8 @@
 import { CHANNEL_LABEL, CHANNELS, type Channel } from "./types.ts";
 import type { WebProductInput, WebSizeInput } from "./web-product.ts";
-import { normalizeProductCode, productCodeFromName } from "./web-product.ts";
+import { normalizeProductCode, productCodeFromName, suggestProductCode } from "./web-product.ts";
 
 const SOLD_YES = new Set(["1", "true", "yes", "y", "có", "co", "đang bán", "dang ban", "bán", "ban"]);
-
-export type ProductExcelRow = {
-  code: string;
-  name: string;
-  category: string;
-  description: string;
-  widthCm: number;
-  heightCm: number;
-  sheets: number;
-  channel: Channel;
-  price: number | null;
-  sold: boolean;
-};
 
 export type ProductExcelDraft = WebProductInput & { code: string };
 
@@ -27,28 +14,39 @@ export function productExcelHeaders(): string[] {
   return headers;
 }
 
+/** Mẫu: mỗi dòng = 1 sản phẩm (1 khổ hoặc 1 combo), cùng nhóm Tráng gương. */
 export function productExcelTemplateRows(): (string | number | null)[][] {
   return [
     productExcelHeaders(),
     [
-      "AEG",
-      "Ảnh ép gỗ",
-      "Ảnh gỗ",
-      "Ví dụ sản phẩm",
-      15,
-      21,
+      "TG-13x18",
+      "Tráng gương 13×18 cm",
+      "Tráng gương",
+      "Một khổ = một mã",
+      13,
+      18,
       1,
       ...CHANNELS.flatMap((channel) => (channel === "tai_tiem" || channel === "facebook" ? [45000, "có"] : ["", "không"])),
     ],
     [
-      "AEG",
-      "Ảnh ép gỗ",
-      "Ảnh gỗ",
-      "Ví dụ sản phẩm",
+      "Combo13x18-02",
+      "Tráng gương Combo 13×18 · 2 tấm",
+      "Tráng gương",
+      "Combo là mã riêng, giá nhập tay",
+      13,
+      18,
+      2,
+      ...CHANNELS.flatMap((channel) => (channel === "tai_tiem" || channel === "facebook" ? [80000, "có"] : ["", "không"])),
+    ],
+    [
+      "TG-20x30",
+      "Tráng gương 20×30 cm",
+      "Tráng gương",
+      "",
       20,
       30,
       1,
-      ...CHANNELS.flatMap((channel) => (channel === "tai_tiem" || channel === "facebook" ? [65000, "có"] : ["", "không"])),
+      ...CHANNELS.flatMap((channel) => (channel === "tai_tiem" ? [65000, "có"] : ["", "không"])),
     ],
   ];
 }
@@ -101,7 +99,7 @@ function channelFromHeader(header: string): { channel: Channel; kind: "price" | 
   return null;
 }
 
-/** Gom các dòng Excel rộng (một khổ / dòng, cột giá từng kênh) thành draft sản phẩm. */
+/** Mỗi dòng Excel = một sản phẩm (một mã). Trùng mã trong file → lỗi rõ. */
 export function parseProductExcel(rows: string[][]): ProductExcelDraft[] {
   if (!rows.length) throw new Error("File trống.");
   const header = rows[0]!.map((cell) => String(cell ?? "").trim());
@@ -127,21 +125,30 @@ export function parseProductExcel(rows: string[][]): ProductExcelDraft[] {
     throw new Error("Thiếu cột giá kênh (vd Giá Tại tiệm).");
   }
 
-  const byCode = new Map<string, ProductExcelDraft>();
+  const drafts: ProductExcelDraft[] = [];
+  const seen = new Map<string, number>();
   rows.slice(1).forEach((row, rowIndex) => {
     if (!row.some((cell) => String(cell ?? "").trim())) return;
     const line = rowIndex + 2;
     const name = String(row[idx.name] ?? "").trim();
     const category = String(row[idx.category] ?? "").trim();
     if (!name || !category) throw new Error(`Dòng ${line}: thiếu tên hoặc nhóm.`);
-    const code =
-      normalizeProductCode(String(row[idx.code] ?? ""))
-      || normalizeProductCode(productCodeFromName(name));
-    if (!code) throw new Error(`Dòng ${line}: thiếu mã sản phẩm.`);
-    const description = idx.description >= 0 ? String(row[idx.description] ?? "").trim() : "";
     const widthCm = intCell(row[idx.width], `Dòng ${line}: rộng`);
     const heightCm = intCell(row[idx.height], `Dòng ${line}: cao`);
     const sheets = idx.sheets >= 0 ? intCell(row[idx.sheets] || "1", `Dòng ${line}: số tấm`) : 1;
+    const code =
+      normalizeProductCode(String(row[idx.code] ?? ""))
+      || suggestProductCode({ category, widthCm, heightCm, sheets })
+      || normalizeProductCode(productCodeFromName(name));
+    if (!code) throw new Error(`Dòng ${line}: thiếu mã sản phẩm.`);
+    const prev = seen.get(code.toLowerCase());
+    if (prev != null) {
+      throw new Error(
+        `Dòng ${line}: mã ${code} trùng dòng ${prev}. Mỗi khổ/combo phải có mã riêng (vd TG-13x18 và Combo13x18-02).`,
+      );
+    }
+    seen.set(code.toLowerCase(), line);
+    const description = idx.description >= 0 ? String(row[idx.description] ?? "").trim() : "";
 
     const quotes: NonNullable<WebSizeInput["quotes"]> = {};
     for (const channel of CHANNELS) {
@@ -168,42 +175,17 @@ export function parseProductExcel(rows: string[][]): ProductExcelDraft[] {
     const retail = quotes.tai_tiem?.price ?? CHANNELS.map((c) => quotes[c]?.price).find((p): p is number => p != null);
     if (retail == null) throw new Error(`Dòng ${line}: cần ít nhất một giá kênh.`);
 
-    const size: WebSizeInput = {
-      widthCm,
-      heightCm,
-      sheets,
-      price: retail,
-      quotes,
-    };
-
-    const existing = byCode.get(code);
-    if (!existing) {
-      byCode.set(code, {
-        code,
-        name,
-        category,
-        description,
-        turnaround: "",
-        sizes: [size],
-        listed: false,
-      });
-      return;
-    }
-    existing.name = name;
-    existing.category = category;
-    if (description) existing.description = description;
-    const dup = existing.sizes.find(
-      (item) => item.widthCm === widthCm && item.heightCm === heightCm && item.sheets === sheets,
-    );
-    if (dup) {
-      dup.price = size.price;
-      if (size.quotes) dup.quotes = size.quotes;
-    } else {
-      existing.sizes.push(size);
-    }
+    drafts.push({
+      code,
+      name,
+      category,
+      description,
+      turnaround: "",
+      sizes: [{ widthCm, heightCm, sheets, price: retail, quotes }],
+      listed: false,
+    });
   });
 
-  const drafts = [...byCode.values()];
   if (!drafts.length) throw new Error("Không có dòng sản phẩm hợp lệ.");
   return drafts;
 }
@@ -224,21 +206,21 @@ export function productsToExcelRows(
 ): (string | number | null)[][] {
   const rows: (string | number | null)[][] = [productExcelHeaders()];
   for (const product of products) {
-    for (const size of product.sizes) {
-      rows.push([
-        product.code,
-        product.name,
-        product.category,
-        product.description,
-        size.widthCm,
-        size.heightCm,
-        size.sheets,
-        ...CHANNELS.flatMap((channel) => {
-          const quote = size.quotes[channel];
-          return [quote?.price ?? "", quote?.sold ? "có" : "không"];
-        }),
-      ]);
-    }
+    const size = product.sizes[0];
+    if (!size) continue;
+    rows.push([
+      product.code,
+      product.name,
+      product.category,
+      product.description,
+      size.widthCm,
+      size.heightCm,
+      size.sheets,
+      ...CHANNELS.flatMap((channel) => {
+        const quote = size.quotes[channel];
+        return [quote?.price ?? "", quote?.sold ? "có" : "không"];
+      }),
+    ]);
   }
   return rows;
 }

@@ -7,26 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { CHANNEL_LABEL, CHANNELS, type Channel } from "@/domain/types";
-import { normalizeProductCode, productCodeFromName } from "@/domain/web-product";
+import {
+  normalizeProductCode,
+  productCodeFromName,
+  suggestProductCode,
+  suggestProductName,
+} from "@/domain/web-product";
 
 type QuoteDraft = { price: string; sold: boolean };
-type SizeDraft = {
-  skuId?: string;
-  width: string;
-  height: string;
-  sheets: string;
-  quotes: Record<Channel, QuoteDraft>;
-};
 
 function blankQuotes(): Record<Channel, QuoteDraft> {
   return Object.fromEntries(CHANNELS.map((channel) => [channel, { price: "", sold: channel === "tai_tiem" }])) as Record<
     Channel,
     QuoteDraft
   >;
-}
-
-function blankRow(): SizeDraft {
-  return { width: "15", height: "21", sheets: "1", quotes: blankQuotes() };
 }
 
 function whole(value: string): number {
@@ -53,12 +47,32 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
+  const [nameTouched, setNameTouched] = useState(false);
   const [code, setCode] = useState("");
   const [codeTouched, setCodeTouched] = useState(false);
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
   const [description, setDescription] = useState("");
-  const [rows, setRows] = useState<SizeDraft[]>([blankRow()]);
+  const [width, setWidth] = useState("13");
+  const [height, setHeight] = useState("18");
+  const [sheets, setSheets] = useState("1");
+  const [skuId, setSkuId] = useState<string | undefined>();
+  const [quotes, setQuotes] = useState<Record<Channel, QuoteDraft>>(blankQuotes);
+  const [legacySizes, setLegacySizes] = useState(0);
+
+  function refreshSuggestions(next: { category?: string; width?: string; height?: string; sheets?: string }) {
+    if (editing) return;
+    const cat = next.category ?? category;
+    const w = Number((next.width ?? width).trim());
+    const h = Number((next.height ?? height).trim());
+    const s = Number((next.sheets ?? sheets).trim());
+    if (!(w > 0 && h > 0 && s > 0)) return;
+    if (!codeTouched) setCode(suggestProductCode({ category: cat, widthCm: w, heightCm: h, sheets: s }));
+    if (!nameTouched && cat.trim().length >= 2) {
+      setName(suggestProductName({ category: cat, widthCm: w, heightCm: h, sheets: s }));
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
     let alive = true;
@@ -70,43 +84,59 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
         const cats = [...new Set(products.map((item) => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi"));
         setCategories(cats);
         if (!groupId) {
+          const cat = cats[0] ?? "Tráng gương";
           setName("");
+          setNameTouched(false);
           setCode("");
           setCodeTouched(false);
-          setCategory(cats[0] ?? "");
+          setCategory(cat);
           setDescription("");
-          setRows([blankRow()]);
+          setWidth("13");
+          setHeight("18");
+          setSheets("1");
+          setSkuId(undefined);
+          setQuotes(blankQuotes());
+          setLegacySizes(0);
+          setCode(suggestProductCode({ category: cat, widthCm: 13, heightCm: 18, sheets: 1 }));
+          setName(suggestProductName({ category: cat, widthCm: 13, heightCm: 18, sheets: 1 }));
           return;
         }
         const product = await getWebProduct({ data: { groupId } });
         if (!alive) return;
+        const size = product.sizes[0];
         setName(product.name);
+        setNameTouched(true);
         setCode(normalizeProductCode(product.id) || product.id);
         setCodeTouched(true);
         setCategory(product.category);
         setDescription(product.description);
-        setRows(
-          product.sizes.length
-            ? product.sizes.map((size) => ({
-                skuId: size.skuId,
-                width: String(size.widthCm),
-                height: String(size.heightCm),
-                sheets: String(size.sheets),
-                quotes: Object.fromEntries(
-                  CHANNELS.map((channel) => {
-                    const quote = size.quotes[channel];
-                    return [
-                      channel,
-                      {
-                        price: quote?.price != null ? String(quote.price) : "",
-                        sold: Boolean(quote?.sold),
-                      },
-                    ];
-                  }),
-                ) as Record<Channel, QuoteDraft>,
-              }))
-            : [blankRow()],
-        );
+        setLegacySizes(product.sizes.length);
+        if (size) {
+          setSkuId(size.skuId);
+          setWidth(String(size.widthCm));
+          setHeight(String(size.heightCm));
+          setSheets(String(size.sheets));
+          setQuotes(
+            Object.fromEntries(
+              CHANNELS.map((channel) => {
+                const quote = size.quotes[channel];
+                return [
+                  channel,
+                  {
+                    price: quote?.price != null ? String(quote.price) : "",
+                    sold: Boolean(quote?.sold),
+                  },
+                ];
+              }),
+            ) as Record<Channel, QuoteDraft>,
+          );
+        } else {
+          setSkuId(undefined);
+          setWidth("13");
+          setHeight("18");
+          setSheets("1");
+          setQuotes(blankQuotes());
+        }
       } catch (error) {
         toast.error((error as Error).message);
         onOpenChange(false);
@@ -126,56 +156,40 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
     return categories;
   }, [categories, category]);
 
-  function patchRow(index: number, patch: Partial<SizeDraft>) {
-    setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  }
-
-  function patchQuote(index: number, channel: Channel, patch: Partial<QuoteDraft>) {
-    setRows((current) =>
-      current.map((row, i) => {
-        if (i !== index) return row;
-        return { ...row, quotes: { ...row.quotes, [channel]: { ...row.quotes[channel], ...patch } } };
-      }),
-    );
-  }
-
-  function onNameChange(value: string) {
-    setName(value);
-    if (!editing && !codeTouched) setCode(productCodeFromName(value));
+  function patchQuote(channel: Channel, patch: Partial<QuoteDraft>) {
+    setQuotes((current) => ({ ...current, [channel]: { ...current[channel], ...patch } }));
   }
 
   async function save() {
-    const sizes = rows.map((row) => {
-      const quotes: Record<string, { price: number | null; sold: boolean }> = {};
+    setSaving(true);
+    try {
+      const quoteMap: Record<string, { price: number | null; sold: boolean }> = {};
       for (const channel of CHANNELS) {
-        const quote = row.quotes[channel];
-        quotes[channel] = {
+        const quote = quotes[channel];
+        quoteMap[channel] = {
           price: optionalWhole(quote.price),
           sold: quote.sold,
         };
       }
       const retail =
-        quotes["tai_tiem"]?.price
-        ?? CHANNELS.map((channel) => quotes[channel]?.price).find((price): price is number => price != null);
-      if (retail == null) throw new Error(`Khổ ${row.width}×${row.height} cần ít nhất một giá.`);
-      return {
-        skuId: row.skuId,
-        widthCm: whole(row.width),
-        heightCm: whole(row.height),
-        sheets: whole(row.sheets),
+        quoteMap["tai_tiem"]?.price
+        ?? CHANNELS.map((channel) => quoteMap[channel]?.price).find((price): price is number => price != null);
+      if (retail == null) throw new Error("Cần ít nhất một giá kênh.");
+      const size = {
+        skuId,
+        widthCm: whole(width),
+        heightCm: whole(height),
+        sheets: whole(sheets),
         price: retail,
-        quotes,
+        quotes: quoteMap,
       };
-    });
-    setSaving(true);
-    try {
       const payload = {
         name,
         code: normalizeProductCode(code) || productCodeFromName(name),
         category,
         description,
         turnaround: "",
-        sizes,
+        sizes: [size],
       };
       const saved =
         editing && groupId
@@ -201,39 +215,24 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
           <p className="text-sm text-muted-foreground">Đang tải sản phẩm…</p>
         ) : (
           <div className="space-y-3">
-            <label className="block text-sm font-semibold">
-              Tên sản phẩm
-              <Input
-                className="mt-1 min-h-11"
-                value={name}
-                onChange={(event) => onNameChange(event.target.value)}
-                placeholder="Ảnh ép gỗ"
-              />
-            </label>
-            <label className="block text-sm font-semibold">
-              Mã sản phẩm
-              <Input
-                className="mt-1 min-h-11 font-mono uppercase"
-                value={code}
-                disabled={editing}
-                onChange={(event) => {
-                  setCodeTouched(true);
-                  setCode(normalizeProductCode(event.target.value));
-                }}
-                placeholder="AEG"
-              />
-              <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                {editing ? "Mã cố định khi sửa — chỉ sửa đúng sản phẩm này." : "Tự lấy từ tên viết tắt liền không dấu; có thể sửa trước khi lưu."}
-              </span>
-            </label>
+            {legacySizes > 1 ? (
+              <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                Mã cũ đang gom {legacySizes} khổ/combo. Lưu sẽ chỉ giữ khổ đang sửa — các khổ khác ngừng bán.
+                Nên tạo từng mã riêng (vd TG-13x18, Combo13x18-02) cùng nhóm.
+              </p>
+            ) : null}
             <label className="block text-sm font-semibold">
               Nhóm sản phẩm
               <Input
                 className="mt-1 min-h-11"
                 list="product-category-options"
                 value={category}
-                onChange={(event) => setCategory(event.target.value)}
-                placeholder="Ảnh gỗ"
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setCategory(value);
+                  refreshSuggestions({ category: value });
+                }}
+                placeholder="Tráng gương"
               />
               <datalist id="product-category-options">
                 {categoryOptions.map((item) => (
@@ -241,7 +240,78 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
                 ))}
               </datalist>
               <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                Chọn từ nhóm đã có hoặc gõ nhóm mới.
+                Chỉ là nhãn nhóm (vd Tráng gương). Mỗi khổ/combo vẫn là một mã riêng.
+              </span>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <label className="text-sm font-semibold">
+                Rộng (cm)
+                <Input
+                  className="mt-1 min-h-11"
+                  inputMode="numeric"
+                  value={width}
+                  onChange={(event) => {
+                    setWidth(event.target.value);
+                    refreshSuggestions({ width: event.target.value });
+                  }}
+                />
+              </label>
+              <label className="text-sm font-semibold">
+                Cao (cm)
+                <Input
+                  className="mt-1 min-h-11"
+                  inputMode="numeric"
+                  value={height}
+                  onChange={(event) => {
+                    setHeight(event.target.value);
+                    refreshSuggestions({ height: event.target.value });
+                  }}
+                />
+              </label>
+              <label className="text-sm font-semibold">
+                Số tấm
+                <Input
+                  className="mt-1 min-h-11"
+                  inputMode="numeric"
+                  value={sheets}
+                  onChange={(event) => {
+                    setSheets(event.target.value);
+                    refreshSuggestions({ sheets: event.target.value });
+                  }}
+                />
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Số tấm = 1 → sản phẩm lẻ. ≥ 2 → combo (mã kiểu Combo13x18-02), giá nhập riêng.
+            </p>
+            <label className="block text-sm font-semibold">
+              Tên sản phẩm
+              <Input
+                className="mt-1 min-h-11"
+                value={name}
+                onChange={(event) => {
+                  setNameTouched(true);
+                  setName(event.target.value);
+                }}
+                placeholder="Tráng gương 13×18 cm"
+              />
+            </label>
+            <label className="block text-sm font-semibold">
+              Mã sản phẩm
+              <Input
+                className="mt-1 min-h-11 font-mono"
+                value={code}
+                disabled={editing}
+                onChange={(event) => {
+                  setCodeTouched(true);
+                  setCode(normalizeProductCode(event.target.value));
+                }}
+                placeholder="TG-13x18"
+              />
+              <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                {editing
+                  ? "Mã cố định khi sửa — chỉ sửa đúng sản phẩm này."
+                  : "Tự gợi ý theo nhóm + khổ (combo → Combo13x18-02). Có thể sửa trước khi lưu."}
               </span>
             </label>
             <label className="block text-sm font-semibold">
@@ -252,92 +322,47 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
                 onChange={(event) => setDescription(event.target.value)}
               />
             </label>
-            <div className="space-y-3">
-              <p className="text-sm font-semibold">Khổ và giá từng kênh</p>
-              {rows.map((row, index) => (
-                <div key={row.skuId ?? index} className="space-y-3 rounded-2xl border bg-slate-50 p-3">
-                  <div className="grid grid-cols-3 gap-2">
-                    <label className="text-xs font-semibold text-muted-foreground">
-                      Rộng (cm)
-                      <Input
-                        className="mt-1 min-h-11 bg-white"
-                        inputMode="numeric"
-                        value={row.width}
-                        onChange={(event) => patchRow(index, { width: event.target.value })}
-                      />
-                    </label>
-                    <label className="text-xs font-semibold text-muted-foreground">
-                      Cao (cm)
-                      <Input
-                        className="mt-1 min-h-11 bg-white"
-                        inputMode="numeric"
-                        value={row.height}
-                        onChange={(event) => patchRow(index, { height: event.target.value })}
-                      />
-                    </label>
-                    <label className="text-xs font-semibold text-muted-foreground">
-                      Số tấm
-                      <Input
-                        className="mt-1 min-h-11 bg-white"
-                        inputMode="numeric"
-                        value={row.sheets}
-                        onChange={(event) => patchRow(index, { sheets: event.target.value })}
-                      />
-                    </label>
-                  </div>
-                  <div className="overflow-x-auto rounded-xl border bg-white">
-                    <table className="w-full min-w-[28rem] text-left text-sm">
-                      <thead className="border-b bg-slate-50 text-xs text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2 font-semibold">Kênh</th>
-                          <th className="px-3 py-2 font-semibold">Giá</th>
-                          <th className="px-3 py-2 font-semibold">Đang bán</th>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Giá từng kênh</p>
+              <div className="overflow-x-auto rounded-xl border bg-white">
+                <table className="w-full min-w-[28rem] text-left text-sm">
+                  <thead className="border-b bg-slate-50 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-semibold">Kênh</th>
+                      <th className="px-3 py-2 font-semibold">Giá</th>
+                      <th className="px-3 py-2 font-semibold">Đang bán</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {CHANNELS.map((channel) => {
+                      const quote = quotes[channel];
+                      return (
+                        <tr key={channel} className="border-b last:border-0">
+                          <td className="px-3 py-2 font-medium">{CHANNEL_LABEL[channel]}</td>
+                          <td className="px-3 py-2">
+                            <MoneyInput
+                              className="min-h-10"
+                              value={quote.price}
+                              placeholder="Để trống nếu không bán"
+                              onValueChange={(value) => patchQuote(channel, { price: value == null ? "" : String(value) })}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <label className="inline-flex items-center gap-2 text-xs font-medium">
+                              <input
+                                type="checkbox"
+                                className="size-4"
+                                checked={quote.sold}
+                                onChange={(event) => patchQuote(channel, { sold: event.target.checked })}
+                              />
+                              {quote.sold ? "Đang bán" : "Không bán"}
+                            </label>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {CHANNELS.map((channel) => {
-                          const quote = row.quotes[channel];
-                          return (
-                            <tr key={channel} className="border-b last:border-0">
-                              <td className="px-3 py-2 font-medium">{CHANNEL_LABEL[channel]}</td>
-                              <td className="px-3 py-2">
-                                <MoneyInput
-                                  className="min-h-10"
-                                  value={quote.price}
-                                  placeholder="Để trống nếu không bán"
-                                  onValueChange={(value) =>
-                                    patchQuote(index, channel, { price: value == null ? "" : String(value) })
-                                  }
-                                />
-                              </td>
-                              <td className="px-3 py-2">
-                                <label className="inline-flex items-center gap-2 text-xs font-medium">
-                                  <input
-                                    type="checkbox"
-                                    className="size-4"
-                                    checked={quote.sold}
-                                    onChange={(event) => patchQuote(index, channel, { sold: event.target.checked })}
-                                  />
-                                  {quote.sold ? "Đang bán" : "Không bán"}
-                                </label>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" className="min-h-11" onClick={() => setRows((current) => [...current, blankRow()])}>
-                  Thêm khổ
-                </Button>
-                {rows.length > 1 ? (
-                  <Button type="button" variant="outline" className="min-h-11" onClick={() => setRows((current) => current.slice(0, -1))}>
-                    Bớt khổ cuối
-                  </Button>
-                ) : null}
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
             <Button className="min-h-12 bg-accent text-accent-foreground" disabled={saving} onClick={() => void save()}>
