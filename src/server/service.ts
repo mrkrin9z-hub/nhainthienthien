@@ -114,7 +114,7 @@ import type {
   SkuMap,
   Staff,
 } from "@/domain/types";
-import { CHANNEL_LABEL, CHANNELS, MESSAGE_TEMPLATE_KINDS, ROLE_LABEL, STATUS_LABEL } from "@/domain/types";
+import { CHANNEL_LABEL, CHANNELS, MESSAGE_TEMPLATE_KINDS, PUBLIC_PRICE_CHANNEL, ROLE_LABEL, STATUS_LABEL } from "@/domain/types";
 import { kpiForActor, saleKpi } from "@/domain/kpi";
 import { businessReport } from "@/domain/report";
 import { appendCollection, buildLedger, categoryLabel, expenseReport, expenseStamp, handoverError, holderBalances, inkPurchaseExpense, ordersToCollect, remainOf, walletCards, walletLabel, EXPENSE_CATEGORIES, type CashOrder } from "@/domain/money";
@@ -128,6 +128,7 @@ import { createGhnWaybill, createGhtkWaybill, createJtWaybill, quoteGhtkFee, tra
 import { integrationStatus, readIntegrationSecret, saveIntegrationSecret } from "@/server/secrets";
 import { deleteFromDrive, downloadDriveThumbnail, downloadFromDrive, driveConnected, inspectDriveUpload, openDriveUpload, uploadToDrive } from "@/server/drive";
 import { mutate, readState, usesDisk, usesSupabase } from "@/server/store";
+import { mediaFor } from "@/lib/product-media";
 
 export type Actor = Pick<Staff, "id" | "name" | "email" | "role" | "mustChangePassword"> & {
   totpEnabled: boolean;
@@ -388,18 +389,17 @@ export async function publicCatalog() {
       slug: group.slug,
       category: group.category,
       description: group.description,
-      cover_path: state.settings.productPhotos?.[group.slug]
-        ? `/api/public/product-photo/${group.slug}`
-        : null,
+      cover_path: mediaFor(group.slug).listingCover
+        ?? (state.settings.productPhotos?.[group.slug] ? `/api/public/product-photo/${group.slug}` : null),
       turnaround_text: group.turnaround,
       sort_order: group.sort,
       variants: state.skus
         .filter((sku) => sku.groupId === group.id)
         .filter((sku) => !isMergedWoodAlias(sku))
-        .filter((sku) => walkInListed(priceOf(state.prices, sku.id, "tai_tiem")?.status))
+        .filter((sku) => walkInListed(priceOf(state.prices, sku.id, PUBLIC_PRICE_CHANNEL)?.status))
         .sort((a, b) => a.sort - b.sort)
         .map((sku) => {
-          const price = priceOf(state.prices, sku.id, "tai_tiem")?.price ?? null;
+          const price = priceOf(state.prices, sku.id, PUBLIC_PRICE_CHANNEL)?.price ?? null;
           return {
             id: sku.id,
             name: sku.name,
@@ -408,6 +408,10 @@ export async function publicCatalog() {
             unit: "cm",
             price,
             sale_price: null as number | null,
+            list_price: (() => {
+              const lp = priceOf(state.prices, sku.id, PUBLIC_PRICE_CHANNEL)?.listPrice ?? priceOf(state.prices, sku.id, "tiktok")?.listPrice ?? null;
+              return typeof lp === "number" && price !== null && lp > price ? lp : null;
+            })(),
             requires_quote: price === null,
             recommended_width_px: sku.widthCm ? Math.round((sku.widthCm / 2.54) * 300) : null,
             recommended_height_px: sku.heightCm ? Math.round((sku.heightCm / 2.54) * 300) : null,
@@ -969,6 +973,44 @@ export async function createUploadTicket(input: {
   return { fileId, path: storagePath, mode: "server" as const };
 }
 
+/** Tạo nhiều phiếu tải ảnh trong một lần ghi sổ (nhanh hơn gọi từng ảnh). */
+export async function createUploadTickets(input: {
+  orderId: string;
+  accessToken: string;
+  files: { fileName: string; mimeType: string; sizeBytes: number }[];
+}) {
+  const limit = await photoByteLimit();
+  const rows = input.files.map((item) => {
+    if (!imageMimeAllowed(item.mimeType)) throw new Error("Định dạng ảnh không được hỗ trợ.");
+    if (photoTooBig(item.sizeBytes, limit)) {
+      throw new Error(limit === null ? "Ảnh quá lớn." : "Mỗi ảnh tối đa 10MB khi chưa nối Google Drive.");
+    }
+    const fileId = nid();
+    const safe = item.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-80) || "anh.jpg";
+    return { ...item, fileId, path: `orders/${input.orderId}/originals/${fileId}-${safe}` };
+  });
+  await mutate(async (state) => {
+    const order = await orderByToken(state, input.orderId, input.accessToken);
+    if (order.status === "huy") throw new Error("Đơn đã hủy, không nhận thêm ảnh.");
+    for (const row of rows) {
+      order.files.push({
+        id: row.fileId,
+        name: row.fileName,
+        mime: row.mimeType,
+        size: row.sizeBytes,
+        status: "uploading",
+        kind: "original",
+        storage: "local",
+        path: row.path,
+        driveFileId: null,
+        createdAt: nowIso(),
+        deletedAt: null,
+      });
+    }
+  });
+  return { fileIds: rows.map((row) => row.fileId) };
+}
+
 async function putPhoto(
   file: OrderFile,
   folder: { orderId: string; code: string; customerName: string; createdAt: string; source: string; channel: string },
@@ -1167,11 +1209,38 @@ export async function markFileStatus(input: {
   return { ok: true };
 }
 
-export async function submitWebOrder(input: { orderId: string; accessToken: string }) {
+export async function submitWebOrder(input: { orderId: string; accessToken: string; sendLater?: boolean | undefined }) {
   return mutate(async (state) => {
     const order = await orderByToken(state, input.orderId, input.accessToken);
-    if (!order.files.length) throw new Error("Đơn chưa có ảnh nào được tải lên.");
-    const allDone = order.files.every((file) => file.status === "complete");
+    if (input.sendLater) {
+      // Khách chọn gửi ảnh sau qua Messenger/Zalo: bỏ các ảnh chưa tải xong, đơn vẫn vào "nhận đơn".
+      const failed = order.files.filter((file) => !file.deletedAt && file.status !== "complete");
+      for (const file of failed) file.deletedAt = nowIso();
+      if (order.status === "draft_upload" || order.status === "upload_error") {
+        const from = order.status;
+        order.status = "nhan_don";
+        order.updatedAt = nowIso();
+        order.history.push({
+          at: nowIso(),
+          from,
+          to: "nhan_don",
+          by: null,
+          note: failed.length ? `Khách sẽ gửi ${failed.length} ảnh sau qua Messenger/Zalo (tải lên web bị lỗi)` : "Khách đặt đơn trên web",
+        });
+      }
+      return { status: order.status, allDone: true };
+    }
+    const liveFiles = order.files.filter((file) => !file.deletedAt);
+    if (!liveFiles.length) {
+      // Ảnh không bắt buộc (hàng có sẵn như Lái Mới, TKB; hoặc khách gửi ảnh sau qua Zalo/Messenger).
+      if (order.status !== "draft_upload") return { status: order.status, allDone: true };
+      const from = order.status;
+      order.status = "nhan_don";
+      order.updatedAt = nowIso();
+      order.history.push({ at: nowIso(), from, to: "nhan_don", by: null, note: "Khách đặt đơn trên web, chưa gửi ảnh" });
+      return { status: "nhan_don" as const, allDone: true };
+    }
+    const allDone = liveFiles.every((file) => file.status === "complete");
     const next = allDone ? "nhan_don" : "upload_error";
     const from = order.status;
     order.status = next;

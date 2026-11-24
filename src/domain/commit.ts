@@ -8,8 +8,12 @@ export async function commitLoop<T, S extends { version: number }>(options: {
   run: (draft: S) => Promise<T> | T;
   attempts?: number;
 }): Promise<T> {
-  const attempts = options.attempts ?? 5;
+  const attempts = options.attempts ?? 6;
   for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) {
+      // Lùi một chút rồi thử lại, tránh nhiều yêu cầu cùng ghi dồn một lúc (KV chỉ nhận ~1 lần ghi/giây/khóa).
+      await new Promise((resolve) => setTimeout(resolve, 150 * attempt + Math.floor(Math.random() * 120)));
+    }
     const current = await options.read();
     const expected = current.version;
     const draft = structuredClone(current);

@@ -4,6 +4,7 @@ import { CheckCircle2 } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { Button } from "@/components/ui/button";
+import { DEPOSIT, NO_RETURN, PAYMENT, REPRINT, SHIP_SUMMARY } from "@/lib/public-policy";
 
 export const Route = createFileRoute("/huong-dan")({
   head: () => ({
@@ -30,7 +31,7 @@ const GUIDE = [
   {
     title: "Bước 1 — Chọn sản phẩm và quy cách",
     points: [
-      "Chọn ảnh ép gỗ tráng gương để bàn, ảnh thờ, giấy khen ép gỗ hoặc nam châm. Giá lấy từ bảng giá tại tiệm.",
+      "Chọn ảnh ép gỗ tráng gương để bàn, thời khóa biểu, nam châm hoặc ảnh lụa. Giá lấy từ bảng giá tại tiệm.",
       "Chọn kích thước và số lượng cho từng quy cách.",
     ],
   },
@@ -76,6 +77,23 @@ function GuidePage() {
             </section>
           ))}
         </div>
+
+        <section className="glass-card mt-8 rounded-3xl p-5">
+          <h2 className="text-lg font-bold text-foreground">Phí ship, thanh toán và in lại</h2>
+          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+            {[SHIP_SUMMARY, PAYMENT, DEPOSIT, REPRINT, NO_RETURN].map((line) => (
+              <li key={line} className="flex gap-2">
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-accent" />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-sm">
+            <Link to="/chinh-sach" className="font-semibold text-primary hover:underline">
+              Xem đầy đủ chính sách
+            </Link>
+          </p>
+        </section>
 
         <div className="mt-8">
           <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">

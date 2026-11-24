@@ -20,7 +20,7 @@ import {
   type DeskTab,
   type ShipMode,
 } from "@/domain/order-desk";
-import { STATUS_LABEL, type Channel, type OrderStatus } from "@/domain/types";
+import { CHANNELS, STATUS_LABEL, type Channel, type OrderStatus } from "@/domain/types";
 import { changeStatus, downloadExcel, getMe, getOrders, markLabelsPrinted } from "@/lib/admin.functions";
 import { formatMaybe } from "@/lib/brand";
 
@@ -96,7 +96,7 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
   const rows = (orders.data?.orders ?? []) as Row[];
   const cards = useMemo(() => deskAlerts(rows), [rows]);
   const carriers = [...new Set(rows.map((row) => row.carrier.trim()).filter(Boolean))].sort();
-  const channels = (["tai_tiem", "facebook", "tiktok", "shopee", "mo_home"] as Channel[]).filter((id) => me.data?.role === "sale" ? id !== "mo_home" : true);
+  const channels = CHANNELS.filter((id) => me.data?.role === "sale" ? id !== "mo_home" : true);
   const tab = (DESK_TABS.find((item) => item.id === status)?.id ?? "can_lam") as DeskTab;
 
   const shown = rows.filter((order) => {

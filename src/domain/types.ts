@@ -2,15 +2,26 @@ import type { ShopChatMessage, ShopConversation } from "./shop-chat.ts";
 
 export type { ChatChannel, ShopChatMessage, ShopConversation } from "./shop-chat.ts";
 
-export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee", "mo_home"] as const;
+export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee", "ctv", "mo_home"] as const;
 export type Channel = (typeof CHANNELS)[number];
 
-/** Kênh bán = “nhánh” vận hành (offline / online / sàn / nội bộ). */
+/** Giá trang khách / API công khai: chỉ giá tại tiệm (bán lẻ B2C). */
+export const PUBLIC_PRICE_CHANNEL = "tai_tiem" as const satisfies Channel;
+
+/** Kênh B2B — chỉ dùng trong quản trị (bảng giá, tạo đơn, báo cáo). Không lộ ra trang chủ hay API công khai. */
+export const B2B_CHANNELS = ["ctv", "mo_home"] as const satisfies readonly Channel[];
+
+export function isB2BChannel(channel: string): channel is (typeof B2B_CHANNELS)[number] {
+  return (B2B_CHANNELS as readonly string[]).includes(channel);
+}
+
+/** Kênh bán = “nhánh” vận hành (offline / online / sàn / CTV / nội bộ). */
 export const CHANNEL_LABEL: Record<Channel, string> = {
   tai_tiem: "Tại tiệm (offline)",
   facebook: "Online / Facebook",
   tiktok: "TikTok",
   shopee: "Shopee",
+  ctv: "CTV",
   mo_home: "Mơ Home (nội bộ)",
 };
 
@@ -137,6 +148,12 @@ export type Settings = {
   showZalo?: boolean;
   /** Đã tắt Zalo một lần trên sổ seed cũ. Sau mốc này, ô trong Cài đặt được giữ nguyên. */
   zaloDefaultMigrated?: boolean;
+  /** Đã ẩn số Zalo cũ trên web một lần ngày 13/11/2026 (chủ đang đổi sim). Sau mốc này, ô trong Cài đặt được giữ nguyên. */
+  zaloHidden20261113?: boolean;
+  /** Đã bật lại số Zalo trên web một lần ngày 14/11/2026. Sau mốc này, ô trong Cài đặt được giữ nguyên. */
+  zaloShown20261114?: boolean;
+  /** Đã đổi số Zalo/hotline sang 0777468766 một lần ngày 20/11/2026. Sau mốc này, ô trong Cài đặt được giữ nguyên. */
+  zaloPhone20261120?: boolean;
   publicHours: string;
   /** Đã nhập bảng giá 22/10 một lần. Không chạy lại. */
   catalogImport20261022?: boolean;

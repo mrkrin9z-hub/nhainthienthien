@@ -16,6 +16,7 @@ export const DESK_CHANNEL_LABEL: Record<Channel, string> = {
   facebook: "Facebook",
   tiktok: "TikTok",
   shopee: "Shopee",
+  ctv: "CTV",
   mo_home: "Mơ Home",
 };
 

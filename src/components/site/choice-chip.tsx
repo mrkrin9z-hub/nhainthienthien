@@ -16,8 +16,8 @@ export function ChoiceChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`min-h-11 rounded-2xl border px-3 py-2 text-left text-sm transition active:scale-95 ${
-        active ? "border-accent bg-accent/10 text-accent" : "border-border bg-card text-foreground/80"
+      className={`min-h-11 rounded-2xl px-3.5 py-2 text-left text-sm transition active:scale-95 ${
+        active ? "bg-[#fff3e0] text-sale shadow-[0_0_0_1.5px_var(--sale)]" : "bg-[#f3f6fa] text-[#123047]/85 hover:shadow-[0_0_0_1px_rgb(180_83_9/0.45)]"
       }`}
     >
       <span className="flex items-center gap-1.5 font-semibold">

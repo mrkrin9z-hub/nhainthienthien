@@ -9,6 +9,7 @@ export type CatalogVariant = {
   unit: string;
   price: number | null;
   sale_price: number | null;
+  list_price?: number | null;
   requires_quote: boolean;
   recommended_width_px: number | null;
   recommended_height_px: number | null;
@@ -60,6 +61,13 @@ export const publicConfigQueryOptions = queryOptions({
   queryKey: ["public-config"],
   queryFn: () => getPublicConfig(),
 });
+
+export function minListPrice(product: CatalogProduct): number | null {
+  const priced = product.variants.filter((v) => typeof v.price === "number");
+  if (!priced.length) return null;
+  const cheapest = priced.reduce((a, b) => ((b.price as number) < (a.price as number) ? b : a));
+  return cheapest.list_price ?? null;
+}
 
 export function minPrice(product: CatalogProduct): number | null {
   const prices = product.variants.map((variant) => variant.price).filter((price): price is number => typeof price === "number");

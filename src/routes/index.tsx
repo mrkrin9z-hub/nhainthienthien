@@ -1,33 +1,27 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  Camera,
-  CheckCircle2,
-  Clock,
-  Heart,
-  MessageCircle,
-  ShieldCheck,
-  Truck,
-  UploadCloud,
-} from "lucide-react";
+import { ChevronRight, MessageCircle, ReceiptText, ScrollText, ShoppingBag, UploadCloud } from "lucide-react";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { Button } from "@/components/ui/button";
-import { catalogQueryOptions, minPrice, offerLines, publicConfigQueryOptions, type CatalogProduct } from "@/lib/catalog.functions";
-import { catalogImage } from "@/lib/product-images";
-import { BRAND, formatVnd } from "@/lib/brand";
+import { POLICY_CHIPS, ProductCard, ProductCover, ShopInfoBlock } from "@/components/site/shop-ui";
+import { catalogQueryOptions, publicConfigQueryOptions } from "@/lib/catalog.functions";
+import { HERO_MAIN_DESKTOP, HERO_MAIN_MOBILE, HomeHero } from "@/components/site/home-hero";
+import { BRAND } from "@/lib/brand";
 
 export const Route = createFileRoute("/")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(catalogQueryOptions),
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(catalogQueryOptions),
+      context.queryClient.ensureQueryData(publicConfigQueryOptions),
+    ]),
   head: () => ({
     meta: [
       { title: "Nhà In Thiên Thiên — Gửi ảnh online" },
       {
         name: "description",
         content:
-          "In ảnh ép gỗ, ảnh thờ, giấy khen và nam châm. Gửi ảnh online 3 bước, nhận mã đơn và theo dõi tiến trình.",
+          "In ảnh tráng gương 4K, thời khóa biểu, nam châm và ảnh lụa theo yêu cầu. Gửi ảnh online 3 bước, nhận mã đơn và theo dõi tiến trình.",
       },
       { property: "og:title", content: "Nhà In Thiên Thiên — In đẹp từng khoảnh khắc" },
       {
@@ -37,283 +31,162 @@ export const Route = createFileRoute("/")({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
+    links: [
+      { rel: "preload", as: "image", href: HERO_MAIN_MOBILE, media: "(max-width: 767px)", fetchPriority: "high" },
+      { rel: "preload", as: "image", href: HERO_MAIN_DESKTOP, media: "(min-width: 768px)", fetchPriority: "high" },
+    ],
   }),
   component: HomePage,
 });
 
-const STEPS = [
-  {
-    icon: Camera,
-    title: "Chọn sản phẩm",
-    desc: "Chọn khổ và số lượng trên gian hàng.",
-  },
-  {
-    icon: UploadCloud,
-    title: "Gửi ảnh",
-    desc: "Tải ảnh gốc từ điện thoại.",
-  },
-  {
-    icon: Clock,
-    title: "Số điện thoại",
-    desc: "Nhập SĐT và địa chỉ sau khi đã gửi ảnh.",
-  },
-];
-
-const BENEFITS = [
-  { icon: ShieldCheck, title: "Bảng giá công khai", desc: "Giá trên web lấy từ bảng tại tiệm." },
-  { icon: Clock, title: "Xưởng nhận in", desc: "Xưởng xem ảnh rồi báo lại trên đơn." },
-  { icon: Truck, title: "Nhận tại tiệm", desc: "Hoặc giao hàng theo địa chỉ trên đơn." },
-  { icon: Heart, title: "Kiểm ảnh thủ công", desc: "Chỉnh sáng, canh nét trước khi in." },
-];
-
-const REASONS = [
-  "Xem trước giá từng kích thước, không cần hỏi tới lui.",
-  "Kỹ thuật viên kiểm tra độ phân giải và báo lại nếu ảnh chưa đủ nét.",
-  "In lại nếu lỗi do xưởng.",
-  "Ảnh gốc của bạn được lưu riêng tư, lưu 6 tháng rồi xoá.",
-];
-
 const FAQS = [
   {
     q: "Ảnh chụp bằng điện thoại in được không?",
-    a: "Được. Ảnh điện thoại đời mới in tốt tới khổ 40×60 cm. Xưởng sẽ kiểm tra và báo trước nếu ảnh chưa đủ nét cho khổ bạn chọn.",
+    a: "Được. Ảnh điện thoại đời mới in tốt tới khổ 40×60 cm. Tiệm sẽ kiểm tra và báo trước nếu ảnh chưa đủ nét cho khổ bạn chọn.",
   },
   {
     q: "Thanh toán như thế nào?",
-    a: "Bạn đặt đơn trước, xưởng xác nhận rồi mới thanh toán. Nhận tại tiệm hoặc chuyển khoản trước khi giao.",
+    a: "Nhận COD khi giao hàng. Tại tiệm thanh toán tiền mặt hoặc chuyển khoản. Đơn từ 300.000đ hoặc có ảnh từ 40×60 trở lên cần cọc 50% trước khi làm hàng.",
+  },
+  {
+    q: "Phí ship bao nhiêu?",
+    a: "Ảnh 13×18 đến 40×60, thời khóa biểu, ảnh lụa, nam châm: 25.000đ, đơn từ 300.000đ thì 0đ phí ship. Ảnh 50×75 và 60×90: 30.000đ, đơn từ 450.000đ thì 0đ phí ship. Nhận tại tiệm: 0đ.",
+  },
+  {
+    q: "In lại hoặc đổi trả thế nào?",
+    a: "Lỗi do xưởng (in sai, trầy, bể khi giao, có video mở hàng): in lại không tính tiền nếu khách báo trong 3 ngày sau khi nhận. Hàng in theo yêu cầu không đổi trả vì đổi ý.",
   },
   {
     q: "Khi nào thì biết tiến trình đơn?",
-    a: "Sau khi nhận đơn, xưởng cập nhật từng bước trên trang tra cứu. Ảnh thờ có hỗ trợ chỉnh sửa ảnh cơ bản.",
+    a: "Sau khi nhận đơn, tiệm cập nhật từng bước trên trang tra cứu. Tiệm hỗ trợ chỉnh sửa ảnh cơ bản.",
   },
 ];
 
-function ShopCard({ product }: { product: CatalogProduct }) {
-  const from = minPrice(product);
-  const lines = offerLines(product);
-  return (
-    <article className="glass-card overflow-hidden rounded-3xl">
-      <img
-        src={catalogImage(product.slug, product.cover_path)}
-        alt={`Ảnh mẫu ${product.name}`}
-        loading="lazy"
-        decoding="async"
-        width={800}
-        height={600}
-        className="aspect-[16/10] w-full object-cover"
-        onError={(event) => {
-          event.currentTarget.src = catalogImage(product.slug, null);
-        }}
-      />
-      <div className="p-4">
-        <h3 className="text-lg font-extrabold leading-tight text-foreground">{product.name}</h3>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{product.description}</p>
-        <ul className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
-          {lines.map((line) => (
-            <li key={line.label} className="shrink-0 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-foreground">
-              {line.label}
-              {line.price === null ? "" : ` · ${line.from ? "từ " : ""}${formatVnd(line.price)}`}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-3 text-sm text-muted-foreground">
-          {product.turnaround_text ? <span>{product.turnaround_text}</span> : null}
-          {from === null ? null : (
-            <>
-              {product.turnaround_text ? " · " : null}
-              từ <strong className="text-base text-accent">{formatVnd(from)}</strong>
-            </>
-          )}
-        </p>
-        <Button asChild className="mt-3 min-h-12 w-full bg-accent text-accent-foreground hover:bg-accent/90">
-          <Link to="/admin">
-            Chọn sản phẩm <ArrowRight className="size-4" />
-          </Link>
-        </Button>
-      </div>
-    </article>
-  );
-}
+
+const STEPS = [
+  { icon: ShoppingBag, title: "Chọn sản phẩm", desc: "Chọn khổ, combo, bỏ vào giỏ." },
+  { icon: UploadCloud, title: "Gửi ảnh", desc: "Tải ảnh gốc từ điện thoại." },
+  { icon: ReceiptText, title: "Đặt hàng", desc: "Nhập SĐT, địa chỉ, nhận mã đơn." },
+];
 
 function HomePage() {
   const { data: products } = useSuspenseQuery(catalogQueryOptions);
   const config = useQuery(publicConfigQueryOptions);
   const showZalo = config.data?.showZalo === true && Boolean(config.data.zalo);
-  const zalo = showZalo ? config.data?.zalo ?? "" : "";
-  const phone = showZalo ? config.data?.phone ?? "" : "";
+  const zalo = showZalo ? (config.data?.zalo ?? "") : "";
+  const phone = showZalo ? (config.data?.phone ?? "") : "";
   const categories = [...new Set(products.map((product) => product.category).filter(Boolean))];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="shop-ui min-h-screen bg-shop-bg">
       <SiteHeader />
-      <main className="pb-32 md:pb-0">
-        {/* Hero */}
-        <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 md:grid-cols-2 md:px-6 md:py-20">
-          <div className="rise min-w-0">
-            <p className="font-sans text-xs font-bold tracking-[0.18em] text-primary uppercase">{BRAND.message}</p>
-            <h1 className="mt-4 text-4xl leading-[1.15] text-primary sm:text-5xl md:text-6xl">
-              In đẹp
-              <span className="mt-1 block italic text-foreground/80">từng khoảnh khắc.</span>
-            </h1>
-            <p className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground md:text-lg">
-              Chọn sản phẩm, gửi ảnh, rồi mới nhập số điện thoại. Giá lấy từ bảng tại tiệm.
-            </p>
+      <main className="mx-auto max-w-6xl px-2.5 pb-20 md:px-6 md:pb-0 md:pt-5">
+        <HomeHero products={products} />
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button asChild size="lg" className="min-h-12 w-full rounded-full bg-primary text-primary-foreground sm:w-auto">
-                <a href="#gian-hang">
-                  Xem gian hàng <ArrowRight className="size-4" />
-                </a>
-              </Button>
-              <Link to="/admin" className="min-h-11 text-center text-sm font-semibold text-primary sm:text-left">
-                Đặt in ngay
+        {/* Chính sách */}
+        <section className="card mt-3 grid grid-cols-4 gap-1 px-2 py-3.5 md:py-4">
+          {POLICY_CHIPS.map((chip) => (
+            <Link key={chip.label} to="/chinh-sach" className="flex flex-col items-center gap-1 text-center">
+              <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-b from-[#eef5fc] to-[#e1edf9] text-brand-blue">
+                <chip.icon className="size-5" aria-hidden />
+              </span>
+              <span className="text-[10px] leading-tight text-foreground/80 md:text-xs">{chip.label}</span>
+            </Link>
+          ))}
+        </section>
+
+        {/* Danh mục */}
+        <section className="card mt-3">
+          <h2 className="section-title px-3.5 pt-3.5">Danh mục</h2>
+          <div className="scrollbar-none flex gap-1 overflow-x-auto px-2 pb-3.5 pt-3">
+            {categories.map((category) => {
+              const first = products.find((product) => product.category === category);
+              return (
+                <Link
+                  key={category}
+                  to="/san-pham"
+                  search={{ cat: category }}
+                  className="flex w-20 shrink-0 flex-col items-center gap-1.5 text-center"
+                >
+                  {first ? <ProductCover product={first} className="size-14 rounded-2xl shadow-[0_0_0_1px_rgb(18_48_71/0.06),0_6px_14px_-8px_rgb(18_48_71/0.35)]" /> : null}
+                  <span className="text-xs text-foreground">{category}</span>
+                </Link>
+              );
+            })}
+            {[
+              { to: "/dat-in" as const, label: "Gửi ảnh in", icon: UploadCloud },
+              { to: "/tra-cuu" as const, label: "Tra cứu đơn", icon: ReceiptText },
+              { to: "/chinh-sach" as const, label: "Chính sách", icon: ScrollText },
+            ].map((item) => (
+              <Link key={item.to} to={item.to} className="flex w-20 shrink-0 flex-col items-center gap-1.5 text-center">
+                <span className="grid size-14 place-items-center rounded-2xl bg-gradient-to-b from-[#eef5fc] to-[#e1edf9] text-brand-blue">
+                  <item.icon className="size-6" aria-hidden />
+                </span>
+                <span className="text-xs text-foreground">{item.label}</span>
               </Link>
-            </div>
-
-            {showZalo ? (
-              <a
-                href={zalo}
-                className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary"
-              >
-                <MessageCircle className="size-4 shrink-0 text-accent" /> Zalo tư vấn {phone}
-              </a>
-            ) : null}
-
+            ))}
           </div>
+        </section>
 
-          <div className="rise overflow-hidden rounded-[2rem] bg-secondary">
-            <img
-              src={catalogImage("anh-tho", null)}
-              alt="Ảnh mẫu in tại tiệm"
-              width={800}
-              height={1000}
-              fetchPriority="high"
-              decoding="async"
-              className="aspect-[4/5] w-full object-cover"
-            />
+        {/* Gợi ý */}
+        <section id="gian-hang" className="mt-4 scroll-mt-24">
+          <h2 className="section-title px-1 pb-2.5">
+            Sản phẩm đang bán
+          </h2>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-5 md:gap-3">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+          <div className="px-3 pb-1 pt-4 text-center">
+            <Link to="/san-pham" className="btn-ghost inline-flex min-h-11 items-center px-10 text-sm font-semibold">
+              Xem tất cả
+            </Link>
           </div>
         </section>
 
         {/* 3 bước */}
-        <section className="mx-auto max-w-6xl px-4 md:px-6">
-          <h2 className="text-2xl font-extrabold text-primary md:text-3xl">Đặt in trong 3 bước</h2>
-          <p className="mt-2 text-sm text-muted-foreground md:text-base">
-            Chọn hàng và gửi ảnh trước. Số điện thoại với địa chỉ để sau cùng.
-          </p>
-          <ol className="mt-4 grid grid-cols-3 gap-2 md:gap-4">
+        <section className="card mt-3 p-3.5 md:p-5">
+          <h2 className="section-title">Đặt in trong 3 bước</h2>
+          <ol className="mt-3 grid grid-cols-3 gap-2">
             {STEPS.map((step, i) => (
-              <li key={step.title} className="glass-card rounded-2xl p-3 text-center md:rounded-3xl md:p-5 md:text-left">
-                <span className="mx-auto flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary md:mx-0">
-                  <step.icon className="size-5" />
-                </span>
-                <p className="mt-2 text-[11px] font-bold uppercase text-accent">Bước {i + 1}</p>
-                <h3 className="mt-1 text-sm font-bold leading-tight text-foreground md:text-lg">{step.title}</h3>
-                <p className="mt-1 hidden text-sm text-muted-foreground md:block">{step.desc}</p>
+              <li key={step.title} className="rounded-2xl bg-[#f5f8fc] p-2.5 text-center md:p-4">
+                <step.icon className="mx-auto size-6 text-brand-blue" aria-hidden />
+                <p className="mt-1 text-[11px] font-semibold text-sale">Bước {i + 1}</p>
+                <h3 className="text-xs font-semibold text-foreground md:text-sm">{step.title}</h3>
+                <p className="mt-0.5 hidden text-xs text-muted-foreground md:block">{step.desc}</p>
               </li>
             ))}
           </ol>
         </section>
 
-        <section id="gian-hang" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-12 md:px-6">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4">
-            <div className="min-w-0">
-              <h2 className="text-2xl font-extrabold text-primary md:text-3xl">Gian hàng</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Đủ sản phẩm đang bán, khổ và giá lấy từ sổ tiệm.</p>
-            </div>
-            <Link to="/san-pham" className="shrink-0 text-sm font-semibold text-accent">
-              Tất cả sản phẩm
-            </Link>
-          </div>
-
-          {categories.map((category) => (
-            <div key={category} className="mt-8">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-accent">{category}</h3>
-              <div className="mt-3 grid gap-4 md:grid-cols-2">
-                {products
-                  .filter((product) => product.category === category)
-                  .map((product) => (
-                    <ShopCard key={product.id} product={product} />
-                  ))}
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* Vì sao chọn */}
-        <section className="mx-auto max-w-6xl px-4 md:px-6">
-          <div className="glass-card rounded-3xl p-5 md:p-8">
-            <div className="grid gap-8 md:grid-cols-2">
-              <div className="min-w-0">
-                <h2 className="text-2xl font-extrabold text-primary md:text-3xl">
-                  Vì sao khách chọn Thiên Thiên?
-                </h2>
-                <ul className="mt-5 space-y-3">
-                  {REASONS.map((r) => (
-                    <li key={r} className="flex gap-3">
-                      <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-accent" />
-                      <span className="text-sm leading-relaxed text-foreground/85 md:text-base">
-                        {r}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {BENEFITS.map((b) => (
-                  <div key={b.title} className="glass-panel rounded-2xl p-4">
-                    <b.icon className="size-6 text-accent" />
-                    <h3 className="mt-3 text-base font-bold text-foreground">{b.title}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">{b.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+        <div className="mt-3">
+          <ShopInfoBlock hours={config.data?.hours} phone={phone} zalo={zalo} />
+        </div>
 
         {/* FAQ */}
-        <section className="mx-auto max-w-3xl px-4 md:px-6">
-          <h2 className="text-2xl font-extrabold text-primary md:text-3xl">Câu hỏi thường gặp</h2>
-          <div className="mt-5 space-y-3">
+        <section className="card mt-3 p-3.5 md:p-5">
+          <h2 className="section-title">Câu hỏi thường gặp</h2>
+          <div className="mt-2 divide-y divide-border">
             {FAQS.map((f) => (
-              <details key={f.q} className="glass-card group rounded-3xl p-5">
-                <summary className="cursor-pointer list-none text-base font-bold text-foreground marker:hidden">
+              <details key={f.q} className="group py-3">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground marker:hidden">
                   {f.q}
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground transition group-open:rotate-90" />
                 </summary>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.a}</p>
               </details>
             ))}
           </div>
-        </section>
-
-        {/* CTA cuối */}
-        <section className="mx-auto max-w-6xl px-4 py-12 md:px-6 md:py-16">
-          <div className="glass-card rounded-3xl bg-primary/5 p-6 text-center md:p-10">
-            <h2 className="text-2xl font-extrabold text-primary md:text-3xl">
-              Sẵn sàng in kỷ niệm của bạn?
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground md:text-base">
-              Gửi ảnh khi sẵn sàng. Xưởng xem ảnh và báo lại.
-            </p>
-            <div className="mx-auto mt-6 flex max-w-md flex-col gap-3 sm:flex-row sm:justify-center">
-              <Button
-                asChild
-                size="lg"
-                className="min-h-12 w-full bg-accent text-accent-foreground hover:bg-accent/90 sm:w-auto"
-              >
-                <Link to="/admin">
-                  Đặt in <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-              {showZalo ? (
-                <Button asChild size="lg" variant="outline" className="min-h-12 w-full sm:w-auto">
-                  <a href={zalo}>
-                    <MessageCircle className="size-4" /> Nhắn Zalo
-                  </a>
-                </Button>
-              ) : null}
-            </div>
-          </div>
+          {showZalo ? (
+            <a href={zalo} className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-sale">
+              <MessageCircle className="size-4" /> Nhắn Zalo {phone}
+            </a>
+          ) : (
+            <a href={BRAND.messengerUrl} target="_blank" rel="noopener" className="btn-soft mt-3 inline-flex min-h-10 items-center gap-2 px-4 text-sm">
+              <MessageCircle className="size-4" /> Chat với shop qua Messenger
+            </a>
+          )}
         </section>
       </main>
 

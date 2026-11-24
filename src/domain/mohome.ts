@@ -88,7 +88,7 @@ export function laborSplit(productionBase: number, percent: number): { moHome: n
  */
 export function skuSoldOn(sku: { soldOn?: Channel[] | null }, channel: Channel): boolean {
   const listed = sku.soldOn;
-  if (!listed || listed.length === 0) return channel !== MO_HOME_CHANNEL;
+  if (!listed || listed.length === 0) return (NHA_IN_CHANNELS as readonly string[]).includes(channel);
   return listed.includes(channel);
 }
 

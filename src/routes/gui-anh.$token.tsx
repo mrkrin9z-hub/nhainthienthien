@@ -231,7 +231,7 @@ export function CustomerUploadScreen({ token }: { token: string }) {
           <CheckCircle2 className="mx-auto size-14 text-accent" />
           <h1 className="mt-4 text-3xl font-extrabold text-primary">Đã nhận ảnh</h1>
           <p className="mt-2 text-muted-foreground">
-            Đơn <strong className="text-foreground">{done.code}</strong> đã nhận ảnh. Xưởng sẽ xử lý theo tiến trình trên phiếu.
+            Đơn <strong className="text-foreground">{done.code}</strong> đã nhận ảnh. Tiệm sẽ xử lý theo tiến trình trên phiếu.
           </p>
           <OrderMoney total={info.total} depositPaid={info.depositPaid} remain={info.remain} className="mx-auto mt-6 max-w-sm space-y-2 rounded-2xl border border-border/70 bg-card p-4 text-left text-sm" />
           <p className="mt-4 text-sm text-muted-foreground">

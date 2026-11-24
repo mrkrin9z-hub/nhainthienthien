@@ -119,8 +119,18 @@ async function writeIfVersion(state: ShopState, expected: number, where: Where):
     const raw = (await kv.get(SHOP_KEY, "json")) as KvDoc | null;
     const current = typeof raw?.version === "number" ? raw.version : raw?.doc?.version;
     if (raw && current !== expected) return false;
-    await kv.put(SHOP_KEY, JSON.stringify({ version: state.version, doc: state }));
-    return true;
+    const body = JSON.stringify({ version: state.version, doc: state });
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await kv.put(SHOP_KEY, body);
+        return true;
+      } catch (error) {
+        // KV giới hạn ~1 lần ghi/giây cho một khóa: gặp 429 thì chờ rồi ghi lại.
+        const message = error instanceof Error ? error.message : String(error);
+        if (attempt >= 3 || !/429|too many/i.test(message)) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
+      }
+    }
   }
   const { mkdir, readFile, writeFile } = await import("node:fs/promises");
   try {

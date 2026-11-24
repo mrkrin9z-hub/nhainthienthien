@@ -194,6 +194,7 @@ export function feeLines(
     return lines;
   }
   if (channel === "mo_home") return [];
+  // CTV và tại tiệm: không phí sàn, chỉ hoa hồng sale (nếu có).
   return [pct("Hoa hồng sale", settings.walkinCommissionPercent)];
 }
 

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -9,6 +10,8 @@ import { businessReport } from "./report.ts";
 import { DEFAULT_SETTINGS, buildSeed } from "./seed.ts";
 import { syncOrderStock } from "./stock.ts";
 import { laborSplit, orderCodePrefix, skuSoldOn } from "./mohome.ts";
+import { defaultShopChannels } from "./org-desk.ts";
+import { B2B_CHANNELS, CHANNELS, CHANNEL_LABEL, PUBLIC_PRICE_CHANNEL, isB2BChannel } from "./types.ts";
 import type { ChannelPrice, Order, ShopState } from "./types.ts";
 
 test("Mơ Home có giá riêng, không hoa hồng, không đụng giá Nhà In", async () => {
@@ -25,9 +28,14 @@ test("Mơ Home có giá riêng, không hoa hồng, không đụng giá Nhà In",
 
   assert.deepEqual(feeLines("mo_home", 100000, DEFAULT_SETTINGS, false), []);
   assert.equal(feeLines("tai_tiem", 100000, DEFAULT_SETTINGS, false)[0]?.name, "Hoa hồng sale");
+  assert.equal(feeLines("ctv", 100000, DEFAULT_SETTINGS, false)[0]?.name, "Hoa hồng sale");
+  assert.equal(feeLines("ctv", 100000, DEFAULT_SETTINGS, false)[0]?.detail, "3%");
+  assert.equal(feeLines("ctv", 100000, DEFAULT_SETTINGS, false).some((line) => /phí sàn|TikTok|Shopee/i.test(line.name)), false);
 
   assert.equal(skuSoldOn({}, "mo_home"), false);
+  assert.equal(skuSoldOn({}, "ctv"), false);
   assert.equal(skuSoldOn({}, "tai_tiem"), true);
+  assert.equal(skuSoldOn({ soldOn: ["ctv"] }, "ctv"), true);
   assert.equal(skuSoldOn({ soldOn: ["mo_home"] }, "facebook"), false);
   assert.equal(skuSoldOn({ soldOn: ["mo_home", "tai_tiem"] }, "tai_tiem"), true);
 
@@ -191,4 +199,44 @@ test("migration gắn cờ bán kênh và không ghi giá Mơ Home", () => {
   assert.ok(state.groups.some((group) => group.id === "photobook"));
   assert.ok(state.settings.shopChannels?.some((row) => row.id === "mo_home" && row.enabled));
   assert.equal(applyStoreMigrations(state), false);
+});
+
+test("CTV và Mơ Home là kênh B2B, không dùng làm giá trang khách", () => {
+  assert.ok(CHANNELS.includes("ctv"));
+  assert.equal(CHANNEL_LABEL.ctv, "CTV");
+  assert.equal(PUBLIC_PRICE_CHANNEL, "tai_tiem");
+  assert.deepEqual([...B2B_CHANNELS], ["ctv", "mo_home"]);
+  assert.equal(isB2BChannel("ctv"), true);
+  assert.equal(isB2BChannel("mo_home"), true);
+  assert.equal(isB2BChannel("tai_tiem"), false);
+  assert.equal(isB2BChannel("facebook"), false);
+  const channels = defaultShopChannels();
+  assert.ok(channels.some((row) => row.id === "ctv" && row.enabled && row.label === "CTV"));
+  assert.equal(orderCodePrefix("ctv", "2026-11-24"), "TT261124");
+
+  // Giá CTV và Mơ Home chỉ ở trang quản trị (B2B). Trang khách / API public chỉ giá tại tiệm (B2C).
+  const read = (file: string) => readFileSync(new URL(file, import.meta.url), "utf8");
+  const publicFiles = [
+    "../routes/index.tsx",
+    "../routes/huong-dan.tsx",
+    "../routes/san-pham.tsx",
+    "../routes/san-pham_.$slug.tsx",
+    "../routes/gio-hang.tsx",
+    "../routes/dat-in.tsx",
+    "../routes/lien-he.tsx",
+    "../routes/chinh-sach.tsx",
+    "../components/site/SiteHeader.tsx",
+    "../components/site/SiteFooter.tsx",
+    "../components/site/home-hero.tsx",
+    "../components/site/shop-ui.tsx",
+    "../lib/cart.ts",
+    "../lib/catalog.functions.ts",
+    "../lib/public-policy.ts",
+  ];
+  for (const file of publicFiles) {
+    assert.doesNotMatch(read(file), /\bctv\b|mo_home/, file);
+  }
+  const catalogFn = read("../server/service.ts").match(/export async function publicCatalog\(\)[\s\S]*?^function /m)?.[0] ?? "";
+  assert.match(catalogFn, /PUBLIC_PRICE_CHANNEL/);
+  assert.doesNotMatch(catalogFn, /\bctv\b|mo_home/);
 });

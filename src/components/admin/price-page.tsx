@@ -254,6 +254,7 @@ const CHANNEL_PILL: Record<Channel, string> = {
   facebook: "bg-blue-100 text-blue-800",
   tiktok: "bg-pink-100 text-pink-800",
   shopee: "bg-orange-100 text-orange-800",
+  ctv: "bg-emerald-100 text-emerald-800",
   mo_home: "bg-violet-100 text-violet-800",
 };
 

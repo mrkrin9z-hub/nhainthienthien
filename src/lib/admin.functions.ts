@@ -332,6 +332,7 @@ const priceMap = z.object({
   facebook: z.number().int().min(1000).max(100_000_000).optional(),
   tiktok: z.number().int().min(1000).max(100_000_000).optional(),
   shopee: z.number().int().min(1000).max(100_000_000).optional(),
+  ctv: z.number().int().min(1000).max(100_000_000).optional(),
   mo_home: z.number().int().min(1000).max(100_000_000).optional(),
 });
 

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Clock, Globe, MessageCircle, PackageSearch, Phone, UploadCloud } from "lucide-react";
+import { Clock, Globe, MapPin, MessageCircle, PackageSearch, Phone, UploadCloud } from "lucide-react";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { BRAND } from "@/lib/brand";
+import { ShopLinksBlock } from "@/components/site/shop-links";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 import { submitInquiry } from "@/lib/orders.functions";
 
@@ -56,11 +57,16 @@ function ContactPage() {
           Đặt in trên web, rồi tra cứu đơn bằng mã đơn và số điện thoại đã đặt.
         </p>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <Link to="/admin" className="glass-card rounded-3xl p-5">
+        <section className="glass-card mt-6 rounded-3xl p-5">
+          <ShopLinksBlock />
+          <p className="mt-3 text-sm text-muted-foreground">Nhắn fanpage để được tư vấn, hoặc mua ngay trên TikTok Shop / Shopee nếu bạn quen dùng sàn.</p>
+        </section>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <Link to="/dat-in" className="glass-card rounded-3xl p-5">
             <UploadCloud className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Đặt in online</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Vào bàn làm việc để tạo đơn hoặc lấy mã gửi ảnh.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Chọn quy cách, gửi ảnh và nhận mã đơn.</p>
           </Link>
           <Link to="/tra-cuu" className="glass-card rounded-3xl p-5">
             <PackageSearch className="size-6 text-accent" />
@@ -81,6 +87,11 @@ function ContactPage() {
               <p className="mt-1 text-sm text-muted-foreground">{phone}</p>
             </a>
           ) : null}
+          <div className="glass-card rounded-3xl p-5">
+            <MapPin className="size-6 text-accent" />
+            <h2 className="mt-3 text-lg font-bold text-foreground">Địa chỉ tiệm</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{BRAND.address}</p>
+          </div>
           <div className="glass-card rounded-3xl p-5">
             <Clock className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Thời gian làm việc</h2>
@@ -103,8 +114,8 @@ function ContactPage() {
               .finally(() => setBusy(false));
           }}
         >
-          <h2 className="text-lg font-bold text-foreground">Gửi tin cho xưởng</h2>
-          <p className="text-sm text-muted-foreground">Xưởng đọc tin trong trang quản trị. Không cần số của tiệm.</p>
+          <h2 className="text-lg font-bold text-foreground">Gửi tin cho tiệm</h2>
+          <p className="text-sm text-muted-foreground">Để lại tin, tiệm gọi hoặc nhắn lại cho bạn.</p>
           <div>
             <Label htmlFor="ten">Tên</Label>
             <Input id="ten" className="mt-1 min-h-11" value={name} onChange={(event) => setName(event.target.value)} required />
@@ -124,7 +135,7 @@ function ContactPage() {
             </div>
           </div>
           {error ? <p className="text-sm font-semibold text-destructive">{error}</p> : null}
-          {sent ? <p className="text-sm font-semibold text-primary">Đã gửi. Xưởng sẽ xem tin này.</p> : null}
+          {sent ? <p className="text-sm font-semibold text-primary">Đã gửi. Tiệm sẽ xem tin này.</p> : null}
           <Button type="submit" className="min-h-11" disabled={busy}>
             {busy ? "Đang gửi…" : "Gửi tin"}
           </Button>

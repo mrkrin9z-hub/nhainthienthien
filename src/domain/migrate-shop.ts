@@ -48,7 +48,11 @@ type ShopGroup = {
 type Migratable = {
   settings: Settings | {
     showZalo?: boolean;
+    zaloPhone?: string;
     zaloDefaultMigrated?: boolean;
+    zaloHidden20261113?: boolean;
+    zaloShown20261114?: boolean;
+    zaloPhone20261120?: boolean;
     groupListed?: Record<string, boolean>;
     sepay?: SePayConfig;
     notifyPrefs?: NotifyPrefs;
@@ -105,6 +109,27 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (state.settings.zaloDefaultMigrated !== true) {
     state.settings.showZalo = false;
     state.settings.zaloDefaultMigrated = true;
+    changed = true;
+  }
+  if (state.settings.zaloHidden20261113 !== true) {
+    state.settings.showZalo = false;
+    state.settings.zaloHidden20261113 = true;
+    changed = true;
+  }
+  // Bật lại số Zalo trên web sau khi chủ chốt sim mới 14/11/2026. Chạy sau bước ẩn 13/11.
+  if (state.settings.zaloShown20261114 !== true) {
+    state.settings.zaloPhone = "0778662227";
+    state.settings.showZalo = true;
+    state.settings.zaloShown20261114 = true;
+    changed = true;
+  }
+  // Đổi số Zalo/hotline sang 0777468766 một lần ngày 20/11/2026 (chủ chốt sim mới). Không đụng ô Hiện Zalo.
+  if (state.settings.zaloPhone20261120 !== true) {
+    const digits = String(state.settings.zaloPhone ?? "").replace(/\D/g, "");
+    if (digits === "0778662227" || digits === "84778662227") {
+      state.settings.zaloPhone = "0777468766";
+    }
+    state.settings.zaloPhone20261120 = true;
     changed = true;
   }
   const groups = state.groups ?? [];
@@ -185,13 +210,14 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (renameDeskStaff(state)) changed = true;
   if (grantDeskLinks(state)) changed = true;
   if (grantTaskMenu(state)) changed = true;
-  if (grantMediaMenu(state)) changed = true;
   if (applyDeskSupplies(state as unknown as Parameters<typeof applyDeskSupplies>[0])) changed = true;
   if (ensureGroupSupplies(state as unknown as Parameters<typeof ensureGroupSupplies>[0])) changed = true;
   if (ensureInkMillilitres(state as unknown as Parameters<typeof ensureInkMillilitres>[0])) changed = true;
   if (ensureInkExpenseModel(state as unknown as Parameters<typeof ensureInkExpenseModel>[0])) changed = true;
   if (ensureChecklistTasks(state)) changed = true;
   if (ensureOrgCollections(state)) changed = true;
+  // Media menu cần roleModules — gắn sau khi đảm bảo bộ sưu tập tổ chức đã có.
+  if (grantMediaMenu(state)) changed = true;
   if (ensureMoHome(state)) changed = true;
   if (ensureWaste(state as Parameters<typeof ensureWaste>[0])) changed = true;
   if (applyTiktokPrices(state)) changed = true;
@@ -199,7 +225,6 @@ export function applyStoreMigrations(state: Migratable): boolean {
   return changed;
 }
 
-/** Một lần: giá khách trả = giá sau giảm TikTok 23/10. Không đụng Mơ Home, số lượng, giá vốn. */
 function applyTiktokPrices(state: Migratable): boolean {
   const settings = state.settings as Settings;
   if (settings.tiktokPrice20261023) return false;
