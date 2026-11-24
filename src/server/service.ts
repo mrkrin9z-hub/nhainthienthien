@@ -44,6 +44,7 @@ import {
   hasPackingPhoto,
   itemChangeNote,
   packReady,
+  transferQrUrl,
   type FeedbackAnswer,
   type LineSnap,
   type PackCheck,
@@ -95,7 +96,24 @@ import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
 import { DEFAULT_ROLE_MODULES, defaultNotifyPrefs, defaultSePay, modulesForStoredRole, sortBySortThenName } from "@/domain/org-desk";
-import { findOrderForSePay, sepayCollectAmount, sepayRejectReason, type SePayWebhookPayload } from "@/domain/sepay";
+import {
+  accountsMatchShop,
+  cleanBankContentForUi,
+  evaluateAutoMatch,
+  findOpenToken,
+  findOrderForSePay,
+  generateSbToken,
+  makeApiKey,
+  normalizeAccountNumber,
+  parseSePayAuthHeader,
+  paymentQrAddInfo,
+  sepayCollectAmount,
+  sepayDateToIso,
+  sepayRejectReason,
+  type BankTransaction,
+  type OrderPaymentQrToken,
+  type SePayWebhookPayload,
+} from "@/domain/sepay";
 import { extractVietnamPhone, normalizeChatChannel, type ChatChannel, type ShopChatMessage, type ShopConversation } from "@/domain/shop-chat";
 import type {
   Announcement,
@@ -1551,11 +1569,20 @@ export async function listOrders(actor: Actor) {
 }
 
 export async function getOrder(actor: Actor, code: string) {
-  const state = await readState();
+  let state = await readState();
   const order = findOrderByRef(state.orders, code);
   if (!order) throw new Error("Không tìm thấy đơn hàng.");
   if (actor.role === "sale" && order.channel === "mo_home") throw new Error("Đơn Mơ Home chỉ chủ và sản xuất xem.");
-  return visibleToRole(actor.role, orderDetail(state, order, actor.role));
+  if (actor.role !== "production") {
+    try {
+      await ensurePaymentQrToken(actor, { orderId: order.id });
+      state = await readState();
+    } catch {
+      /* thiếu STK / hết nợ */
+    }
+  }
+  const fresh = findOrderByRef(state.orders, order.id) ?? order;
+  return visibleToRole(actor.role, orderDetail(state, fresh, actor.role));
 }
 
 export async function createManualOrder(
@@ -3446,9 +3473,19 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
     }
     if (Array.isArray(patch.kpiTargets)) state.settings.kpiTargets = (patch.kpiTargets as number[]).map(Number);
     if ("bank" in patch) {
-      const next = cleanBank(patch.bank && typeof patch.bank === "object" ? (patch.bank as { id?: string; account?: string; holder?: string }) : null);
-      if (next) state.settings.bank = next;
-      else delete state.settings.bank;
+      const rawBank =
+        patch.bank && typeof patch.bank === "object"
+          ? (patch.bank as { id?: string; account?: string; holder?: string; autoOrderPaymentEnabled?: boolean })
+          : null;
+      const next = cleanBank(rawBank);
+      if (next) {
+        const prevAuto = state.settings.bank?.autoOrderPaymentEnabled === true;
+        state.settings.bank = {
+          ...next,
+          autoOrderPaymentEnabled:
+            typeof rawBank?.autoOrderPaymentEnabled === "boolean" ? rawBank.autoOrderPaymentEnabled : prevAuto,
+        };
+      } else delete state.settings.bank;
     }
     if (patch["sepay"] && typeof patch["sepay"] === "object") {
       const raw = patch["sepay"] as Partial<SePayConfig>;
@@ -3459,6 +3496,9 @@ export async function saveSettings(actor: Actor, patch: Record<string, unknown>)
         accountHint: typeof raw.accountHint === "string" ? raw.accountHint.trim() : prev.accountHint,
         webhookPath: typeof raw.webhookPath === "string" && raw.webhookPath.trim() ? raw.webhookPath.trim() : prev.webhookPath || "/api/public/sepay",
         note: typeof raw.note === "string" ? raw.note.trim() : prev.note,
+        lastPingAt: prev.lastPingAt ?? null,
+        lastReceivedAt: prev.lastReceivedAt ?? null,
+        pingCount: prev.pingCount ?? 0,
       };
     }
     if (patch["notifyPrefs"] && typeof patch["notifyPrefs"] === "object") {
@@ -5250,10 +5290,184 @@ export async function getSePayConfig(actor: Actor) {
   assertRole(actor, ["owner"]);
   const state = await readState();
   const sepay = state.settings.sepay ?? defaultSePay();
+  const bankTxns = state.bankTransactions ?? [];
   return {
     sepay,
     bank: state.settings.bank ?? null,
+    stats: {
+      storedTxns: bankTxns.length,
+      unmatched: bankTxns.filter((row) => row.matchStatus === "unmatched").length,
+      matched: bankTxns.filter((row) => row.matchStatus === "matched" || row.matchStatus === "manual").length,
+      openTokens: (state.paymentQrTokens ?? []).filter((row) => row.status === "open").length,
+    },
   };
+}
+
+export async function regenerateSePayApiKey(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  let key = "";
+  await mutate(async (state) => {
+    const prev = state.settings.sepay ?? defaultSePay();
+    key = makeApiKey();
+    state.settings.sepay = { ...prev, apiKey: key, enabled: true };
+    audit(state, actor.id, "sepay.key", "sepay", { apiKey: prev.apiKey ? "set" : "" }, { apiKey: "set" });
+  });
+  return { apiKey: key };
+}
+
+export async function listBankTransactions(
+  actor: Actor,
+  input: { status?: "all" | "matched" | "unmatched" | "manual" | "ignored"; limit?: number } = {},
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const status = input.status ?? "all";
+  const limit = Math.min(200, Math.max(1, input.limit ?? 80));
+  const rows = [...(state.bankTransactions ?? [])]
+    .filter((row) => (status === "all" ? true : row.matchStatus === status))
+    .sort((a, b) => b.transactionDate.localeCompare(a.transactionDate) || b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit);
+  return {
+    rows: rows.map((row) => {
+      const order = row.matchedOrderId ? state.orders.find((item) => item.id === row.matchedOrderId) : null;
+      return {
+        ...row,
+        contentUi: cleanBankContentForUi(row.content || row.description),
+        orderCode: order?.code ?? null,
+        orderCustomer: order?.customerName ?? null,
+      };
+    }),
+  };
+}
+
+export async function reconcileBankTransaction(
+  actor: Actor,
+  input: { txnId: string; orderId: string; createPayment?: boolean; note?: string },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    if (!state.bankTransactions) state.bankTransactions = [];
+    const txn = state.bankTransactions.find((row) => row.id === input.txnId);
+    if (!txn) throw new Error("Không thấy giao dịch ngân hàng.");
+    if (txn.matchStatus === "matched") throw new Error("Giao dịch đã khớp rồi.");
+    const order = state.orders.find((row) => row.id === input.orderId);
+    if (!order) throw new Error("Không thấy đơn.");
+    if (order.channel === "tiktok" || order.channel === "shopee") throw new Error("Đơn sàn không thu trên web.");
+    if (order.status === "huy") throw new Error("Đơn đã hủy.");
+    const amount = txn.amountIn > 0 ? txn.amountIn : 0;
+    if (!(amount > 0)) throw new Error("Chỉ gắn được giao dịch tiền vào.");
+    let paymentId = txn.matchedOrderPaymentId;
+    if (input.createPayment !== false) {
+      const before = order.depositPaid;
+      const payment = {
+        id: nid(),
+        at: txn.transactionDate || nowIso(),
+        amount,
+        method: "Chuyển khoản",
+        by: actor.id,
+      };
+      const next = appendCollection(order, payment, nid());
+      order.payments = next.payments;
+      order.depositPaid = next.depositPaid;
+      order.depositMethod = next.depositMethod;
+      order.depositBy = next.depositBy;
+      order.updatedAt = nowIso();
+      order.history.push({
+        at: order.updatedAt,
+        from: order.status,
+        to: order.status,
+        by: actor.id,
+        note: `Đối soát tay SePay ${amount.toLocaleString("vi-VN")}đ · GD ${txn.sepayId}`,
+      });
+      paymentId = payment.id;
+      audit(state, actor.id, "sepay.reconcile", order.id, { depositPaid: before }, { depositPaid: order.depositPaid, txnId: txn.sepayId, amount });
+    }
+    txn.matchStatus = "manual";
+    txn.matchReason = input.note?.trim() || "Đối soát tay";
+    txn.matchedOrderId = order.id;
+    txn.matchedOrderPaymentId = paymentId;
+    txn.reconciledAt = nowIso();
+    txn.reconciledBy = actor.id;
+    txn.reconcileNote = input.note?.trim() || "";
+    txn.reconcileKind = "manual_attach";
+  });
+  return { ok: true as const };
+}
+
+export async function ignoreBankTransaction(actor: Actor, input: { txnId: string; note?: string }) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const txn = (state.bankTransactions ?? []).find((row) => row.id === input.txnId);
+    if (!txn) throw new Error("Không thấy giao dịch ngân hàng.");
+    txn.matchStatus = "ignored";
+    txn.matchReason = input.note?.trim() || "Bỏ qua";
+    txn.reconciledAt = nowIso();
+    txn.reconciledBy = actor.id;
+    txn.reconcileNote = input.note?.trim() || "";
+    txn.reconcileKind = "ignored";
+  });
+  return { ok: true as const };
+}
+
+/** Phát / tái sử dụng mã SB cho đơn còn nợ. */
+export async function ensurePaymentQrToken(
+  actor: Actor | null,
+  input: { orderId: string; amount?: number },
+): Promise<{ token: string; amount: number; addInfo: string; image: string | null } | null> {
+  const state = await readState();
+  const order = state.orders.find((row) => row.id === input.orderId);
+  if (!order || !state.settings.bank) return null;
+  if (order.channel === "tiktok" || order.channel === "shopee") return null;
+  const remain = remainOf(order);
+  const amount = Math.round(input.amount ?? (remain ?? 0));
+  if (!(amount > 0)) return null;
+  const account = normalizeAccountNumber(state.settings.bank.account);
+  if (!account) return null;
+
+  let issued: OrderPaymentQrToken | null = findOpenToken(state.paymentQrTokens ?? [], {
+    orderId: order.id,
+    amount,
+    accountNumber: account,
+  });
+
+  if (!issued) {
+    await mutate(async (draft) => {
+      if (!draft.paymentQrTokens) draft.paymentQrTokens = [];
+      const existing = findOpenToken(draft.paymentQrTokens, { orderId: order.id, amount, accountNumber: account });
+      if (existing) {
+        issued = existing;
+        return;
+      }
+      for (const row of draft.paymentQrTokens) {
+        if (row.orderId === order.id && row.status === "open" && (row.amount !== amount || normalizeAccountNumber(row.accountNumber) !== account)) {
+          row.status = "void";
+        }
+      }
+      let token = generateSbToken();
+      while (draft.paymentQrTokens.some((row) => row.token === token)) token = generateSbToken();
+      const staff = actor ? draft.staff.find((person) => person.id === actor.id) : null;
+      issued = {
+        id: nid(),
+        token,
+        orderId: order.id,
+        amount,
+        accountNumber: account,
+        issuedBy: actor?.id ?? null,
+        issuedByName: staff?.name ?? "Hệ thống",
+        status: "open",
+        matchedBankTxnId: null,
+        matchedOrderPaymentId: null,
+        matchedAt: null,
+        createdAt: nowIso(),
+      };
+      draft.paymentQrTokens.push(issued);
+    });
+  }
+
+  if (!issued) return null;
+  const addInfo = paymentQrAddInfo(issued.token, order.code);
+  const image = transferQrUrl({ bank: state.settings.bank, amount, code: order.code, addInfo });
+  return { token: issued.token, amount, addInfo, image };
 }
 
 /* ── Extend: chiến dịch / tin mẫu / thông báo prefs / gói ── */
@@ -5688,26 +5902,261 @@ export async function getNotifyPrefs(actor: Actor) {
   return { notifyPrefs: state.settings.notifyPrefs ?? defaultNotifyPrefs() };
 }
 
-/** Webhook SePay: khớp mã CK với mã đơn → tự thu chuyển khoản. */
-export async function processSePayWebhook(payload: SePayWebhookPayload, authHeader: string | null): Promise<{ success: true; duplicate?: boolean; matched?: string; amount?: number; skipped?: string }> {
+/** Ping / health webhook SePay (GET hoặc POST không body GD). */
+export async function pingSePayWebhook(authHeader: string | null): Promise<{ ok: true; ready: true }> {
+  const state = await readState();
+  const cfg = state.settings.sepay ?? defaultSePay();
+  if (!cfg.apiKey.trim()) throw new Error("API key SePay chưa tạo.");
+  if (!cfg.enabled) throw new Error("SePay chưa bật.");
+  if (!parseSePayAuthHeader(authHeader, cfg.apiKey)) throw new Error("API key SePay không khớp.");
+  await mutate(async (draft) => {
+    const sepay = draft.settings.sepay ?? defaultSePay();
+    sepay.lastPingAt = nowIso();
+    sepay.pingCount = (sepay.pingCount ?? 0) + 1;
+    draft.settings.sepay = sepay;
+  });
+  return { ok: true, ready: true };
+}
+
+/**
+ * Webhook SePay: lưu sổ phụ → (nếu ví bật auto) khớp mã SB → tự thu đơn + ví CK.
+ * Không đụng HĐĐT / Payment Gateway.
+ */
+export async function processSePayWebhook(
+  payload: SePayWebhookPayload,
+  authHeader: string | null,
+): Promise<{
+  success: true;
+  duplicate?: boolean;
+  matched?: string;
+  amount?: number;
+  skipped?: string;
+  matchStatus?: string;
+}> {
   const state = await readState();
   const cfg = state.settings.sepay ?? defaultSePay();
   if (!cfg.enabled) return { success: true, skipped: "SePay chưa bật." };
-  const expected = cfg.apiKey.trim();
-  if (expected) {
-    const header = (authHeader ?? "").trim();
-    const ok =
-      header === expected ||
-      header === `Bearer ${expected}` ||
-      header === `Apikey ${expected}` ||
-      header.toLowerCase() === `apikey ${expected.toLowerCase()}`;
-    if (!ok) throw new Error("API key SePay không khớp.");
-  }
+  if (!cfg.apiKey.trim()) throw new Error("API key SePay chưa tạo.");
+  if (!parseSePayAuthHeader(authHeader, cfg.apiKey)) throw new Error("API key SePay không khớp.");
+
   const txId = String(payload.id ?? "").trim();
   if (!txId) throw new Error("Thiếu id giao dịch SePay.");
-  const seen = state.sepaySeen ?? [];
-  if (seen.includes(txId)) return { success: true, duplicate: true };
 
+  const existing = (state.bankTransactions ?? []).find((row) => row.sepayId === txId);
+  if (existing) {
+    if (existing.matchStatus === "unmatched" && (state.settings.bank?.autoOrderPaymentEnabled === true) && existing.amountIn > 0) {
+      const retried = await tryMatchBankTxn(existing.id);
+      return { success: true, duplicate: true, ...retried };
+    }
+    return { success: true, duplicate: true, matchStatus: existing.matchStatus };
+  }
+  if ((state.sepaySeen ?? []).includes(txId)) return { success: true, duplicate: true };
+
+  const transferType = String(payload.transferType ?? "in").toLowerCase();
+  const amountRaw = Math.round(Number(payload.transferAmount) || 0);
+  const amountIn = transferType === "out" ? 0 : Math.max(0, amountRaw);
+  const amountOut = transferType === "out" ? Math.max(0, amountRaw) : 0;
+  const accountMap = accountsMatchShop(payload, state.settings.bank?.account);
+  if (!accountMap.mapped) {
+    await mutate(async (draft) => {
+      touchSePayPing(draft, true);
+      draft.sepaySeen = [txId, ...(draft.sepaySeen ?? [])].slice(0, 500);
+      audit(draft, null, "sepay.skip", txId, null, { reason: "unmapped_account", account: accountMap.preferred });
+    });
+    return { success: true, skipped: "unmapped_account" };
+  }
+
+  let txnId = "";
+  await mutate(async (draft) => {
+    if (!draft.bankTransactions) draft.bankTransactions = [];
+    if (draft.bankTransactions.some((row) => row.sepayId === txId)) return;
+    touchSePayPing(draft, true);
+    const row: BankTransaction = {
+      id: nid(),
+      sepayId: txId,
+      amountIn,
+      amountOut,
+      transactionDate: sepayDateToIso(payload.transactionDate),
+      content: String(payload.content ?? ""),
+      description: String(payload.description ?? ""),
+      code: String(payload.code ?? ""),
+      referenceCode: String(payload.referenceCode ?? ""),
+      gateway: String(payload.gateway ?? ""),
+      accountNumber: accountMap.preferred,
+      subAccount: normalizeAccountNumber(payload.subAccount),
+      matchStatus: amountIn > 0 ? "unmatched" : "ignored",
+      matchReason: amountIn > 0 ? "Chưa khớp" : "Tiền ra — chỉ lưu sổ",
+      matchedOrderId: null,
+      matchedOrderPaymentId: null,
+      reconciledAt: null,
+      reconciledBy: null,
+      reconcileNote: "",
+      reconcileKind: "",
+      createdAt: nowIso(),
+    };
+    txnId = row.id;
+    draft.bankTransactions.unshift(row);
+    draft.bankTransactions = draft.bankTransactions.slice(0, 2000);
+    draft.sepaySeen = [txId, ...(draft.sepaySeen ?? [])].slice(0, 500);
+  });
+
+  if (!(amountIn > 0)) return { success: true, matchStatus: "ignored", skipped: "amount_out" };
+  if (state.settings.bank?.autoOrderPaymentEnabled !== true) {
+    return { success: true, matchStatus: "unmatched", skipped: "auto_disabled" };
+  }
+  if (!txnId) return { success: true, duplicate: true };
+
+  const matched = await tryMatchBankTxn(txnId);
+  if (matched.matched) return { success: true, matched: matched.matched, amount: matched.amount, matchStatus: "matched" };
+
+  // Fallback legacy: khớp mã đơn TT… nếu không có SB
+  if (matched.skipped === "no_sb") {
+    const legacy = await tryLegacyOrderMatch(payload, accountMap.preferred);
+    if (legacy.matched) return { success: true, ...legacy, matchStatus: "matched" };
+  }
+  return { success: true, matchStatus: matched.matchStatus ?? "unmatched", skipped: matched.skipped };
+}
+
+function touchSePayPing(draft: ShopState, received: boolean) {
+  const sepay = draft.settings.sepay ?? defaultSePay();
+  sepay.lastPingAt = nowIso();
+  sepay.pingCount = (sepay.pingCount ?? 0) + 1;
+  if (received) sepay.lastReceivedAt = nowIso();
+  draft.settings.sepay = sepay;
+}
+
+async function tryMatchBankTxn(txnId: string): Promise<{ matched?: string; amount?: number; skipped?: string; matchStatus?: string }> {
+  let result: { matched?: string; amount?: number; skipped?: string; matchStatus?: string } = { skipped: "no_sb", matchStatus: "unmatched" };
+  await mutate(async (draft) => {
+    const txn = (draft.bankTransactions ?? []).find((row) => row.id === txnId);
+    if (!txn || txn.amountIn <= 0) {
+      result = { skipped: "no_txn", matchStatus: "ignored" };
+      return;
+    }
+    if (txn.matchStatus === "matched" || txn.matchStatus === "manual") {
+      result = { matchStatus: txn.matchStatus };
+      return;
+    }
+    if (draft.settings.bank?.autoOrderPaymentEnabled !== true) {
+      result = { skipped: "auto_disabled", matchStatus: "unmatched" };
+      return;
+    }
+    const orders = draft.orders.map((order) => ({
+      id: order.id,
+      code: order.code,
+      status: order.status,
+      channel: order.channel,
+      total: order.total,
+      depositPaid: order.depositPaid,
+      discount: order.discount,
+      shipping: order.shipping,
+    }));
+    const recentPayments = draft.orders.flatMap((order) =>
+      (order.payments ?? []).map((payment) => ({ orderId: order.id, amount: payment.amount, at: payment.at })),
+    );
+    const verdict = evaluateAutoMatch({
+      amountIn: txn.amountIn,
+      content: txn.content,
+      description: txn.description,
+      code: txn.code,
+      accountNumber: txn.accountNumber,
+      tokens: draft.paymentQrTokens ?? [],
+      orders,
+      recentPayments,
+      bankAt: txn.transactionDate,
+    });
+    if (verdict.status === "unmatched" && verdict.reason.includes("Không có mã SB")) {
+      txn.matchStatus = "unmatched";
+      txn.matchReason = verdict.reason;
+      result = { skipped: "no_sb", matchStatus: "unmatched" };
+      return;
+    }
+    if (verdict.status === "ignored") {
+      txn.matchStatus = "ignored";
+      txn.matchReason = verdict.reason;
+      if (verdict.token) {
+        const token = (draft.paymentQrTokens ?? []).find((row) => row.id === verdict.token!.id);
+        if (token && token.status === "open") token.status = "void";
+      }
+      result = { matchStatus: "ignored", skipped: verdict.reason };
+      return;
+    }
+    if (verdict.status === "manual") {
+      txn.matchStatus = "manual";
+      txn.matchReason = verdict.reason;
+      const token = (draft.paymentQrTokens ?? []).find((row) => row.id === verdict.token.id);
+      if (token) token.status = "void";
+      result = { matchStatus: "manual", skipped: verdict.reason };
+      return;
+    }
+    if (verdict.status !== "matched") {
+      txn.matchStatus = "unmatched";
+      txn.matchReason = verdict.reason;
+      result = { matchStatus: "unmatched", skipped: verdict.reason };
+      return;
+    }
+
+    const target = draft.orders.find((item) => item.id === verdict.orderId);
+    const token = (draft.paymentQrTokens ?? []).find((row) => row.id === verdict.token.id);
+    if (!target || !token) {
+      txn.matchStatus = "unmatched";
+      txn.matchReason = "Mất đơn hoặc mã SB khi ghi thu.";
+      result = { matchStatus: "unmatched", skipped: txn.matchReason };
+      return;
+    }
+    const before = target.depositPaid;
+    const payment = {
+      id: nid(),
+      at: txn.transactionDate || nowIso(),
+      amount: verdict.amount,
+      method: "Chuyển khoản",
+      by: token.issuedBy,
+    };
+    const next = appendCollection(target, payment, nid());
+    target.payments = next.payments;
+    target.depositPaid = next.depositPaid;
+    target.depositMethod = next.depositMethod;
+    target.depositBy = next.depositBy;
+    target.updatedAt = nowIso();
+    target.history.push({
+      at: target.updatedAt,
+      from: target.status,
+      to: target.status,
+      by: token.issuedBy,
+      note: `Tự động ghi nhận từ chuyển khoản ngân hàng ${verdict.amount.toLocaleString("vi-VN")}đ · ${token.token} · GD ${txn.sepayId}`,
+    });
+    token.status = "matched";
+    token.matchedBankTxnId = txn.id;
+    token.matchedOrderPaymentId = payment.id;
+    token.matchedAt = nowIso();
+    for (const row of draft.paymentQrTokens ?? []) {
+      if (row.orderId === target.id && row.status === "open" && row.amount === token.amount && row.id !== token.id) {
+        row.status = "void";
+      }
+    }
+    txn.matchStatus = "matched";
+    txn.matchReason = verdict.reason;
+    txn.matchedOrderId = target.id;
+    txn.matchedOrderPaymentId = payment.id;
+    txn.reconciledAt = nowIso();
+    txn.reconciledBy = token.issuedBy;
+    txn.reconcileKind = "auto";
+    audit(draft, token.issuedBy, "sepay.collect", target.id, { depositPaid: before }, {
+      depositPaid: target.depositPaid,
+      txId: txn.sepayId,
+      amount: verdict.amount,
+      token: token.token,
+    });
+    result = { matched: target.code, amount: verdict.amount, matchStatus: "matched" };
+  });
+  return result;
+}
+
+async function tryLegacyOrderMatch(
+  payload: SePayWebhookPayload,
+  accountNumber: string,
+): Promise<{ matched?: string; amount?: number; skipped?: string }> {
+  const state = await readState();
   const candidates = state.orders.map((order) => ({
     id: order.id,
     code: order.code,
@@ -5715,35 +6164,29 @@ export async function processSePayWebhook(payload: SePayWebhookPayload, authHead
     channel: order.channel,
     total: order.total,
     depositPaid: order.depositPaid,
+    discount: order.discount,
+    shipping: order.shipping,
   }));
   const order = findOrderForSePay(candidates, payload);
   const amountRaw = Number(payload.transferAmount) || 0;
   const reject = sepayRejectReason(order, amountRaw, payload.transferType);
-  if (reject || !order) {
-    await mutate(async (draft) => {
-      draft.sepaySeen = [txId, ...(draft.sepaySeen ?? [])].slice(0, 500);
-      audit(draft, null, "sepay.skip", txId, null, { reason: reject ?? "unknown", content: payload.content, code: payload.code });
-    });
-    return { success: true, skipped: reject ?? "Không khớp." };
-  }
-
+  if (reject || !order) return { skipped: reject ?? "Không khớp." };
   const amount = sepayCollectAmount(order, amountRaw);
+  if (!(amount > 0)) return { skipped: "Đơn đã thu đủ hoặc số tiền không hợp lệ." };
+  const txId = String(payload.id ?? "").trim();
   await mutate(async (draft) => {
-    draft.sepaySeen = [txId, ...(draft.sepaySeen ?? [])].slice(0, 500);
     const target = draft.orders.find((item) => item.id === order.id);
-    if (!target) return;
+    const txn = (draft.bankTransactions ?? []).find((row) => row.sepayId === txId);
+    if (!target || !txn || txn.matchStatus === "matched") return;
     const before = target.depositPaid;
-    const next = appendCollection(
-      target,
-      {
-        id: nid(),
-        at: nowIso(),
-        amount,
-        method: "SePay / chuyển khoản",
-        by: null,
-      },
-      nid(),
-    );
+    const payment = {
+      id: nid(),
+      at: txn.transactionDate || nowIso(),
+      amount,
+      method: "Chuyển khoản",
+      by: null,
+    };
+    const next = appendCollection(target, payment, nid());
     target.payments = next.payments;
     target.depositPaid = next.depositPaid;
     target.depositMethod = next.depositMethod;
@@ -5754,11 +6197,18 @@ export async function processSePayWebhook(payload: SePayWebhookPayload, authHead
       from: target.status,
       to: target.status,
       by: null,
-      note: `SePay tự thu ${amount.toLocaleString("vi-VN")}đ · GD ${txId}`,
+      note: `SePay tự thu (mã đơn) ${amount.toLocaleString("vi-VN")}đ · GD ${txId}`,
     });
-    audit(draft, null, "sepay.collect", target.id, { depositPaid: before }, { depositPaid: target.depositPaid, txId, amount, reference: payload.referenceCode });
+    txn.matchStatus = "matched";
+    txn.matchReason = "Khớp mã đơn legacy";
+    txn.matchedOrderId = target.id;
+    txn.matchedOrderPaymentId = payment.id;
+    txn.accountNumber = accountNumber;
+    txn.reconciledAt = nowIso();
+    txn.reconcileKind = "auto_legacy";
+    audit(draft, null, "sepay.collect", target.id, { depositPaid: before }, { depositPaid: target.depositPaid, txId, amount });
   });
-  return { success: true, matched: order.code, amount };
+  return { matched: order.code, amount };
 }
 
 export async function listPackages(actor: Actor) {

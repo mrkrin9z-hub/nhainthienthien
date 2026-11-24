@@ -1,6 +1,8 @@
+import type { BankTransaction, OrderPaymentQrToken } from "./sepay.ts";
 import type { ShopChatMessage, ShopConversation } from "./shop-chat.ts";
 
 export type { ChatChannel, ShopChatMessage, ShopConversation } from "./shop-chat.ts";
+export type { BankTransaction, OrderPaymentQrToken } from "./sepay.ts";
 
 export const CHANNELS = ["tai_tiem", "facebook", "tiktok", "shopee", "ctv", "mo_home"] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -208,7 +210,7 @@ export type Settings = {
   fixedCosts: { key: string; name: string; amount: number; note: string }[];
   rentFromJune2027: number;
   /** Tài khoản nhận chuyển khoản. Thiếu thì đơn không hiện mã QR. */
-  bank?: { id: string; account: string; holder: string };
+  bank?: { id: string; account: string; holder: string; autoOrderPaymentEnabled?: boolean };
   /** Địa chỉ lấy hàng cho GHN, GHTK, J&T. Không phải khóa. */
   carrierPickup?: {
     name: string;
@@ -324,7 +326,7 @@ export type ShopDocument = {
   by: string | null;
 };
 
-/** Cấu hình SePay — webhook tiền vào → tự thu đơn (mã CK = mã đơn). */
+/** Cấu hình SePay — webhook tiền vào → check tiền / tự thu theo mã SB. */
 export type SePayConfig = {
   enabled: boolean;
   /** API Key / Bearer SePay gửi kèm (xác thực webhook) */
@@ -334,6 +336,11 @@ export type SePayConfig = {
   /** Path webhook công khai */
   webhookPath: string;
   note: string;
+  /** Health — lần ping GET/POST hợp lệ gần nhất */
+  lastPingAt?: string | null;
+  /** Lần nhận giao dịch thật gần nhất */
+  lastReceivedAt?: string | null;
+  pingCount?: number;
 };
 
 /** Gói dịch vụ bán tại xưởng (không phải subscription StudioBase). */
@@ -833,8 +840,12 @@ export type ShopState = {
   chatMessages?: ShopChatMessage[];
   /** Gói dịch vụ bán tại xưởng. */
   packages?: ServicePackage[];
-  /** Id giao dịch SePay đã xử lý (idempotent). */
+  /** Id giao dịch SePay đã xử lý (idempotent). Legacy — ưu tiên bankTransactions. */
   sepaySeen?: string[];
+  /** Sổ phụ biến động số dư từ SePay. */
+  bankTransactions?: BankTransaction[];
+  /** Mã đối soát SB****** gắn đơn + số tiền + ví. */
+  paymentQrTokens?: OrderPaymentQrToken[];
   /** Tin khách gửi từ trang liên hệ. */
   inquiries?: Inquiry[];
   /** Việc một lần (setup, khai trương, ảnh, đào tạo). */

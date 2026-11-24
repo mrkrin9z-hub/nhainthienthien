@@ -552,6 +552,8 @@ export async function buildSeed(): Promise<ShopState> {
     roleModules: DEFAULT_ROLE_MODULES.map((row) => ({ role: row.role, modules: [...row.modules] })),
     packages: [],
     sepaySeen: [],
+    bankTransactions: [],
+    paymentQrTokens: [],
     tasks: [],
     taskChecks: [],
   };

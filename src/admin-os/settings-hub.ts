@@ -94,6 +94,13 @@ export const SETTINGS_HUB_GROUPS: SettingsHubGroup[] = [
         icon: "plug",
       },
       {
+        id: "sepay",
+        title: "SePay",
+        blurb: "Webhook ngân hàng, Check tiền, mã SB tự thu đơn (không HĐĐT).",
+        to: "/admin/sepay",
+        icon: "wallet",
+      },
+      {
         id: "sao-luu",
         title: "Sao lưu & khôi phục",
         blurb: "Sao lưu sổ hằng ngày và khôi phục khi cần.",

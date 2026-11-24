@@ -4,6 +4,7 @@ import { checklistBadge } from "./checklists.ts";
 import { commissionForSale } from "./commission.ts";
 import { materialForecast } from "./forecast.ts";
 import { depositEvents, remainOf } from "./money.ts";
+import { paymentQrAddInfo } from "./sepay.ts";
 import { bankLabel, deskAlerts, hasPackingPhoto, itemChangeNote, transferQrUrl } from "./print-shop.ts";
 import { onDeliveryDesk, orderShipping } from "./shipping.ts";
 import { wasteMonth } from "./waste.ts";
@@ -411,10 +412,29 @@ export function orderDetail(state: ShopState, order: Order, role: Role) {
       : [],
     transfer: (() => {
       if (!showMoney || order.channel === "tiktok" || order.channel === "shopee" || !state.settings.bank || order.total === null) return null;
-      const amount = order.total - order.depositPaid;
-      const image = transferQrUrl({ bank: state.settings.bank, amount, code: order.code });
+      const remain = remainOf(order);
+      const amount = remain === null ? Math.max(0, order.total - order.depositPaid) : Math.max(0, remain);
+      if (!(amount > 0)) return null;
+      const account = String(state.settings.bank.account ?? "").replace(/\D/g, "");
+      const token =
+        (state.paymentQrTokens ?? []).find(
+          (row) =>
+            row.status === "open" &&
+            row.orderId === order.id &&
+            row.amount === amount &&
+            String(row.accountNumber ?? "").replace(/\D/g, "") === account,
+        ) ?? null;
+      const addInfo = token ? paymentQrAddInfo(token.token, order.code) : undefined;
+      const image = transferQrUrl({ bank: state.settings.bank, amount, code: order.code, ...(addInfo ? { addInfo } : {}) });
       if (!image) return null;
-      return { image, content: order.code, bank: bankLabel(state.settings.bank.id), holder: state.settings.bank.holder, amount };
+      return {
+        image,
+        content: addInfo || order.code,
+        token: token?.token ?? null,
+        bank: bankLabel(state.settings.bank.id),
+        holder: state.settings.bank.holder,
+        amount,
+      };
     })(),
     packCheck: order.packCheck ?? { ep: false, bo: false, tem: false },
     hasPackingPhoto: hasPackingPhoto(files),
