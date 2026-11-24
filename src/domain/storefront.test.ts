@@ -193,3 +193,63 @@ test("Google Maps: resolve link rút gọn thành embed cid, nút Chỉ đườn
   assert.match(admin, /Link Google Maps/);
   assert.match(admin, /mapsUrl/);
 });
+
+test("trang liên hệ: địa chỉ mở Google Maps, không còn form gửi tin; API inquiry vẫn còn", () => {
+  const contact = readFileSync(join(root, "routes/lien-he.tsx"), "utf8");
+  assert.match(contact, /mapsDirectionsUrl/);
+  assert.match(contact, /Địa chỉ tiệm/);
+  assert.match(contact, /data-shop-address/);
+  assert.match(contact, /target="_blank"/);
+  assert.match(contact, /rel="noopener noreferrer"/);
+  assert.doesNotMatch(contact, /Gửi tin cho tiệm/);
+  assert.doesNotMatch(contact, /submitInquiry/);
+  assert.doesNotMatch(contact, /<form/);
+  const api = readFileSync(join(root, "lib/orders.functions.ts"), "utf8");
+  assert.match(api, /export const submitInquiry/);
+  const service = readFileSync(join(root, "server/service.ts"), "utf8");
+  assert.match(service, /export async function submitInquiry/);
+});
+
+test("footer có bản đồ nhỏ lazy + Chỉ đường; header có TikTok Shop và Fanpage", () => {
+  const footer = readFileSync(join(root, "components/site/SiteFooter.tsx"), "utf8");
+  assert.match(footer, /data-footer-map/);
+  assert.match(footer, /mapsEmbedUrl/);
+  assert.match(footer, /loading="lazy"/);
+  assert.match(footer, /Chỉ đường/);
+  assert.match(footer, /mapsDirectionsUrl/);
+  const header = readFileSync(join(root, "components/site/SiteHeader.tsx"), "utf8");
+  assert.match(header, /TikTok Shop/);
+  assert.match(header, /Fanpage/);
+  assert.match(header, /resolveTiktokHref/);
+  assert.match(header, /resolveFacebookHref/);
+  assert.match(header, /md:hidden/);
+});
+
+test("cụm nút nổi chỉ logo Zalo/TikTok/Shopee/Fanpage, ẩn staff, không chữ Chat Zalo", () => {
+  const fab = readFileSync(join(root, "components/site/zalo-fab.tsx"), "utf8");
+  assert.match(fab, /isStaffPath\(/);
+  assert.match(fab, /data-social-fab/);
+  assert.match(fab, /data-zalo-fab/);
+  assert.match(fab, /data-social-fab-item=\{item\.key\}/);
+  for (const key of ["zalo", "tiktok", "shopee", "facebook"]) {
+    assert.match(fab, new RegExp(`key: "${key}"`));
+  }
+  assert.match(fab, /ZaloIcon/);
+  assert.match(fab, /TikTokIcon/);
+  assert.match(fab, /ShopeeIcon/);
+  assert.match(fab, /FacebookIcon/);
+  assert.match(fab, /target="_blank"/);
+  assert.match(fab, /rel="noopener noreferrer"/);
+  assert.match(fab, /aria-label/);
+  assert.doesNotMatch(fab, /zalo-fab-label/);
+  assert.doesNotMatch(fab, /zalo-fab-mark/);
+  assert.doesNotMatch(fab, />Chat Zalo</);
+  const icons = readFileSync(join(root, "components/site/shop-links.tsx"), "utf8");
+  assert.match(icons, /#0068FF/);
+  assert.match(icons, /#1877F2/);
+  assert.match(icons, /#EE4D2D/);
+  assert.match(icons, /#25F4EE/);
+  const css = readFileSync(join(root, "styles.css"), "utf8");
+  assert.match(css, /\.social-fab-btn/);
+  assert.match(css, /site-sticky-bottom/);
+});

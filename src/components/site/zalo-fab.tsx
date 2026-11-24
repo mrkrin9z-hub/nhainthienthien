@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
+import { FacebookIcon, ShopeeIcon, TikTokIcon, ZaloIcon } from "@/components/site/shop-links";
 import { resolvePublicZaloHref } from "@/domain/public-contact";
 import { isStaffPath } from "@/domain/site-chrome";
+import { resolveFacebookHref, resolveShopeeHref, resolveTiktokHref } from "@/lib/brand";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 
 const GAP_PX = 16;
@@ -43,28 +45,42 @@ function useClearanceAboveStickyBars(enabled: boolean) {
   return bottom;
 }
 
-/** Nút nổi Chat Zalo trên trang công khai — không hiện trên admin, tạo đơn, việc nhân viên. */
+/** Cụm nút nổi logo (Zalo, TikTok Shop, Shopee, Fanpage) — ẩn trên admin/staff. */
 export function ZaloFab() {
   const admin = useRouterState({ select: (state) => isStaffPath(state.location.pathname) });
   const config = useQuery({ ...publicConfigQueryOptions, enabled: !admin });
-  const href = resolvePublicZaloHref(admin ? undefined : config.data);
   const bottom = useClearanceAboveStickyBars(!admin);
 
   if (admin) return null;
 
+  const links = [
+    { key: "zalo", href: resolvePublicZaloHref(config.data), label: "Chat Zalo", Icon: ZaloIcon },
+    { key: "tiktok", href: resolveTiktokHref(config.data?.tiktokUrl), label: "TikTok Shop", Icon: TikTokIcon },
+    { key: "shopee", href: resolveShopeeHref(config.data?.shopeeUrl), label: "Shopee", Icon: ShopeeIcon },
+    { key: "facebook", href: resolveFacebookHref(config.data?.facebookUrl), label: "Fanpage Facebook", Icon: FacebookIcon },
+  ];
+
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+    <nav
       data-zalo-fab="1"
-      aria-label="Chat Zalo"
+      data-social-fab="1"
+      aria-label="Liên hệ nhanh"
       className="zalo-fab"
       style={bottom != null ? { bottom } : undefined}
     >
-      <span className="zalo-fab-pulse" aria-hidden />
-      <span className="zalo-fab-mark">Zalo</span>
-      <span className="zalo-fab-label">Chat Zalo</span>
-    </a>
+      {links.map((item) => (
+        <a
+          key={item.key}
+          href={item.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${item.label} (mở tab mới)`}
+          data-social-fab-item={item.key}
+          className="social-fab-btn"
+        >
+          <item.Icon className="size-full" />
+        </a>
+      ))}
+    </nav>
   );
 }

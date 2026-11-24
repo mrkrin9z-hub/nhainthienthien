@@ -1,18 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import { Clock, Globe, MapPin, MessageCircle, PackageSearch, Phone, UploadCloud } from "lucide-react";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { BRAND } from "@/lib/brand";
+import { BRAND, mapsDirectionsUrl } from "@/lib/brand";
 import { ShopLinksBlock } from "@/components/site/shop-links";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
-import { submitInquiry } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/lien-he")({
   head: () => ({
@@ -41,13 +35,8 @@ function ContactPage() {
   const phoneRaw = showZalo ? config.data?.phoneRaw ?? "" : "";
   const zalo = showZalo ? config.data?.zalo ?? "" : "";
   const hours = config.data?.hours ?? "08:00–18:00";
-  const [name, setName] = useState("");
-  const [message, setMessage] = useState("");
-  const [orderCode, setOrderCode] = useState("");
-  const [callback, setCallback] = useState("");
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const address = config.data?.address || BRAND.address;
+  const mapsHref = mapsDirectionsUrl(config.data?.mapsUrl);
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
@@ -87,59 +76,25 @@ function ContactPage() {
               <p className="mt-1 text-sm text-muted-foreground">{phone}</p>
             </a>
           ) : null}
-          <div className="glass-card rounded-3xl p-5">
+          <a
+            href={mapsHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Địa chỉ tiệm — mở Google Maps (tab mới)"
+            data-shop-address
+            className="glass-card rounded-3xl p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+          >
             <MapPin className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Địa chỉ tiệm</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{BRAND.address}</p>
-          </div>
+            <p className="mt-1 text-sm text-muted-foreground">{address}</p>
+            <p className="mt-2 text-sm font-semibold text-sale">Chỉ đường trên Google Maps</p>
+          </a>
           <div className="glass-card rounded-3xl p-5">
             <Clock className="size-6 text-accent" />
             <h2 className="mt-3 text-lg font-bold text-foreground">Thời gian làm việc</h2>
             <p className="mt-1 text-sm text-muted-foreground">{hours}</p>
           </div>
         </div>
-
-        <form
-          className="glass-card mt-8 space-y-3 rounded-3xl p-5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setBusy(true);
-            setError("");
-            void submitInquiry({ data: { name, message, orderCode, phone: callback } })
-              .then(() => {
-                setSent(true);
-                setMessage("");
-              })
-              .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Chưa gửi được."))
-              .finally(() => setBusy(false));
-          }}
-        >
-          <h2 className="text-lg font-bold text-foreground">Gửi tin cho tiệm</h2>
-          <p className="text-sm text-muted-foreground">Để lại tin, tiệm gọi hoặc nhắn lại cho bạn.</p>
-          <div>
-            <Label htmlFor="ten">Tên</Label>
-            <Input id="ten" className="mt-1 min-h-11" value={name} onChange={(event) => setName(event.target.value)} required />
-          </div>
-          <div>
-            <Label htmlFor="nd">Nội dung</Label>
-            <Textarea id="nd" className="mt-1 min-h-28" value={message} onChange={(event) => setMessage(event.target.value)} required />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="madon">Mã đơn (nếu có)</Label>
-              <Input id="madon" className="mt-1 min-h-11" value={orderCode} onChange={(event) => setOrderCode(event.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="sdt">Số để gọi lại (nếu muốn)</Label>
-              <Input id="sdt" className="mt-1 min-h-11" inputMode="tel" value={callback} onChange={(event) => setCallback(event.target.value)} />
-            </div>
-          </div>
-          {error ? <p className="text-sm font-semibold text-destructive">{error}</p> : null}
-          {sent ? <p className="text-sm font-semibold text-primary">Đã gửi. Tiệm sẽ xem tin này.</p> : null}
-          <Button type="submit" className="min-h-11" disabled={busy}>
-            {busy ? "Đang gửi…" : "Gửi tin"}
-          </Button>
-        </form>
 
         <p className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
           <Globe className="size-4 text-accent" /> {BRAND.website}

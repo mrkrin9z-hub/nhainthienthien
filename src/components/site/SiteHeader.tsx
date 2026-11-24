@@ -4,7 +4,9 @@ import { ChevronLeft, Home, LayoutGrid, ReceiptText, Search, ShoppingCart } from
 import { useState, type FormEvent } from "react";
 
 import { LOGO_SQUARE } from "@/lib/assets";
-import { BRAND } from "@/lib/brand";
+import { BRAND, resolveFacebookHref, resolveShopeeHref, resolveTiktokHref } from "@/lib/brand";
+import { FacebookIcon, ShopeeIcon, TikTokIcon, ZaloIcon } from "@/components/site/shop-links";
+import { resolvePublicZaloHref } from "@/domain/public-contact";
 import { useCart } from "@/lib/cart";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 
@@ -76,21 +78,49 @@ export function SiteHeader({ back, title, hideTabs, query }: { back?: boolean; t
   const config = useQuery(publicConfigQueryOptions);
   const showZalo = config.data?.showZalo === true && Boolean(config.data.zalo);
   const phone = showZalo ? config.data?.phone ?? "" : "";
-  const zalo = showZalo ? config.data?.zalo ?? "" : "";
+  const zalo = showZalo ? resolvePublicZaloHref(config.data) : "";
+  const tiktok = resolveTiktokHref(config.data?.tiktokUrl);
+  const shopee = resolveShopeeHref(config.data?.shopeeUrl);
+  const facebook = resolveFacebookHref(config.data?.facebookUrl);
+  const socials = [
+    ...(showZalo ? [{ key: "zalo", href: zalo, label: phone ? `Zalo ${phone}` : "Zalo", Icon: ZaloIcon }] : []),
+    { key: "tiktok", href: tiktok, label: "TikTok Shop", Icon: TikTokIcon },
+    { key: "shopee", href: shopee, label: "Shopee", Icon: ShopeeIcon },
+    { key: "facebook", href: facebook, label: "Fanpage", Icon: FacebookIcon },
+  ];
   return (
     <>
       <header className="glass-header sticky top-0 z-40 text-white">
+        <div className="mx-auto flex h-9 max-w-6xl items-center justify-end gap-2.5 px-3 md:hidden">
+          {socials.map((item) => (
+            <a
+              key={item.key}
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${item.label} (mở tab mới)`}
+              className="grid size-7 place-items-center opacity-95 hover:opacity-100"
+            >
+              <item.Icon className="size-6" />
+            </a>
+          ))}
+        </div>
         <div className="mx-auto hidden h-8 max-w-6xl items-center justify-between px-6 text-xs md:flex">
           <span className="opacity-85">{BRAND.address}</span>
-          <nav className="flex items-center gap-5">
-            {showZalo ? (
-              <a href={zalo} target="_blank" rel="noopener noreferrer" className="opacity-90 hover:opacity-100">
-                Zalo {phone}
+          <nav className="flex min-w-0 items-center gap-3 overflow-x-auto lg:gap-5">
+            {socials.map((item) => (
+              <a
+                key={item.key}
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${item.label} (mở tab mới)`}
+                className="inline-flex items-center gap-1.5 opacity-90 hover:opacity-100"
+              >
+                <item.Icon className="size-3.5" />
+                {item.label}
               </a>
-            ) : null}
-            <a href={BRAND.shopeeUrl} target="_blank" rel="noopener" className="opacity-90 hover:opacity-100">
-              Shopee: nhainthienthien
-            </a>
+            ))}
             {TOP_LINKS.map((item) => (
               <Link key={item.to} to={item.to} className="opacity-90 hover:opacity-100">
                 {item.label}

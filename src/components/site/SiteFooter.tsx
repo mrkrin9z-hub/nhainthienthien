@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { LOGO_HORIZONTAL } from "@/lib/assets";
-import { BRAND } from "@/lib/brand";
+import { BRAND, mapsDirectionsUrl, mapsEmbedUrl } from "@/lib/brand";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 import { ShopLinksBlock } from "@/components/site/shop-links";
 
@@ -54,6 +54,30 @@ export function SiteFooter() {
           <p className="text-muted-foreground">{BRAND.website}</p>
         </div>
       </div>
+      <section className="mx-auto max-w-6xl px-4 pb-4 md:px-6 md:pb-6" data-footer-map aria-labelledby="footer-map-title">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 id="footer-map-title" className="font-sans text-xs font-bold tracking-[0.16em] text-foreground uppercase">
+            Tìm đường tới tiệm
+          </h2>
+          <a
+            href={mapsDirectionsUrl(config.data?.mapsUrl)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-semibold text-sale hover:underline"
+          >
+            Chỉ đường
+          </a>
+        </div>
+        <div className="h-36 overflow-hidden rounded-2xl bg-[#e8eef4] md:h-44">
+          <iframe
+            title="Bản đồ Nhà In Thiên Thiên — Số 67 Ngô Quyền, Xuân Lộc, Đồng Nai"
+            src={mapsEmbedUrl(config.data?.mapsUrl, config.data?.address || BRAND.address)}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            className="size-full border-0"
+          />
+        </div>
+      </section>
       <div className="border-t border-[#123047]/5 py-4 text-center text-xs text-muted-foreground">
         © {new Date().getFullYear()} {BRAND.name}
       </div>

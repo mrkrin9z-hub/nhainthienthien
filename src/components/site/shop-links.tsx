@@ -48,18 +48,23 @@ export function ShopeeIcon({ className = "size-6" }: { className?: string }) {
   );
 }
 
+/** Logo Zalo (nền #0068FF, chữ Zalo trắng — dạng icon app chính thức). */
 export function ZaloIcon({ className = "size-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden>
       <rect width="24" height="24" rx="6" fill="#0068FF" />
-      <path
+      <text
+        x="12"
+        y="16"
+        textAnchor="middle"
         fill="#fff"
-        d="M7.2 8.2c0-1.4 1.5-2.6 4.8-2.6s4.8 1.2 4.8 2.6v5.2c0 1.3-1.3 2.4-3.9 2.55l-2.5 1.85c-.28.2-.7 0-.7-.35v-1.5c-1.7-.4-2.5-1.4-2.5-2.55z"
-      />
-      <path
-        fill="#0068FF"
-        d="M10.15 9.15h1.12c.9 0 1.42.38 1.42 1.08 0 .5-.28.86-.74 1.02l.86 1.55h-1.06l-.74-1.4H11.2v1.4h-.96zm1.05 1.72c.32 0 .48-.16.48-.4s-.16-.4-.48-.4h-.17v.8z"
-      />
+        fontSize="7.4"
+        fontWeight="800"
+        fontFamily="Arial, Helvetica, sans-serif"
+        letterSpacing="-0.04em"
+      >
+        Zalo
+      </text>
     </svg>
   );
 }
