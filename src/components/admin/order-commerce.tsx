@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { isMarketplace, PAYMENT_METHODS, shipModeLabel, type PaymentMethod, type ShipMode } from "@/domain/order-desk";
@@ -143,7 +144,7 @@ export function OrderCommercePanel({ order, money }: { order: CommerceOrder; mon
             </label>
             <label className="text-sm">
               <Label>Thực nhận sau phí</Label>
-              <Input className="mt-1" inputMode="numeric" value={netAmount} placeholder={order.netAmount == null ? "Tự tính khi để trống" : formatMaybe(order.netAmount)} onChange={(event) => setNetAmount(event.target.value.replace(/[^\d]/g, ""))} />
+              <MoneyInput className="mt-1" value={netAmount} placeholder={order.netAmount == null ? "Tự tính khi để trống" : formatMaybe(order.netAmount)} onValueChange={(value) => setNetAmount(value == null ? "" : String(value))} />
             </label>
           </>
         ) : null}

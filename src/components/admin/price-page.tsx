@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { formatMaybe, formatVnd } from "@/lib/brand";
@@ -457,15 +458,15 @@ function PriceRow({
             ) : null}
             <label className="block text-sm font-semibold">
               Giá bán
-              <Input className="mt-1 min-h-11" inputMode="numeric" value={price} placeholder="Chưa có" aria-label={`Giá ${row.name}`} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
+              <MoneyInput className="mt-1 min-h-11" value={price} placeholder="Chưa có" aria-label={`Giá ${row.name}`} onValueChange={(value) => setPrice(value == null ? "" : String(value))} />
             </label>
             <label className="block text-sm font-semibold">
               Giá gạch (nếu có)
-              <Input className="mt-1 min-h-11" inputMode="numeric" value={listPrice} placeholder="Không gạch" onChange={(e) => setListPrice(e.target.value.replace(/[^\d]/g, ""))} />
+              <MoneyInput className="mt-1 min-h-11" value={listPrice} placeholder="Không gạch" onValueChange={(value) => setListPrice(value == null ? "" : String(value))} />
             </label>
             <label className="block text-sm font-semibold">
               Tối thiểu / dòng
-              <Input className="mt-1 min-h-11" inputMode="numeric" value={minTotal} placeholder="Không" onChange={(e) => setMinTotal(e.target.value.replace(/[^\d]/g, ""))} />
+              <MoneyInput className="mt-1 min-h-11" value={minTotal} placeholder="Không" onValueChange={(value) => setMinTotal(value == null ? "" : String(value))} />
               <span className="mt-1 block text-xs font-normal text-muted-foreground">Ví dụ ảnh lụa 6×9 lẻ: 1–10 ảnh vẫn tính 30.000đ.</span>
             </label>
             <label className="block text-sm font-semibold">
@@ -612,7 +613,7 @@ function CreatePriceDialog({
           </label>
           <label className="text-sm font-semibold">
             Giá (VNĐ)*
-            <Input className="mt-1 min-h-11" inputMode="numeric" value={price} onChange={(event) => setPrice(digits(event.target.value))} />
+            <MoneyInput className="mt-1 min-h-11" value={price} onValueChange={(value) => setPrice(value == null ? "" : String(value))} />
           </label>
         </div>
         <label className="text-sm font-semibold">

@@ -20,6 +20,7 @@ import { installMotion } from "../lib/motion";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { publicConfigQueryOptions, type PublicConfig } from "@/lib/catalog.functions";
 import { ZaloFab } from "@/components/site/zalo-fab";
+import { isStaffPath } from "@/domain/site-chrome";
 import { BRAND } from "@/lib/brand";
 import { telE164 } from "@/domain/public-contact";
 
@@ -87,7 +88,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   loader: ({ context }) => context.queryClient.ensureQueryData(publicConfigQueryOptions),
   head: ({ matches, loaderData }) => {
     const path = matches[matches.length - 1]?.pathname ?? "/";
-    const admin = path.startsWith("/admin");
+    const admin = isStaffPath(path);
     const links: Array<Record<string, string>> = [
       { rel: "icon", href: "/favicon.png?v=3", type: "image/png", sizes: "32x32" },
     ];
@@ -161,7 +162,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootShell({ children }: { children: ReactNode }) {
   // Trang khách: CSS chặn render để không chớp trang chưa có giao diện rồi nhảy bố cục (CLS).
   // Trang quản trị giữ cách tải CSS không chặn như cũ.
-  const admin = useRouterState({ select: (state) => state.location.pathname.startsWith("/admin") });
+  const admin = useRouterState({ select: (state) => isStaffPath(state.location.pathname) });
   return (
     <html lang="vi">
       <head>
@@ -173,7 +174,7 @@ function RootShell({ children }: { children: ReactNode }) {
         {children}
         <script
           dangerouslySetInnerHTML={{
-            __html: `for(const l of document.querySelectorAll('link[data-app-css]')){const go=()=>{l.media='all'};l.addEventListener('load',go);if(l.sheet)go()}if(location.pathname.startsWith('/admin')){}else{const l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(FONT_STYLESHEET)};l.media='print';l.setAttribute('data-fonts','1');const go=()=>{l.media='all'};l.addEventListener('load',go);document.head.appendChild(l);if(l.sheet)go()}`,
+            __html: `for(const l of document.querySelectorAll('link[data-app-css]')){const go=()=>{l.media='all'};l.addEventListener('load',go);if(l.sheet)go()}if((()=>{const p=location.pathname;return p==='/admin'||p.startsWith('/admin/')||p==='/orders'||p.startsWith('/orders/')||p==='/q'||p.startsWith('/q/')||p.startsWith('/q_/')})()){}else{const l=document.createElement('link');l.rel='stylesheet';l.href=${JSON.stringify(FONT_STYLESHEET)};l.media='print';l.setAttribute('data-fonts','1');const go=()=>{l.media='all'};l.addEventListener('load',go);document.head.appendChild(l);if(l.sheet)go()}`,
           }}
         />
         <Scripts />

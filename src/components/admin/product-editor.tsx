@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { CHANNELS, CHANNEL_LABEL, type Channel } from "@/domain/types";
 import { createWebProduct, getWebProduct, updateWebProduct } from "@/lib/admin.functions";
 
@@ -311,16 +312,16 @@ export function ProductEditor({
                           </label>
                           <label className="mt-2 block text-[11px] text-muted-foreground">
                             Giá bán
-                            <Input className="mt-1 min-h-10" inputMode="numeric" value={quote.price} placeholder="Để trống nếu không bán" onChange={(event) => patchQuote(index, channel, { price: event.target.value.replace(/[^\d]/g, "") })} />
+                            <MoneyInput className="mt-1 min-h-10" value={quote.price} placeholder="Để trống nếu không bán" onValueChange={(value) => patchQuote(index, channel, { price: value == null ? "" : String(value) })} />
                           </label>
                           <div className="mt-1 grid grid-cols-2 gap-2">
                             <label className="text-[11px] text-muted-foreground">
                               Giá gạch
-                              <Input className="mt-1 min-h-10" inputMode="numeric" value={quote.listPrice} onChange={(event) => patchQuote(index, channel, { listPrice: event.target.value.replace(/[^\d]/g, "") })} />
+                              <MoneyInput className="mt-1 min-h-10" value={quote.listPrice} onValueChange={(value) => patchQuote(index, channel, { listPrice: value == null ? "" : String(value) })} />
                             </label>
                             <label className="text-[11px] text-muted-foreground">
                               Đơn tối thiểu
-                              <Input className="mt-1 min-h-10" inputMode="numeric" value={quote.minTotal} placeholder="vd 30000" onChange={(event) => patchQuote(index, channel, { minTotal: event.target.value.replace(/[^\d]/g, "") })} />
+                              <MoneyInput className="mt-1 min-h-10" value={quote.minTotal} placeholder="vd 30.000" onValueChange={(value) => patchQuote(index, channel, { minTotal: value == null ? "" : String(value) })} />
                             </label>
                           </div>
                         </div>

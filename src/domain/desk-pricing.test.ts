@@ -1,3 +1,4 @@
+import { lineAmountAfterDiscount } from "./calc.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -64,4 +65,15 @@ test("đổi kênh sau khi chọn sản phẩm thì cập nhật lại đơn gi�
   const toTiktok = retargetLinesForChannel(toHome, [mirror, luaLe], "tiktok");
   assert.equal(toTiktok[0]?.unitPrice, "39000");
   assert.equal(toTiktok[1]?.unitPrice, "");
+});
+
+test("thành tiền dòng = max(0, đơn giá × SL − giảm), vẫn tôn trọng tối thiểu kênh trước khi trừ giảm", () => {
+  // lẻ tai_tiem 5 tấm * 3000 = 15000 nhưng min 30000
+  assert.equal(lineAmountAfterDiscount(3000, 5, 30000, 0), 30000);
+  assert.equal(lineAmountAfterDiscount(3000, 5, 30000, 5000), 25000);
+  assert.equal(lineAmountAfterDiscount(56000, 1, null, 0), 56000);
+  assert.equal(lineAmountAfterDiscount(56000, 2, null, 12000), 100000);
+  assert.equal(lineAmountAfterDiscount(56000, 1, null, 56000), 0);
+  assert.equal(lineAmountAfterDiscount(56000, 1, null, 80000), 0);
+  assert.equal(lineAmountAfterDiscount(null, 1, null, 0), null);
 });

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { CHANNEL_LABEL, CHANNELS } from "@/domain/types";
 import { walletLabel, type WalletId } from "@/domain/money";
 import { formatMaybe } from "@/lib/brand";
@@ -118,7 +119,7 @@ function DebtBody() {
           {opened ? <p className="text-sm text-muted-foreground">Còn {opened.remain === null ? "chưa đủ giá" : formatMaybe(opened.remain)}.</p> : null}
           <label className="text-sm font-semibold">
             Số tiền
-            <Input className="mt-1 min-h-11" inputMode="numeric" aria-label="Số tiền thu" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} />
+            <MoneyInput className="mt-1 min-h-11" aria-label="Số tiền thu" value={amount} onValueChange={(value) => setAmount(value == null ? "" : String(value))} />
           </label>
           <WalletToggle value={wallet} onChange={setWallet} />
           <DialogFooter>

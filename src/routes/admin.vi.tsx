@@ -10,6 +10,7 @@ import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { vnMonth, vnYmd } from "@/domain/calc";
 import { SHOP_TILL_ID, type WalletId } from "@/domain/money";
 import { formatVnd } from "@/lib/brand";
@@ -199,7 +200,7 @@ function WalletBody() {
               <p className="text-sm text-muted-foreground">Đang giữ {formatVnd(me?.tien_mat ?? 0)} tiền mặt.</p>
               <label className="block text-sm font-semibold">
                 Số tiền nộp
-                <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={handAmount} onChange={(event) => setHandAmount(event.target.value.replace(/\D/g, ""))} />
+                <MoneyInput className="mt-1 min-h-11" required placeholder="0" value={handAmount} onValueChange={(value) => setHandAmount(value == null ? "" : String(value))} />
               </label>
               <Input aria-label="Ghi chú nộp tiền" placeholder="Ghi chú" value={handNote} onChange={(event) => setHandNote(event.target.value)} />
               <DialogFooter>
@@ -430,7 +431,7 @@ function WalletBody() {
             </label>
             <label className="block text-sm font-semibold">
               Số tiền nộp vào ví cửa hàng
-              <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={handAmount} onChange={(event) => setHandAmount(event.target.value.replace(/\D/g, ""))} />
+              <MoneyInput className="mt-1 min-h-11" required placeholder="0" value={handAmount} onValueChange={(value) => setHandAmount(value == null ? "" : String(value))} />
             </label>
             <Input aria-label="Ghi chú nộp tiền" placeholder="Ghi chú" value={handNote} onChange={(event) => setHandNote(event.target.value)} />
             <DialogFooter>
@@ -485,7 +486,7 @@ function WalletBody() {
             </div>
             <label className="block text-sm font-semibold">
               Số tiền
-              <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} />
+              <MoneyInput className="mt-1 min-h-11" required placeholder="0" value={amount} onValueChange={(value) => setAmount(value == null ? "" : String(value))} />
             </label>
             <label className="block text-sm font-semibold">
               Diễn giải

@@ -310,6 +310,19 @@ export function lineAmount(unitPrice: number | null, qty: number, minTotal?: num
   return Math.max(raw, floor);
 }
 
+/** Thành tiền dòng sau giảm: max(0, đơn giá × SL (có tối thiểu kênh) − giảm). */
+export function lineAmountAfterDiscount(
+  unitPrice: number | null,
+  qty: number,
+  minTotal?: number | null,
+  discount?: number | null,
+): number | null {
+  const base = lineAmount(unitPrice, qty, minTotal);
+  if (base === null) return null;
+  const cut = typeof discount === "number" && Number.isFinite(discount) && discount > 0 ? Math.round(discount) : 0;
+  return Math.max(0, base - cut);
+}
+
 export function comboPriceError(
   rows: { sheets: number; price: number | null }[],
 ): string | null {

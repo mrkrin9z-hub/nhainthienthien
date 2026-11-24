@@ -9,6 +9,7 @@ import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { vnMonth } from "@/domain/calc";
 import { CHANNEL_LABEL, CHANNELS, type Channel } from "@/domain/types";
 import { formatMaybe } from "@/lib/brand";
@@ -275,13 +276,12 @@ function FixedEditor({
             {draft.map((row, index) => (
               <label key={row.key} className="block text-sm font-semibold">
                 {row.name}
-                <Input
+                <MoneyInput
                   className="mt-1 min-h-11"
-                  inputMode="numeric"
-                  value={String(row.amount)}
-                  onChange={(event) => {
+                  value={row.amount || ""}
+                  onValueChange={(value) => {
                     const next = [...draft];
-                    next[index] = { ...row, amount: Number(event.target.value.replace(/[^\d]/g, "")) };
+                    next[index] = { ...row, amount: value ?? 0 };
                     setDraft(next);
                   }}
                 />

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
 import { changeStatus, deleteDeskOrder, getMe, getOrderDetail, getSkuOptions, markApproval, orderUploadLink, recordDeposit, reviseOrder, saveNote, savePackCheck, saveReprint, setPrintChoice, storeShipping } from "@/lib/admin.functions";
@@ -273,6 +274,7 @@ function OrderDetailPage() {
                 quantity: item.quantity,
                 variant: item.variant || "",
                 unitPrice: item.unitPrice === null ? "" : String(item.unitPrice),
+                discount: item.discount ?? 0,
               })),
             }}
             onSave={async (value) => {
@@ -746,9 +748,9 @@ function ShippingForm({
       ) : null}
       <Input className="min-h-12" placeholder="Hãng vận chuyển" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
       <Input className="min-h-12" placeholder="Mã vận đơn" value={tracking} onChange={(e) => setTracking(e.target.value)} />
-      <Input className="min-h-12" inputMode="numeric" placeholder="Phí hãng (nội bộ)" value={shipFee} onChange={(e) => setShipFee(e.target.value.replace(/[^\d]/g, ""))} />
-      <Input className="min-h-12" inputMode="numeric" placeholder="Phí giao khách trả" value={customerShip} onChange={(e) => setCustomerShip(e.target.value.replace(/[^\d]/g, ""))} />
-      <Input className="min-h-12" inputMode="numeric" placeholder="Tiền thu hộ COD" value={codAmount} onChange={(e) => setCodAmount(e.target.value.replace(/[^\d]/g, ""))} />
+      <MoneyInput className="min-h-12" placeholder="Phí hãng (nội bộ)" value={shipFee} onValueChange={(value) => setShipFee(value == null ? "" : String(value))} />
+      <MoneyInput className="min-h-12" placeholder="Phí giao khách trả" value={customerShip} onValueChange={(value) => setCustomerShip(value == null ? "" : String(value))} />
+      <MoneyInput className="min-h-12" placeholder="Tiền thu hộ COD" value={codAmount} onValueChange={(value) => setCodAmount(value == null ? "" : String(value))} />
       <Button
         className="min-h-11"
         onClick={async () => {

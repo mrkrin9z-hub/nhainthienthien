@@ -16,7 +16,7 @@ import {
   minutesLate,
   groupIsListed,
   isMergedWoodAlias,
-  lineAmount,
+  lineAmount, lineAmountAfterDiscount,
   priceOf,
   quoteSku,
   isProductionStep,
@@ -504,7 +504,7 @@ function buildItems(
   state: ShopState,
   channel: Channel,
   actorRole: Role | "web",
-  items: { skuId: string; quantity: number; variant?: string; unitPrice?: number | null; priceReason?: string }[],
+  items: { skuId: string; quantity: number; variant?: string; unitPrice?: number | null; discount?: number | null; priceReason?: string }[],
 ) {
   /** Đơn trống được phép — tạo nhanh để lấy mã QR gửi ảnh trước. */
   return items.map((item) => {
@@ -528,7 +528,13 @@ function buildItems(
       skuCode: sku.code,
       quantity: item.quantity,
       unitPrice,
-      lineTotal: lineAmount(unitPrice, item.quantity, channelMinTotal(channel, priceOf(state.prices, item.skuId, channel)?.minTotal)),
+      ...(item.discount && item.discount > 0 ? { discount: Math.round(item.discount) } : {}),
+      lineTotal: lineAmountAfterDiscount(
+        unitPrice,
+        item.quantity,
+        channelMinTotal(channel, priceOf(state.prices, item.skuId, channel)?.minTotal),
+        item.discount,
+      ),
       variant: item.variant?.trim() || "",
     };
   });
@@ -1604,7 +1610,7 @@ export async function createManualOrder(
     netAmount?: number | null;
     designFileUrl?: string | null;
     albumId?: string | null;
-    items: { skuId: string; quantity: number; variant?: string; unitPrice?: number | null; priceReason?: string }[];
+    items: { skuId: string; quantity: number; variant?: string; unitPrice?: number | null; discount?: number | null; priceReason?: string }[];
   },
 ) {
   if (isMarketplace(input.channel)) throw new Error("Đơn TikTok và Shopee nhập từ file xuất của sàn, không tạo tay.");
@@ -1711,7 +1717,7 @@ export async function reviseOrder(
     shipBy?: string | null;
     paymentMethod?: PaymentMethod;
     designFileUrl?: string | null;
-    items?: { skuId: string; quantity: number; variant?: string; unitPrice?: number | null; priceReason?: string }[];
+    items?: { skuId: string; quantity: number; variant?: string; unitPrice?: number | null; discount?: number | null; priceReason?: string }[];
   },
 ) {
   assertRole(actor, ["owner", "sale"]);
@@ -1764,7 +1770,13 @@ export async function reviseOrder(
           skuCode: sku.code,
           quantity: item.quantity,
           unitPrice,
-          lineTotal: lineAmount(unitPrice, item.quantity, channelMinTotal(order.channel, priceOf(state.prices, item.skuId, order.channel)?.minTotal)),
+          ...(item.discount && item.discount > 0 ? { discount: Math.round(item.discount) } : { discount: null }),
+          lineTotal: lineAmountAfterDiscount(
+            unitPrice,
+            item.quantity,
+            channelMinTotal(order.channel, priceOf(state.prices, item.skuId, order.channel)?.minTotal),
+            item.discount,
+          ),
           ...(previous?.listUnitPrice !== undefined ? { listUnitPrice: previous.listUnitPrice } : {}),
           ...(previous?.sellerSku ? { sellerSku: previous.sellerSku } : {}),
           variant: item.variant?.trim() || previous?.variant || "",

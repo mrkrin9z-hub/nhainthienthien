@@ -31,7 +31,6 @@ export function ProductPickerDialog({
 }) {
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("all");
-  const [selected, setSelected] = useState<string[]>([]);
   const [showUnpriced, setShowUnpriced] = useState(false);
 
   const groups = useMemo(() => {
@@ -50,15 +49,15 @@ export function ProductPickerDialog({
     });
   }, [catalog, group, q, showUnpriced, channel]);
 
-  function toggle(id: string) {
-    setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  function pick(id: string) {
+    onConfirm([id]);
   }
 
   function close(next: boolean) {
     if (!next) {
       setQ("");
       setGroup("all");
-      setSelected([]);
+      
     }
     onOpenChange(next);
   }
@@ -104,16 +103,15 @@ export function ProductPickerDialog({
         <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {rows.map((sku) => {
             const price = sku.prices?.[channel] ?? null;
-            const active = selected.includes(sku.id);
             return (
               <li key={sku.id}>
                 <button
                   type="button"
-                  onClick={() => toggle(sku.id)}
-                  className={`flex w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left ${active ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-muted/40"}`}
+                  onClick={() => pick(sku.id)}
+                  className="flex w-full items-start gap-3 rounded-md border border-border bg-card px-3 py-2.5 text-left hover:border-primary hover:bg-primary/5"
                 >
-                  <span className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${active ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"}`}>
-                    {active ? <span className="size-1.5 rounded-full bg-primary-foreground" /> : null}
+                  <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-primary/40 text-[10px] font-bold text-primary">
+                    +
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2">
@@ -130,18 +128,8 @@ export function ProductPickerDialog({
           {rows.length === 0 ? <li className="py-8 text-center text-sm text-muted-foreground">Không có sản phẩm khớp.</li> : null}
         </ul>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => close(false)}>
-            Hủy
-          </Button>
-          <Button
-            type="button"
-            disabled={selected.length === 0}
-            onClick={() => {
-              onConfirm(selected);
-              close(false);
-            }}
-          >
-            Xác nhận ({selected.length})
+          <Button type="button" className="w-full" onClick={() => close(false)}>
+            Xong
           </Button>
         </DialogFooter>
       </DialogContent>

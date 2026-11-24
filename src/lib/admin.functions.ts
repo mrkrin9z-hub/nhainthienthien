@@ -104,6 +104,7 @@ const itemSchema = z.object({
   quantity: z.number().int().min(1).max(500),
   variant: z.string().max(80).optional().default(""),
   unitPrice: z.number().int().min(0).nullable().optional(),
+  discount: z.number().int().min(0).max(100_000_000).optional().default(0),
   priceReason: z.string().max(300).optional(),
 });
 

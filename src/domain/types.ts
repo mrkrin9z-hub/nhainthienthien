@@ -547,6 +547,8 @@ export type OrderItem = {
   variant?: string;
   quantity: number;
   unitPrice: number | null;
+  /** Giảm giá trên dòng. Thiếu hoặc 0 thì không giảm. */
+  discount?: number | null;
   lineTotal: number | null;
   /** Giá niêm yết của tiệm lúc nhập đơn sàn. Giá bán trên đơn là tiền sàn. */
   listUnitPrice?: number | null;

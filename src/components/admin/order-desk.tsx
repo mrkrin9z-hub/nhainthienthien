@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { ProductPickerDialog } from "@/components/admin/product-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { lineAmount } from "@/domain/calc";
+import { lineAmountAfterDiscount } from "@/domain/calc";
 import { vnYmd } from "@/domain/calc";
 import { minTotalForChannel, retargetLinesForChannel } from "@/domain/desk-pricing";
 import { skuSoldOn } from "@/domain/mohome";
@@ -39,6 +40,7 @@ type Line = {
   unitPrice: string;
   priceTouched: boolean;
   variant: string;
+  discount: string;
 };
 
 export type DeskSave = {
@@ -60,11 +62,11 @@ export type DeskSave = {
   netAmount?: number | null;
   designFileUrl?: string | null;
   albumId?: string | null;
-  items?: { skuId: string; quantity: number; variant?: string; unitPrice?: number; priceReason?: string }[];
+  items?: { skuId: string; quantity: number; variant?: string; unitPrice?: number; discount?: number; priceReason?: string }[];
 };
 
 function blankLine(): Line {
-  return { key: crypto.randomUUID(), skuId: "", query: "", quantity: 1, unitPrice: "", priceTouched: false, variant: "" };
+  return { key: crypto.randomUUID(), skuId: "", query: "", quantity: 1, unitPrice: "", priceTouched: false, variant: "", discount: "" };
 }
 
 function localIso(value: string): string | null {
@@ -120,7 +122,7 @@ export function OrderDesk({
     shipBy?: string;
     designFileUrl?: string;
     paymentMethod?: PaymentMethod;
-    lines: { key: string; skuId: string; quantity: number; unitPrice: string; variant?: string }[];
+    lines: { key: string; skuId: string; quantity: number; unitPrice: string; variant?: string; discount?: number | string | null }[];
   };
   paidSoFar: number;
   payments?: { at: string; amount: number; method: string; byName: string }[];
@@ -147,7 +149,13 @@ export function OrderDesk({
   const [designFileUrl, setDesignFileUrl] = useState(initial.designFileUrl ?? "");
   const [lines, setLines] = useState<Line[]>(
     initial.lines.length
-      ? initial.lines.map((line) => ({ ...line, query: "", priceTouched: line.unitPrice !== "", variant: line.variant ?? "" }))
+      ? initial.lines.map((line) => ({
+          ...line,
+          query: "",
+          priceTouched: line.unitPrice !== "",
+          variant: line.variant ?? "",
+          discount: line.discount == null || line.discount === "" || line.discount === 0 ? "" : String(line.discount),
+        }))
       : mode === "create"
         ? []
         : [blankLine()],
@@ -188,7 +196,11 @@ export function OrderDesk({
       const listed = sku?.prices?.[channel] ?? null;
       const typed = digits(line.unitPrice);
       const unit = line.priceTouched && Number.isFinite(typed) ? typed : listed;
-      const lineTotal = !sku || unit === null ? null : lineAmount(unit, line.quantity, minTotalForChannel(sku, channel));
+      const cut = line.discount.trim() === "" ? 0 : digits(line.discount);
+      const lineTotal =
+        !sku || unit === null
+          ? null
+          : lineAmountAfterDiscount(unit, line.quantity, minTotalForChannel(sku, channel), Number.isFinite(cut) ? cut : 0);
       return { ...line, sku, listed, unit, lineTotal };
     });
   }, [catalog, channel, lines]);
@@ -203,12 +215,6 @@ export function OrderDesk({
 
   function patchLine(key: string, patch: Partial<Line>) {
     setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
-  }
-
-  function chooseSku(key: string, skuId: string) {
-    const sku = catalog.find((item) => item.id === skuId);
-    const listed = sku?.prices?.[channel] ?? null;
-    patchLine(key, { skuId, query: "", priceTouched: false, unitPrice: listed === null ? "" : String(listed) });
   }
 
   function addSkus(skuIds: string[]) {
@@ -226,6 +232,7 @@ export function OrderDesk({
             unitPrice: listed === null ? "" : String(listed),
             priceTouched: false,
             variant: "",
+            discount: "",
           } satisfies Line;
         }),
       ];
@@ -247,6 +254,7 @@ export function OrderDesk({
         quantity: line.quantity,
         variant: line.variant.trim(),
         ...(line.unit !== null ? { unitPrice: line.unit, ...(line.priceTouched ? { priceReason } : {}) } : {}),
+        ...(digits(line.discount) > 0 ? { discount: digits(line.discount) } : { discount: 0 }),
       }));
     // Cho phép tạo đơn không sản phẩm để lấy mã QR gửi ảnh trước.
     if (priced.some((line) => line.priceTouched) && !priceReason.trim()) {
@@ -420,7 +428,7 @@ export function OrderDesk({
                   : "Chưa có sản phẩm trong đơn."}
               </p>
               {itemsLocked ? null : (
-                <Button type="button" className="mt-3" onClick={() => setPickerOpen(true)}>
+                <Button type="button" className="mt-3 w-full" onClick={() => setPickerOpen(true)}>
                   <Plus className="mr-1 size-4" />
                   Thêm sản phẩm
                 </Button>
@@ -433,15 +441,13 @@ export function OrderDesk({
                   key={line.key}
                   index={index}
                   line={line}
-                  catalog={sellable}
                   owner={owner}
                   locked={itemsLocked}
-                  canRemove={!itemsLocked && lines.length > 0}
-                  onQuery={(query) => patchLine(line.key, { query })}
-                  onSku={(skuId) => chooseSku(line.key, skuId)}
+                  canRemove={!itemsLocked}
                   onQty={(quantity) => patchLine(line.key, { quantity })}
                   onPrice={(unitPrice) => patchLine(line.key, { unitPrice, priceTouched: true })}
                   onVariant={(variant) => patchLine(line.key, { variant })}
+                  onDiscount={(discount) => patchLine(line.key, { discount })}
                   onRemove={() => setLines((current) => current.filter((item) => item.key !== line.key))}
                 />
               ))}
@@ -464,7 +470,7 @@ export function OrderDesk({
             {fieldsLocked ? null : (
               <label className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground">Giảm giá</span>
-                <Input className="h-9 w-32 text-right" inputMode="numeric" value={discount} placeholder="0" aria-label="Giảm giá" onChange={(event) => setDiscount(event.target.value.replace(/[^\d]/g, ""))} />
+                <MoneyInput className="h-9 w-32 text-right" value={discount} placeholder="0" aria-label="Giảm giá" onValueChange={(value) => setDiscount(value == null ? "" : String(value))} />
               </label>
             )}
             <div className="flex items-center justify-between border-t pt-2">
@@ -491,7 +497,7 @@ export function OrderDesk({
               </Field>
               {retail ? null : (
                 <Field label="Thực nhận ước tính">
-                  <Input className="min-h-11" inputMode="numeric" value={netAmount} disabled={fieldsLocked} placeholder="Để trống thì tự tính" onChange={(event) => setNetAmount(event.target.value.replace(/[^\d]/g, ""))} />
+                  <MoneyInput className="min-h-11" value={netAmount} disabled={fieldsLocked} placeholder="Để trống thì tự tính" onValueChange={(value) => setNetAmount(value == null ? "" : String(value))} />
                 </Field>
               )}
               <Field label="Link ảnh thiết kế">
@@ -511,7 +517,7 @@ export function OrderDesk({
             {compact ? null : (
               <label className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground">Phí giao khách trả</span>
-                <Input className="h-9 w-32 text-right" inputMode="numeric" value={customerShip} disabled={fieldsLocked} placeholder="Để trống" aria-label="Phí giao khách trả" onChange={(event) => setCustomerShip(event.target.value.replace(/[^\d]/g, ""))} />
+                <MoneyInput className="h-9 w-32 text-right" value={customerShip} disabled={fieldsLocked} placeholder="Để trống" aria-label="Phí giao khách trả" onValueChange={(value) => setCustomerShip(value == null ? "" : String(value))} />
               </label>
             )}
             <div className="flex justify-between">
@@ -579,7 +585,7 @@ export function OrderDesk({
                   <>
                     <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn. Để 0 nếu chưa thu.</p>
                     <Field label="Số tiền thu lần 1">
-                      <Input inputMode="numeric" placeholder="0" value={deposit} disabled={fieldsLocked} onChange={(event) => setDeposit(event.target.value.replace(/[^\d]/g, ""))} />
+                      <MoneyInput placeholder="0" value={deposit} disabled={fieldsLocked} onValueChange={(value) => setDeposit(value == null ? "" : String(value))} />
                     </Field>
                   </>
                 )
@@ -595,7 +601,7 @@ export function OrderDesk({
               <div className="flex items-end gap-2">
                 <div className="min-w-0 flex-1">
                   <Field label="Số tiền">
-                    <Input inputMode="numeric" placeholder="Số tiền" value={deposit} disabled={fieldsLocked || !onCollect} onChange={(event) => setDeposit(event.target.value.replace(/[^\d]/g, ""))} />
+                    <MoneyInput placeholder="Số tiền" value={deposit} disabled={fieldsLocked || !onCollect} onValueChange={(value) => setDeposit(value == null ? "" : String(value))} />
                   </Field>
                 </div>
                 <div className="w-36 shrink-0">
@@ -656,111 +662,163 @@ function Field({ label, children, required, icon }: { label: string; children: R
   );
 }
 
+function skuTitle(sku: DeskSku): string {
+  const group = sku.groupName.trim();
+  const name = sku.name.trim();
+  if (group && name && !name.includes(group)) return `${group} · ${name}`;
+  return name || group || sku.label;
+}
+
 function ProductLine({
   index,
   line,
-  catalog,
   owner,
   locked,
   canRemove,
-  onQuery,
-  onSku,
   onQty,
   onPrice,
   onVariant,
+  onDiscount,
   onRemove,
 }: {
   index: number;
   line: Line & { sku?: DeskSku; listed: number | null; unit: number | null; lineTotal: number | null };
-  catalog: DeskSku[];
   owner: boolean;
   locked: boolean;
   canRemove: boolean;
-  onQuery: (query: string) => void;
-  onSku: (skuId: string) => void;
   onQty: (quantity: number) => void;
   onPrice: (unitPrice: string) => void;
   onVariant: (variant: string) => void;
+  onDiscount: (discount: string) => void;
   onRemove: () => void;
 }) {
-  const query = line.query.trim().toLowerCase();
-  const visible = catalog.filter((sku) => {
-    if (!query || sku.id === line.skuId) return true;
-    return `${sku.label} ${sku.code} ${sku.name}`.toLowerCase().includes(query);
-  });
-  const groups = new Map<string, DeskSku[]>();
-  for (const sku of visible) {
-    const name = sku.groupName || "Khác";
-    const bucket = groups.get(name) ?? [];
-    bucket.push(sku);
-    groups.set(name, bucket);
-  }
+  const [editVariant, setEditVariant] = useState(Boolean(line.variant.trim()));
+  const title = line.sku ? skuTitle(line.sku) : "Chưa chọn sản phẩm";
 
   return (
-    <div className="rounded-xl border p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-muted-foreground">Dòng {index + 1}</p>
+    <div className="rounded-2xl border border-border/80 bg-card p-3 shadow-sm">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] leading-snug font-bold text-foreground">{title}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {line.sku ? (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 font-mono text-[11px] font-semibold text-blue-700">
+                {line.sku.code}
+              </span>
+            ) : null}
+            {line.variant.trim() && !editVariant ? (
+              <button
+                type="button"
+                className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+                disabled={locked}
+                onClick={() => setEditVariant(true)}
+              >
+                {line.variant}
+              </button>
+            ) : null}
+            {!locked && (editVariant || !line.variant.trim()) ? (
+              editVariant ? (
+                <Input
+                  className="h-7 w-36 rounded-full px-2 text-xs"
+                  value={line.variant}
+                  disabled={locked}
+                  placeholder="Mẫu / phân loại"
+                  aria-label={`Mẫu dòng ${index + 1}`}
+                  onChange={(event) => onVariant(event.target.value)}
+                  onBlur={() => {
+                    if (!line.variant.trim()) setEditVariant(false);
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="text-[11px] font-medium text-blue-700"
+                  onClick={() => setEditVariant(true)}
+                >
+                  + Mẫu
+                </button>
+              )
+            ) : null}
+          </div>
+        </div>
         {canRemove ? (
-          <Button type="button" size="icon" variant="ghost" aria-label="Xóa dòng" onClick={onRemove}>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="size-8 shrink-0 text-red-500 hover:bg-red-50 hover:text-red-600"
+            aria-label="Xóa sản phẩm"
+            onClick={onRemove}
+          >
             <Trash2 className="size-4" />
           </Button>
         ) : null}
       </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_auto_7rem_6.5rem]">
-        <Field label="Sản phẩm">
-          <Input className="mb-1 min-h-11" placeholder="Tìm mã hoặc tên" value={line.query} disabled={locked} onChange={(event) => onQuery(event.target.value)} aria-label={`Tìm sản phẩm dòng ${index + 1}`} />
-          <select className={control} value={line.skuId} disabled={locked} aria-label={`Sản phẩm dòng ${index + 1}`} onChange={(event) => onSku(event.target.value)}>
-            <option value="">Chọn sản phẩm</option>
-            {[...groups.entries()].map(([name, items]) => (
-              <optgroup key={name} label={name}>
-                {items.map((sku) => (
-                  <option key={sku.id} value={sku.id}>
-                    {sku.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </Field>
-        <Field label="Mẫu">
-          <Input className="min-h-11" value={line.variant} disabled={locked} placeholder="Phân loại" aria-label={`Mẫu dòng ${index + 1}`} onChange={(event) => onVariant(event.target.value)} />
-        </Field>
-        <Field label="Số lượng">
-          <div className="flex min-h-11 items-center">
-            <Button type="button" variant="outline" className="size-11 shrink-0" aria-label={`Giảm số lượng dòng ${index + 1}`} disabled={locked || line.quantity <= 1} onClick={() => onQty(line.quantity - 1)}>
-              <Minus className="size-4" />
-            </Button>
+
+      <div className="mt-3 grid grid-cols-3 items-end gap-2">
+        <label className="min-w-0 space-y-1">
+          <span className="block text-[11px] font-semibold text-muted-foreground">Giá:</span>
+          {owner && !locked ? (
+            <MoneyInput
+              className="h-9 rounded-full px-2 text-center text-sm"
+              aria-label={`Đơn giá dòng ${index + 1}`}
+              placeholder={line.listed === null ? "—" : formatGroupedInt(line.listed)}
+              value={line.unitPrice}
+              onValueChange={(value) => onPrice(value == null ? "" : String(value))}
+            />
+          ) : (
+            <p className="flex h-9 items-center justify-center text-sm font-medium">
+              {line.unit === null ? "Chưa có giá" : formatVnd(line.unit)}
+            </p>
+          )}
+        </label>
+        <label className="min-w-0 space-y-1">
+          <span className="block text-[11px] font-semibold text-muted-foreground">SL:</span>
+          <div className="flex h-9 items-center rounded-full border border-input bg-background">
+            <button
+              type="button"
+              className="flex size-8 shrink-0 items-center justify-center text-muted-foreground disabled:opacity-40"
+              aria-label={`Giảm số lượng dòng ${index + 1}`}
+              disabled={locked || line.quantity <= 1}
+              onClick={() => onQty(line.quantity - 1)}
+            >
+              <Minus className="size-3.5" />
+            </button>
             <Input
-              className="h-11 w-14 rounded-none border-x-0 text-center"
+              className="h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-center shadow-none focus-visible:ring-0"
               inputMode="numeric"
               disabled={locked}
               aria-label={`Số lượng dòng ${index + 1}`}
               value={line.quantity}
               onChange={(event) => onQty(Math.min(500, Math.max(1, Number(event.target.value.replace(/\D/g, "")) || 1)))}
             />
-            <Button type="button" variant="outline" className="size-11 shrink-0" aria-label={`Tăng số lượng dòng ${index + 1}`} disabled={locked || line.quantity >= 500} onClick={() => onQty(line.quantity + 1)}>
-              <Plus className="size-4" />
-            </Button>
+            <button
+              type="button"
+              className="flex size-8 shrink-0 items-center justify-center text-muted-foreground disabled:opacity-40"
+              aria-label={`Tăng số lượng dòng ${index + 1}`}
+              disabled={locked || line.quantity >= 500}
+              onClick={() => onQty(line.quantity + 1)}
+            >
+              <Plus className="size-3.5" />
+            </button>
           </div>
-        </Field>
-        <Field label="Đơn giá">
-          {owner && !locked ? (
-            <Input
-              className="min-h-11"
-              inputMode="numeric"
-              aria-label={`Đơn giá dòng ${index + 1}`}
-              placeholder={line.listed === null ? "Chưa có giá" : String(line.listed)}
-              value={line.unitPrice}
-              onChange={(event) => onPrice(event.target.value.replace(/[^\d]/g, ""))}
-            />
-          ) : (
-            <p className="flex min-h-11 items-center text-sm">{line.unit === null ? "Chưa có giá" : formatVnd(line.unit)}</p>
-          )}
-        </Field>
-        <Field label="Thành tiền">
-          <p className="flex min-h-11 items-center text-sm font-semibold">{line.sku ? formatMaybe(line.lineTotal) : "—"}</p>
-        </Field>
+        </label>
+        <label className="min-w-0 space-y-1">
+          <span className="block text-[11px] font-semibold text-muted-foreground">Giảm:</span>
+          <MoneyInput
+            className="h-9 rounded-full px-2 text-center text-sm"
+            aria-label={`Giảm giá dòng ${index + 1}`}
+            placeholder="0"
+            value={line.discount}
+            disabled={locked}
+            onValueChange={(value) => onDiscount(value == null ? "" : String(value))}
+          />
+        </label>
       </div>
+
+      <p className="mt-2 text-right text-base font-extrabold text-blue-700">
+        {line.sku ? formatMaybe(line.lineTotal) : "—"}
+      </p>
     </div>
   );
 }

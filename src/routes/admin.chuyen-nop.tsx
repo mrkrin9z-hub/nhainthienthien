@@ -9,6 +9,7 @@ import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { vnMonth } from "@/domain/calc";
 import { formatVnd } from "@/lib/brand";
 import { getMe, getMoneyDesk, handCashIn } from "@/lib/admin.functions";
@@ -100,7 +101,7 @@ function HandoverBody() {
           )}
           <label className="text-sm font-semibold">
             Số tiền nộp
-            <Input className="mt-1 min-h-11" inputMode="numeric" aria-label="Số tiền nộp" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} />
+            <MoneyInput className="mt-1 min-h-11" aria-label="Số tiền nộp" value={amount} onValueChange={(value) => setAmount(value == null ? "" : String(value))} />
           </label>
           <label className="text-sm font-semibold">
             Ghi chú

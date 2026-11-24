@@ -8,6 +8,7 @@ import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { formatMaybe } from "@/lib/brand";
 import { getTargets, storeSettings } from "@/lib/admin.functions";
@@ -105,14 +106,13 @@ function TargetsBody() {
             {labels.map((label, index) => (
               <div key={label}>
                 <Label htmlFor={`target-${index}`}>{label}</Label>
-                <Input
+                <MoneyInput
                   id={`target-${index}`}
                   className="mt-1 min-h-11"
-                  inputMode="numeric"
                   value={values[index] ?? ""}
-                  onChange={(e) => {
+                  onValueChange={(value) => {
                     const next = [...values];
-                    next[index] = e.target.value.replace(/[^\d]/g, "");
+                    next[index] = value == null ? "" : String(value);
                     setValues(next);
                   }}
                 />

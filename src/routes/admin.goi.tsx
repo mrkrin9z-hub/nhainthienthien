@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
@@ -161,7 +162,7 @@ function PackagesBody() {
             </div>
             <div>
               <Label>Giá (đ)</Label>
-              <Input className="mt-1 min-h-11" inputMode="numeric" value={form.price} onChange={(e) => setForm((c) => ({ ...c, price: e.target.value.replace(/[^\d]/g, "") }))} required />
+              <MoneyInput className="mt-1 min-h-11" value={form.price} required onValueChange={(value) => setForm((c) => ({ ...c, price: value == null ? "" : String(value) }))} />
             </div>
             <div>
               <Label>Mô tả ngắn</Label>

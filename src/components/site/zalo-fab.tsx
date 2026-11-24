@@ -3,6 +3,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { resolvePublicZaloHref } from "@/domain/public-contact";
+import { isStaffPath } from "@/domain/site-chrome";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 
 const GAP_PX = 16;
@@ -42,9 +43,9 @@ function useClearanceAboveStickyBars(enabled: boolean) {
   return bottom;
 }
 
-/** Nút nổi Chat Zalo trên trang công khai — không hiện trong /admin. */
+/** Nút nổi Chat Zalo trên trang công khai — không hiện trên admin, tạo đơn, việc nhân viên. */
 export function ZaloFab() {
-  const admin = useRouterState({ select: (state) => state.location.pathname.startsWith("/admin") });
+  const admin = useRouterState({ select: (state) => isStaffPath(state.location.pathname) });
   const config = useQuery({ ...publicConfigQueryOptions, enabled: !admin });
   const href = resolvePublicZaloHref(admin ? undefined : config.data);
   const bottom = useClearanceAboveStickyBars(!admin);

@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CircleCheck, CircleDashed, ClipboardList, Droplets, MoreHorizontal, Package, PackagePlus, PackageSearch, TriangleAlert } from "lucide-react";
 import { formatMaybe } from "@/lib/brand";
@@ -594,13 +595,12 @@ function BulkReceive({
                   </td>
                   <td className="py-2 pr-2 text-slate-600">{material ? purchaseUnit(material) : "—"}</td>
                   <td className="py-2 pr-2">
-                    <Input
+                    <MoneyInput
                       className="h-10 w-28"
-                      inputMode="numeric"
                       aria-label="Đơn giá"
                       placeholder="Tuỳ chọn"
                       value={row.price}
-                      onChange={(event) => setRows((current) => current.map((item) => (item.key === row.key ? { ...item, price: event.target.value.replace(/[^\d]/g, "") } : item)))}
+                      onValueChange={(value) => setRows((current) => current.map((item) => (item.key === row.key ? { ...item, price: value == null ? "" : String(value) } : item)))}
                     />
                   </td>
                   <td className="py-2">

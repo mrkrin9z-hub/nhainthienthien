@@ -12,6 +12,7 @@ import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { vnMonth, vnYmd } from "@/domain/calc";
 import { EXPENSE_CATEGORIES, type ExpenseCategoryId, type WalletId } from "@/domain/money";
 import { formatVnd } from "@/lib/brand";
@@ -215,7 +216,7 @@ function ExpenseDialog({
           </div>
           <label className="text-sm font-semibold">
             Số tiền
-            <Input className="mt-1 min-h-11" inputMode="numeric" required placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} />
+            <MoneyInput className="mt-1 min-h-11" required placeholder="0" value={amount} onValueChange={(value) => setAmount(value == null ? "" : String(value))} />
           </label>
           <label className="text-sm font-semibold">
             Diễn giải

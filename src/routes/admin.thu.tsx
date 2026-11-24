@@ -13,6 +13,7 @@ import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import type { WalletId } from "@/domain/money";
 import { walletLabel } from "@/domain/money";
 import { formatMaybe, formatVnd } from "@/lib/brand";
@@ -170,7 +171,7 @@ function HandDialog({ open, held, onOpenChange }: { open: boolean; held: number;
         <p className="text-sm text-muted-foreground">Đưa số tiền mặt đang giữ về két tiệm. Đang giữ {formatVnd(held)}.</p>
         <label className="text-sm font-semibold">
           Số tiền nộp
-          <Input className="mt-1 min-h-11" inputMode="numeric" aria-label="Số tiền nộp" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} />
+          <MoneyInput className="mt-1 min-h-11" aria-label="Số tiền nộp" value={amount} onValueChange={(value) => setAmount(value == null ? "" : String(value))} />
         </label>
         <label className="text-sm font-semibold">
           Ghi chú
@@ -234,12 +235,11 @@ function CollectDialog({
             <p className="text-sm font-semibold">Cộng vào ví của {payerName || "bạn"}.</p>
             <label className="text-sm font-semibold">
               Số tiền
-              <Input
+              <MoneyInput
                 className="mt-1 min-h-11"
-                inputMode="numeric"
                 aria-label={`Số tiền thu ${row.code}`}
                 value={amount}
-                onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))}
+                onValueChange={(value) => setAmount(value == null ? "" : String(value))}
               />
             </label>
             <WalletToggle value={wallet} onChange={setWallet} />
