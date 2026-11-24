@@ -9,8 +9,9 @@ export const BRAND = {
   shopeeUrl: "https://shopee.vn/nhainthienthien",
   /** Fanpage Facebook Nhà In Thiên Thiên. */
   facebookPageUrl: "https://www.facebook.com/profile.php?id=61595796658051",
-  /** Kênh TikTok Shop (mã shop VNLC2LWWT8). */
-  tiktokShopUrl: "https://www.tiktok.com/@xuonginthienthien",
+  tiktokHandle: "@nhain.thienthien",
+  /** Kênh TikTok Shop Nhà In Thiên Thiên. */
+  tiktokShopUrl: "https://www.tiktok.com/@nhain.thienthien",
   /** Nút "Chat ngay": Messenger của Page Nhà In Thiên Thiên. */
   messengerUrl: "https://m.me/61595796658051",
 } as const;

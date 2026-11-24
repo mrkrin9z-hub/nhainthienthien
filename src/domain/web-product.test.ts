@@ -90,9 +90,12 @@ test("từ chối khổ trùng và combo đắt hơn trên mỗi tấm", () => {
 
 test("trang quản trị có chỗ thêm sản phẩm lên trang chủ", () => {
   const page = readFileSync(new URL("../routes/admin.san-pham.tsx", import.meta.url), "utf8");
+  const editor = readFileSync(new URL("../components/admin/product-editor.tsx", import.meta.url), "utf8");
   const home = readFileSync(new URL("../routes/index.tsx", import.meta.url), "utf8");
-  assert.match(page, /createWebProduct/);
-  assert.match(page, /Hiện trên trang chủ/);
+  assert.match(page, /ProductEditor/);
+  assert.match(editor, /createWebProduct/);
+  assert.match(editor, /updateWebProduct/);
+  assert.match(editor, /Hiện trên trang chủ/);
   assert.doesNotMatch(page, /redirect\(/);
   assert.match(home, /catalogQueryOptions/);
   assert.match(home, /id="gian-hang"/);
@@ -129,4 +132,41 @@ test("sản phẩm mới nhận giá từng kênh và tối thiểu, mặc đị
   assert.equal(byChannel['tiktok']?.price, null);
   assert.equal(byChannel['tiktok']?.status, "nhap");
   assert.deepEqual(built.skus[0]?.soldOn, ["tai_tiem", "facebook", "ctv", "mo_home"]);
+});
+
+test("tạo sản phẩm ghi đủ giá 6 kênh và không lấy giá CTV làm giá công khai", () => {
+  const built = buildWebProduct(
+    {
+      name: "Ảnh thử",
+      category: "Ảnh gỗ",
+      description: "",
+      turnaround: "",
+      sizes: [
+        {
+          widthCm: 13,
+          heightCm: 18,
+          sheets: 1,
+          price: 37000,
+          quotes: {
+            tai_tiem: { price: 37000, sold: true, minTotal: null },
+            facebook: { price: 37000, sold: true },
+            tiktok: { price: 39000, sold: true },
+            shopee: { price: 39000, sold: true },
+            ctv: { price: 33000, sold: true },
+            mo_home: { price: 25000, sold: true },
+          },
+        },
+      ],
+    },
+    empty,
+  );
+  const byChannel = Object.fromEntries(built.prices.map((row) => [row.channel, row]));
+  assert.equal(byChannel.tai_tiem?.price, 37000);
+  assert.equal(byChannel.tiktok?.price, 39000);
+  assert.equal(byChannel.ctv?.price, 33000);
+  assert.equal(byChannel.mo_home?.price, 25000);
+  const settings = { showAnhThe: false, showAlbum: false, groupListed: { [built.group.id]: true } };
+  const offers = walkInPublicOffers({ settings: settings as never, groups: [built.group], skus: built.skus, prices: built.prices });
+  assert.equal(offers[0]?.price, 37000);
+  assert.equal(offers[0]?.skuId ?? built.skus[0]?.id, built.skus[0]?.id);
 });

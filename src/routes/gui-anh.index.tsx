@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { CheckCircle2, Loader2, UploadCloud } from "lucide-react";
@@ -45,6 +45,7 @@ function guessMime(file: File): string {
 }
 
 function SharedUploadPage() {
+  const navigate = useNavigate();
   const config = useQuery(publicConfigQueryOptions);
   const limit = config.data ? config.data.maxPhotoBytes : undefined;
   const direct = limit === null;
@@ -89,6 +90,8 @@ function SharedUploadPage() {
     setBatchProgress(0);
     let failed = false;
     let savedPhone = "";
+    let savedAlbumId = "";
+    let savedCount = 0;
     const queue = pending.filter((row) => !(limit != null && row.file.size > limit));
     const totalBytes = Math.max(
       1,
@@ -123,6 +126,7 @@ function SharedUploadPage() {
             },
           });
           savedPhone = ticket.phone;
+          savedAlbumId = ticket.albumId;
           if (direct) {
             const session = await prepareAlbumDriveUpload({ data: { albumId: ticket.albumId, phone, fileId: ticket.fileId } });
             const driveFileId = await putDriveFile(session.uploadUrl, row.file, mime, report);
@@ -136,6 +140,7 @@ function SharedUploadPage() {
             await postFormWithProgress("/api/public/album", body, report);
           }
           loadedBytes += row.file.size;
+          savedCount += 1;
           setRows((current) => current.map((item) => (item.key === row.key ? { ...item, status: "complete", progress: 100 } : item)));
         } catch (err) {
           failed = true;
@@ -147,6 +152,13 @@ function SharedUploadPage() {
       if (failed) setError("Một số ảnh chưa lên. Có thể gửi tiếp.");
       if (!savedPhone && failed) setError("Chưa gửi được ảnh.");
       if (!failed) setBatchProgress(100);
+      if (savedAlbumId && savedPhone && savedCount > 0 && !failed) {
+        await navigate({
+          to: "/gui-anh/phieu",
+          search: { album: savedAlbumId, phone: savedPhone, name: customerName.trim(), count: String(savedCount) },
+        });
+        return;
+      }
     } finally {
       setBusy(false);
     }

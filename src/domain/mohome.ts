@@ -88,12 +88,12 @@ export function laborSplit(productionBase: number, percent: number): { moHome: n
  */
 export function skuSoldOn(sku: { soldOn?: Channel[] | null }, channel: Channel): boolean {
   const listed = sku.soldOn;
-  if (!listed || listed.length === 0) return (NHA_IN_CHANNELS as readonly string[]).includes(channel);
+  if (listed == null) return (NHA_IN_CHANNELS as readonly string[]).includes(channel);
   return listed.includes(channel);
 }
 
 export function withChannelSold(sku: { soldOn?: Channel[] | null }, channel: Channel, sold: boolean): Channel[] {
-  const current = sku.soldOn && sku.soldOn.length > 0 ? [...sku.soldOn] : [...NHA_IN_CHANNELS];
+  const current = sku.soldOn == null ? [...NHA_IN_CHANNELS] : [...sku.soldOn];
   if (sold) return current.includes(channel) ? current : [...current, channel];
   return current.filter((item) => item !== channel);
 }

@@ -1,12 +1,21 @@
 import { comboPriceError } from "./calc.ts";
 import { CHANNELS, type Channel, type ChannelPrice, type Group, type Sku } from "./types.ts";
 
+export type WebChannelQuote = {
+  price?: number | null;
+  listPrice?: number | null;
+  minTotal?: number | null;
+  sold?: boolean;
+};
+
 export type WebSizeInput = {
+  skuId?: string;
   widthCm: number;
   heightCm: number;
   sheets: number;
   price: number;
   prices?: Partial<Record<Channel, number>>;
+  quotes?: Partial<Record<Channel, WebChannelQuote>>;
   minTotal?: number | null;
 };
 
@@ -24,6 +33,28 @@ export type BuiltWebProduct = {
   skus: Sku[];
   prices: ChannelPrice[];
 };
+
+
+export function channelQuotes(size: WebSizeInput): Record<Channel, { price: number | null; listPrice: number | null; minTotal: number | null; sold: boolean }> {
+  const out = {} as Record<Channel, { price: number | null; listPrice: number | null; minTotal: number | null; sold: boolean }>;
+  for (const channel of CHANNELS) {
+    const quote = size.quotes?.[channel];
+    const fallback = channel === "tai_tiem" ? size.price : (size.prices?.[channel] ?? null);
+    const price = quote?.price !== undefined ? quote.price : (fallback ?? null);
+    const minTotal = quote?.minTotal !== undefined ? quote.minTotal : (channel === "tai_tiem" ? (size.minTotal ?? null) : null);
+    const sold = quote?.sold ?? price != null;
+    if (sold && (price == null || !Number.isFinite(price))) {
+      throw new Error(`Kênh đang bán cần có giá (khổ ${size.widthCm}×${size.heightCm} cm).`);
+    }
+    out[channel] = {
+      price: price ?? null,
+      listPrice: quote?.listPrice ?? null,
+      minTotal: minTotal && minTotal > 0 ? minTotal : null,
+      sold: Boolean(sold && price != null),
+    };
+  }
+  return out;
+}
 
 /** Bỏ dấu tiếng Việt để làm đường dẫn sản phẩm. */
 export function slugifyProductName(name: string): string {
@@ -74,7 +105,9 @@ export function buildWebProduct(
     sheets: whole(size.sheets, "Số tấm", 1, 100),
     price: whole(size.price, "Giá tại tiệm", 1000, 100_000_000),
     prices: size.prices,
+    quotes: size.quotes,
     minTotal: size.minTotal ?? null,
+    skuId: size.skuId,
   }));
   const seen = new Set<string>();
   for (const size of sizes) {
@@ -104,7 +137,8 @@ export function buildWebProduct(
     const stem = `WEB-${slug.slice(0, 24)}-${size.widthCm}x${size.heightCm}-${size.sheets}`;
     const code = uniqueKey(stem, takenCodes);
     takenCodes.add(code);
-    const soldOn = CHANNELS.filter((channel) => (channel === "tai_tiem" ? size.price : size.prices?.[channel]) != null);
+    const quotes = channelQuotes(size);
+    const soldOn = CHANNELS.filter((channel) => quotes[channel].sold);
     skus.push({
       id: code,
       code,
@@ -116,17 +150,18 @@ export function buildWebProduct(
       sheets: size.sheets,
       piecesPerPack: null,
       sort: index + 1,
-      soldOn: soldOn.length ? soldOn : ["tai_tiem"],
+      soldOn,
     });
     for (const channel of CHANNELS) {
-      const amount = channel === "tai_tiem" ? size.price : (size.prices?.[channel] ?? null);
+      const quote = quotes[channel];
       prices.push({
         skuId: code,
         channel,
-        price: amount ?? null,
-        status: amount != null ? "dang_ban" : "nhap",
+        price: quote.price,
+        status: quote.sold && quote.price != null ? "dang_ban" : "nhap",
         note: channel === "tai_tiem" ? "Thêm từ quản trị" : "",
-        ...(channel === "tai_tiem" && size.minTotal ? { minTotal: size.minTotal } : {}),
+        ...(quote.listPrice != null ? { listPrice: quote.listPrice } : {}),
+        ...(quote.minTotal ? { minTotal: quote.minTotal } : {}),
       });
     }
   });

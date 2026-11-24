@@ -457,7 +457,7 @@ export function statusChangeError(input: {
 
 export function comboWarnings(
   skus: { id: string; groupId: string; size: string | null; sheets: number; code: string }[],
-  prices: { skuId: string; channel: Channel; price: number | null }[],
+  prices: { skuId: string; channel: Channel; price: number | null; status?: string }[],
   channel: Channel,
 ): string[] {
   const warnings: string[] = [];
@@ -471,10 +471,11 @@ export function comboWarnings(
   }
   for (const list of groups.values()) {
     const error = comboPriceError(
-      list.map((sku) => ({
-        sheets: sku.sheets,
-        price: prices.find((row) => row.skuId === sku.id && row.channel === channel)?.price ?? null,
-      })),
+      list.map((sku) => {
+        const row = prices.find((item) => item.skuId === sku.id && item.channel === channel);
+        const live = row && row.status !== "nhap" && row.status !== "cho_duyet" ? (row.price ?? null) : null;
+        return { sheets: sku.sheets, price: live };
+      }),
     );
     if (error) warnings.push(`${list[0]!.size} · ${error}`);
   }

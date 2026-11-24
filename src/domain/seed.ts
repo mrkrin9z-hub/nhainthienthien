@@ -82,6 +82,7 @@ export const DEFAULT_SETTINGS: Settings = {
   menuLinks20261022: true,
   taskMenu20261023: true,
   mediaMenu20261117: true,
+  homepageMenu20261124: true,
   deskBom20261023: true,
   groupSupply20261024: true,
   inkMl20261024: true,

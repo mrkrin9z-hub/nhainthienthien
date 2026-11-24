@@ -355,14 +355,24 @@ export async function listInquiries(actor: Actor) {
 export async function publicConfig() {
   const state = await readState();
   const contact = publicContact(state.settings);
+  const site = resolveSiteContent(state.settings.siteContent, state.settings);
   return {
     name: "NHÀ IN THIÊN THIÊN",
     showZalo: contact.showZalo,
     phone: contact.phone,
     phoneRaw: contact.phoneRaw,
     zalo: contact.zalo,
-    hours: state.settings.publicHours,
-    region: "",
+    hours: site.hours,
+    region: site.region,
+    address: site.address,
+    heroTitle: site.heroTitle,
+    heroSubtitle: site.heroSubtitle,
+    banner: site.banner,
+    facebookUrl: site.facebookUrl,
+    tiktokUrl: site.tiktokUrl,
+    tiktokHandle: site.tiktokHandle,
+    shopeeUrl: site.shopeeUrl,
+    commitments: site.commitments,
     maxPhotoBytes: await photoByteLimit(),
   };
 }
@@ -515,7 +525,7 @@ function buildItems(
       skuCode: sku.code,
       quantity: item.quantity,
       unitPrice,
-      lineTotal: lineAmount(unitPrice, item.quantity, priceOf(state.prices, item.skuId, input.channel)?.minTotal),
+      lineTotal: lineAmount(unitPrice, item.quantity, priceOf(state.prices, item.skuId, channel)?.minTotal),
       variant: item.variant?.trim() || "",
     };
   });
@@ -806,6 +816,22 @@ export async function createAlbumTicket(input: {
     album.updatedAt = nowIso();
     return { albumId: album.id, fileId, phone, customerName: album.customerName || "" };
   });
+}
+
+export async function publicAlbumReceipt(albumId: string, phone: string) {
+  const state = await readState();
+  const wanted = albumPhone(phone);
+  const album = (state.albums ?? []).find((item) => item.id === albumId);
+  if (!album || album.phone !== wanted) throw new Error("Không thấy phiếu gửi ảnh.");
+  const files = album.files.filter((file) => !file.deletedAt && file.status === "complete");
+  return {
+    albumId: album.id,
+    phone: album.phone,
+    customerName: album.customerName || "",
+    fileCount: files.length,
+    fileNames: files.slice(0, 20).map((file) => file.name),
+    createdAt: album.createdAt,
+  };
 }
 
 export async function saveAlbumUpload(input: { albumId: string; phone: string; fileId: string; bytes: Uint8Array; mime: string }) {
@@ -1527,7 +1553,7 @@ export async function reviseOrder(
           skuCode: sku.code,
           quantity: item.quantity,
           unitPrice,
-          lineTotal: lineAmount(unitPrice, item.quantity, priceOf(state.prices, item.skuId, input.channel)?.minTotal),
+          lineTotal: lineAmount(unitPrice, item.quantity, priceOf(state.prices, item.skuId, order.channel)?.minTotal),
           ...(previous?.listUnitPrice !== undefined ? { listUnitPrice: previous.listUnitPrice } : {}),
           ...(previous?.sellerSku ? { sellerSku: previous.sellerSku } : {}),
           variant: item.variant?.trim() || previous?.variant || "",
@@ -1947,7 +1973,7 @@ export async function addReprint(
 export async function priceBoard(actor: Actor, groupId?: string) {
   assertRole(actor, ["owner", "sale"]);
   const state = await readState();
-  const skus = state.skus.filter((sku) => !groupId || sku.groupId === groupId);
+  const skus = state.skus.filter((sku) => !isMergedWoodAlias(sku) && (!groupId || sku.groupId === groupId));
   const warnings = (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]).flatMap((channel) =>
     comboWarnings(skus, state.prices, channel).map((text) => `${CHANNEL_LABEL[channel]}: ${text}`),
   );
@@ -1963,7 +1989,7 @@ export async function priceBoard(actor: Actor, groupId?: string) {
       sheets: sku.sheets,
       piecesPerPack: sku.piecesPerPack,
       sheetCost: sku.sheetCost ?? null,
-      soldOn: sku.soldOn && sku.soldOn.length > 0 ? sku.soldOn : (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]),
+      soldOn: sku.soldOn ?? (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]),
       prices: Object.fromEntries(
         CHANNELS.map((channel) => {
           const row = priceOf(state.prices, sku.id, channel);
@@ -1986,10 +2012,14 @@ export async function updateChannelPrice(
     const sku = skuOrThrow(state, input.skuId);
     const siblings = state.skus.filter((item) => item.groupId === sku.groupId && item.size === sku.size && !item.code.endsWith("-GOI"));
     const error = comboPriceError(
-      siblings.map((item) => ({
-        sheets: item.sheets,
-        price: item.id === sku.id ? input.price : (priceOf(state.prices, item.id, input.channel)?.price ?? null),
-      })),
+      siblings.map((item) => {
+        if (item.id === sku.id) {
+          const live = input.status === "dang_ban" ? input.price : null;
+          return { sheets: item.sheets, price: live };
+        }
+        const row = priceOf(state.prices, item.id, input.channel);
+        return { sheets: item.sheets, price: row?.status === "dang_ban" ? (row.price ?? null) : null };
+      }),
     );
     if (error) throw new Error(error);
     const row = state.prices.find((item) => item.skuId === sku.id && item.channel === input.channel);
@@ -3565,7 +3595,7 @@ export async function skuOptions(actor: Actor) {
         label: `${sku.code} · ${group?.name ?? ""} · ${sku.name}`,
         groupId: sku.groupId,
         size: sku.size,
-        soldOn: sku.soldOn && sku.soldOn.length > 0 ? sku.soldOn : (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]),
+        soldOn: sku.soldOn ?? (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]),
         prices,
         minTotals,
         price: prices.tai_tiem,
@@ -4377,6 +4407,152 @@ export async function createWebProduct(actor: Actor, input: WebProductInput) {
       listed: input.listed !== false,
     });
     return { id: built.group.id, slug: built.group.slug, name: built.group.name };
+  });
+}
+
+
+export async function getWebProduct(actor: Actor, groupId: string) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  const group = state.groups.find((item) => item.id === groupId);
+  if (!group) throw new Error("Không thấy sản phẩm.");
+  const skus = state.skus.filter((sku) => sku.groupId === group.id && !isMergedWoodAlias(sku)).sort((a, b) => a.sort - b.sort);
+  return {
+    id: group.id,
+    name: group.name,
+    slug: group.slug,
+    category: group.category,
+    description: group.description,
+    turnaround: group.turnaround,
+    listed: groupIsListed(state.settings, group),
+    cover: Boolean(state.settings.productPhotos?.[group.slug]),
+    gallery: (state.settings.productGalleries?.[group.slug] ?? []).map((item) => item.id),
+    sizes: skus.map((sku) => ({
+      skuId: sku.id,
+      code: sku.code,
+      widthCm: sku.widthCm,
+      heightCm: sku.heightCm,
+      sheets: sku.sheets,
+      quotes: Object.fromEntries(
+        CHANNELS.map((channel) => {
+          const row = priceOf(state.prices, sku.id, channel);
+          return [
+            channel,
+            {
+              price: row?.price ?? null,
+              listPrice: row?.listPrice ?? null,
+              minTotal: row?.minTotal ?? null,
+              sold: skuSoldOn(sku, channel),
+            },
+          ];
+        }),
+      ),
+    })),
+  };
+}
+
+export async function updateWebProduct(actor: Actor, input: WebProductInput & { groupId: string }) {
+  assertRole(actor, ["owner", "sale"]);
+  return mutate(async (state) => {
+    const group = state.groups.find((item) => item.id === input.groupId);
+    if (!group) throw new Error("Không thấy sản phẩm.");
+    const built = buildWebProduct(input, {
+      slugs: state.groups.filter((item) => item.id !== group.id).map((item) => item.slug),
+      ids: state.groups.filter((item) => item.id !== group.id).map((item) => item.id),
+      codes: state.skus.filter((sku) => sku.groupId !== group.id).map((sku) => sku.code),
+      sorts: [group.sort - 1],
+    });
+    group.name = built.group.name;
+    group.category = built.group.category;
+    group.description = built.group.description;
+    group.turnaround = built.group.turnaround;
+    const existing = state.skus.filter((sku) => sku.groupId === group.id && !isMergedWoodAlias(sku));
+    const used = new Set<string>();
+    const nextSkus = [];
+    built.skus.forEach((draft) => {
+      const wanted = input.sizes.find((size) => size.widthCm === draft.widthCm && size.heightCm === draft.heightCm && size.sheets === draft.sheets)?.skuId;
+      const match = existing.find((sku) => sku.id === wanted && !used.has(sku.id))
+        ?? existing.find((sku) => sku.widthCm === draft.widthCm && sku.heightCm === draft.heightCm && sku.sheets === draft.sheets && !used.has(sku.id));
+      const sku = match ?? draft;
+      if (match) {
+        used.add(match.id);
+        match.name = draft.name;
+        match.size = draft.size;
+        match.widthCm = draft.widthCm;
+        match.heightCm = draft.heightCm;
+        match.sheets = draft.sheets;
+        match.sort = draft.sort;
+        match.soldOn = draft.soldOn;
+      } else {
+        sku.groupId = group.id;
+        state.skus.push(sku);
+        used.add(sku.id);
+      }
+      nextSkus.push(sku);
+      const sourcePrices = built.prices.filter((row) => row.skuId === draft.id);
+      for (const row of sourcePrices) {
+        const current = state.prices.find((item) => item.skuId === sku.id && item.channel === row.channel);
+        if (current) {
+          current.price = row.price;
+          current.status = row.status;
+          current.listPrice = row.listPrice ?? null;
+          current.minTotal = row.minTotal ?? null;
+        } else {
+          state.prices.push({ ...row, skuId: sku.id });
+        }
+      }
+    });
+    for (const sku of existing) {
+      if (used.has(sku.id)) continue;
+      sku.soldOn = [];
+      for (const row of state.prices.filter((item) => item.skuId === sku.id)) {
+        row.status = "nhap";
+      }
+    }
+    state.settings.groupListed = { ...state.settings.groupListed, [group.id]: input.listed !== false };
+    audit(state, actor.id, "product.update", group.id, null, { name: group.name, sizes: nextSkus.length });
+    return { id: group.id, slug: group.slug, name: group.name };
+  });
+}
+
+export async function saveSiteContent(actor: Actor, input: Parameters<typeof resolveSiteContent>[0]) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const next = resolveSiteContent(input, state.settings);
+    state.settings.siteContent = {
+      heroTitle: next.heroTitle,
+      heroSubtitle: next.heroSubtitle,
+      banner: next.banner,
+      address: next.address,
+      hours: next.hours,
+      facebookUrl: next.facebookUrl,
+      tiktokUrl: next.tiktokUrl,
+      tiktokHandle: next.tiktokHandle,
+      shopeeUrl: next.shopeeUrl,
+      commitments: next.commitments,
+    };
+    state.settings.publicHours = next.hours;
+    audit(state, actor.id, "site.update", "trang-chu", null, { handle: next.tiktokHandle });
+  });
+}
+
+export async function saveHomepageCatalog(
+  actor: Actor,
+  rows: { groupId: string; listed: boolean; sort: number }[],
+) {
+  assertRole(actor, ["owner", "sale"]);
+  await mutate(async (state) => {
+    const listed = { ...state.settings.groupListed };
+    for (const row of rows) {
+      const group = state.groups.find((item) => item.id === row.groupId);
+      if (!group) continue;
+      group.sort = row.sort;
+      listed[group.id] = row.listed;
+      if (row.listed && group.gate === "anh_the") state.settings.showAnhThe = true;
+      if (row.listed && group.gate === "album") state.settings.showAlbum = true;
+    }
+    state.settings.groupListed = listed;
+    audit(state, actor.id, "site.catalog", "trang-chu", null, { count: rows.length });
   });
 }
 

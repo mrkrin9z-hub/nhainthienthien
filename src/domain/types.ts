@@ -171,6 +171,10 @@ export type Settings = {
   taskMenu20261023?: boolean;
   /** Đã thêm Media (kho source + feedback) vào menu một lần. */
   mediaMenu20261117?: boolean;
+  /** Đã thêm Quản lý trang chủ + Ảnh sản phẩm vào menu một lần. */
+  homepageMenu20261124?: boolean;
+  /** Nội dung trang chủ (hero, liên hệ, cam kết). Sửa trong /admin/trang-chu, áp dụng ngay. */
+  siteContent?: SiteContent;
   /** Đã gắn gỗ cho ảnh TG, định mức nam châm theo khổ, và 9 lọ mực. Không chạy lại. */
   deskBom20261023?: boolean;
   /** Đã đổ checklist sheet vào sổ việc. */
@@ -223,6 +227,20 @@ export type Settings = {
    * Thiếu một kênh thì kênh đó được bật với CHANNEL_LABEL.
    */
   shopChannels?: { id: Channel; enabled: boolean; label: string }[];
+};
+
+/** Bản sao công khai của trang chủ. Không chứa giá CTV/Mơ Home. */
+export type SiteContent = {
+  heroTitle?: string;
+  heroSubtitle?: string;
+  banner?: string;
+  address?: string;
+  hours?: string;
+  facebookUrl?: string;
+  tiktokUrl?: string;
+  tiktokHandle?: string;
+  shopeeUrl?: string;
+  commitments?: string[];
 };
 
 /** Đề xuất nhân sự. pendingOwnerApproval false = chủ đã duyệt, số đang dùng. */

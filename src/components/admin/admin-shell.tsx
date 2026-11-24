@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   FolderOpen,
   HandCoins,
+  Home,
   Image,
   Images,
   Landmark,
@@ -80,6 +81,8 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin/media": FolderOpen,
   "/admin/feedback-gia": MessageSquareQuote,
   "/admin/nhac-khach": Bell,
+  "/admin/trang-chu": Home,
+  "/admin/san-pham": Package,
   "/admin/gia": Tags,
   "/admin/kho": Package,
   "/admin/anh": Image,
@@ -111,7 +114,7 @@ function pathActive(pathname: string, to: string) {
   if (to === "/admin") return pathname === "/admin" || pathname === "/admin/";
   if (to === "/admin/don-hang") return pathname.startsWith("/admin/don-hang");
   if (to === "/admin/don-moi") return pathname.startsWith("/admin/don-moi") || pathname.startsWith("/orders/");
-  if (to === "/admin/gia") return pathname.startsWith("/admin/gia") || pathname.startsWith("/admin/san-pham");
+  if (to === "/admin/gia") return pathname.startsWith("/admin/gia");
   if (to === "/admin/viec") {
     return ["/admin/viec", "/admin/cham-cong", "/admin/check-cong", "/admin/luong", "/admin/thuong"].some(
       (path) => pathname === path || pathname.startsWith(`${path}/`),
@@ -157,7 +160,10 @@ function pageTitle(pathname: string, role: Role, search: Record<string, unknown>
     return match.label;
   }
   const extra: [string, string][] = [
-    ["/admin/san-pham", "Sản phẩm"],
+    ["/admin/trang-chu", "Quản lý trang chủ"],
+    ["/admin/san-pham", "Sản phẩm & Giá"],
+    ["/admin/gia", "Bảng giá 6 kênh"],
+    ["/admin/anh", "Ảnh sản phẩm"],
     ["/admin/cham-cong", "Chấm công"],
     ["/admin/check-cong", "Check công"],
     ["/admin/luong", role === "owner" ? "Lương" : "Lương của tôi"],

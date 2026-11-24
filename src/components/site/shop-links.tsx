@@ -66,7 +66,7 @@ export function ZaloIcon({ className = "size-6" }: { className?: string }) {
 
 export const SHOP_LINKS = [
   { key: "facebook", label: "Fanpage", sub: "Nhà In Thiên Thiên", href: BRAND.facebookPageUrl, Icon: FacebookIcon },
-  { key: "tiktok", label: "TikTok Shop", sub: "@xuonginthienthien", href: BRAND.tiktokShopUrl, Icon: TikTokIcon },
+  { key: "tiktok", label: "TikTok Shop", sub: BRAND.tiktokHandle, href: BRAND.tiktokShopUrl, Icon: TikTokIcon },
   { key: "shopee", label: "Shopee", sub: "nhainthienthien", href: BRAND.shopeeUrl, Icon: ShopeeIcon },
 ] as const;
 
@@ -76,9 +76,17 @@ export function ShopLinksBlock({ title = "Liên hệ & mua tại", className = "
   const showZalo = config.data?.showZalo === true && Boolean(config.data.zalo);
   const phone = showZalo ? config.data?.phone ?? "" : "";
   const zalo = showZalo ? config.data?.zalo ?? "" : "";
+  const resolved = SHOP_LINKS.map((link) => {
+    if (link.key === "tiktok") {
+      return { ...link, href: config.data?.tiktokUrl || link.href, sub: config.data?.tiktokHandle || link.sub };
+    }
+    if (link.key === "facebook") return { ...link, href: config.data?.facebookUrl || link.href };
+    if (link.key === "shopee") return { ...link, href: config.data?.shopeeUrl || link.href };
+    return link;
+  });
   const links = showZalo
-    ? [...SHOP_LINKS, { key: "zalo", label: "Zalo", sub: phone, href: zalo, Icon: ZaloIcon }]
-    : SHOP_LINKS;
+    ? [...resolved, { key: "zalo", label: "Zalo", sub: phone, href: zalo, Icon: ZaloIcon }]
+    : resolved;
   return (
     <div className={className}>
       {title ? (

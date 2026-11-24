@@ -218,6 +218,7 @@ export function applyStoreMigrations(state: Migratable): boolean {
   if (ensureOrgCollections(state)) changed = true;
   // Media menu cần roleModules — gắn sau khi đảm bảo bộ sưu tập tổ chức đã có.
   if (grantMediaMenu(state)) changed = true;
+  if (grantHomepageMenu(state)) changed = true;
   if (ensureMoHome(state)) changed = true;
   if (ensureWaste(state as Parameters<typeof ensureWaste>[0])) changed = true;
   if (applyTiktokPrices(state)) changed = true;
@@ -476,5 +477,24 @@ function grantMediaMenu(state: Migratable): boolean {
     }
   }
   settings.mediaMenu20261117 = true;
+  return true;
+}
+
+const HOMEPAGE_MENU_LINKS: Record<string, string[]> = {
+  owner: ["/admin/trang-chu", "/admin/san-pham", "/admin/gia", "/admin/anh"],
+  sale: ["/admin/trang-chu", "/admin/san-pham", "/admin/gia", "/admin/anh"],
+};
+
+/** Sổ cũ chưa có Quản lý trang chủ / Ảnh sản phẩm trong roleModules. */
+function grantHomepageMenu(state: Migratable): boolean {
+  const settings = state.settings as Settings;
+  if (settings.homepageMenu20261124) return false;
+  if (!state.roleModules?.length) return false;
+  for (const row of state.roleModules) {
+    for (const path of HOMEPAGE_MENU_LINKS[row.role] ?? []) {
+      if (!row.modules.includes(path)) row.modules.push(path);
+    }
+  }
+  settings.homepageMenu20261124 = true;
   return true;
 }

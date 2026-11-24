@@ -1147,6 +1147,27 @@ export const getWebProducts = createServerFn({ method: "GET" }).handler(async ()
   return listWebProducts(await actor());
 });
 
+const quoteMap = z.record(
+  z.enum(["tai_tiem", "facebook", "tiktok", "shopee", "ctv", "mo_home"]),
+  z.object({
+    price: z.number().int().min(1000).max(100_000_000).nullable().optional(),
+    listPrice: z.number().int().min(1000).max(100_000_000).nullable().optional(),
+    minTotal: z.number().int().min(0).max(100_000_000).nullable().optional(),
+    sold: z.boolean().optional(),
+  }),
+);
+
+const webSizeSchema = z.object({
+  skuId: z.string().min(1).max(80).optional(),
+  widthCm: z.number().int().positive(),
+  heightCm: z.number().int().positive(),
+  sheets: z.number().int().positive(),
+  price: z.number().int().positive(),
+  prices: priceMap.optional(),
+  quotes: quoteMap.optional(),
+  minTotal: z.number().int().min(0).max(100_000_000).nullable().optional(),
+});
+
 export const createWebProduct = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -1155,19 +1176,7 @@ export const createWebProduct = createServerFn({ method: "POST" })
         category: z.string().min(2).max(40),
         description: z.string().max(400),
         turnaround: z.string().max(80),
-        sizes: z
-          .array(
-            z.object({
-              widthCm: z.number().int().positive(),
-              heightCm: z.number().int().positive(),
-              sheets: z.number().int().positive(),
-              price: z.number().int().positive(),
-              prices: priceMap.optional(),
-              minTotal: z.number().int().min(0).max(100_000_000).nullable().optional(),
-            }),
-          )
-          .min(1)
-          .max(40),
+        sizes: z.array(webSizeSchema).min(1).max(40),
         listed: z.boolean().optional(),
       })
       .parse(data),
@@ -1175,6 +1184,75 @@ export const createWebProduct = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { createWebProduct: create } = await import("@/server/service");
     return create(await actor(), data);
+  });
+
+export const getWebProduct = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ groupId: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { getWebProduct: load } = await import("@/server/service");
+    return load(await actor(), data.groupId);
+  });
+
+export const updateWebProduct = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        groupId: z.string().min(1),
+        name: z.string().min(2).max(80),
+        category: z.string().min(2).max(40),
+        description: z.string().max(400),
+        turnaround: z.string().max(80),
+        sizes: z.array(webSizeSchema).min(1).max(40),
+        listed: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { updateWebProduct: update } = await import("@/server/service");
+    return update(await actor(), data);
+  });
+
+export const getSiteContent = createServerFn({ method: "GET" }).handler(async () => {
+  const { publicConfig, listWebProducts } = await import("@/server/service");
+  const [site, products] = await Promise.all([publicConfig(), listWebProducts(await actor())]);
+  return { site, products };
+});
+
+export const saveSiteContent = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        heroTitle: z.string().max(120).optional(),
+        heroSubtitle: z.string().max(160).optional(),
+        banner: z.string().max(200).optional(),
+        address: z.string().max(200).optional(),
+        hours: z.string().max(80).optional(),
+        facebookUrl: z.string().max(200).optional(),
+        tiktokUrl: z.string().max(200).optional(),
+        tiktokHandle: z.string().max(40).optional(),
+        shopeeUrl: z.string().max(200).optional(),
+        commitments: z.array(z.string().max(160)).max(8).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveSiteContent: save } = await import("@/server/service");
+    await save(await actor(), data);
+    return { ok: true };
+  });
+
+export const saveHomepageCatalog = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        rows: z.array(z.object({ groupId: z.string().min(1), listed: z.boolean(), sort: z.number().int() })),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { saveHomepageCatalog: save } = await import("@/server/service");
+    await save(await actor(), data.rows);
+    return { ok: true };
   });
 
 export const setWebProductListed = createServerFn({ method: "POST" })

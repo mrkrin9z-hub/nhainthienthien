@@ -68,7 +68,17 @@ function SideTile({
   );
 }
 
-export function HomeHero({ products }: { products: Product[] }) {
+export function HomeHero({
+  products,
+  title,
+  subtitle,
+  banner,
+}: {
+  products: Product[];
+  title?: string;
+  subtitle?: string;
+  banner?: string;
+}) {
   const combo = priceOf(products, "trang-guong", "TG-13x18-C4", 100000);
   const comboList = combo.list ?? 190000;
   const pct = discountPercent(combo.price, comboList);
@@ -107,7 +117,7 @@ export function HomeHero({ products }: { products: Product[] }) {
           </div>
           <div className="relative z-[1] -mt-5 flex flex-1 flex-col justify-end px-3 pb-3 md:px-6 md:pb-5">
             <h1 className="text-[17px] font-extrabold leading-[1.15] md:text-[30px]">
-              Ảnh tráng gương 4K – <span className="text-cta">in từ ảnh của bạn</span>
+              {title || <>Ảnh tráng gương 4K – <span className="text-cta">in từ ảnh của bạn</span></>}
             </h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 md:mt-1">
               <span className="text-[26px] font-extrabold leading-tight tracking-tight md:text-[38px]">
@@ -170,9 +180,10 @@ export function HomeHero({ products }: { products: Product[] }) {
           className="hidden md:block"
         />
       </div>
+      {banner ? <p className="px-1 pt-2 text-sm font-semibold text-[#123047]">{banner}</p> : null}
       <p className="flex items-center gap-2 px-1 pt-2.5 text-xs text-[#5b6b7a] md:text-sm">
         <img src="/brand/icon-192.png" alt="" width={22} height={22} loading="lazy" decoding="async" className="size-[22px] rounded-full" />
-        Nhà In Thiên Thiên · {BRAND.region} · Giao tận nơi
+        {subtitle || <>Nhà In Thiên Thiên · {BRAND.region} · Giao tận nơi</>}
       </p>
     </section>
   );

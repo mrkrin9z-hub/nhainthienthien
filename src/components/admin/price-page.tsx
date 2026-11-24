@@ -17,6 +17,7 @@ import { SUPPLY_SCALES, type SupplyScale } from "@/domain/types";
 import { DESK_CHANNEL_LABEL } from "@/domain/order-desk";
 import { isMoHomeGroup } from "@/domain/mohome";
 import { CHANNEL_LABEL, CHANNELS, type Channel } from "@/domain/types";
+import { ProductEditor } from "@/components/admin/product-editor";
 import { MoreHorizontal, Settings } from "lucide-react";
 
 
@@ -33,6 +34,8 @@ export function PricePage() {
   });
   const owner = me.data?.role === "owner";
   const [createOpen, setCreateOpen] = useState(false);
+  const [editGroupId, setEditGroupId] = useState<string | null>(null);
+  const [productOpen, setProductOpen] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
   const [excelOpen, setExcelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -72,8 +75,11 @@ export function PricePage() {
               <Button variant="outline" className="min-h-10 rounded-xl bg-white" onClick={() => setGroupOpen(true)}>
                 Nhóm sản phẩm
               </Button>
+              <Button variant="outline" className="min-h-10 rounded-xl bg-white" onClick={() => { setEditGroupId(null); setProductOpen(true); }}>
+                Tạo sản phẩm
+              </Button>
               <Button className="min-h-10 rounded-xl bg-blue-600 hover:bg-blue-700" onClick={() => setCreateOpen(true)}>
-                + Tạo
+                + Tạo khổ
               </Button>
             </>
           ) : null
@@ -146,8 +152,31 @@ export function PricePage() {
           ))}
         </div>
       ) : null}
+      <ProductEditor
+        open={Boolean(editGroupId) || productOpen}
+        groupId={editGroupId}
+        onOpenChange={(next) => {
+          if (!next) {
+            setEditGroupId(null);
+            setProductOpen(false);
+          }
+        }}
+        onSaved={() => void board.refetch()}
+      />
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="sản phẩm" onPage={list.setPage} />
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="space-y-3 md:hidden">
+        {list.slice.map((row, index) => (
+          <PriceCard
+            key={row.skuId}
+            row={row}
+            groupName={(board.data?.groups ?? []).find((group) => group.id === row.groupId)?.name ?? row.groupId}
+            owner={owner}
+            stt={list.start + index + 1}
+            onEdit={() => setEditGroupId(row.groupId)}
+          />
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
         <table className="w-full min-w-[1180px] text-sm">
           <thead>
             <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
@@ -172,6 +201,7 @@ export function PricePage() {
                 groupName={(board.data?.groups ?? []).find((group) => group.id === row.groupId)?.name ?? row.groupId}
                 owner={owner}
                 stt={list.start + index + 1}
+                onEdit={() => setEditGroupId(row.groupId)}
               />
             ))}
           </tbody>
@@ -264,9 +294,11 @@ function PriceRow({
   groupName,
   owner,
   stt,
+  onEdit,
 }: {
   row: {
     skuId: string;
+    groupId: string;
     code: string;
     name: string;
     piecesPerPack: number | null;
@@ -278,6 +310,7 @@ function PriceRow({
   groupName: string;
   owner: boolean;
   stt: number;
+  onEdit?: () => void;
 }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -356,7 +389,7 @@ function PriceRow({
       <td className="px-3 py-3">
         <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs">{row.code}</span>
       </td>
-      <td className="px-3 py-3 font-medium text-slate-900">{row.name}</td>
+      <td className="max-w-[220px] whitespace-normal break-words px-3 py-3 font-medium text-slate-900">{row.name}</td>
       <td className="px-3 py-3 text-slate-600">{groupName}</td>
       {CHANNELS.map((item) => {
         const offer = row.prices[item] ?? { price: null, status: "nhap", sold: false, listPrice: null, minTotal: null };
@@ -399,6 +432,7 @@ function PriceRow({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {onEdit ? <DropdownMenuItem onClick={onEdit}>Sửa sản phẩm & giá 6 kênh</DropdownMenuItem> : null}
               {CHANNELS.map((item) => (
                 <DropdownMenuItem key={item} onClick={() => begin(item)}>
                   Sửa giá {DESK_CHANNEL_LABEL[item]}
@@ -888,5 +922,56 @@ function GroupSupplyDialog({ open, onOpenChange }: { open: boolean; onOpenChange
         ) : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+
+function PriceCard({
+  row,
+  groupName,
+  owner,
+  stt,
+  onEdit,
+}: {
+  row: {
+    skuId: string;
+    groupId: string;
+    code: string;
+    name: string;
+    prices: Record<string, { price: number | null; listPrice?: number | null; minTotal?: number | null; status: string; sold?: boolean }>;
+  };
+  groupName: string;
+  owner: boolean;
+  stt: number;
+  onEdit?: () => void;
+}) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">#{stt} · {row.code}</p>
+          <h3 className="mt-1 text-base font-semibold leading-snug break-words text-slate-900">{row.name}</h3>
+          <p className="text-xs text-slate-500">{groupName}</p>
+        </div>
+        {owner && onEdit ? (
+          <Button type="button" variant="outline" className="min-h-9 shrink-0" onClick={onEdit}>
+            Sửa
+          </Button>
+        ) : null}
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-2">
+        {CHANNELS.map((item) => {
+          const offer = row.prices[item] ?? { price: null, sold: false, minTotal: null };
+          return (
+            <div key={item} className="rounded-xl bg-slate-50 px-2.5 py-2">
+              <dt className="text-[11px] font-semibold text-slate-500">{DESK_CHANNEL_LABEL[item]}</dt>
+              <dd className="text-sm font-semibold tabular-nums text-slate-900">{offer.price == null ? "—" : formatVnd(offer.price)}</dd>
+              {offer.minTotal ? <p className="text-[10px] text-slate-500">min {formatVnd(offer.minTotal)}</p> : null}
+              <p className="text-[10px] text-slate-500">{offer.sold ? "Đang bán" : "Không bán"}</p>
+            </div>
+          );
+        })}
+      </dl>
+    </article>
   );
 }

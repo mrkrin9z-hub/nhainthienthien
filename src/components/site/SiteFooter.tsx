@@ -49,7 +49,7 @@ export function SiteFooter() {
               Zalo {phone}
             </a>
           ) : null}
-          <p className="text-muted-foreground">{BRAND.address}</p>
+          <p className="text-muted-foreground">{config.data?.address || BRAND.address}</p>
           {config.data?.hours ? <p className="text-muted-foreground">Mở cửa {config.data.hours}</p> : null}
           <p className="text-muted-foreground">{BRAND.website}</p>
         </div>

@@ -55,7 +55,7 @@ test("không còn bridge StudioBase; menu không kéo trang phụ", () => {
 
 test("modulesForRole tôn trọng role và danh sách allowed", () => {
   const sale = modulesForRole("sale").flatMap((g) => g.items).map((i) => i.label);
-  assert.deepEqual(sale, ["Tổng quan", "Đơn hàng", "Hình ảnh", "Kho source", "Feedback", "Sản phẩm", "Kho vật tư", "Tiền", "Thống kê khách hàng", "Nhân sự"]);
+  assert.deepEqual(sale, ["Tổng quan", "Đơn hàng", "Hình ảnh", "Kho source", "Feedback", "Quản lý trang chủ", "Sản phẩm & Giá", "Bảng giá 6 kênh", "Ảnh sản phẩm", "Kho vật tư", "Tiền", "Thống kê khách hàng", "Nhân sự"]);
   const production = modulesForRole("production").flatMap((g) => g.items).map((i) => i.label);
   assert.deepEqual(production, ["Tổng quan", "Đơn hàng", "Hình ảnh", "Kho source", "Sản xuất", "Kho vật tư", "Nhân sự"]);
   const trimmed = modulesForRole("sale", ["/admin/don-hang", "/admin/thu"]).flatMap((g) => g.items).map((i) => i.to);
@@ -71,7 +71,10 @@ test("owner thấy đủ mục kể cả Hình ảnh và Feedback; không thấy
     "/admin/media",
     "/admin/feedback-gia",
     "/admin/san-xuat",
+    "/admin/trang-chu",
+    "/admin/san-pham",
     "/admin/gia",
+    "/admin/anh",
     "/admin/kho",
     "/admin/thu",
     "/admin/bao-cao",
@@ -128,4 +131,47 @@ test("migration gắn Media vào roleModules sổ cũ một lần", () => {
   const before = roleModules[0]!.modules.filter((path) => path === "/admin/media").length;
   applyStoreMigrations(state);
   assert.equal(roleModules[0]!.modules.filter((path) => path === "/admin/media").length, before);
+});
+
+test("migration gắn Quản lý trang chủ và Ảnh sản phẩm vào menu một lần", () => {
+  const roleModules: RoleModules[] = [
+    { role: "owner", modules: ["/admin", "/admin/gia"] },
+    { role: "sale", modules: ["/admin", "/admin/gia"] },
+    { role: "production", modules: ["/admin"] },
+  ];
+  const state = {
+    settings: {
+      zaloDefaultMigrated: true,
+      mediaMenu20261117: true,
+      homepageMenu20261124: false,
+      menuLinks20261022: true,
+      taskMenu20261023: true,
+      catalogImport20261022: true,
+      hrApproved20261022: true,
+      orderDesk20261024: true,
+      deskBom20261023: true,
+      groupSupply20261024: true,
+      inkMl20261024: true,
+      inkExpense20261024: true,
+      checklist20261023: true,
+      fixedCosts: [{ key: "x", label: "x", amount: 1 }],
+    } as unknown as Settings,
+    roleModules,
+    groups: [],
+    skus: [],
+    prices: [],
+    materials: [],
+    boms: [],
+    orders: [],
+    staff: [],
+  };
+  assert.equal(applyStoreMigrations(state), true);
+  assert.equal(state.settings.homepageMenu20261124, true);
+  for (const path of ["/admin/trang-chu", "/admin/san-pham", "/admin/gia", "/admin/anh"]) {
+    assert.ok(roleModules[0]!.modules.includes(path), path);
+    assert.ok(roleModules[1]!.modules.includes(path), path);
+  }
+  assert.equal(roleModules[2]!.modules.includes("/admin/trang-chu"), false);
+  applyStoreMigrations(state);
+  assert.equal(roleModules[0]!.modules.filter((path) => path === "/admin/trang-chu").length, 1);
 });

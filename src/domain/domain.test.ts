@@ -147,6 +147,20 @@ test("thành tiền tôn trọng tối thiểu mỗi dòng", () => {
   assert.equal(lineAmount(89000, 2), 178000);
 });
 
+test("cảnh báo combo chỉ tính gói đang bán, bỏ gói cũ đã nháp", () => {
+  const skus = [
+    { id: "LUA-6x9-20", groupId: "lua", size: "6x9", sheets: 20, code: "LUA-6x9-20" },
+    { id: "LUA-6x9-30", groupId: "lua", size: "6x9", sheets: 30, code: "LUA-6x9-30" },
+    { id: "LUA-6x9-50", groupId: "lua", size: "6x9", sheets: 50, code: "LUA-6x9-50" },
+  ];
+  const stale = [
+    { skuId: "LUA-6x9-20", channel: "facebook" as const, price: 34000, status: "nhap" },
+    { skuId: "LUA-6x9-30", channel: "facebook" as const, price: 52000, status: "nhap" },
+    { skuId: "LUA-6x9-50", channel: "facebook" as const, price: 75000, status: "dang_ban" },
+  ];
+  assert.deepEqual(comboWarnings(skus, stale, "facebook"), []);
+});
+
 test("giấy 13x18 xếp vừa khổ 61cm", () => {
   const meters = rollMeters(13, 18, 61, 0.1);
   assert.ok(meters && meters > 0 && meters < 0.2);

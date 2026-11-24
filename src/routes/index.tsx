@@ -81,7 +81,12 @@ function HomePage() {
     <div className="shop-ui min-h-screen bg-shop-bg">
       <SiteHeader />
       <main className="mx-auto max-w-6xl px-2.5 pb-20 md:px-6 md:pb-0 md:pt-5">
-        <HomeHero products={products} />
+        <HomeHero
+          products={products}
+          title={config.data?.heroTitle}
+          subtitle={config.data?.heroSubtitle}
+          banner={config.data?.banner}
+        />
 
         {/* Chính sách */}
         <section className="card mt-3 grid grid-cols-4 gap-1 px-2 py-3.5 md:py-4">
@@ -127,6 +132,17 @@ function HomePage() {
             ))}
           </div>
         </section>
+
+        {config.data?.commitments?.length ? (
+          <section className="card mt-3 px-3.5 py-3.5">
+            <h2 className="section-title">Cam kết của tiệm</h2>
+            <ul className="mt-2 space-y-1.5 text-sm text-foreground/80">
+              {config.data.commitments.map((item) => (
+                <li key={item}>• {item}</li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {/* Gợi ý */}
         <section id="gian-hang" className="mt-4 scroll-mt-24">

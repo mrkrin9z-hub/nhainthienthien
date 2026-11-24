@@ -38,6 +38,8 @@ test("Mơ Home có giá riêng, không hoa hồng, không đụng giá Nhà In",
   assert.equal(skuSoldOn({ soldOn: ["ctv"] }, "ctv"), true);
   assert.equal(skuSoldOn({ soldOn: ["mo_home"] }, "facebook"), false);
   assert.equal(skuSoldOn({ soldOn: ["mo_home", "tai_tiem"] }, "tai_tiem"), true);
+  assert.equal(skuSoldOn({ soldOn: [] }, "tai_tiem"), false);
+  assert.equal(skuSoldOn({ soldOn: [] }, "facebook"), false);
 
   assert.equal(orderCodePrefix("mo_home", "2026-10-23"), "MH261023");
   assert.equal(orderCodePrefix("shopee", "2026-10-23"), "TT261023");

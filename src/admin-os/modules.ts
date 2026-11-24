@@ -48,7 +48,12 @@ export const ADMIN_MODULE_GROUPS: AdminModuleGroup[] = [
   },
   {
     title: "Sản phẩm",
-    items: [{ to: "/admin/gia", label: "Sản phẩm", roles: ["owner", "sale"], mode: "live" }],
+    items: [
+      { to: "/admin/trang-chu", label: "Quản lý trang chủ", roles: ["owner", "sale"], mode: "live" },
+      { to: "/admin/san-pham", label: "Sản phẩm & Giá", roles: ["owner", "sale"], mode: "live" },
+      { to: "/admin/gia", label: "Bảng giá 6 kênh", roles: ["owner", "sale"], mode: "live" },
+      { to: "/admin/anh", label: "Ảnh sản phẩm", roles: ["owner", "sale"], mode: "live" },
+    ],
   },
   {
     title: "Kho vật tư",

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { lineAmount } from "@/domain/calc";
 import { vnYmd } from "@/domain/calc";
+import { retargetLinesForChannel } from "@/domain/desk-pricing";
 import { skuSoldOn } from "@/domain/mohome";
 import { depositMethodLabel, isMarketplace, PAYMENT_METHODS, RETAIL_PAYMENT_METHODS, type PaymentMethod } from "@/domain/order-desk";
 import { CHANNEL_LABEL, type Channel } from "@/domain/types";
@@ -235,14 +236,7 @@ export function OrderDesk({
   function changeChannel(next: Channel) {
     setChannel(next);
     if (isMarketplace(next)) setFulfillment("delivery");
-    setLines((current) =>
-      current.map((line) => {
-        if (line.priceTouched || !line.skuId) return line;
-        const sku = catalog.find((item) => item.id === line.skuId);
-        const listed = sku?.prices?.[next] ?? null;
-        return { ...line, unitPrice: listed === null ? "" : String(listed) };
-      }),
-    );
+    setLines((current) => retargetLinesForChannel(current, catalog, next));
   }
 
   async function save() {

@@ -279,3 +279,10 @@ export const finishPublicMediaUpload = createServerFn({ method: "POST" })
     const { finishMediaDriveUpload } = await import("@/server/media-library");
     return finishMediaDriveUpload(null, data);
   });
+
+export const getAlbumReceipt = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) => z.object({ albumId: z.string().uuid(), phone: z.string().trim().min(8).max(20) }).parse(data))
+  .handler(async ({ data }) => {
+    const { publicAlbumReceipt } = await import("@/server/service");
+    return publicAlbumReceipt(data.albumId, data.phone);
+  });

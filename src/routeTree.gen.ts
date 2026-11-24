@@ -65,11 +65,13 @@ import { Route as AdminThongBaoRouteImport } from './routes/admin.thong-bao'
 import { Route as AdminThuRouteImport } from './routes/admin.thu'
 import { Route as AdminThuongRouteImport } from './routes/admin.thuong'
 import { Route as AdminTinMauRouteImport } from './routes/admin.tin-mau'
+import { Route as AdminTrangChuRouteImport } from './routes/admin.trang-chu'
 import { Route as AdminViRouteImport } from './routes/admin.vi'
 import { Route as AdminViecRouteImport } from './routes/admin.viec'
 import { Route as DanhGiaTokenRouteImport } from './routes/danh-gia.$token'
 import { Route as GuiAnhIndexRouteImport } from './routes/gui-anh.index'
 import { Route as GuiAnhTokenRouteImport } from './routes/gui-anh.$token'
+import { Route as GuiAnhPhieuRouteImport } from './routes/gui-anh.phieu'
 import { Route as OrdersCreateRouteImport } from './routes/orders.create'
 import { Route as SanPhamSlugRouteImport } from './routes/san-pham_.$slug'
 import { Route as UCodeRouteImport } from './routes/u.$code'
@@ -386,6 +388,11 @@ const AdminTinMauRoute = AdminTinMauRouteImport.update({
   path: '/tin-mau',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTrangChuRoute = AdminTrangChuRouteImport.update({
+  id: '/trang-chu',
+  path: '/trang-chu',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminViRoute = AdminViRouteImport.update({
   id: '/vi',
   path: '/vi',
@@ -409,6 +416,11 @@ const GuiAnhIndexRoute = GuiAnhIndexRouteImport.update({
 const GuiAnhTokenRoute = GuiAnhTokenRouteImport.update({
   id: '/gui-anh/$token',
   path: '/gui-anh/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuiAnhPhieuRoute = GuiAnhPhieuRouteImport.update({
+  id: '/gui-anh/phieu',
+  path: '/gui-anh/phieu',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersCreateRoute = OrdersCreateRouteImport.update({
@@ -646,10 +658,12 @@ export interface FileRoutesByFullPath {
   '/admin/thu': typeof AdminThuRoute
   '/admin/thuong': typeof AdminThuongRoute
   '/admin/tin-mau': typeof AdminTinMauRoute
+  '/admin/trang-chu': typeof AdminTrangChuRoute
   '/admin/vi': typeof AdminViRoute
   '/admin/viec': typeof AdminViecRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
+  '/gui-anh/phieu': typeof GuiAnhPhieuRoute
   '/orders/create': typeof OrdersCreateRoute
   '/san-pham/$slug': typeof SanPhamSlugRoute
   '/u/$code': typeof UCodeRoute
@@ -743,10 +757,12 @@ export interface FileRoutesByTo {
   '/admin/thu': typeof AdminThuRoute
   '/admin/thuong': typeof AdminThuongRoute
   '/admin/tin-mau': typeof AdminTinMauRoute
+  '/admin/trang-chu': typeof AdminTrangChuRoute
   '/admin/vi': typeof AdminViRoute
   '/admin/viec': typeof AdminViecRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
+  '/gui-anh/phieu': typeof GuiAnhPhieuRoute
   '/orders/create': typeof OrdersCreateRoute
   '/san-pham/$slug': typeof SanPhamSlugRoute
   '/u/$code': typeof UCodeRoute
@@ -842,10 +858,12 @@ export interface FileRoutesById {
   '/admin/thu': typeof AdminThuRoute
   '/admin/thuong': typeof AdminThuongRoute
   '/admin/tin-mau': typeof AdminTinMauRoute
+  '/admin/trang-chu': typeof AdminTrangChuRoute
   '/admin/vi': typeof AdminViRoute
   '/admin/viec': typeof AdminViecRoute
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
+  '/gui-anh/phieu': typeof GuiAnhPhieuRoute
   '/orders/create': typeof OrdersCreateRoute
   '/san-pham_/$slug': typeof SanPhamSlugRoute
   '/u/$code': typeof UCodeRoute
@@ -942,10 +960,12 @@ export interface FileRouteTypes {
     | '/admin/thu'
     | '/admin/thuong'
     | '/admin/tin-mau'
+    | '/admin/trang-chu'
     | '/admin/vi'
     | '/admin/viec'
     | '/danh-gia/$token'
     | '/gui-anh/$token'
+    | '/gui-anh/phieu'
     | '/orders/create'
     | '/san-pham/$slug'
     | '/u/$code'
@@ -1039,10 +1059,12 @@ export interface FileRouteTypes {
     | '/admin/thu'
     | '/admin/thuong'
     | '/admin/tin-mau'
+    | '/admin/trang-chu'
     | '/admin/vi'
     | '/admin/viec'
     | '/danh-gia/$token'
     | '/gui-anh/$token'
+    | '/gui-anh/phieu'
     | '/orders/create'
     | '/san-pham/$slug'
     | '/u/$code'
@@ -1137,10 +1159,12 @@ export interface FileRouteTypes {
     | '/admin/thu'
     | '/admin/thuong'
     | '/admin/tin-mau'
+    | '/admin/trang-chu'
     | '/admin/vi'
     | '/admin/viec'
     | '/danh-gia/$token'
     | '/gui-anh/$token'
+    | '/gui-anh/phieu'
     | '/orders/create'
     | '/san-pham_/$slug'
     | '/u/$code'
@@ -1196,6 +1220,7 @@ export interface RootRouteChildren {
   TraCuuRoute: typeof TraCuuRoute
   DanhGiaTokenRoute: typeof DanhGiaTokenRoute
   GuiAnhTokenRoute: typeof GuiAnhTokenRoute
+  GuiAnhPhieuRoute: typeof GuiAnhPhieuRoute
   SanPhamSlugRoute: typeof SanPhamSlugRoute
   UCodeRoute: typeof UCodeRoute
   GuiAnhIndexRoute: typeof GuiAnhIndexRoute
@@ -1619,6 +1644,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTinMauRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/trang-chu': {
+      id: '/admin/trang-chu'
+      path: '/trang-chu'
+      fullPath: '/admin/trang-chu'
+      preLoaderRoute: typeof AdminTrangChuRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/vi': {
       id: '/admin/vi'
       path: '/vi'
@@ -1652,6 +1684,13 @@ declare module '@tanstack/react-router' {
       path: '/gui-anh/$token'
       fullPath: '/gui-anh/$token'
       preLoaderRoute: typeof GuiAnhTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gui-anh/phieu': {
+      id: '/gui-anh/phieu'
+      path: '/gui-anh/phieu'
+      fullPath: '/gui-anh/phieu'
+      preLoaderRoute: typeof GuiAnhPhieuRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders/create': {
@@ -1945,6 +1984,7 @@ interface AdminRouteChildren {
   AdminThuRoute: typeof AdminThuRoute
   AdminThuongRoute: typeof AdminThuongRoute
   AdminTinMauRoute: typeof AdminTinMauRoute
+  AdminTrangChuRoute: typeof AdminTrangChuRoute
   AdminViRoute: typeof AdminViRoute
   AdminViecRoute: typeof AdminViecRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -2001,6 +2041,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminThuRoute: AdminThuRoute,
   AdminThuongRoute: AdminThuongRoute,
   AdminTinMauRoute: AdminTinMauRoute,
+  AdminTrangChuRoute: AdminTrangChuRoute,
   AdminViRoute: AdminViRoute,
   AdminViecRoute: AdminViecRoute,
   AdminIndexRoute: AdminIndexRoute,
@@ -2043,6 +2084,7 @@ const rootRouteChildren: RootRouteChildren = {
   TraCuuRoute: TraCuuRoute,
   DanhGiaTokenRoute: DanhGiaTokenRoute,
   GuiAnhTokenRoute: GuiAnhTokenRoute,
+  GuiAnhPhieuRoute: GuiAnhPhieuRoute,
   SanPhamSlugRoute: SanPhamSlugRoute,
   UCodeRoute: UCodeRoute,
   GuiAnhIndexRoute: GuiAnhIndexRoute,
