@@ -10,6 +10,7 @@ export type CatalogVariant = {
   price: number | null;
   sale_price: number | null;
   list_price?: number | null;
+  min_total?: number | null;
   requires_quote: boolean;
   recommended_width_px: number | null;
   recommended_height_px: number | null;
@@ -25,6 +26,7 @@ export type CatalogProduct = {
   category: string;
   description: string;
   cover_path: string | null;
+  gallery?: string[];
   turnaround_text: string;
   sort_order: number;
   variants: CatalogVariant[];

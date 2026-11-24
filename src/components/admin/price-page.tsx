@@ -58,7 +58,7 @@ export function PricePage() {
     <div className="space-y-4 bg-slate-50">
       <PageToolbar
         title="Sản phẩm"
-        hint="Giá bán nằm trên từng sản phẩm. Vật tư tính theo nhóm và khổ. Mực không vào giá vốn. * là còn vật tư chưa có giá mua."
+        hint="Mỗi mã có giá riêng cho 6 kênh. Ô khác giá tại tiệm được tô cam. Giá CTV và Mơ Home chỉ dùng trong quản trị, không hiện trên trang chủ. * là còn vật tư chưa có giá mua."
         actions={
           owner ? (
             <>
@@ -148,18 +148,18 @@ export function PricePage() {
       ) : null}
       <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="sản phẩm" onPage={list.setPage} />
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[880px] text-sm">
+        <table className="w-full min-w-[1180px] text-sm">
           <thead>
             <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
               <th className="px-3 py-3">STT</th>
               <th className="px-3 py-3">Mã SP</th>
               <th className="px-3 py-3">Tên sản phẩm</th>
               <th className="px-3 py-3">Nhóm SP</th>
-              <th className="px-3 py-3">Kênh</th>
-              <th className="px-3 py-3 text-right">Giá</th>
-              <th className="px-3 py-3 text-right">Giá vốn</th>
-              <th className="px-3 py-3 text-right">Lãi</th>
-              <th className="px-3 py-3">Trạng thái</th>
+              {CHANNELS.map((item) => (
+                <th key={item} className={`px-2 py-3 text-right ${channel !== "all" && channel !== item ? "opacity-40" : ""}`}>
+                  {DESK_CHANNEL_LABEL[item]}
+                </th>
+              ))}
               <th className="px-3 py-3" />
             </tr>
           </thead>
@@ -168,7 +168,7 @@ export function PricePage() {
               <PriceRow
                 key={row.skuId}
                 row={row}
-                channel={displayChannel}
+                focusChannel={channel === "all" ? null : channel}
                 groupName={(board.data?.groups ?? []).find((group) => group.id === row.groupId)?.name ?? row.groupId}
                 owner={owner}
                 stt={list.start + index + 1}
@@ -260,7 +260,7 @@ const CHANNEL_PILL: Record<Channel, string> = {
 
 function PriceRow({
   row,
-  channel,
+  focusChannel,
   groupName,
   owner,
   stt,
@@ -272,17 +272,20 @@ function PriceRow({
     piecesPerPack: number | null;
     sheetCost?: number | null;
     soldOn?: Channel[];
-    prices: Record<string, { price: number | null; listPrice?: number | null; status: string; note: string; profit?: number | null; marginPercent?: number | null; cost?: number | null; costKnown?: number; costIncomplete?: boolean; sold?: boolean }>;
+    prices: Record<string, { price: number | null; listPrice?: number | null; minTotal?: number | null; status: string; note: string; profit?: number | null; marginPercent?: number | null; cost?: number | null; costKnown?: number; costIncomplete?: boolean; sold?: boolean }>;
   };
-  channel: Channel;
+  focusChannel: Channel | null;
   groupName: string;
   owner: boolean;
   stt: number;
 }) {
   const queryClient = useQueryClient();
-  const cell = row.prices[channel] ?? { price: null, status: "dang_ban", note: "" };
   const [open, setOpen] = useState(false);
+  const [editChannel, setEditChannel] = useState<Channel>("tai_tiem");
+  const cell = row.prices[editChannel] ?? { price: null, status: "dang_ban", note: "" };
   const [price, setPrice] = useState("");
+  const [listPrice, setListPrice] = useState("");
+  const [minTotal, setMinTotal] = useState("");
   const [status, setStatus] = useState(cell.status);
   const [note, setNote] = useState(cell.note);
   const [pieces, setPieces] = useState("");
@@ -290,13 +293,18 @@ function PriceRow({
   const [saving, setSaving] = useState(false);
   const [quote, setQuote] = useState<Awaited<ReturnType<typeof runQuote>> | null>(null);
   const pack = row.code.endsWith("-GOI");
+  const retail = row.prices['tai_tiem']?.price ?? null;
 
-  function begin() {
-    setPrice(cell.price === null ? "" : String(cell.price));
-    setStatus(cell.status);
-    setNote(cell.note);
+  function begin(channel: Channel) {
+    const current = row.prices[channel] ?? { price: null, status: "dang_ban", note: "", listPrice: null, minTotal: null, sold: false };
+    setEditChannel(channel);
+    setPrice(current.price === null ? "" : String(current.price));
+    setListPrice(current.listPrice == null ? "" : String(current.listPrice));
+    setMinTotal(current.minTotal == null ? "" : String(current.minTotal));
+    setStatus(current.status);
+    setNote(current.note);
     setPieces(row.piecesPerPack === null ? "" : String(row.piecesPerPack));
-    setSold(Boolean(cell.sold));
+    setSold(Boolean(current.sold));
     setQuote(null);
     setOpen(true);
     if (owner) {
@@ -306,13 +314,11 @@ function PriceRow({
     }
   }
 
-  async function toggleSold(next: boolean) {
-    setSold(next);
+  async function toggleSold(channel: Channel, next: boolean) {
     try {
       await setSkuSold({ data: { skuId: row.skuId, channel, sold: next } });
       await queryClient.invalidateQueries({ queryKey: ["prices"] });
     } catch (error) {
-      setSold(!next);
       toast.error((error as Error).message);
     }
   }
@@ -323,10 +329,12 @@ function PriceRow({
       await savePrice({
         data: {
           skuId: row.skuId,
-          channel,
+          channel: editChannel,
           price: price.trim() === "" ? null : Number(price),
           status: status as "dang_ban" | "nhap" | "cho_duyet",
           note,
+          listPrice: listPrice.trim() === "" ? null : Number(listPrice),
+          minTotal: minTotal.trim() === "" ? null : Number(minTotal),
         },
       });
       if (pack) {
@@ -342,9 +350,6 @@ function PriceRow({
     }
   }
 
-  const tagged = CHANNELS.filter((item) => row.soldOn?.includes(item) || row.prices[item]?.price != null);
-  const shownTags = tagged.slice(0, 2);
-  const extraTags = tagged.length - shownTags.length;
   return (
     <tr className="border-b last:border-0">
       <td className="px-3 py-3 text-slate-500">{stt}</td>
@@ -353,24 +358,38 @@ function PriceRow({
       </td>
       <td className="px-3 py-3 font-medium text-slate-900">{row.name}</td>
       <td className="px-3 py-3 text-slate-600">{groupName}</td>
-      <td className="px-3 py-3">
-        <div className="flex flex-wrap gap-1">
-          {shownTags.map((item) => (
-            <span key={item} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${CHANNEL_PILL[item]}`}>
-              {DESK_CHANNEL_LABEL[item]}
-            </span>
-          ))}
-          {extraTags > 0 ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">+{extraTags} khác</span> : null}
-        </div>
-      </td>
-      <td className="px-3 py-3 text-right font-semibold tabular-nums">{cell.price === null ? "—" : formatVnd(cell.price)}</td>
-      <td className="px-3 py-3 text-right tabular-nums">
-        {cell.costIncomplete ? (cell.costKnown ? `${formatVnd(cell.costKnown)}*` : "Chưa đủ giá") : cell.cost == null ? "—" : formatVnd(cell.cost)}
-      </td>
-      <td className="px-3 py-3 text-right tabular-nums">{cell.marginPercent == null ? "—" : `${cell.marginPercent}%`}</td>
-      <td className="px-3 py-3">
-        <Switch checked={Boolean(cell.sold)} disabled={!owner} aria-label={`Trạng thái ${row.code}`} onCheckedChange={(next) => void toggleSold(next)} />
-      </td>
+      {CHANNELS.map((item) => {
+        const offer = row.prices[item] ?? { price: null, status: "nhap", sold: false, listPrice: null, minTotal: null };
+        const differs = offer.price != null && retail != null && offer.price !== retail;
+        const dim = focusChannel !== null && focusChannel !== item;
+        return (
+          <td key={item} className={`px-2 py-2 text-right ${dim ? "opacity-40" : ""}`}>
+            <button
+              type="button"
+              className={`w-full rounded-lg px-1.5 py-1 text-right tabular-nums ${owner ? "hover:bg-slate-50" : ""} ${differs ? "font-semibold text-amber-700" : "font-medium text-slate-900"}`}
+              onClick={() => owner && begin(item)}
+              disabled={!owner}
+            >
+              {offer.price == null ? "—" : formatVnd(offer.price)}
+            </button>
+            {offer.listPrice != null && offer.price != null && offer.listPrice > offer.price ? (
+              <p className="text-[10px] text-slate-400 line-through tabular-nums">{formatVnd(offer.listPrice)}</p>
+            ) : null}
+            {offer.minTotal ? <p className="text-[10px] text-slate-500">min {formatVnd(offer.minTotal)}</p> : null}
+            <label className="mt-1 inline-flex items-center gap-1 text-[10px] text-slate-500">
+              <input
+                type="checkbox"
+                className="size-3"
+                checked={Boolean(offer.sold)}
+                disabled={!owner}
+                aria-label={`Bán ${row.code} kênh ${DESK_CHANNEL_LABEL[item]}`}
+                onChange={(event) => void toggleSold(item, event.target.checked)}
+              />
+              {offer.sold ? "Bán" : "Ẩn"}
+            </label>
+          </td>
+        );
+      })}
       <td className="px-3 py-3 text-right">
         {owner ? (
           <DropdownMenu>
@@ -380,7 +399,11 @@ function PriceRow({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={begin}>Sửa giá</DropdownMenuItem>
+              {CHANNELS.map((item) => (
+                <DropdownMenuItem key={item} onClick={() => begin(item)}>
+                  Sửa giá {DESK_CHANNEL_LABEL[item]}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
@@ -391,16 +414,25 @@ function PriceRow({
             <DialogTitle>Sửa giá · {row.code}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">{row.name} · {CHANNEL_LABEL[channel]}</p>
+            <p className="text-sm text-muted-foreground">{row.name} · {CHANNEL_LABEL[editChannel]}</p>
             {owner ? (
               <label className="flex min-h-11 items-center gap-2 text-sm font-semibold">
-                <input type="checkbox" checked={sold} onChange={(event) => void toggleSold(event.target.checked)} />
+                <input type="checkbox" checked={sold} onChange={(event) => void toggleSold(editChannel, event.target.checked)} />
                 Bán ở kênh này
               </label>
             ) : null}
             <label className="block text-sm font-semibold">
               Giá bán
               <Input className="mt-1 min-h-11" inputMode="numeric" value={price} placeholder="Chưa có" aria-label={`Giá ${row.name}`} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} />
+            </label>
+            <label className="block text-sm font-semibold">
+              Giá gạch (nếu có)
+              <Input className="mt-1 min-h-11" inputMode="numeric" value={listPrice} placeholder="Không gạch" onChange={(e) => setListPrice(e.target.value.replace(/[^\d]/g, ""))} />
+            </label>
+            <label className="block text-sm font-semibold">
+              Tối thiểu / dòng
+              <Input className="mt-1 min-h-11" inputMode="numeric" value={minTotal} placeholder="Không" onChange={(e) => setMinTotal(e.target.value.replace(/[^\d]/g, ""))} />
+              <span className="mt-1 block text-xs font-normal text-muted-foreground">Ví dụ ảnh lụa 6×9 lẻ: 1–10 ảnh vẫn tính 30.000đ.</span>
             </label>
             <label className="block text-sm font-semibold">
               Trạng thái

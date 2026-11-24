@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { ImagePlaceholder, Stepper } from "@/components/site/shop-ui";
 import { catalogQueryOptions, type CatalogProduct, type CatalogVariant } from "@/lib/catalog.functions";
 import { designNote, itemsParam, useCart, type CartLine } from "@/lib/cart";
+import { lineAmount } from "@/domain/calc";
 import { formatVnd } from "@/lib/brand";
 import { variantThumb } from "@/lib/product-media";
 import { shipEstimate } from "@/lib/ship-estimate";
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/gio-hang")({
   component: CartPage,
 });
 
-type Row = CartLine & { key: string; product: CatalogProduct; variant: CatalogVariant; unit: number };
+type Row = CartLine & { key: string; product: CatalogProduct; variant: CatalogVariant; unit: number; amount: number };
 
 function CartPage() {
   const { data: products } = useSuspenseQuery(catalogQueryOptions);
@@ -40,13 +41,14 @@ function CartPage() {
     const hit = lookup.get(line.variantId);
     if (!hit) return [];
     const unit = hit.variant.requires_quote ? 0 : (hit.variant.sale_price ?? hit.variant.price ?? 0);
-    return [{ ...line, key: `${line.variantId}|${line.design ?? ""}`, ...hit, unit }];
+    const amount = hit.variant.requires_quote ? 0 : (lineAmount(unit, line.qty, hit.variant.min_total) ?? unit * line.qty);
+    return [{ ...line, key: `${line.variantId}|${line.design ?? ""}`, ...hit, unit, amount }];
   });
   const picked = rows.filter((r) => !unselected.has(r.key));
-  const subtotal = picked.reduce((sum, r) => sum + r.unit * r.qty, 0);
+  const subtotal = picked.reduce((sum, r) => sum + r.amount, 0);
   const saved = picked.reduce((sum, r) => sum + Math.max(0, (r.variant.list_price ?? r.unit) - r.unit) * r.qty, 0);
   const ship = shipEstimate(
-    picked.map((r) => ({ width: r.variant.width, height: r.variant.height, amount: r.unit * r.qty })),
+    picked.map((r) => ({ width: r.variant.width, height: r.variant.height, amount: r.amount })),
     "delivery",
   );
   const allOn = rows.length > 0 && picked.length === rows.length;
@@ -107,7 +109,10 @@ function CartPage() {
                       </p>
                       <div className="mt-1.5 flex flex-wrap items-end justify-between gap-2">
                         <p className="flex items-baseline gap-1.5">
-                          <span className="text-[15px] font-extrabold tracking-tight text-sale">{r.unit ? formatVnd(r.unit) : "Liên hệ"}</span>
+                          <span className="text-[15px] font-extrabold tracking-tight text-sale">{r.unit ? formatVnd(r.amount) : "Liên hệ"}</span>
+                          {r.variant.min_total && r.amount !== r.unit * r.qty ? (
+                            <p className="text-xs text-muted-foreground">Đã áp dụng tối thiểu {formatVnd(r.variant.min_total)}</p>
+                          ) : null}
                           {r.variant.list_price ? <s className="text-xs text-muted-foreground">{formatVnd(r.variant.list_price)}</s> : null}
                         </p>
                         <div className="flex items-center gap-2">

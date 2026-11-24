@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { lineAmount } from "@/domain/calc";
 import { vnYmd } from "@/domain/calc";
 import { skuSoldOn } from "@/domain/mohome";
 import { depositMethodLabel, isMarketplace, PAYMENT_METHODS, RETAIL_PAYMENT_METHODS, type PaymentMethod } from "@/domain/order-desk";
@@ -25,6 +26,7 @@ export type DeskSku = {
   groupName: string;
   label: string;
   prices?: Partial<Record<Channel, number | null>>;
+  minTotals?: Partial<Record<Channel, number | null>>;
   soldOn?: Channel[];
 };
 
@@ -166,13 +168,13 @@ export function OrderDesk({
   /** Form khách lẻ gọn như lúc tạo — ẩn địa chỉ khi lấy tại xưởng, nhãn ngắn. */
   const compact = retail;
   const channelList =
-    retail && mode === "create"
-      ? [
-          { id: "tai_tiem" as const, label: "Trực tiếp" },
-          { id: "facebook" as const, label: "Facebook" },
-        ]
-      : channelOptions?.length
-        ? channelOptions
+    channelOptions?.length
+      ? channelOptions
+      : retail && mode === "create"
+        ? [
+            { id: "tai_tiem" as const, label: "Trực tiếp" },
+            { id: "facebook" as const, label: "Facebook" },
+          ]
         : (Object.keys(CHANNEL_LABEL) as Channel[]).map((id) => ({ id, label: CHANNEL_LABEL[id] }));
   const sellable = useMemo(
     () => catalog.filter((sku) => skuSoldOn(sku, channel)),
@@ -185,7 +187,7 @@ export function OrderDesk({
       const listed = sku?.prices?.[channel] ?? null;
       const typed = digits(line.unitPrice);
       const unit = line.priceTouched && Number.isFinite(typed) ? typed : listed;
-      const lineTotal = !sku || unit === null ? null : unit * line.quantity;
+      const lineTotal = !sku || unit === null ? null : lineAmount(unit, line.quantity, sku.minTotals?.[channel]);
       return { ...line, sku, listed, unit, lineTotal };
     });
   }, [catalog, channel, lines]);

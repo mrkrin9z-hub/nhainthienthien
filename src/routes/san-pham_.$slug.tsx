@@ -9,6 +9,7 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 import { FreeshipTag, ImagePlaceholder, PolicyChips, ProductCard, ShopInfoBlock, Stepper } from "@/components/site/shop-ui";
 import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct, type CatalogVariant } from "@/lib/catalog.functions";
 import { matchingSheet, sizeChoices } from "@/domain/catalog-label";
+import { lineAmount } from "@/domain/calc";
 import { BRAND, formatVnd, tiktokUrl } from "@/lib/brand";
 import { ShopLinksRow } from "@/components/site/shop-links";
 import { flyToCart } from "@/lib/motion";
@@ -128,7 +129,7 @@ function ProductPage() {
   const media = mediaFor(product.slug);
   const designs = media.designs;
   const gallery = useMemo(
-    () => galleryFor(product.slug, product.cover_path, choices.length > 1 ? (choice?.key ?? null) : null, product.name),
+    () => galleryFor(product.slug, product.cover_path, choices.length > 1 ? (choice?.key ?? null) : null, product.name, product.gallery),
     [product, choice?.key, choices.length],
   );
   const tiktok = tiktokUrl(product.slug);
@@ -200,6 +201,9 @@ function ProductPage() {
             <section className="card relative z-[1] mx-2.5 -mt-5 p-3.5 md:m-0 md:rounded-none md:bg-transparent md:p-0 md:shadow-none">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-gradient-to-r from-[#fff3e0] via-[#fff8ee] to-white px-3.5 py-3 md:px-5 md:py-4">
                 <span className="text-[26px] font-extrabold tracking-tight text-sale md:text-[32px]">{price === null ? "Liên hệ" : formatVnd(price * 1)}</span>
+                {price !== null && variant?.min_total ? (
+                  <p className="mt-1 text-sm text-muted-foreground">Tối thiểu {formatVnd(variant.min_total)} / lần đặt (ít ảnh hơn vẫn tính mức này).</p>
+                ) : null}
                 {variant?.list_price ? <s className="text-sm text-muted-foreground">{formatVnd(variant.list_price)}</s> : null}
                 {pct ? <span className="rounded-full bg-cta px-2 py-0.5 text-xs font-extrabold text-cta-foreground">-{pct}%</span> : null}
               </div>
@@ -285,7 +289,7 @@ function ProductPage() {
               </div>
               {price !== null && qty > 1 ? (
                 <p className="mt-2 text-right text-sm text-muted-foreground">
-                  Thành tiền: <span className="font-semibold text-sale">{formatVnd(price * qty)}</span>
+                  Thành tiền: <span className="font-semibold text-sale">{formatVnd(lineAmount(price, qty, variant?.min_total) ?? price * qty)}</span>
                 </p>
               ) : null}
 

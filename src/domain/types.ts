@@ -191,6 +191,8 @@ export type Settings = {
   groupListed: Record<string, boolean>;
   /** slug → mime khi đã tải ảnh thật lên KV. Thiếu thì web dùng ảnh mẫu. */
   productPhotos?: Record<string, string>;
+  /** Thư viện ảnh thêm (không phải ảnh bìa), hiện trên trang chi tiết mà không cần deploy lại. */
+  productGalleries?: Record<string, { id: string; mime: string }[]>;
   marketplaceCutoff: string;
   marketplaceHandover: string;
   /** Số đơn để gắn khách quay lại. Thiếu thì 2. */
@@ -393,6 +395,8 @@ export type ChannelPrice = {
   note: string;
   /** Giá niêm yết sàn trước khi giảm. Thiếu với kênh tại tiệm và Facebook. */
   listPrice?: number | null;
+  /** Tổng tối thiểu trên một dòng (vd. ảnh lụa 6×9 lẻ: 1–10 ảnh vẫn tính 30.000đ). */
+  minTotal?: number | null;
 };
 
 export type Material = {

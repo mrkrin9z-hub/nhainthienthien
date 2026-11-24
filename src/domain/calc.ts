@@ -302,6 +302,14 @@ export function perSheet(price: number, sheets: number): number {
 }
 
 /** Báo lỗi nếu combo sau đắt hơn (tính trên mỗi tấm) so với combo trước. */
+/** Thành tiền một dòng: đơn giá × số lượng, không thấp hơn minTotal (nếu có). */
+export function lineAmount(unitPrice: number | null, qty: number, minTotal?: number | null): number | null {
+  if (unitPrice === null || !Number.isFinite(unitPrice) || qty <= 0) return null;
+  const raw = unitPrice * qty;
+  const floor = typeof minTotal === "number" && minTotal > 0 ? minTotal : 0;
+  return Math.max(raw, floor);
+}
+
 export function comboPriceError(
   rows: { sheets: number; price: number | null }[],
 ): string | null {

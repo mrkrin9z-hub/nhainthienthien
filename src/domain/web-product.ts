@@ -1,11 +1,13 @@
 import { comboPriceError } from "./calc.ts";
-import { CHANNELS, type ChannelPrice, type Group, type Sku } from "./types.ts";
+import { CHANNELS, type Channel, type ChannelPrice, type Group, type Sku } from "./types.ts";
 
 export type WebSizeInput = {
   widthCm: number;
   heightCm: number;
   sheets: number;
   price: number;
+  prices?: Partial<Record<Channel, number>>;
+  minTotal?: number | null;
 };
 
 export type WebProductInput = {
@@ -14,6 +16,7 @@ export type WebProductInput = {
   description: string;
   turnaround: string;
   sizes: WebSizeInput[];
+  listed?: boolean;
 };
 
 export type BuiltWebProduct = {
@@ -69,7 +72,9 @@ export function buildWebProduct(
     widthCm: whole(size.widthCm, "Chiều rộng", 1, 200),
     heightCm: whole(size.heightCm, "Chiều cao", 1, 200),
     sheets: whole(size.sheets, "Số tấm", 1, 100),
-    price: whole(size.price, "Giá", 1000, 100_000_000),
+    price: whole(size.price, "Giá tại tiệm", 1000, 100_000_000),
+    prices: size.prices,
+    minTotal: size.minTotal ?? null,
   }));
   const seen = new Set<string>();
   for (const size of sizes) {
@@ -99,6 +104,7 @@ export function buildWebProduct(
     const stem = `WEB-${slug.slice(0, 24)}-${size.widthCm}x${size.heightCm}-${size.sheets}`;
     const code = uniqueKey(stem, takenCodes);
     takenCodes.add(code);
+    const soldOn = CHANNELS.filter((channel) => (channel === "tai_tiem" ? size.price : size.prices?.[channel]) != null);
     skus.push({
       id: code,
       code,
@@ -110,14 +116,17 @@ export function buildWebProduct(
       sheets: size.sheets,
       piecesPerPack: null,
       sort: index + 1,
+      soldOn: soldOn.length ? soldOn : ["tai_tiem"],
     });
     for (const channel of CHANNELS) {
+      const amount = channel === "tai_tiem" ? size.price : (size.prices?.[channel] ?? null);
       prices.push({
         skuId: code,
         channel,
-        price: channel === "tai_tiem" ? size.price : null,
-        status: channel === "tai_tiem" ? "dang_ban" : "nhap",
+        price: amount ?? null,
+        status: amount != null ? "dang_ban" : "nhap",
         note: channel === "tai_tiem" ? "Thêm từ quản trị" : "",
+        ...(channel === "tai_tiem" && size.minTotal ? { minTotal: size.minTotal } : {}),
       });
     }
   });

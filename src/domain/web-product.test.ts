@@ -97,3 +97,36 @@ test("trang quản trị có chỗ thêm sản phẩm lên trang chủ", () => {
   assert.match(home, /catalogQueryOptions/);
   assert.match(home, /id="gian-hang"/);
 });
+
+test("sản phẩm mới nhận giá từng kênh và tối thiểu, mặc định hiện trang chủ", () => {
+  const built = buildWebProduct(
+    {
+      name: "Ảnh lụa 6x9 lẻ",
+      category: "Ảnh lụa",
+      description: "In lẻ",
+      turnaround: "",
+      listed: true,
+      sizes: [
+        {
+          widthCm: 6,
+          heightCm: 9,
+          sheets: 1,
+          price: 3000,
+          minTotal: 30000,
+          prices: { facebook: 3000, ctv: 2700, mo_home: 2400 },
+        },
+      ],
+    },
+    { slugs: [], ids: [], codes: [], sorts: [0] },
+  );
+  assert.equal(built.group.slug, "anh-lua-6x9-le");
+  const byChannel = Object.fromEntries(built.prices.map((row) => [row.channel, row]));
+  assert.equal(byChannel['tai_tiem']?.price, 3000);
+  assert.equal(byChannel['tai_tiem']?.minTotal, 30000);
+  assert.equal(byChannel['facebook']?.price, 3000);
+  assert.equal(byChannel['ctv']?.price, 2700);
+  assert.equal(byChannel['mo_home']?.price, 2400);
+  assert.equal(byChannel['tiktok']?.price, null);
+  assert.equal(byChannel['tiktok']?.status, "nhap");
+  assert.deepEqual(built.skus[0]?.soldOn, ["tai_tiem", "facebook", "ctv", "mo_home"]);
+});

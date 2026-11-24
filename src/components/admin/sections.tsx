@@ -62,7 +62,7 @@ export function GoodsLinks() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const role = me.data?.role;
   const items = [
-    ...(role === "owner" ? [{ to: "/admin/san-pham", label: "Sản phẩm web" }] : []),
+    ...(role === "owner" || role === "sale" ? [{ to: "/admin/san-pham", label: "Sản phẩm web" }] : []),
     ...(role === "owner" || role === "sale" ? [{ to: "/admin/gia", label: "Bảng giá" }] : []),
     { to: "/admin/kho", label: "Kho" },
     ...(role === "owner" || role === "sale" ? [{ to: "/admin/anh", label: "Ảnh web" }] : []),

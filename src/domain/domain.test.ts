@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   comboPriceError,
   comboWarnings,
+  lineAmount,
   collectedRevenue,
   commissionOf,
   depositFor,
@@ -137,6 +138,13 @@ test("zip ảnh lưu tên và đúng checksum", async () => {
 test("combo sau không được đắt hơn trên mỗi tấm", () => {
   assert.equal(comboPriceError([{ sheets: 1, price: 100000 }, { sheets: 2, price: 180000 }]), null);
   assert.match(comboPriceError([{ sheets: 1, price: 100000 }, { sheets: 2, price: 220000 }]) ?? "", /Combo 2/);
+});
+
+test("thành tiền tôn trọng tối thiểu mỗi dòng", () => {
+  assert.equal(lineAmount(3000, 5, 30000), 30000);
+  assert.equal(lineAmount(3000, 12, 30000), 36000);
+  assert.equal(lineAmount(null, 5, 30000), null);
+  assert.equal(lineAmount(89000, 2), 178000);
 });
 
 test("giấy 13x18 xếp vừa khổ 61cm", () => {

@@ -65,3 +65,64 @@ export async function clearProductPhoto(slug: string): Promise<void> {
   await unlink(path.join(dir, slug)).catch(() => undefined);
   await unlink(path.join(dir, `${slug}.mime`)).catch(() => undefined);
 }
+
+function galleryKey(slug: string, id: string): { slug: string; id: string; blob: string; mime: string } {
+  const cleanSlug = photoSlug(slug);
+  if (!/^[a-z0-9-]{1,40}$/.test(id)) throw new Error("Mã ảnh không hợp lệ.");
+  return { slug: cleanSlug, id, blob: `${PREFIX}${cleanSlug}:g:${id}`, mime: `${PREFIX}${cleanSlug}:g:${id}:mime` };
+}
+
+export async function writeProductGalleryPhoto(slug: string, id: string, bytes: Uint8Array, mime: string): Promise<void> {
+  const key = galleryKey(slug, id);
+  if (!["image/jpeg", "image/png", "image/webp"].includes(mime)) throw new Error("Chỉ nhận JPG, PNG hoặc WEBP.");
+  if (!imageBytesMatch(mime, bytes)) throw new Error("Nội dung file không khớp định dạng ảnh.");
+  if (bytes.byteLength > MAX_BYTES) throw new Error("Ảnh sản phẩm tối đa 2MB.");
+  const kv = await shopKv();
+  if (kv) {
+    await kv.put(key.blob, bytes);
+    await kv.put(key.mime, mime);
+    return;
+  }
+  if (onWorkers()) throw new Error("Chưa có KV để lưu ảnh sản phẩm.");
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const dir = path.join(process.cwd(), "data", "product-photos", key.slug);
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, `g-${key.id}`), bytes);
+  await writeFile(path.join(dir, `g-${key.id}.mime`), mime);
+}
+
+export async function readProductGalleryPhoto(slug: string, id: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  const key = galleryKey(slug, id);
+  const kv = await shopKv();
+  if (kv) {
+    const bytes = await kv.get(key.blob, "arrayBuffer");
+    if (!bytes) return null;
+    const mime = (await kv.get(key.mime, "text")) || "image/jpeg";
+    return { bytes: new Uint8Array(bytes), mime };
+  }
+  if (onWorkers()) return null;
+  const { readFile } = await import("node:fs/promises");
+  const dir = path.join(process.cwd(), "data", "product-photos", key.slug);
+  try {
+    const bytes = new Uint8Array(await readFile(path.join(dir, `g-${key.id}`)));
+    const mime = (await readFile(path.join(dir, `g-${key.id}.mime`), "utf8")).trim() || "image/jpeg";
+    return { bytes, mime };
+  } catch {
+    return null;
+  }
+}
+
+export async function clearProductGalleryPhoto(slug: string, id: string): Promise<void> {
+  const key = galleryKey(slug, id);
+  const kv = await shopKv();
+  if (kv) {
+    await kv.delete(key.blob);
+    await kv.delete(key.mime);
+    return;
+  }
+  if (onWorkers()) return;
+  const { unlink } = await import("node:fs/promises");
+  const dir = path.join(process.cwd(), "data", "product-photos", key.slug);
+  await unlink(path.join(dir, `g-${key.id}`)).catch(() => undefined);
+  await unlink(path.join(dir, `g-${key.id}.mime`)).catch(() => undefined);
+}

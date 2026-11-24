@@ -19,6 +19,7 @@ import { postFormWithProgress, putDriveFile } from "@/lib/drive-put";
 import { createOrder, createUploadTickets, finishOrderDriveUpload, prepareOrderDriveUpload, submitOrder } from "@/lib/orders.functions";
 import { preparePhoto } from "@/lib/compress-image";
 import { UploadOverlay, type UploadPhase } from "@/components/site/upload-overlay";
+import { lineAmount } from "@/domain/calc";
 import { BRAND, formatVnd } from "@/lib/brand";
 import { useCart } from "@/lib/cart";
 import { needsCustomerPhotos, variantThumb } from "@/lib/product-media";
@@ -136,7 +137,7 @@ function OrderPage() {
     return rows;
   }, [products, quantities]);
 
-  const subtotal = selected.reduce((sum, r) => sum + r.unitPrice * r.quantity, 0);
+  const subtotal = selected.reduce((sum, r) => sum + (lineAmount(r.unitPrice, r.quantity, r.variant.min_total) ?? r.unitPrice * r.quantity), 0);
 
   function setQty(variantId: string, next: number) {
     setQuantities((prev) => ({ ...prev, [variantId]: Math.max(0, Math.min(500, next)) }));
@@ -666,6 +667,7 @@ function ProductOptions({
         {choice.variants.map((variant) => {
           const qty = quantities[variant.id] ?? 0;
           const amount = variant.requires_quote ? null : (variant.sale_price ?? variant.price);
+          const line = amount == null || qty <= 0 ? amount : (lineAmount(amount, qty, variant.min_total) ?? amount * qty);
           return (
             <li key={variant.id} className="flex items-center justify-between gap-3 rounded-2xl bg-[#f6f8fb] px-3 py-2">
               <span className="min-w-0">
@@ -673,8 +675,9 @@ function ProductOptions({
                   {showOptions ? sheetOptionLabel(variant.sheets) : variant.name}
                 </span>
                 <span className="block text-xs font-semibold text-sale">
-                  {amount == null ? "Liên hệ báo giá" : formatVnd(amount)}
+                  {amount == null ? "Liên hệ báo giá" : qty > 0 ? formatVnd(line ?? amount) : formatVnd(amount)}
                 </span>
+                {variant.min_total ? <span className="block text-[11px] text-muted-foreground">Tối thiểu {formatVnd(variant.min_total)}</span> : null}
               </span>
               <div className="flex shrink-0 items-center rounded-full bg-white shadow-[0_0_0_1px_rgb(18_48_71/0.08)]">
                 <button

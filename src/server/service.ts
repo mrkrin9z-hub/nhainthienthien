@@ -16,6 +16,7 @@ import {
   minutesLate,
   groupIsListed,
   isMergedWoodAlias,
+  lineAmount,
   priceOf,
   quoteSku,
   isProductionStep,
@@ -123,7 +124,7 @@ import { getRequest } from "@tanstack/react-start/server";
 
 import { onWorkers, orderFiles, shopKv } from "@/server/bindings";
 import { listBackups, readBackup, writeManualBackup } from "@/server/store";
-import { clearProductPhoto, readProductPhoto, writeProductPhoto } from "@/server/photos";
+import { clearProductGalleryPhoto, clearProductPhoto, readProductGalleryPhoto, readProductPhoto, writeProductGalleryPhoto, writeProductPhoto } from "@/server/photos";
 import { createGhnWaybill, createGhtkWaybill, createJtWaybill, quoteGhtkFee, trackGhn, trackGhtk, trackJt } from "@/server/carriers";
 import { integrationStatus, readIntegrationSecret, saveIntegrationSecret } from "@/server/secrets";
 import { deleteFromDrive, downloadDriveThumbnail, downloadFromDrive, driveConnected, inspectDriveUpload, openDriveUpload, uploadToDrive } from "@/server/drive";
@@ -389,8 +390,12 @@ export async function publicCatalog() {
       slug: group.slug,
       category: group.category,
       description: group.description,
-      cover_path: mediaFor(group.slug).listingCover
-        ?? (state.settings.productPhotos?.[group.slug] ? `/api/public/product-photo/${group.slug}` : null),
+      cover_path: state.settings.productPhotos?.[group.slug]
+        ? `/api/public/product-photo/${group.slug}`
+        : (mediaFor(group.slug).listingCover ?? null),
+      gallery: (state.settings.productGalleries?.[group.slug] ?? []).map(
+        (item) => `/api/public/product-photo/${group.slug}?g=${encodeURIComponent(item.id)}`,
+      ),
       turnaround_text: group.turnaround,
       sort_order: group.sort,
       variants: state.skus
@@ -412,6 +417,7 @@ export async function publicCatalog() {
               const lp = priceOf(state.prices, sku.id, PUBLIC_PRICE_CHANNEL)?.listPrice ?? priceOf(state.prices, sku.id, "tiktok")?.listPrice ?? null;
               return typeof lp === "number" && price !== null && lp > price ? lp : null;
             })(),
+            min_total: priceOf(state.prices, sku.id, PUBLIC_PRICE_CHANNEL)?.minTotal ?? null,
             requires_quote: price === null,
             recommended_width_px: sku.widthCm ? Math.round((sku.widthCm / 2.54) * 300) : null,
             recommended_height_px: sku.heightCm ? Math.round((sku.heightCm / 2.54) * 300) : null,
@@ -509,7 +515,7 @@ function buildItems(
       skuCode: sku.code,
       quantity: item.quantity,
       unitPrice,
-      lineTotal: unitPrice === null ? null : unitPrice * item.quantity,
+      lineTotal: lineAmount(unitPrice, item.quantity, priceOf(state.prices, item.skuId, input.channel)?.minTotal),
       variant: item.variant?.trim() || "",
     };
   });
@@ -1521,7 +1527,7 @@ export async function reviseOrder(
           skuCode: sku.code,
           quantity: item.quantity,
           unitPrice,
-          lineTotal: unitPrice === null ? null : unitPrice * item.quantity,
+          lineTotal: lineAmount(unitPrice, item.quantity, priceOf(state.prices, item.skuId, input.channel)?.minTotal),
           ...(previous?.listUnitPrice !== undefined ? { listUnitPrice: previous.listUnitPrice } : {}),
           ...(previous?.sellerSku ? { sellerSku: previous.sellerSku } : {}),
           variant: item.variant?.trim() || previous?.variant || "",
@@ -1964,7 +1970,7 @@ export async function priceBoard(actor: Actor, groupId?: string) {
           const price = row?.price ?? null;
           const boms = linesForSku(state, sku);
           const margin = quoteSku({ sku, price, channel, settings: state.settings, boms, materials: state.materials, affiliate: false });
-          return [channel, { price, listPrice: row?.listPrice ?? null, status: row?.status ?? "nhap", note: row?.note ?? "", profit: margin.profit, marginPercent: margin.marginPercent, cost: margin.material, costKnown: margin.materialKnown, costIncomplete: margin.materialIncomplete, sold: skuSoldOn(sku, channel) }];
+          return [channel, { price, listPrice: row?.listPrice ?? null, minTotal: row?.minTotal ?? null, status: row?.status ?? "nhap", note: row?.note ?? "", profit: margin.profit, marginPercent: margin.marginPercent, cost: margin.material, costKnown: margin.materialKnown, costIncomplete: margin.materialIncomplete, sold: skuSoldOn(sku, channel) }];
         }),
       ),
     })),
@@ -1973,7 +1979,7 @@ export async function priceBoard(actor: Actor, groupId?: string) {
 
 export async function updateChannelPrice(
   actor: Actor,
-  input: { skuId: string; channel: Channel; price: number | null; status: "dang_ban" | "nhap" | "cho_duyet"; note: string },
+  input: { skuId: string; channel: Channel; price: number | null; status: "dang_ban" | "nhap" | "cho_duyet"; note: string; listPrice?: number | null; minTotal?: number | null },
 ) {
   assertRole(actor, ["owner"]);
   await mutate(async (state) => {
@@ -1991,11 +1997,21 @@ export async function updateChannelPrice(
     const status = input.price === null ? "nhap" : input.status;
     if (status === "dang_ban" && input.price === null) throw new Error("Chưa có giá thì không để đang bán.");
     if (!row) {
-      state.prices.push({ skuId: sku.id, channel: input.channel, price: input.price, status, note: input.note });
+      state.prices.push({
+        skuId: sku.id,
+        channel: input.channel,
+        price: input.price,
+        status,
+        note: input.note,
+        ...(input.listPrice !== undefined ? { listPrice: input.listPrice } : {}),
+        ...(input.minTotal !== undefined ? { minTotal: input.minTotal } : {}),
+      });
     } else {
       row.price = input.price;
       row.status = status;
       row.note = input.note;
+      if (input.listPrice !== undefined) row.listPrice = input.listPrice;
+      if (input.minTotal !== undefined) row.minTotal = input.minTotal;
     }
     if (input.price !== null) sku.soldOn = withChannelSold(sku, input.channel, true);
     audit(state, actor.id, "price.update", `${sku.code}:${input.channel}`, before, input);
@@ -3538,6 +3554,9 @@ export async function skuOptions(actor: Actor) {
       const prices = Object.fromEntries(
         CHANNELS.map((channel) => [channel, priceOf(state.prices, sku.id, channel)?.price ?? null]),
       ) as Record<(typeof CHANNELS)[number], number | null>;
+      const minTotals = Object.fromEntries(
+        CHANNELS.map((channel) => [channel, priceOf(state.prices, sku.id, channel)?.minTotal ?? null]),
+      ) as Record<(typeof CHANNELS)[number], number | null>;
       return {
         id: sku.id,
         code: sku.code,
@@ -3548,6 +3567,7 @@ export async function skuOptions(actor: Actor) {
         size: sku.size,
         soldOn: sku.soldOn && sku.soldOn.length > 0 ? sku.soldOn : (["tai_tiem", "facebook", "tiktok", "shopee"] as Channel[]),
         prices,
+        minTotals,
         price: prices.tai_tiem,
       };
     }),
@@ -4312,7 +4332,7 @@ export async function codBoard(actor: Actor, month: string) {
 }
 
 export async function listWebProducts(actor: Actor) {
-  assertRole(actor, ["owner"]);
+  assertRole(actor, ["owner", "sale"]);
   const state = await readState();
   return state.groups
     .slice()
@@ -4331,12 +4351,14 @@ export async function listWebProducts(actor: Actor) {
         listed: groupIsListed(state.settings, group),
         variants: skus.length,
         from: prices.length ? Math.min(...prices) : null,
+        cover: Boolean(state.settings.productPhotos?.[group.slug]),
+        gallery: (state.settings.productGalleries?.[group.slug] ?? []).length,
       };
     });
 }
 
 export async function createWebProduct(actor: Actor, input: WebProductInput) {
-  assertRole(actor, ["owner"]);
+  assertRole(actor, ["owner", "sale"]);
   return mutate(async (state) => {
     const built = buildWebProduct(input, {
       slugs: state.groups.map((group) => group.slug),
@@ -4347,18 +4369,19 @@ export async function createWebProduct(actor: Actor, input: WebProductInput) {
     state.groups.push(built.group);
     state.skus.push(...built.skus);
     state.prices.push(...built.prices);
-    state.settings.groupListed = { ...state.settings.groupListed, [built.group.id]: true };
+    state.settings.groupListed = { ...state.settings.groupListed, [built.group.id]: input.listed !== false };
     audit(state, actor.id, "product.create", built.group.id, null, {
       name: built.group.name,
       slug: built.group.slug,
       sizes: built.skus.length,
+      listed: input.listed !== false,
     });
     return { id: built.group.id, slug: built.group.slug, name: built.group.name };
   });
 }
 
 export async function setWebProductListed(actor: Actor, groupId: string, listed: boolean) {
-  assertRole(actor, ["owner"]);
+  assertRole(actor, ["owner", "sale"]);
   await mutate(async (state) => {
     const group = state.groups.find((item) => item.id === groupId);
     if (!group) throw new Error("Không thấy sản phẩm.");
@@ -4380,6 +4403,8 @@ export async function listGroupPhotos(actor: Actor) {
       name: group.name,
       slug: group.slug,
       custom: Boolean(state.settings.productPhotos?.[group.slug]),
+      listed: groupIsListed(state.settings, group),
+      gallery: (state.settings.productGalleries?.[group.slug] ?? []).map((item) => item.id),
     }));
 }
 
@@ -4405,10 +4430,45 @@ export async function removeGroupPhoto(actor: Actor, slug: string) {
   });
 }
 
-export async function publicProductPhoto(slug: string) {
+export async function publicProductPhoto(slug: string, galleryId?: string | null) {
   const state = await readState();
+  if (galleryId) {
+    const found = (state.settings.productGalleries?.[slug] ?? []).some((item) => item.id === galleryId);
+    if (!found) return null;
+    return readProductGalleryPhoto(slug, galleryId);
+  }
   if (!state.settings.productPhotos?.[slug]) return null;
   return readProductPhoto(slug);
+}
+
+export async function saveGroupGalleryPhoto(actor: Actor, slug: string, bytes: Uint8Array, mime: string) {
+  assertRole(actor, ["owner", "sale"]);
+  const state = await readState();
+  if (!state.groups.some((group) => group.slug === slug)) throw new Error("Không có nhóm này.");
+  const id = nid().replace(/[^a-z0-9]/gi, "").slice(0, 12).toLowerCase() || "anh";
+  await writeProductGalleryPhoto(slug, id, bytes, mime);
+  await mutate(async (draft) => {
+    const current = draft.settings.productGalleries?.[slug] ?? [];
+    draft.settings.productGalleries = {
+      ...(draft.settings.productGalleries ?? {}),
+      [slug]: [...current, { id, mime }],
+    };
+    audit(draft, actor.id, "photo.gallery", slug, null, { id, mime });
+  });
+  return { id };
+}
+
+export async function removeGroupGalleryPhoto(actor: Actor, slug: string, id: string) {
+  assertRole(actor, ["owner", "sale"]);
+  await clearProductGalleryPhoto(slug, id);
+  await mutate(async (draft) => {
+    const current = draft.settings.productGalleries?.[slug] ?? [];
+    draft.settings.productGalleries = {
+      ...(draft.settings.productGalleries ?? {}),
+      [slug]: current.filter((item) => item.id !== id),
+    };
+    audit(draft, actor.id, "photo.gallery", slug, null, { id, cleared: true });
+  });
 }
 
 /* ── Org desk: chi nhánh / bộ phận / nhóm quyền / TB / tài liệu / feedback ── */

@@ -27,8 +27,7 @@ type ProductMedia = {
 };
 
 const sp = (name: string, count: number) => Array.from({ length: count }, (_, i) => `/media/sp/${name}-${i + 1}.webp`);
-const ai = (name: string, count: number) => Array.from({ length: count }, (_, i) => `/media/sp/${name}-ai-${i + 1}.webp`);
-const withAi = (name: string, aiCount: number, existingCount: number) => [...ai(name, aiCount), ...sp(name, existingCount)];
+const real = (name: string, count: number) => Array.from({ length: count }, (_, i) => `/media/sp/${name}-real-${i + 1}.webp`);
 
 const TKB_NAMES = [
   "Khủng long",
@@ -49,20 +48,23 @@ export const PRODUCT_MEDIA: Record<string, ProductMedia> = {
   "trang-guong": {
     listingCover: "/media/sp/cover-trang-guong.webp",
     bySize: {
-      "13x18": withAi("tg-13x18", 3, 4),
-      "15x21": withAi("tg-15x21", 2, 3),
-      "20x30": withAi("tg-20x30", 2, 4),
-      "30x45": ["/media/sp/tg-30x45-ai-1.webp", "/media/sp/tg-30x45-real-1.webp"],
-      "40x60": withAi("tg-40x60", 2, 4),
-      "50x75": withAi("tg-50x75", 2, 5),
-      "60x90": withAi("tg-60x90", 1, 5),
+      "13x18": real("tg-13x18", 5),
+      "15x21": real("tg-15x21", 5),
+      "20x30": real("tg-20x30", 5),
+      "30x45": real("tg-30x45", 5),
+      "40x60": real("tg-40x60", 5),
+      "50x75": real("tg-50x75", 5),
+      "60x90": real("tg-60x90", 5),
     },
     video: null,
     printsCustomerPhotos: true,
   },
+  "trang-guong-khung-tivi": { listingCover: "/media/sp/cover-trang-guong.webp", printsCustomerPhotos: true },
+  "trang-guong-khung-hop": { listingCover: "/media/sp/cover-trang-guong.webp", printsCustomerPhotos: true },
+  "trang-guong-khung-nhom": { listingCover: "/media/sp/cover-trang-guong.webp", printsCustomerPhotos: true },
   "nam-cham-xe": {
-    listingCover: "/media/sp/lai-moi-ai-1.webp",
-    gallery: withAi("lai-moi", 2, 9),
+    listingCover: "/media/sp/lai-moi-cover.webp",
+    gallery: [...real("lai-moi", 5), ...sp("lai-moi", 9)],
     video: null,
     designs: {
       title: "Chọn mẫu",
@@ -74,8 +76,8 @@ export const PRODUCT_MEDIA: Record<string, ProductMedia> = {
     },
   },
   "thoi-khoa-bieu": {
-    listingCover: "/media/sp/tkb-ai-1.webp",
-    gallery: withAi("tkb", 1, 7),
+    listingCover: "/media/sp/tkb-cover.webp",
+    gallery: real("tkb", 8),
     video: null,
     designs: {
       title: "Chọn mẫu",
@@ -87,12 +89,14 @@ export const PRODUCT_MEDIA: Record<string, ProductMedia> = {
     },
   },
   "thoi-khoa-bieu-boc-dan": {
-    listingCover: "/media/sp/tkb-bd-ai-1.webp",
-    gallery: ["/media/sp/tkb-bd-ai-1.webp", "/media/sp/tkb-bd-real-1.webp"],
+    listingCover: "/media/sp/tkb-bd-cover.webp",
+    gallery: real("tkb-bd", 8),
     video: null,
   },
-  "nam-cham-tu-lanh": { listingCover: "/media/sp/nct-ai-1.webp", gallery: withAi("nct", 2, 9), video: null, printsCustomerPhotos: true },
-  "anh-lua-6x9": { listingCover: "/media/sp/lua-ai-1.webp", gallery: withAi("lua", 2, 5), video: null, printsCustomerPhotos: true },
+  "nam-cham-tu-lanh": { listingCover: "/media/sp/nct-cover.webp", gallery: [...real("nct", 7), ...sp("nct", 9)], video: null, printsCustomerPhotos: true },
+  "anh-lua-6x9": { listingCover: "/media/sp/lua-cover.webp", gallery: real("lua", 4), video: null, printsCustomerPhotos: true },
+  "anh-lua-in-roi": { listingCover: "/media/sp/lua-cover.webp", gallery: real("lua", 4), video: null, printsCustomerPhotos: true },
+  "ep-go-lua": { listingCover: "/media/sp/lua-cover.webp", gallery: real("lua", 4), video: null, printsCustomerPhotos: true },
 };
 
 export function mediaFor(slug: string): ProductMedia {
@@ -112,10 +116,12 @@ export function hasPlaceholderCover(slug: string): boolean {
 }
 
 /** Bộ ảnh/video cho trang chi tiết, theo khổ đang chọn (nếu có). */
-export function galleryFor(slug: string, cover: string | null, sizeKey: string | null, name: string): MediaItem[] {
+export function galleryFor(slug: string, cover: string | null, sizeKey: string | null, name: string, uploaded?: string[] | null): MediaItem[] {
   const media = mediaFor(slug);
   let images: string[] = [];
-  if (media.bySize && sizeKey) {
+  if (uploaded && uploaded.length) {
+    images = uploaded.filter(Boolean);
+  } else if (media.bySize && sizeKey) {
     const key = media.bySize[sizeKey] ? sizeKey : media.sizeFallback?.[sizeKey];
     images = (key && media.bySize[key]) || [];
   }

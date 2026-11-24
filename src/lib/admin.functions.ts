@@ -318,6 +318,8 @@ export const savePrice = createServerFn({ method: "POST" })
         price: z.number().int().min(0).nullable(),
         status: z.enum(["dang_ban", "nhap", "cho_duyet"]),
         note: z.string().optional().default(""),
+        listPrice: z.number().int().min(0).nullable().optional(),
+        minTotal: z.number().int().min(0).nullable().optional(),
       })
       .parse(data),
   )
@@ -356,6 +358,7 @@ export const createPriceSize = createServerFn({ method: "POST" })
     if (data.prices.facebook !== undefined) prices.facebook = data.prices.facebook;
     if (data.prices.tiktok !== undefined) prices.tiktok = data.prices.tiktok;
     if (data.prices.shopee !== undefined) prices.shopee = data.prices.shopee;
+    if (data.prices.ctv !== undefined) prices.ctv = data.prices.ctv;
     if (data.prices.mo_home !== undefined) prices.mo_home = data.prices.mo_home;
     return create(await actor(), { ...data, prices, code: data.code });
   });
@@ -1159,10 +1162,13 @@ export const createWebProduct = createServerFn({ method: "POST" })
               heightCm: z.number().int().positive(),
               sheets: z.number().int().positive(),
               price: z.number().int().positive(),
+              prices: priceMap.optional(),
+              minTotal: z.number().int().min(0).max(100_000_000).nullable().optional(),
             }),
           )
           .min(1)
           .max(40),
+        listed: z.boolean().optional(),
       })
       .parse(data),
   )
@@ -1176,6 +1182,14 @@ export const setWebProductListed = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { setWebProductListed: setListed } = await import("@/server/service");
     await setListed(await actor(), data.groupId, data.listed);
+    return { ok: true };
+  });
+
+export const clearGroupGalleryPhoto = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ slug: z.string(), id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { removeGroupGalleryPhoto } = await import("@/server/service");
+    await removeGroupGalleryPhoto(await actor(), data.slug, data.id);
     return { ok: true };
   });
 
