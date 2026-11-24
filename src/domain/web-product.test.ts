@@ -86,6 +86,8 @@ test("trang quản trị quản lý sản phẩm + giá kênh, không gắn tran
   assert.match(editor, /suggestProductCode/);
   assert.match(editor, /getProductCategories/);
   assert.match(editor, /Có thể đổi nhóm khi sửa sản phẩm/);
+  assert.match(editor, /Bắt buộc chọn nhóm đã tạo/);
+  assert.match(editor, /setCategory\(""\)/);
   assert.doesNotMatch(editor, /Hiện trên trang chủ/);
   assert.doesNotMatch(editor, /Ảnh đại diện/);
   assert.doesNotMatch(editor, /Thêm khổ/);
