@@ -53,8 +53,11 @@ export type DeskSave = {
   note: string;
   dueDate: string | null;
   marketplaceCode: string;
+  /** Tạo đơn: số thu lần đầu (cộng ví ngay). */
   depositPaid: number;
   depositMethod: string;
+  /** Sửa đơn: số thu thêm lần này (ghi ví sau khi cập nhật). */
+  collectAmount?: number;
   discount?: number | null;
   customerShip: number | null;
   shipBy?: string | null;
@@ -96,7 +99,6 @@ export function OrderDesk({
   payments = [],
   transfer = null,
   onSave,
-  onCollect,
 }: {
   mode: "create" | "edit";
   owner: boolean;
@@ -129,7 +131,6 @@ export function OrderDesk({
   payments?: { at: string; amount: number; method: string; byName: string }[];
   transfer?: { image: string; content: string; bank: string; holder: string; amount: number } | null;
   onSave: (value: DeskSave) => Promise<void>;
-  onCollect?: (amount: number, method: string) => Promise<void>;
 }) {
   const [channel, setChannel] = useState<Channel>(initial.channel);
   const [fullName, setFullName] = useState(initial.fullName);
@@ -154,9 +155,7 @@ export function OrderDesk({
         : [blankLine()],
   );
   const [deposit, setDeposit] = useState("");
-  const [method, setMethod] = useState(mode === "create" ? "Tiền mặt" : "chuyển khoản");
   const [saving, setSaving] = useState(false);
-  const [collecting, setCollecting] = useState(false);
   const payChoices = retail ? RETAIL_PAYMENT_METHODS : PAYMENT_METHODS;
   const isCodPay = commercePay === "cod";
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -201,8 +200,10 @@ export function OrderDesk({
   }, [safeCatalog, channel, lines]);
   const chosen = priced.filter((line) => line.sku);
   const goods = chosen.length > 0 && chosen.every((line) => line.lineTotal !== null) ? chosen.reduce((sum, line) => sum + (line.lineTotal ?? 0), 0) : null;
-  const draftPaid = mode === "create" && Number.isFinite(digits(deposit)) ? digits(deposit) : 0;
-  const paid = mode === "create" ? draftPaid : paidSoFar;
+  const enteredPay = !isCodPay && Number.isFinite(digits(deposit)) ? digits(deposit) : 0;
+  const draftPaid = mode === "create" ? enteredPay : 0;
+  const collectAmount = mode === "edit" ? enteredPay : 0;
+  const paid = mode === "create" ? draftPaid : paidSoFar + collectAmount;
   const lineDiscountSum = chosen.reduce((sum, line) => {
     const cut = normalizeDeskDiscount(line.discount);
     const amount = cut === "" ? 0 : digits(cut);
@@ -255,7 +256,15 @@ export function OrderDesk({
         dueDate: dueDate || null,
         marketplaceCode,
         depositPaid: isCodPay ? 0 : draftPaid,
-        depositMethod: isCodPay || draftPaid <= 0 ? "" : payLabel || method,
+        depositMethod:
+          mode === "create"
+            ? isCodPay || draftPaid <= 0
+              ? ""
+              : payLabel
+            : collectAmount > 0
+              ? payLabel || "Tiền mặt"
+              : "",
+        ...(collectAmount > 0 ? { collectAmount } : {}),
         customerShip: customerShip.trim() === "" ? null : digits(customerShip),
         shipBy: localIso(shipBy),
         autoCancelAt: null,
@@ -265,6 +274,7 @@ export function OrderDesk({
         albumId: albumId || null,
         ...(itemsLocked ? {} : { items }),
       });
+      if (collectAmount > 0) setDeposit("");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không lưu được đơn.");
     } finally {
@@ -541,7 +551,7 @@ export function OrderDesk({
           </div>
           {mode === "create" || (retail && !fieldsLocked) ? (
             <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
-              <p className="text-sm font-medium">Thanh toán đơn hàng</p>
+              <p className="text-sm font-medium">Thanh toán</p>
               <Field label="Hình thức" required={mode === "create"}>
                 <select
                   className={control}
@@ -550,8 +560,6 @@ export function OrderDesk({
                   onChange={(event) => {
                     const next = event.target.value as PaymentMethod;
                     setCommercePay(next);
-                    const label = depositMethodLabel(next);
-                    if (label) setMethod(label);
                     if (next === "cod") setDeposit("");
                   }}
                 >
@@ -563,58 +571,27 @@ export function OrderDesk({
                   ))}
                 </select>
               </Field>
-              {mode === "create" ? (
-                isCodPay ? (
-                  <p className="text-[12px] text-muted-foreground">
-                    COD không thu ngay khi tạo đơn. Tiền thu hộ ghi sau khi đối soát với vận chuyển tại mục Đối soát COD — không tự cộng ví lúc lưu.
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-[12px] text-muted-foreground">Số tiền này cộng vào ví của bạn ngay khi lưu đơn. Để 0 nếu chưa thu.</p>
-                    <Field label="Số tiền thu lần 1">
-                      <MoneyInput placeholder="0" value={deposit} disabled={fieldsLocked} onValueChange={(value) => setDeposit(value == null ? "" : String(value))} />
-                    </Field>
-                  </>
-                )
+              {isCodPay ? (
+                <p className="text-[12px] text-muted-foreground">
+                  COD không thu ngay. Tiền thu hộ ghi sau khi đối soát vận chuyển tại Đối soát COD — không cộng ví lúc lưu.
+                </p>
               ) : (
-                <p className="text-[12px] text-muted-foreground">Đổi hình thức rồi bấm Cập nhật. Thu thêm tiền ở ô bên dưới.</p>
+                <>
+                  <Field label={mode === "create" ? "Số tiền thu" : "Thu thêm lần này"}>
+                    <MoneyInput
+                      placeholder="0"
+                      value={deposit}
+                      disabled={fieldsLocked}
+                      onValueChange={(value) => setDeposit(value == null ? "" : String(value))}
+                    />
+                  </Field>
+                  <p className="text-[12px] text-muted-foreground">
+                    {mode === "create"
+                      ? "Số tiền cộng vào ví khi bấm Lưu đơn. Để trống hoặc 0 nếu chưa thu."
+                      : "Nhập số thu thêm (nếu có) rồi bấm Cập nhật — hình thức và tiền ghi cùng lúc, cộng vào ví của bạn."}
+                  </p>
+                </>
               )}
-            </div>
-          ) : null}
-          {mode === "edit" ? (
-            <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
-              <p className="text-sm font-medium">Thu tiền</p>
-              <p className="text-[12px] text-muted-foreground">Ghi nhận sẽ cộng vào ví của bạn.</p>
-              <div className="flex items-end gap-2">
-                <div className="min-w-0 flex-1">
-                  <Field label="Số tiền">
-                    <MoneyInput placeholder="Số tiền" value={deposit} disabled={fieldsLocked || !onCollect} onValueChange={(value) => setDeposit(value == null ? "" : String(value))} />
-                  </Field>
-                </div>
-                <div className="w-36 shrink-0">
-                  <Field label="Nguồn thu">
-                    <select className={control} value={method} disabled={fieldsLocked || !onCollect} onChange={(event) => setMethod(event.target.value)}>
-                      <option>chuyển khoản</option>
-                      <option>tiền mặt</option>
-                    </select>
-                  </Field>
-                </div>
-              </div>
-              <Button
-                type="button"
-                className="w-full"
-                disabled={fieldsLocked || !onCollect || collecting || !deposit}
-                onClick={() => {
-                  if (!onCollect) return;
-                  setCollecting(true);
-                  void onCollect(Number(deposit), method)
-                    .then(() => setDeposit(""))
-                    .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không ghi được tiền."))
-                    .finally(() => setCollecting(false));
-                }}
-              >
-                {collecting ? "Đang ghi…" : "Ghi nhận vào ví của bạn"}
-              </Button>
             </div>
           ) : null}
           <p className="text-[11px] text-muted-foreground">
@@ -624,7 +601,7 @@ export function OrderDesk({
                 ? "COD: sau khi ship trả tiền, đánh dấu đã nhận tại Đối soát COD."
                 : channel === "facebook"
                   ? "Đơn Facebook có thể cần cọc trước khi in."
-                  : "Cọc có thể để trống, ghi thêm được sau khi mở đơn."}
+                  : "Số tiền thu có thể để trống; thu thêm được khi sửa đơn."}
           </p>
           {albumId ? <p className="text-[11px] font-medium text-primary">Ảnh từ album sẽ gắn vào đơn khi lưu.</p> : null}
           <Button type="submit" className="min-h-12 w-full text-base font-bold" disabled={saving || fieldsLocked}>
