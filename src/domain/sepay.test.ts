@@ -44,12 +44,14 @@ const tokenOpen: OrderPaymentQrToken = {
   createdAt: "2026-11-24T00:00:00.000Z",
 };
 
-test("extractPaymentNeedle ưu tiên SB rồi code rồi nội dung TT…", () => {
+test("extractPaymentNeedle ưu tiên SB rồi code rồi nội dung DH/TT…", () => {
   assert.equal(extractSbToken("ck SBABCD12 cam on"), "SBABCD12");
+  assert.equal(extractPaymentNeedle({ id: 1, code: "dh0007" }), "DH0007");
   assert.equal(extractPaymentNeedle({ id: 1, code: "tt251021-001" }), "TT251021-001");
+  assert.equal(extractPaymentNeedle({ id: 1, code: null, content: "chuyen DH0003 cam on" }), "DH0003");
   assert.equal(extractPaymentNeedle({ id: 1, code: null, content: "chuyen TT251021-001 cam on" }), "TT251021-001");
   assert.equal(extractPaymentNeedle({ id: 1, content: "khong co ma" }), "");
-  assert.equal(extractPaymentNeedle({ id: 1, content: "SBABCD12 TT251021-001" }), "SBABCD12");
+  assert.equal(extractPaymentNeedle({ id: 1, content: "SBABCD12 DH0001" }), "SBABCD12");
 });
 
 test("findOrderForSePay khớp mã đơn VietQR legacy", () => {

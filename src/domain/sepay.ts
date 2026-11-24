@@ -246,7 +246,9 @@ export function extractPaymentNeedle(payload: SePayWebhookPayload): string {
     .replace(/[^A-Z0-9-]/g, "");
   if (fromCode) return fromCode;
   const content = String(payload.content ?? payload.description ?? "").toUpperCase();
-  const match = content.match(/\bTT\d{6}-\d{2,4}\b/);
+  const dh = content.match(/\bDH\d{4,}\b/);
+  if (dh) return dh[0];
+  const match = content.match(/\b(?:TT|MH)\d{6}-\d{2,4}\b/);
   return match?.[0] ?? "";
 }
 

@@ -27,7 +27,8 @@ import {
 } from "@/domain/calc";
 import { commissionBasisLabel, commissionForSale } from "@/domain/commission";
 import { channelMinTotal } from "@/domain/desk-pricing";
-import { orderCodePrefix, skuSoldOn, withChannelSold, type ReportScope } from "@/domain/mohome";
+import { skuSoldOn, withChannelSold, type ReportScope } from "@/domain/mohome";
+import { nextDeskOrderCode } from "@/domain/order-code";
 import { applyStockCount, approveWaste, confirmWasteDay, editWaste, previousMonth, recordWaste, voidWaste, wasteDayStats, wasteDesk, wasteMonth, wasteMonthCompare, type EditWasteInput } from "@/domain/waste";
 import { workbookXml, type Sheet } from "@/domain/excel";
 import { imageBytesMatch, imageMimeAllowed, imagePreviewable } from "@/domain/images";
@@ -564,10 +565,14 @@ function refreshDeposit(state: ShopState, order: Order) {
   });
 }
 
-function nextCode(state: ShopState, channel: Channel = "tai_tiem"): string {
-  const prefix = orderCodePrefix(channel, vnParts().ymd);
-  const seq = state.orders.filter((order) => order.code.startsWith(`${prefix}-`)).length + 1;
-  return `${prefix}-${String(seq).padStart(3, "0")}`;
+/** Cấp mã DH0001, DH0002… tăng dần; cập nhật settings.orderSeq. */
+function nextCode(state: ShopState, _channel: Channel = "tai_tiem"): string {
+  const issued = nextDeskOrderCode(
+    state.orders.map((order) => order.code),
+    state.settings.orderSeq ?? 0,
+  );
+  state.settings.orderSeq = issued.seq;
+  return issued.code;
 }
 
 export async function createWebOrder(input: {

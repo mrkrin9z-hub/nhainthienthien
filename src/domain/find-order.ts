@@ -1,4 +1,4 @@
-/** Tìm đơn theo mã (TT261124-001) hoặc id (UUID), không phân biệt hoa thường ở mã. */
+/** Tìm đơn theo mã (DH0001 hoặc TT261124-001 cũ) hoặc id (UUID), không phân biệt hoa thường. */
 export function findOrderByRef<T extends { id: string; code: string }>(
   orders: T[] | null | undefined,
   ref: string | null | undefined,
