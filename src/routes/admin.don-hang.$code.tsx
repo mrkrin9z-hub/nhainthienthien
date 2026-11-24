@@ -131,10 +131,12 @@ function OrderDetailPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold text-primary">{data.code}</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Chỉnh sửa đơn hàng</h1>
           <p className="mt-1 truncate text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{data.code}</span>
+            {" · "}
             <span className="font-medium text-foreground">{data.customerName}</span>
             {" · "}
             {data.phone}
@@ -161,9 +163,20 @@ function OrderDetailPage() {
                 </option>
               ))}
           </select>
-          <Button asChild className="min-h-11">
-            <Link to="/admin/phieu/$code" params={{ code: data.code }}>In K80</Link>
+          <Button asChild variant="outline" className="min-h-11">
+            <Link to="/admin/phieu/$code" params={{ code: data.code }}>In hóa đơn</Link>
           </Button>
+          {role === "owner" ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+              disabled={deleting}
+              onClick={() => void removeOrder()}
+            >
+              {deleting ? "Đang xóa…" : "Xóa đơn"}
+            </Button>
+          ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className="inline-flex size-9 items-center justify-center rounded-md border" aria-label={`Thao tác ${data.code}`}>
@@ -181,15 +194,6 @@ function OrderDetailPage() {
                   <Link to="/admin/khach/$id" params={{ id: data.customerId }}>Hồ sơ khách</Link>
                 </DropdownMenuItem>
               ) : null}
-              {role === "owner" ? (
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  disabled={deleting}
-                  onClick={() => void removeOrder()}
-                >
-                  {deleting ? "Đang xóa…" : "Xóa đơn"}
-                </DropdownMenuItem>
-              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -200,19 +204,19 @@ function OrderDetailPage() {
           Bỏ qua cọc / checklist khi đổi trạng thái
         </label>
       ) : null}
-      <div className="flex gap-1 overflow-x-auto border-b">
+      <div className="flex gap-1 overflow-x-auto rounded-xl border bg-card px-1 pt-1 shadow-sm">
         {(
           [
             ["thong-tin", "Thông tin"],
             ["anh", "Hình ảnh"],
-            ["giao", "Giao hàng"],
+            ["giao", "Lịch trình"],
             ["lich-su", "Lịch sử"],
           ] as const
         ).map(([id, label]) => (
           <button
             key={id}
             type="button"
-            className={`shrink-0 border-b-2 px-3 py-2 text-sm font-semibold ${tab === id ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+            className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold ${tab === id ? "bg-[#2563eb] text-white" : "text-muted-foreground hover:bg-muted"}`}
             onClick={() => setTab(id)}
           >
             {label}
@@ -239,6 +243,8 @@ function OrderDetailPage() {
             mode="edit"
             retail={retail}
             owner={role === "owner"}
+            orderCode={data.code}
+            statusLabel={statusOptionLabel(data.shipMode, currentStatus)}
             fieldsLocked={marketplaceEditLocked(data.channel)}
             itemsLocked={marketplaceEditLocked(data.channel) || data.printDeducted || data.packDeducted || data.status === "xong" || data.status === "huy"}
             lockNote={
