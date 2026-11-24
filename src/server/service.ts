@@ -84,6 +84,7 @@ import { applyPriceDrafts, parsePriceRows, type PriceDraft } from "@/domain/pric
 import { applyShelfOffers, cloneChannelPrices, type ShelfOffer } from "@/domain/catalog-sync";
 import { rowsFromUpload } from "@/domain/sheet";
 import { buildWebProduct, type WebProductInput } from "@/domain/web-product";
+import { resolveSiteContent } from "@/domain/site-content";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
 import { syncOrderStock } from "@/domain/stock";
