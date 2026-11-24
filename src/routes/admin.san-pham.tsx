@@ -136,7 +136,7 @@ function AdminProductsPage() {
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Quản lý sản phẩm</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Tạo / sửa sản phẩm kèm giá từng kênh. Bảng giá kênh gộp chung tại đây.
+            Mỗi mã = một khổ hoặc một combo (giá riêng). Cùng nhóm (vd Tráng gương) nhưng không gộp nhiều khổ vào một mã.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -173,27 +173,40 @@ function AdminProductsPage() {
                 <th className="px-3 py-3 font-semibold">Mã</th>
                 <th className="px-3 py-3 font-semibold">Tên</th>
                 <th className="px-3 py-3 font-semibold">Nhóm</th>
+                <th className="px-3 py-3 font-semibold">Khổ / combo</th>
                 <th className="px-3 py-3 font-semibold">Giá từng kênh</th>
                 <th className="px-3 py-3 font-semibold">Sửa</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((item, index) => (
-                <tr key={item.id} className="border-b last:border-0 align-top">
-                  <td className="px-3 py-3 tabular-nums text-muted-foreground">{index + 1}</td>
-                  <td className="px-3 py-3 font-mono text-xs font-semibold uppercase">{(item.code ?? item.id).replace(/_/g, "").toUpperCase()}</td>
-                  <td className="px-3 py-3 font-medium">{item.name}</td>
-                  <td className="px-3 py-3">{item.category}</td>
-                  <td className="px-3 py-3">
-                    <div className="space-y-2">
-                      {(item.sizes ?? []).length ? (
-                        (item.sizes ?? []).map((size) => (
-                          <div key={size.skuId} className="text-xs leading-relaxed">
-                            <p className="font-semibold text-foreground">
-                              {size.widthCm ?? "?"}×{size.heightCm ?? "?"} cm
-                              {(size.sheets ?? 1) > 1 ? ` · ${size.sheets} tấm` : ""}
-                            </p>
-                            {CHANNELS.map((channel) => {
+              {rows.map((item, index) => {
+                const size = item.sizes?.[0];
+                const multi = (item.sizes ?? []).length > 1;
+                return (
+                  <tr key={item.id} className="border-b last:border-0 align-top">
+                    <td className="px-3 py-3 tabular-nums text-muted-foreground">{index + 1}</td>
+                    <td className="px-3 py-3 font-mono text-xs font-semibold uppercase">
+                      {(item.code ?? item.id).replace(/_/g, "-").toUpperCase()}
+                    </td>
+                    <td className="px-3 py-3 font-medium">{item.name}</td>
+                    <td className="px-3 py-3">{item.category}</td>
+                    <td className="px-3 py-3 text-sm">
+                      {size ? (
+                        <>
+                          {size.widthCm ?? "?"}×{size.heightCm ?? "?"} cm
+                          {(size.sheets ?? 1) > 1 ? ` · Combo ${size.sheets} tấm` : " · lẻ"}
+                          {multi ? (
+                            <span className="mt-1 block text-xs text-amber-700">Mã cũ gom {item.sizes!.length} khổ — nên tách</span>
+                          ) : null}
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="text-xs leading-relaxed">
+                        {size
+                          ? CHANNELS.map((channel) => {
                               const quote = size.quotes?.[channel];
                               if (!quote) return null;
                               return (
@@ -203,27 +216,26 @@ function AdminProductsPage() {
                                   {quote.sold ? "" : " · không bán"}
                                 </p>
                               );
-                            })}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          {item.from != null ? `Từ ${formatVnd(item.from)} · ${item.variants} khổ` : "Chưa có giá"}
-                        </p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <Button type="button" variant="outline" className="min-h-10" onClick={() => setEditId(item.id)}>
-                      Sửa
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+                            })
+                          : (
+                            <p className="text-muted-foreground">
+                              {item.from != null ? `Từ ${formatVnd(item.from)}` : "Chưa có giá"}
+                            </p>
+                          )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Button type="button" variant="outline" className="min-h-10" onClick={() => setEditId(item.id)}>
+                        Sửa
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
               {!rows.length ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                    Chưa có sản phẩm. Tạo lẻ hoặc nhập từ Excel.
+                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                    Chưa có sản phẩm. Tạo lẻ hoặc nhập từ Excel (mỗi dòng một mã).
                   </td>
                 </tr>
               ) : null}
@@ -261,7 +273,7 @@ function AdminProductsPage() {
               File: <span className="font-semibold">{pendingFile?.name ?? "—"}</span>
             </p>
             <p className="text-muted-foreground">
-              Trùng mã hoặc trùng tên sẽ được báo rõ. Chọn «Ghi đè» để cập nhật sản phẩm trùng, hoặc «Chỉ tạo mới» để bỏ qua dòng trùng.
+              Mỗi dòng = một mã (một khổ hoặc một combo). Trùng mã/tên: chọn «Ghi đè» để cập nhật, hoặc «Chỉ tạo mới» để bỏ qua.
             </p>
             {conflictPreview.length ? (
               <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950">

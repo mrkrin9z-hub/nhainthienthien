@@ -1174,11 +1174,11 @@ export const createWebProduct = createServerFn({ method: "POST" })
     z
       .object({
         name: z.string().min(2).max(80),
-        code: z.string().min(1).max(24).optional(),
+        code: z.string().min(1).max(32).optional(),
         category: z.string().min(2).max(40),
         description: z.string().max(400),
         turnaround: z.string().max(80).optional(),
-        sizes: z.array(webSizeSchema).min(1).max(40),
+        sizes: z.array(webSizeSchema).min(1).max(1),
         listed: z.boolean().optional(),
       })
       .parse(data),
@@ -1201,11 +1201,11 @@ export const updateWebProduct = createServerFn({ method: "POST" })
       .object({
         groupId: z.string().min(1),
         name: z.string().min(2).max(80),
-        code: z.string().min(1).max(24).optional(),
+        code: z.string().min(1).max(32).optional(),
         category: z.string().min(2).max(40),
         description: z.string().max(400),
         turnaround: z.string().max(80).optional(),
-        sizes: z.array(webSizeSchema).min(1).max(40),
+        sizes: z.array(webSizeSchema).min(1).max(1),
         listed: z.boolean().optional(),
       })
       .parse(data),
