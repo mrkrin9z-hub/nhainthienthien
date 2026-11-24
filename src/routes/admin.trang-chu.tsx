@@ -7,7 +7,7 @@ import { RoleGate } from "@/components/role-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageToolbar } from "@/components/admin/page-toolbar";
-import { formatVnd } from "@/lib/brand";
+import { BRAND, formatVnd } from "@/lib/brand";
 import { getSiteContent, getWebProduct, saveHomepageCatalog, saveSiteContent } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/trang-chu")({
@@ -34,6 +34,7 @@ function HomepageAdminBody() {
   const [tiktokHandle, setTiktokHandle] = useState("@nhain.thienthien");
   const [tiktokUrl, setTiktokUrl] = useState("https://www.tiktok.com/@nhain.thienthien");
   const [shopeeUrl, setShopeeUrl] = useState("");
+  const [mapsUrl, setMapsUrl] = useState(BRAND.mapsUrl);
   const [commitments, setCommitments] = useState<string[]>([""]);
   const [rows, setRows] = useState<{ groupId: string; listed: boolean; sort: number; name: string; slug: string; from: number | null; cover: boolean }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -56,6 +57,7 @@ function HomepageAdminBody() {
     setTiktokHandle(site.tiktokHandle ?? "@nhain.thienthien");
     setTiktokUrl(site.tiktokUrl ?? "https://www.tiktok.com/@nhain.thienthien");
     setShopeeUrl(site.shopeeUrl ?? "");
+    setMapsUrl(site.mapsUrl ?? BRAND.mapsUrl);
     setCommitments(site.commitments?.length ? site.commitments : [""]);
     setRows(
       data.data.products.map((product, index) => ({
@@ -103,6 +105,7 @@ function HomepageAdminBody() {
           tiktokHandle: handle,
           tiktokUrl: tiktokUrl || `https://www.tiktok.com/${handle}`,
           shopeeUrl,
+          mapsUrl: mapsUrl || BRAND.mapsUrl,
           commitments: commitments.map((item) => item.trim()).filter(Boolean),
         },
       });
@@ -148,6 +151,11 @@ function HomepageAdminBody() {
           Địa chỉ
           <Input className="mt-1 min-h-11" value={address} onChange={(event) => setAddress(event.target.value)} />
         </label>
+        <label className="block text-sm font-semibold">
+          Link Google Maps
+          <Input className="mt-1 min-h-11" value={mapsUrl} onChange={(event) => setMapsUrl(event.target.value)} placeholder={BRAND.mapsUrl} />
+        </label>
+        <p className="text-xs text-muted-foreground">Nút “Chỉ đường” trên trang chủ mở link này (tab mới). Mặc định là link tiệm 67 Ngô Quyền, Xuân Lộc.</p>
         <label className="block text-sm font-semibold">
           Giờ mở cửa
           <Input className="mt-1 min-h-11" value={hours} onChange={(event) => setHours(event.target.value)} />

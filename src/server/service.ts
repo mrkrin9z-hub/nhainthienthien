@@ -376,6 +376,7 @@ export async function publicConfig() {
     tiktokUrl: site.tiktokUrl,
     tiktokHandle: site.tiktokHandle,
     shopeeUrl: site.shopeeUrl,
+    mapsUrl: site.mapsUrl,
     commitments: site.commitments,
     maxPhotoBytes: await photoByteLimit(),
   };
@@ -4753,6 +4754,7 @@ export async function saveSiteContent(actor: Actor, input: Parameters<typeof res
       tiktokUrl: next.tiktokUrl,
       tiktokHandle: next.tiktokHandle,
       shopeeUrl: next.shopeeUrl,
+      mapsUrl: next.mapsUrl,
       commitments: next.commitments,
     };
     state.settings.publicHours = next.hours;

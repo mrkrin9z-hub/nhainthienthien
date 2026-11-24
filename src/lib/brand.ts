@@ -14,7 +14,16 @@ export const BRAND = {
   tiktokShopUrl: "https://www.tiktok.com/@nhain.thienthien",
   /** Nút "Chat ngay": Messenger của Page Nhà In Thiên Thiên. */
   messengerUrl: "https://m.me/61595796658051",
+  /** Link Google Maps anh gửi (rút gọn). Nút "Chỉ đường" mở đúng link này. */
+  mapsUrl: "https://maps.app.goo.gl/KMDTbrLZ7TM4sHR76?g_st=ic",
 } as const;
+
+/**
+ * Place CID lấy từ curl -sIL link rút gọn:
+ * Location → ftid=0x317453427e249353:0x8ce70c5bc9b7b617 (cid = 0x8ce70c5bc9b7b617).
+ * Query: Nhà In Thiên Thiên, 67 Ngô Quyền, Xuân Lộc, Đồng Nai.
+ */
+export const SHOP_MAPS_CID = "10153097473295889943";
 
 /** Link sản phẩm trên TikTok Shop theo nhóm web. */
 export const TIKTOK_PRODUCT: Record<string, string> = {
@@ -134,6 +143,65 @@ export function tiktokUrl(slug: string, override?: string | null): string {
   const id = TIKTOK_PRODUCT[slug];
   if (id) return tiktokProductUrl(id);
   return fromOverride || tiktokShopUrlFor();
+}
+
+
+const MAPS_HOSTS = [
+  "google.com",
+  "google.com.vn",
+  "maps.google.com",
+  "maps.google.com.vn",
+  "maps.app.goo.gl",
+  "goo.gl",
+];
+
+function isMapsHost(hostname: string): boolean {
+  const host = hostname.replace(/^www\./, "").toLowerCase();
+  return MAPS_HOSTS.some((item) => host === item || host.endsWith(`.${item}`));
+}
+
+/** Link "Chỉ đường": giữ đúng URL anh gửi / CMS nếu là Google Maps; không thì mặc định. */
+export function mapsDirectionsUrl(raw?: string | null): string {
+  const href = ensureHttpsUrl(raw);
+  if (!href) return BRAND.mapsUrl;
+  try {
+    if (isMapsHost(new URL(href).hostname)) return href;
+  } catch {
+    /* fallback */
+  }
+  return BRAND.mapsUrl;
+}
+
+/**
+ * iframe embed (không cần API key): cid của tiệm khi dùng link chính thức,
+ * hoặc q=/cid= từ URL Maps khác, hoặc tìm theo địa chỉ.
+ */
+export function mapsEmbedUrl(raw?: string | null, address?: string | null): string {
+  const fallbackQ = (address?.trim() || BRAND.address);
+  const defaultEmbed = `https://www.google.com/maps?cid=${SHOP_MAPS_CID}&hl=vi&output=embed`;
+  const href = ensureHttpsUrl(raw);
+  if (!href || href.includes("maps.app.goo.gl/KMDTbrLZ7TM4sHR76") || href.includes(`cid=${SHOP_MAPS_CID}`) || href.toLowerCase().includes("0x8ce70c5bc9b7b617")) {
+    return defaultEmbed;
+  }
+  try {
+    const url = new URL(href);
+    if (!isMapsHost(url.hostname)) {
+      return `https://www.google.com/maps?q=${encodeURIComponent(fallbackQ)}&hl=vi&output=embed`;
+    }
+    if (url.pathname.includes("/maps/embed") || url.searchParams.get("output") === "embed") return href;
+    const cid = url.searchParams.get("cid");
+    if (cid && /^\d+$/.test(cid)) return `https://www.google.com/maps?cid=${cid}&hl=vi&output=embed`;
+    const q = url.searchParams.get("q") || url.searchParams.get("query");
+    if (q) return `https://www.google.com/maps?q=${encodeURIComponent(q)}&hl=vi&output=embed`;
+    const at = href.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (at) return `https://www.google.com/maps?q=${at[1]},${at[2]}&hl=vi&z=17&output=embed`;
+    if (url.hostname.replace(/^www\./, "").toLowerCase().includes("goo.gl")) {
+      return `https://www.google.com/maps?q=${encodeURIComponent(fallbackQ)}&hl=vi&output=embed`;
+    }
+  } catch {
+    /* fallback */
+  }
+  return `https://www.google.com/maps?q=${encodeURIComponent(fallbackQ)}&hl=vi&output=embed`;
 }
 
 export function formatVnd(amount: number): string {

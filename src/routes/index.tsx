@@ -5,6 +5,7 @@ import { ChevronRight, MessageCircle, ReceiptText, ScrollText, ShoppingBag, Uplo
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { POLICY_CHIPS, ProductCard, ProductCover, ShopInfoBlock } from "@/components/site/shop-ui";
+import { ShopMapBlock } from "@/components/site/shop-map";
 import { catalogQueryOptions, publicConfigQueryOptions } from "@/lib/catalog.functions";
 import { HERO_MAIN_DESKTOP, HERO_MAIN_MOBILE, HomeHero } from "@/components/site/home-hero";
 import { BRAND } from "@/lib/brand";
@@ -179,6 +180,8 @@ function HomePage() {
         <div className="mt-3">
           <ShopInfoBlock hours={config.data?.hours} phone={phone} zalo={zalo} />
         </div>
+
+        <ShopMapBlock address={config.data?.address} mapsUrl={config.data?.mapsUrl} hours={config.data?.hours} />
 
         {/* FAQ */}
         <section className="card mt-3 p-3.5 md:p-5">

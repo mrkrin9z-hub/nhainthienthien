@@ -1,4 +1,4 @@
-import { BRAND, resolveFacebookHref, resolveShopeeHref, resolveTiktokHref, tiktokHandleOrDefault } from "@/lib/brand";
+import { BRAND, mapsDirectionsUrl, resolveFacebookHref, resolveShopeeHref, resolveTiktokHref, tiktokHandleOrDefault } from "@/lib/brand";
 import type { Settings, SiteContent } from "./types.ts";
 
 export const DEFAULT_COMMITMENTS = [
@@ -7,7 +7,7 @@ export const DEFAULT_COMMITMENTS = [
   "Đổi ảnh nếu lỗi in của tiệm.",
 ];
 
-export function defaultSiteContent(): Required<Pick<SiteContent, "heroTitle" | "heroSubtitle" | "banner" | "address" | "hours" | "facebookUrl" | "tiktokUrl" | "tiktokHandle" | "shopeeUrl" | "commitments">> & { region: string } {
+export function defaultSiteContent(): Required<Pick<SiteContent, "heroTitle" | "heroSubtitle" | "banner" | "address" | "hours" | "facebookUrl" | "tiktokUrl" | "tiktokHandle" | "shopeeUrl" | "mapsUrl" | "commitments">> & { region: string } {
   return {
     heroTitle: "Ảnh tráng gương 4K – in từ ảnh của bạn",
     heroSubtitle: `${BRAND.shortName} · ${BRAND.region} · Giao tận nơi`,
@@ -18,6 +18,7 @@ export function defaultSiteContent(): Required<Pick<SiteContent, "heroTitle" | "
     tiktokUrl: BRAND.tiktokShopUrl,
     tiktokHandle: BRAND.tiktokHandle,
     shopeeUrl: BRAND.shopeeUrl,
+    mapsUrl: BRAND.mapsUrl,
     commitments: [...DEFAULT_COMMITMENTS],
     region: BRAND.region,
   };
@@ -43,6 +44,7 @@ export function resolveSiteContent(partial?: SiteContent | null, settings?: Pick
     tiktokHandle: handle,
     tiktokUrl,
     shopeeUrl: resolveShopeeHref(partial?.shopeeUrl?.trim() || base.shopeeUrl).slice(0, 200),
+    mapsUrl: mapsDirectionsUrl(partial?.mapsUrl?.trim() || base.mapsUrl).slice(0, 400),
     commitments: commitments.length ? commitments : base.commitments,
     region: base.region,
   };

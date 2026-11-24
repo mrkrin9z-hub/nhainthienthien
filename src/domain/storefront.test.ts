@@ -17,6 +17,10 @@ import {
   tiktokProductUrl,
   tiktokShopUrlFor,
   tiktokUrl,
+  BRAND as BRAND2,
+  SHOP_MAPS_CID,
+  mapsDirectionsUrl,
+  mapsEmbedUrl,
 } from "../lib/brand.ts";
 import { PRODUCT_MEDIA, galleryFor, galleryItemsForSelection, mediaFor } from "../lib/product-media.ts";
 import { resolveSiteContent } from "./site-content.ts";
@@ -155,4 +159,37 @@ test("gallery có nút trước/sau, cuộn thumbnail, phóng to; thẻ trang ch
   const links = readFileSync(join(root, "components/site/shop-links.tsx"), "utf8");
   assert.match(links, /rel="noopener noreferrer"/);
   assert.match(links, /target="_blank"/);
+});
+
+test("Google Maps: resolve link rút gọn thành embed cid, nút Chỉ đường giữ đúng link anh gửi", () => {
+  const sent = "https://maps.app.goo.gl/KMDTbrLZ7TM4sHR76?g_st=ic";
+  assert.equal(BRAND.mapsUrl, sent);
+  assert.equal(mapsDirectionsUrl(sent), sent);
+  assert.equal(mapsDirectionsUrl(null), sent);
+  assert.equal(mapsDirectionsUrl("https://example.com/phishing"), sent);
+  const embed = mapsEmbedUrl(sent);
+  assert.equal(embed, `https://www.google.com/maps?cid=${SHOP_MAPS_CID}&hl=vi&output=embed`);
+  assert.match(embed, /output=embed/);
+  assert.equal(SHOP_MAPS_CID, "10153097473295889943");
+  assert.equal(
+    mapsEmbedUrl("https://www.google.com/maps?cid=12345"),
+    "https://www.google.com/maps?cid=12345&hl=vi&output=embed",
+  );
+  const byQ = mapsEmbedUrl("https://www.google.com/maps?q=67+Ngo+Quyen+Xuan+Loc");
+  assert.match(byQ, /output=embed/);
+  assert.match(byQ, /67/);
+  const site = resolveSiteContent({});
+  assert.equal(site.mapsUrl, sent);
+  assert.match(site.address, /67/);
+  assert.match(site.address, /Xuân Lộc/);
+  const mapSrc = readFileSync(join(root, "components/site/shop-map.tsx"), "utf8");
+  assert.match(mapSrc, /loading="lazy"/);
+  assert.match(mapSrc, /Chỉ đường/);
+  assert.match(mapSrc, /Tìm đường tới tiệm/);
+  assert.match(mapSrc, /target="_blank"/);
+  const home = readFileSync(join(root, "routes/index.tsx"), "utf8");
+  assert.match(home, /ShopMapBlock/);
+  const admin = readFileSync(join(root, "routes/admin.trang-chu.tsx"), "utf8");
+  assert.match(admin, /Link Google Maps/);
+  assert.match(admin, /mapsUrl/);
 });

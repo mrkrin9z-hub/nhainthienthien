@@ -240,6 +240,8 @@ export type SiteContent = {
   tiktokUrl?: string;
   tiktokHandle?: string;
   shopeeUrl?: string;
+  /** Link Google Maps của tiệm (rút gọn hoặc full). */
+  mapsUrl?: string;
   commitments?: string[];
 };
 

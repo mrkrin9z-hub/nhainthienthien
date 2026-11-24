@@ -48,6 +48,7 @@ export type PublicConfig = {
   tiktokUrl?: string;
   tiktokHandle?: string;
   shopeeUrl?: string;
+  mapsUrl?: string;
   commitments?: string[];
   /** null khi có R2, Drive hoặc Supabase. 10485760 khi ảnh vào KV hoặc đĩa. */
   maxPhotoBytes: number | null;

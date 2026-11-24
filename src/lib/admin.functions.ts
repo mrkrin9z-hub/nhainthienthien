@@ -1232,6 +1232,7 @@ export const saveSiteContent = createServerFn({ method: "POST" })
         tiktokUrl: z.string().max(200).optional(),
         tiktokHandle: z.string().max(40).optional(),
         shopeeUrl: z.string().max(200).optional(),
+        mapsUrl: z.string().max(400).optional(),
         commitments: z.array(z.string().max(160)).max(8).optional(),
       })
       .parse(data),
