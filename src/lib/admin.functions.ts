@@ -1174,9 +1174,10 @@ export const createWebProduct = createServerFn({ method: "POST" })
     z
       .object({
         name: z.string().min(2).max(80),
+        code: z.string().min(1).max(24).optional(),
         category: z.string().min(2).max(40),
         description: z.string().max(400),
-        turnaround: z.string().max(80),
+        turnaround: z.string().max(80).optional(),
         sizes: z.array(webSizeSchema).min(1).max(40),
         listed: z.boolean().optional(),
       })
@@ -1200,9 +1201,10 @@ export const updateWebProduct = createServerFn({ method: "POST" })
       .object({
         groupId: z.string().min(1),
         name: z.string().min(2).max(80),
+        code: z.string().min(1).max(24).optional(),
         category: z.string().min(2).max(40),
         description: z.string().max(400),
-        turnaround: z.string().max(80),
+        turnaround: z.string().max(80).optional(),
         sizes: z.array(webSizeSchema).min(1).max(40),
         listed: z.boolean().optional(),
       })
@@ -1211,6 +1213,21 @@ export const updateWebProduct = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { updateWebProduct: update } = await import("@/server/service");
     return update(await actor(), data);
+  });
+
+export const importWebProducts = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        filename: z.string().min(1).max(180),
+        base64: z.string().min(8),
+        overwrite: z.boolean(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { importWebProducts: load } = await import("@/server/service");
+    return load(await actor(), data);
   });
 
 export const getSiteContent = createServerFn({ method: "GET" }).handler(async () => {

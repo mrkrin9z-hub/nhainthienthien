@@ -250,7 +250,7 @@ function HomepageAdminBody() {
                       Bảng giá 6 kênh
                     </Link>{" "}
                     hoặc{" "}
-                    <Link to="/admin/san-pham" className="font-semibold text-accent">
+                    <Link to="/admin/san-pham" search={{ m: undefined }} className="font-semibold text-accent">
                       Sản phẩm & Giá
                     </Link>
                     . Ảnh bìa/thư viện tại{" "}

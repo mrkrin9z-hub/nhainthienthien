@@ -161,8 +161,8 @@ function pageTitle(pathname: string, role: Role, search: Record<string, unknown>
   }
   const extra: [string, string][] = [
     ["/admin/trang-chu", "Quản lý trang chủ"],
-    ["/admin/san-pham", "Sản phẩm & Giá"],
-    ["/admin/gia", "Bảng giá 6 kênh"],
+    ["/admin/san-pham", "Quản lý sản phẩm"],
+    ["/admin/gia", "Quản lý sản phẩm"],
     ["/admin/anh", "Ảnh sản phẩm"],
     ["/admin/cham-cong", "Chấm công"],
     ["/admin/check-cong", "Check công"],

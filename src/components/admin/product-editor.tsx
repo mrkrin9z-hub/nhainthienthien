@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { createWebProduct, getWebProduct, getWebProducts, updateWebProduct } from "@/lib/admin.functions";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { MoneyInput } from "@/components/ui/money-input";
-import { CHANNELS, CHANNEL_LABEL, type Channel } from "@/domain/types";
-import { createWebProduct, getWebProduct, updateWebProduct } from "@/lib/admin.functions";
+import { CHANNEL_LABEL, CHANNELS, type Channel } from "@/domain/types";
+import { normalizeProductCode, productCodeFromName } from "@/domain/web-product";
 
-type QuoteDraft = { price: string; listPrice: string; minTotal: string; sold: boolean };
-type SizeRow = {
+type QuoteDraft = { price: string; sold: boolean };
+type SizeDraft = {
   skuId?: string;
   width: string;
   height: string;
@@ -17,223 +18,170 @@ type SizeRow = {
   quotes: Record<Channel, QuoteDraft>;
 };
 
-const CHANNEL_HINT: Record<Channel, string> = {
-  tai_tiem: "Trực tiếp",
-  facebook: "Facebook",
-  tiktok: "TikTok",
-  shopee: "Shopee",
-  ctv: "CTV (chỉ admin)",
-  mo_home: "Mơ Home (chỉ admin)",
-};
-
-function blankQuote(): QuoteDraft {
-  return { price: "", listPrice: "", minTotal: "", sold: false };
+function blankQuotes(): Record<Channel, QuoteDraft> {
+  return Object.fromEntries(CHANNELS.map((channel) => [channel, { price: "", sold: channel === "tai_tiem" }])) as Record<
+    Channel,
+    QuoteDraft
+  >;
 }
 
-function emptyQuotes(): Record<Channel, QuoteDraft> {
-  return {
-    tai_tiem: { price: "", listPrice: "", minTotal: "", sold: true },
-    facebook: blankQuote(),
-    tiktok: blankQuote(),
-    shopee: blankQuote(),
-    ctv: blankQuote(),
-    mo_home: blankQuote(),
-  };
-}
-
-function blankRow(): SizeRow {
-  return { width: "", height: "", sheets: "1", quotes: emptyQuotes() };
+function blankRow(): SizeDraft {
+  return { width: "15", height: "21", sheets: "1", quotes: blankQuotes() };
 }
 
 function whole(value: string): number {
-  const digits = value.replace(/[^\d]/g, "");
-  return digits ? Number(digits) : Number.NaN;
+  const n = Number(value.trim());
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) throw new Error("Khổ/giá phải là số nguyên dương.");
+  return n;
 }
 
 function optionalWhole(value: string): number | null {
-  const n = whole(value);
-  return Number.isFinite(n) ? n : null;
+  if (!value.trim()) return null;
+  return whole(value);
 }
 
-async function uploadCover(slug: string, file: File) {
-  const body = new FormData();
-  body.set("slug", slug);
-  body.set("kind", "cover");
-  body.set("file", file);
-  const response = await fetch("/api/admin/product-photo", { method: "POST", body });
-  if (!response.ok) throw new Error(await response.text());
-}
-
-async function uploadGallery(slug: string, file: File) {
-  const body = new FormData();
-  body.set("slug", slug);
-  body.set("kind", "gallery");
-  body.set("file", file);
-  const response = await fetch("/api/admin/product-photo", { method: "POST", body });
-  if (!response.ok) throw new Error(await response.text());
-}
-
-function percent(amount: number, rate: number): number {
-  return Math.round(amount * rate);
-}
-
-export function ProductEditor({
-  open,
-  onOpenChange,
-  groupId = null,
-  onSaved,
-}: {
+type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  groupId?: string | null;
   onSaved: () => void;
-}) {
-  const editing = Boolean(groupId);
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("Ảnh gỗ");
-  const [description, setDescription] = useState("");
-  const [turnaround, setTurnaround] = useState("");
-  const [listed, setListed] = useState(true);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
-  const [rows, setRows] = useState<SizeRow[]>([blankRow()]);
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(false);
+  /** Khi có groupId → chỉ sửa đúng sản phẩm đó. */
+  groupId?: string | null;
+};
 
+export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: Props) {
+  const editing = Boolean(groupId);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [codeTouched, setCodeTouched] = useState(false);
+  const [category, setCategory] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [description, setDescription] = useState("");
+  const [rows, setRows] = useState<SizeDraft[]>([blankRow()]);
   useEffect(() => {
     if (!open) return;
-    if (!groupId) {
-      setName("");
-      setCategory("Ảnh gỗ");
-      setDescription("");
-      setTurnaround("");
-      setListed(true);
-      setCoverFile(null);
-      setGalleryFiles([]);
-      setRows([blankRow()]);
-      return;
-    }
-    setLoading(true);
-    void getWebProduct({ data: { groupId } })
-      .then((product) => {
+    let alive = true;
+    void (async () => {
+      setLoading(true);
+      try {
+        const products = await getWebProducts();
+        if (!alive) return;
+        const cats = [...new Set(products.map((item) => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi"));
+        setCategories(cats);
+        if (!groupId) {
+          setName("");
+          setCode("");
+          setCodeTouched(false);
+          setCategory(cats[0] ?? "");
+          setDescription("");
+          setRows([blankRow()]);
+          return;
+        }
+        const product = await getWebProduct({ data: { groupId } });
+        if (!alive) return;
         setName(product.name);
+        setCode(normalizeProductCode(product.id) || product.id);
+        setCodeTouched(true);
         setCategory(product.category);
         setDescription(product.description);
-        setTurnaround(product.turnaround);
-        setListed(product.listed);
-        setCoverFile(null);
-        setGalleryFiles([]);
         setRows(
-          product.sizes.map((size) => ({
-            skuId: size.skuId,
-            width: String(size.widthCm),
-            height: String(size.heightCm),
-            sheets: String(size.sheets),
-            quotes: Object.fromEntries(
-              CHANNELS.map((channel) => {
-                const quote = size.quotes[channel];
-                return [
-                  channel,
-                  {
-                    price: quote?.price == null ? "" : String(quote.price),
-                    listPrice: quote?.listPrice == null ? "" : String(quote.listPrice),
-                    minTotal: quote?.minTotal == null ? "" : String(quote.minTotal),
-                    sold: Boolean(quote?.sold),
-                  },
-                ];
-              }),
-            ) as Record<Channel, QuoteDraft>,
-          })),
+          product.sizes.length
+            ? product.sizes.map((size) => ({
+                skuId: size.skuId,
+                width: String(size.widthCm),
+                height: String(size.heightCm),
+                sheets: String(size.sheets),
+                quotes: Object.fromEntries(
+                  CHANNELS.map((channel) => {
+                    const quote = size.quotes[channel];
+                    return [
+                      channel,
+                      {
+                        price: quote?.price != null ? String(quote.price) : "",
+                        sold: Boolean(quote?.sold),
+                      },
+                    ];
+                  }),
+                ) as Record<Channel, QuoteDraft>,
+              }))
+            : [blankRow()],
         );
-      })
-      .catch((error) => toast.error((error as Error).message))
-      .finally(() => setLoading(false));
-  }, [open, groupId]);
+      } catch (error) {
+        toast.error((error as Error).message);
+        onOpenChange(false);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [open, groupId, onOpenChange]);
 
-  function patchRow(index: number, patch: Partial<SizeRow>) {
-    setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+  const title = editing ? `Sửa sản phẩm · ${code || groupId}` : "Tạo sản phẩm";
+
+  const categoryOptions = useMemo(() => {
+    if (category && !categories.includes(category)) return [...categories, category];
+    return categories;
+  }, [categories, category]);
+
+  function patchRow(index: number, patch: Partial<SizeDraft>) {
+    setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
   function patchQuote(index: number, channel: Channel, patch: Partial<QuoteDraft>) {
     setRows((current) =>
-      current.map((row, rowIndex) =>
-        rowIndex === index ? { ...row, quotes: { ...row.quotes, [channel]: { ...row.quotes[channel], ...patch } } } : row,
-      ),
-    );
-  }
-
-  function copyRetail(index: number) {
-    const retail = rows[index]?.quotes.tai_tiem.price ?? "";
-    const minTotal = rows[index]?.quotes.tai_tiem.minTotal ?? "";
-    if (!retail) {
-      toast.error("Nhập giá tại tiệm trước.");
-      return;
-    }
-    setRows((current) =>
-      current.map((row, rowIndex) => {
-        if (rowIndex !== index) return row;
-        const next = { ...row.quotes };
-        for (const channel of ["facebook", "tiktok", "shopee"] as Channel[]) {
-          next[channel] = { ...next[channel], price: retail, minTotal, sold: true };
-        }
-        return { ...row, quotes: next };
+      current.map((row, i) => {
+        if (i !== index) return row;
+        return { ...row, quotes: { ...row.quotes, [channel]: { ...row.quotes[channel], ...patch } } };
       }),
     );
   }
 
-  function fillCtv(index: number) {
-    const retail = whole(rows[index]?.quotes.tai_tiem.price ?? "");
-    if (!Number.isFinite(retail)) {
-      toast.error("Nhập giá tại tiệm trước.");
-      return;
-    }
-    patchQuote(index, "ctv", { price: String(percent(retail, 0.9)), sold: true });
+  function onNameChange(value: string) {
+    setName(value);
+    if (!editing && !codeTouched) setCode(productCodeFromName(value));
   }
 
   async function save() {
     const sizes = rows.map((row) => {
-      const price = whole(row.quotes.tai_tiem.price);
-      const quotes: Record<string, { price: number | null; listPrice: number | null; minTotal: number | null; sold: boolean }> = {};
+      const quotes: Record<string, { price: number | null; sold: boolean }> = {};
       for (const channel of CHANNELS) {
         const quote = row.quotes[channel];
         quotes[channel] = {
           price: optionalWhole(quote.price),
-          listPrice: optionalWhole(quote.listPrice),
-          minTotal: optionalWhole(quote.minTotal),
           sold: quote.sold,
         };
       }
+      const retail =
+        quotes["tai_tiem"]?.price
+        ?? CHANNELS.map((channel) => quotes[channel]?.price).find((price): price is number => price != null);
+      if (retail == null) throw new Error(`Khổ ${row.width}×${row.height} cần ít nhất một giá.`);
       return {
         skuId: row.skuId,
         widthCm: whole(row.width),
         heightCm: whole(row.height),
         sheets: whole(row.sheets),
-        price,
+        price: retail,
         quotes,
-        minTotal: optionalWhole(row.quotes.tai_tiem.minTotal),
       };
     });
     setSaving(true);
     try {
-      const payload = { name, category, description, turnaround, sizes, listed };
-      const saved = editing && groupId
-        ? await updateWebProduct({ data: { groupId, ...payload } })
-        : await createWebProduct({ data: payload });
-      if (coverFile) {
-        try {
-          await uploadCover(saved.slug, coverFile);
-        } catch (error) {
-          toast.error(`Đã lưu sản phẩm nhưng chưa lưu ảnh bìa: ${(error as Error).message}`);
-        }
-      }
-      for (const file of galleryFiles) {
-        try {
-          await uploadGallery(saved.slug, file);
-        } catch (error) {
-          toast.error(`Chưa lưu ảnh thư viện ${file.name}: ${(error as Error).message}`);
-        }
-      }
-      toast.success(editing ? `Đã lưu ${saved.name}` : listed ? `Đã thêm ${saved.name} lên trang chủ` : `Đã thêm ${saved.name} (đang ẩn)`);
+      const payload = {
+        name,
+        code: normalizeProductCode(code) || productCodeFromName(name),
+        category,
+        description,
+        turnaround: "",
+        sizes,
+      };
+      const saved =
+        editing && groupId
+          ? await updateWebProduct({ data: { groupId, ...payload } })
+          : await createWebProduct({ data: payload });
+      toast.success(editing ? `Đã lưu ${saved.name}` : `Đã thêm ${saved.name}`);
       onOpenChange(false);
       onSaved();
     } catch (error) {
@@ -247,7 +195,7 @@ export function ProductEditor({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{editing ? "Sửa sản phẩm và giá 6 kênh" : "Tạo sản phẩm và giá 6 kênh"}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         {loading ? (
           <p className="text-sm text-muted-foreground">Đang tải sản phẩm…</p>
@@ -255,19 +203,54 @@ export function ProductEditor({
           <div className="space-y-3">
             <label className="block text-sm font-semibold">
               Tên sản phẩm
-              <Input className="mt-1 min-h-11" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ảnh canvas" />
+              <Input
+                className="mt-1 min-h-11"
+                value={name}
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="Ảnh ép gỗ"
+              />
             </label>
             <label className="block text-sm font-semibold">
-              Nhóm / danh mục
-              <Input className="mt-1 min-h-11" value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Ảnh gỗ" />
+              Mã sản phẩm
+              <Input
+                className="mt-1 min-h-11 font-mono uppercase"
+                value={code}
+                disabled={editing}
+                onChange={(event) => {
+                  setCodeTouched(true);
+                  setCode(normalizeProductCode(event.target.value));
+                }}
+                placeholder="AEG"
+              />
+              <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                {editing ? "Mã cố định khi sửa — chỉ sửa đúng sản phẩm này." : "Tự lấy từ tên viết tắt liền không dấu; có thể sửa trước khi lưu."}
+              </span>
             </label>
             <label className="block text-sm font-semibold">
-              Mô tả ngắn
-              <textarea className="mt-1 min-h-20 w-full rounded-xl border bg-card px-3 py-2 text-sm" value={description} onChange={(event) => setDescription(event.target.value)} />
+              Nhóm sản phẩm
+              <Input
+                className="mt-1 min-h-11"
+                list="product-category-options"
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                placeholder="Ảnh gỗ"
+              />
+              <datalist id="product-category-options">
+                {categoryOptions.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+              <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                Chọn từ nhóm đã có hoặc gõ nhóm mới.
+              </span>
             </label>
             <label className="block text-sm font-semibold">
-              Ghi chú thời gian
-              <Input className="mt-1 min-h-11" value={turnaround} onChange={(event) => setTurnaround(event.target.value)} placeholder="Để trống nếu chưa chốt lịch" />
+              Mô tả
+              <textarea
+                className="mt-1 min-h-20 w-full rounded-xl border bg-card px-3 py-2 text-sm"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
             </label>
             <div className="space-y-3">
               <p className="text-sm font-semibold">Khổ và giá từng kênh</p>
@@ -276,57 +259,73 @@ export function ProductEditor({
                   <div className="grid grid-cols-3 gap-2">
                     <label className="text-xs font-semibold text-muted-foreground">
                       Rộng (cm)
-                      <Input className="mt-1 min-h-11 bg-white" inputMode="numeric" value={row.width} onChange={(event) => patchRow(index, { width: event.target.value })} />
+                      <Input
+                        className="mt-1 min-h-11 bg-white"
+                        inputMode="numeric"
+                        value={row.width}
+                        onChange={(event) => patchRow(index, { width: event.target.value })}
+                      />
                     </label>
                     <label className="text-xs font-semibold text-muted-foreground">
                       Cao (cm)
-                      <Input className="mt-1 min-h-11 bg-white" inputMode="numeric" value={row.height} onChange={(event) => patchRow(index, { height: event.target.value })} />
+                      <Input
+                        className="mt-1 min-h-11 bg-white"
+                        inputMode="numeric"
+                        value={row.height}
+                        onChange={(event) => patchRow(index, { height: event.target.value })}
+                      />
                     </label>
                     <label className="text-xs font-semibold text-muted-foreground">
                       Số tấm
-                      <Input className="mt-1 min-h-11 bg-white" inputMode="numeric" value={row.sheets} onChange={(event) => patchRow(index, { sheets: event.target.value })} />
+                      <Input
+                        className="mt-1 min-h-11 bg-white"
+                        inputMode="numeric"
+                        value={row.sheets}
+                        onChange={(event) => patchRow(index, { sheets: event.target.value })}
+                      />
                     </label>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" className="min-h-9 text-xs" onClick={() => copyRetail(index)}>
-                      Chép giá Tại tiệm sang Facebook/TikTok/Shopee
-                    </Button>
-                    <Button type="button" variant="outline" className="min-h-9 text-xs" onClick={() => fillCtv(index)}>
-                      Tự tính CTV = 90%
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {CHANNELS.map((channel) => {
-                      const quote = row.quotes[channel];
-                      return (
-                        <div key={channel} className="rounded-xl border bg-white p-2.5">
-                          <label className="flex items-center justify-between gap-2 text-xs font-semibold">
-                            <span>
-                              {CHANNEL_LABEL[channel]}
-                              <span className="ml-1 font-normal text-muted-foreground">· {CHANNEL_HINT[channel]}</span>
-                            </span>
-                            <span className="inline-flex items-center gap-1 font-medium">
-                              <input type="checkbox" className="size-4" checked={quote.sold} onChange={(event) => patchQuote(index, channel, { sold: event.target.checked })} />
-                              Đang bán
-                            </span>
-                          </label>
-                          <label className="mt-2 block text-[11px] text-muted-foreground">
-                            Giá bán
-                            <MoneyInput className="mt-1 min-h-10" value={quote.price} placeholder="Để trống nếu không bán" onValueChange={(value) => patchQuote(index, channel, { price: value == null ? "" : String(value) })} />
-                          </label>
-                          <div className="mt-1 grid grid-cols-2 gap-2">
-                            <label className="text-[11px] text-muted-foreground">
-                              Giá gạch
-                              <MoneyInput className="mt-1 min-h-10" value={quote.listPrice} onValueChange={(value) => patchQuote(index, channel, { listPrice: value == null ? "" : String(value) })} />
-                            </label>
-                            <label className="text-[11px] text-muted-foreground">
-                              Đơn tối thiểu
-                              <MoneyInput className="mt-1 min-h-10" value={quote.minTotal} placeholder="vd 30.000" onValueChange={(value) => patchQuote(index, channel, { minTotal: value == null ? "" : String(value) })} />
-                            </label>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="overflow-x-auto rounded-xl border bg-white">
+                    <table className="w-full min-w-[28rem] text-left text-sm">
+                      <thead className="border-b bg-slate-50 text-xs text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">Kênh</th>
+                          <th className="px-3 py-2 font-semibold">Giá</th>
+                          <th className="px-3 py-2 font-semibold">Đang bán</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {CHANNELS.map((channel) => {
+                          const quote = row.quotes[channel];
+                          return (
+                            <tr key={channel} className="border-b last:border-0">
+                              <td className="px-3 py-2 font-medium">{CHANNEL_LABEL[channel]}</td>
+                              <td className="px-3 py-2">
+                                <MoneyInput
+                                  className="min-h-10"
+                                  value={quote.price}
+                                  placeholder="Để trống nếu không bán"
+                                  onValueChange={(value) =>
+                                    patchQuote(index, channel, { price: value == null ? "" : String(value) })
+                                  }
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <label className="inline-flex items-center gap-2 text-xs font-medium">
+                                  <input
+                                    type="checkbox"
+                                    className="size-4"
+                                    checked={quote.sold}
+                                    onChange={(event) => patchQuote(index, channel, { sold: event.target.checked })}
+                                  />
+                                  {quote.sold ? "Đang bán" : "Không bán"}
+                                </label>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               ))}
@@ -341,22 +340,9 @@ export function ProductEditor({
                 ) : null}
               </div>
             </div>
-            <label className="block text-sm font-semibold">
-              Ảnh đại diện (JPG, PNG hoặc WEBP, tối đa 2MB)
-              <input className="mt-1 block w-full text-sm" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)} />
-            </label>
-            <label className="block text-sm font-semibold">
-              Thư viện ảnh thêm
-              <input className="mt-1 block w-full text-sm" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={(event) => setGalleryFiles(Array.from(event.target.files ?? []))} />
-            </label>
-            <label className="flex min-h-11 items-center gap-2 text-sm font-semibold">
-              <input type="checkbox" className="size-4" checked={listed} onChange={(event) => setListed(event.target.checked)} />
-              Hiện trên trang chủ nhainthienthien.com (chỉ giá tại tiệm)
-            </label>
             <Button className="min-h-12 bg-accent text-accent-foreground" disabled={saving} onClick={() => void save()}>
-              {saving ? "Đang lưu…" : editing ? "Lưu sản phẩm và giá 6 kênh" : listed ? "Tạo và hiện trên trang chủ" : "Tạo sản phẩm (đang ẩn)"}
+              {saving ? "Đang lưu…" : editing ? "Lưu sản phẩm" : "Tạo sản phẩm"}
             </Button>
-            <p className="text-xs text-muted-foreground">Lưu một lần là ghi sản phẩm và giá cả 6 kênh. Giá CTV / Mơ Home chỉ dùng trong quản trị, không hiện trên trang công khai.</p>
           </div>
         )}
       </DialogContent>

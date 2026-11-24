@@ -86,7 +86,8 @@ import { publicContact } from "@/domain/public-contact";
 import { applyPriceDrafts, parsePriceRows, type PriceDraft } from "@/domain/price-sheet";
 import { applyShelfOffers, cloneChannelPrices, type ShelfOffer } from "@/domain/catalog-sync";
 import { rowsFromUpload } from "@/domain/sheet";
-import { buildWebProduct, type WebProductInput } from "@/domain/web-product";
+import { parseProductExcel } from "@/domain/product-excel";
+import { buildWebProduct, normalizeProductCode, type WebProductInput } from "@/domain/web-product";
 import { resolveSiteContent } from "@/domain/site-content";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
@@ -4593,12 +4594,15 @@ export async function listWebProducts(actor: Actor) {
     .slice()
     .sort((a, b) => a.sort - b.sort)
     .map((group) => {
-      const skus = state.skus.filter((sku) => sku.groupId === group.id && !isMergedWoodAlias(sku));
+      const skus = state.skus
+        .filter((sku) => sku.groupId === group.id && !isMergedWoodAlias(sku))
+        .sort((a, b) => a.sort - b.sort);
       const prices = skus
         .map((sku) => priceOf(state.prices, sku.id, "tai_tiem")?.price)
         .filter((price): price is number => typeof price === "number");
       return {
         id: group.id,
+        code: group.id,
         name: group.name,
         slug: group.slug,
         category: group.category,
@@ -4608,6 +4612,25 @@ export async function listWebProducts(actor: Actor) {
         from: prices.length ? Math.min(...prices) : null,
         cover: Boolean(state.settings.productPhotos?.[group.slug]),
         gallery: (state.settings.productGalleries?.[group.slug] ?? []).length,
+        sizes: skus.map((sku) => ({
+          skuId: sku.id,
+          code: sku.code,
+          widthCm: sku.widthCm,
+          heightCm: sku.heightCm,
+          sheets: sku.sheets,
+          quotes: Object.fromEntries(
+            CHANNELS.map((channel) => {
+              const row = priceOf(state.prices, sku.id, channel);
+              return [
+                channel,
+                {
+                  price: row?.price ?? null,
+                  sold: skuSoldOn(sku, channel),
+                },
+              ];
+            }),
+          ),
+        })),
       };
     });
 }
@@ -4624,12 +4647,13 @@ export async function createWebProduct(actor: Actor, input: WebProductInput) {
     state.groups.push(built.group);
     state.skus.push(...built.skus);
     state.prices.push(...built.prices);
-    state.settings.groupListed = { ...state.settings.groupListed, [built.group.id]: input.listed !== false };
+    const listed = input.listed === true;
+    state.settings.groupListed = { ...state.settings.groupListed, [built.group.id]: listed };
     audit(state, actor.id, "product.create", built.group.id, null, {
       name: built.group.name,
       slug: built.group.slug,
       sizes: built.skus.length,
-      listed: input.listed !== false,
+      listed,
     });
     return { id: built.group.id, slug: built.group.slug, name: built.group.name };
   });
@@ -4707,7 +4731,7 @@ export async function updateWebProduct(actor: Actor, input: WebProductInput & { 
         match.heightCm = draft.heightCm;
         match.sheets = draft.sheets;
         match.sort = draft.sort;
-        match.soldOn = draft.soldOn;
+        match.soldOn = draft.soldOn ?? [];
       } else {
         sku.groupId = group.id;
         state.skus.push(sku);
@@ -4734,9 +4758,111 @@ export async function updateWebProduct(actor: Actor, input: WebProductInput & { 
         row.status = "nhap";
       }
     }
-    state.settings.groupListed = { ...state.settings.groupListed, [group.id]: input.listed !== false };
+    if (typeof input.listed === "boolean") {
+      state.settings.groupListed = { ...state.settings.groupListed, [group.id]: input.listed };
+    }
     audit(state, actor.id, "product.update", group.id, null, { name: group.name, sizes: nextSkus.length });
     return { id: group.id, slug: group.slug, name: group.name };
+  });
+}
+
+/** Nhập sản phẩm từ Excel. Trùng mã (id nhóm) thì ghi đè và báo rõ. */
+export async function importWebProducts(
+  actor: Actor,
+  input: { filename: string; base64: string; overwrite: boolean },
+) {
+  assertRole(actor, ["owner", "sale"]);
+  const drafts = parseProductExcel(rowsFromUpload(input.filename, bytesFromBase64(input.base64)));
+  return mutate(async (state) => {
+    const created: string[] = [];
+    const overwritten: string[] = [];
+    const skipped: string[] = [];
+    for (const draft of drafts) {
+      const code = normalizeProductCode(draft.code);
+      const match =
+        state.groups.find((group) => group.id.toLowerCase() === code.toLowerCase())
+        ?? state.groups.find((group) => group.name.trim().toLowerCase() === draft.name.trim().toLowerCase());
+      if (match) {
+        if (!input.overwrite) {
+          skipped.push(`${match.id} · ${match.name}`);
+          continue;
+        }
+        const built = buildWebProduct(
+          { ...draft, turnaround: match.turnaround, listed: groupIsListed(state.settings, match) },
+          {
+            slugs: state.groups.filter((item) => item.id !== match.id).map((item) => item.slug),
+            ids: state.groups.filter((item) => item.id !== match.id).map((item) => item.id),
+            codes: state.skus.filter((sku) => sku.groupId !== match.id).map((sku) => sku.code),
+            sorts: [match.sort - 1],
+          },
+        );
+        match.name = built.group.name;
+        match.category = built.group.category;
+        match.description = built.group.description;
+        const existing = state.skus.filter((sku) => sku.groupId === match.id && !isMergedWoodAlias(sku));
+        const used = new Set<string>();
+        built.skus.forEach((draftSku) => {
+          const hit = existing.find(
+            (sku) => sku.widthCm === draftSku.widthCm && sku.heightCm === draftSku.heightCm && sku.sheets === draftSku.sheets && !used.has(sku.id),
+          );
+          const sku = hit ?? draftSku;
+          if (hit) {
+            used.add(hit.id);
+            hit.name = draftSku.name;
+            hit.size = draftSku.size;
+            hit.widthCm = draftSku.widthCm;
+            hit.heightCm = draftSku.heightCm;
+            hit.sheets = draftSku.sheets;
+            hit.sort = draftSku.sort;
+            hit.soldOn = draftSku.soldOn ?? [];
+          } else {
+            sku.groupId = match.id;
+            state.skus.push(sku);
+            used.add(sku.id);
+          }
+          for (const row of built.prices.filter((item) => item.skuId === draftSku.id)) {
+            const current = state.prices.find((item) => item.skuId === sku.id && item.channel === row.channel);
+            if (current) {
+              current.price = row.price;
+              current.status = row.status;
+              current.listPrice = row.listPrice ?? null;
+              current.minTotal = row.minTotal ?? null;
+            } else {
+              state.prices.push({ ...row, skuId: sku.id });
+            }
+          }
+        });
+        for (const sku of existing) {
+          if (used.has(sku.id)) continue;
+          sku.soldOn = [];
+          for (const row of state.prices.filter((item) => item.skuId === sku.id)) row.status = "nhap";
+        }
+        overwritten.push(`${match.id} · ${match.name}`);
+        audit(state, actor.id, "product.import.overwrite", match.id, null, { filename: input.filename });
+        continue;
+      }
+      const built = buildWebProduct(draft, {
+        slugs: state.groups.map((group) => group.slug),
+        ids: state.groups.map((group) => group.id),
+        codes: state.skus.map((sku) => sku.code),
+        sorts: state.groups.map((group) => group.sort),
+      });
+      state.groups.push(built.group);
+      state.skus.push(...built.skus);
+      state.prices.push(...built.prices);
+      state.settings.groupListed = { ...state.settings.groupListed, [built.group.id]: false };
+      created.push(`${built.group.id} · ${built.group.name}`);
+      audit(state, actor.id, "product.import.create", built.group.id, null, { filename: input.filename });
+    }
+    return {
+      total: drafts.length,
+      created: created.length,
+      overwritten: overwritten.length,
+      skipped: skipped.length,
+      createdNames: created,
+      overwrittenNames: overwritten,
+      skippedNames: skipped,
+    };
   });
 }
 
