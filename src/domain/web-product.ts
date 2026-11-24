@@ -21,9 +21,11 @@ export type WebSizeInput = {
 
 export type WebProductInput = {
   name: string;
+  /** Mã sản phẩm (viết tắt liền không dấu). Khi tạo mới dùng làm id nhóm nếu còn trống. */
+  code?: string;
   category: string;
   description: string;
-  turnaround: string;
+  turnaround?: string;
   sizes: WebSizeInput[];
   listed?: boolean;
 };
@@ -68,6 +70,37 @@ export function slugifyProductName(name: string): string {
   return slug.slice(0, 48) || "san-pham";
 }
 
+/** Mã viết tắt liền không dấu từ tên (vd "Ảnh ép gỗ" → AEG). */
+export function productCodeFromName(name: string): string {
+  const plain = name
+    .trim()
+    .toLowerCase()
+    .replace(/đ/g, "d")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const words = plain.split(/[^a-z0-9]+/).filter(Boolean);
+  if (words.length >= 2) {
+    return words
+      .map((word) => word[0]!)
+      .join("")
+      .toUpperCase()
+      .slice(0, 16);
+  }
+  return plain.replace(/[^a-z0-9]/g, "").toUpperCase().slice(0, 16) || "SP";
+}
+
+/** Chuẩn hoá mã người nhập: chữ/số viết hoa, tối đa 24 ký tự. */
+export function normalizeProductCode(code: string): string {
+  const plain = code
+    .trim()
+    .toUpperCase()
+    .replace(/đ/gi, "D")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]+/g, "");
+  return plain.slice(0, 24);
+}
+
 export function uniqueKey(base: string, taken: Set<string>): string {
   if (!taken.has(base)) return base;
   let n = 2;
@@ -86,29 +119,40 @@ function whole(value: number, label: string, min: number, max: number): number {
   return value;
 }
 
-/** Tạo nhóm, quy cách và giá tại tiệm. Kênh sàn để trống cho đến khi chủ sửa ở bảng giá. */
+/** Tạo nhóm, quy cách và giá từng kênh. */
 export function buildWebProduct(
   input: WebProductInput,
   existing: { slugs: string[]; ids: string[]; codes: string[]; sorts: number[] },
 ): BuiltWebProduct {
   const name = clean(input.name, 80);
   const category = clean(input.category, 40);
-  const description = clean(input.description, 400);
-  const turnaround = clean(input.turnaround, 80);
+  const description = clean(input.description ?? "", 400);
+  const turnaround = clean(input.turnaround ?? "", 80);
   if (name.length < 2) throw new Error("Nhập tên sản phẩm.");
-  if (category.length < 2) throw new Error("Nhập nhóm, ví dụ Ảnh gỗ.");
+  if (category.length < 2) throw new Error("Chọn hoặc nhập nhóm sản phẩm.");
   if (!input.sizes.length) throw new Error("Thêm ít nhất một khổ và giá.");
 
-  const sizes = input.sizes.map((size) => ({
-    widthCm: whole(size.widthCm, "Chiều rộng", 1, 200),
-    heightCm: whole(size.heightCm, "Chiều cao", 1, 200),
-    sheets: whole(size.sheets, "Số tấm", 1, 100),
-    price: whole(size.price, "Giá tại tiệm", 1000, 100_000_000),
-    prices: size.prices,
-    quotes: size.quotes,
-    minTotal: size.minTotal ?? null,
-    skuId: size.skuId,
-  }));
+  const sizes: WebSizeInput[] = input.sizes.map((size) => {
+    const quotes = channelQuotes(size);
+    const retail =
+      quotes.tai_tiem.price
+      ?? CHANNELS.map((channel) => quotes[channel].price).find((price): price is number => price != null)
+      ?? size.price;
+    if (retail == null || !Number.isFinite(retail)) {
+      throw new Error(`Khổ ${size.widthCm}×${size.heightCm} cm cần ít nhất một giá kênh.`);
+    }
+    const next: WebSizeInput = {
+      widthCm: whole(size.widthCm, "Chiều rộng", 1, 200),
+      heightCm: whole(size.heightCm, "Chiều cao", 1, 200),
+      sheets: whole(size.sheets, "Số tấm", 1, 100),
+      price: whole(retail, "Giá", 1000, 100_000_000),
+      minTotal: size.minTotal ?? null,
+    };
+    if (size.prices) next.prices = size.prices;
+    if (size.quotes) next.quotes = size.quotes;
+    if (size.skuId) next.skuId = size.skuId;
+    return next;
+  });
   const seen = new Set<string>();
   for (const size of sizes) {
     const key = `${size.widthCm}x${size.heightCm}x${size.sheets}`;
@@ -128,13 +172,17 @@ export function buildWebProduct(
   }
 
   const slug = uniqueKey(slugifyProductName(name), new Set(existing.slugs));
-  const id = uniqueKey(slug.replace(/-/g, "_"), new Set(existing.ids));
+  const wantedCode = normalizeProductCode(input.code ?? "") || normalizeProductCode(productCodeFromName(name));
+  const idBase = wantedCode
+    ? wantedCode.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || slug.replace(/-/g, "_")
+    : slug.replace(/-/g, "_");
+  const id = uniqueKey(idBase, new Set(existing.ids));
   const takenCodes = new Set(existing.codes);
   const skus: Sku[] = [];
   const prices: ChannelPrice[] = [];
   const ordered = [...sizes].sort((a, b) => a.widthCm - b.widthCm || a.heightCm - b.heightCm || a.sheets - b.sheets);
   ordered.forEach((size, index) => {
-    const stem = `WEB-${slug.slice(0, 24)}-${size.widthCm}x${size.heightCm}-${size.sheets}`;
+    const stem = `${wantedCode || "SP"}-${size.widthCm}x${size.heightCm}-${size.sheets}`;
     const code = uniqueKey(stem, takenCodes);
     takenCodes.add(code);
     const quotes = channelQuotes(size);

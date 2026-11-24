@@ -1,183 +1,289 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { ALL_TONE, FilterChips, type FilterChip } from "@/components/admin/filter-chips";
-import { ListPager, useListPage } from "@/components/admin/list-page";
-import { FilterSheet, PageToolbar, ToolbarButton } from "@/components/admin/page-toolbar";
-import { Plus } from "lucide-react";
-import { RoleGate } from "@/components/role-gate";
-import { Button } from "@/components/ui/button";
 import { ProductEditor } from "@/components/admin/product-editor";
-import { getMe, getWebProducts, setWebProductListed } from "@/lib/admin.functions";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { workbookXml } from "@/domain/excel";
+import { productExcelTemplateRows, productsToExcelRows } from "@/domain/product-excel";
+import { CHANNEL_LABEL, CHANNELS } from "@/domain/types";
 import { formatVnd } from "@/lib/brand";
+import { getWebProduct, getWebProducts, importWebProducts } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/san-pham")({
-  validateSearch: (search: Record<string, unknown>): { m: string } => ({
-    m: search.m === "nhap" ? "nhap" : "",
+  component: AdminProductsPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    m: search["m"] === "nhap" ? ("nhap" as const) : undefined,
   }),
-  component: WebProductsPage,
 });
 
-function WebProductsPage() {
-  return (
-    <RoleGate allow={["owner", "sale"]} deny="Chỉ chủ và sale xem sản phẩm.">
-      <WebProductsBody />
-    </RoleGate>
-  );
-}
-
-function WebProductsBody() {
-  const queryClient = useQueryClient();
-  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
-  const staff = me.data?.role === "owner" || me.data?.role === "sale";
+function AdminProductsPage() {
   const { m } = Route.useSearch();
   const products = useQuery({ queryKey: ["web-products"], queryFn: () => getWebProducts() });
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [open, setOpen] = useState(m === "nhap" && staff);
+  const [createOpen, setCreateOpen] = useState(m === "nhap");
   const [editId, setEditId] = useState<string | null>(null);
-  const [filters, setFilters] = useState(false);
-  useEffect(() => {
-    if (m === "nhap" && staff) setOpen(true);
-  }, [m, staff]);
-  const [q, setQ] = useState("");
-  const [listed, setListed] = useState("all");
-  const catalog = products.data ?? [];
-  const shown = catalog.filter((product) => {
-    if (listed === "on" && !product.listed) return false;
-    if (listed === "off" && product.listed) return false;
-    const needle = q.trim().toLowerCase();
-    return !needle || `${product.name} ${product.category} ${product.slug}`.toLowerCase().includes(needle);
-  });
-  const chips: FilterChip[] = [
-    { id: "all", label: "Tất cả", count: catalog.length, ...ALL_TONE },
-    { id: "on", label: "Đang hiện", count: catalog.filter((product) => product.listed).length, color: "#059669" },
-    { id: "off", label: "Đang ẩn", count: catalog.filter((product) => !product.listed).length, color: "#6B7280" },
-  ];
-  const list = useListPage(shown, `${q}|${listed}`);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [pendingFile, setPendingFile] = useState<{ name: string; base64: string } | null>(null);
+  const [conflictPreview, setConflictPreview] = useState<string[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: ["web-products"] });
-    await queryClient.invalidateQueries({ queryKey: ["catalog"] });
-    await queryClient.invalidateQueries({ queryKey: ["settings"] });
-    await queryClient.invalidateQueries({ queryKey: ["group-photos"] });
-    await queryClient.invalidateQueries({ queryKey: ["prices"] });
+  const rows = useMemo(() => products.data ?? [], [products.data]);
+
+  function refresh() {
+    void products.refetch();
   }
 
-  async function onListed(groupId: string, next: boolean) {
-    setBusyId(groupId);
+  function downloadBlob(filename: string, xml: string) {
+    const blob = new Blob([xml], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportTemplate() {
+    downloadBlob("mau-san-pham.xls", workbookXml([{ name: "SanPham", rows: productExcelTemplateRows() }]));
+    toast.success("Đã tải file mẫu Excel.");
+  }
+
+  async function exportCurrent() {
     try {
-      await setWebProductListed({ data: { groupId, listed: next } });
-      await refresh();
+      const detailed = await Promise.all(
+        rows.map(async (item) => {
+          const full = await getWebProduct({ data: { groupId: item.id } });
+          return {
+            code: item.code ?? item.id,
+            name: full.name,
+            category: full.category,
+            description: full.description,
+            sizes: full.sizes
+              .filter((size) => size.widthCm != null && size.heightCm != null)
+              .map((size) => ({
+                widthCm: size.widthCm as number,
+                heightCm: size.heightCm as number,
+                sheets: size.sheets,
+                quotes: Object.fromEntries(
+                  CHANNELS.map((channel) => {
+                    const quote = size.quotes[channel];
+                    return [channel, { price: quote?.price ?? null, sold: Boolean(quote?.sold) }];
+                  }),
+                ),
+              })),
+          };
+        }),
+      );
+      downloadBlob("san-pham.xls", workbookXml([{ name: "SanPham", rows: productsToExcelRows(detailed) }]));
+      toast.success("Đã xuất danh sách sản phẩm.");
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  }
+
+  async function onPickFile(file: File | null) {
+    if (!file) return;
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]!);
+    const base64 = btoa(binary);
+    setPendingFile({ name: file.name, base64 });
+    setConflictPreview([]);
+    setImportOpen(true);
+  }
+
+  async function runImport(overwrite: boolean) {
+    if (!pendingFile) return;
+    setImporting(true);
+    try {
+      const result = await importWebProducts({
+        data: { filename: pendingFile.name, base64: pendingFile.base64, overwrite },
+      });
+      const parts: string[] = [];
+      if (result.created) parts.push(`tạo mới ${result.created}`);
+      if (result.overwritten) parts.push(`ghi đè ${result.overwritten}`);
+      if (result.skipped) parts.push(`bỏ qua ${result.skipped} (trùng, chưa ghi đè)`);
+      toast.success(parts.length ? `Nhập xong: ${parts.join(", ")}.` : "Không có dòng nào được nhập.");
+      if (result.overwrittenNames?.length) {
+        toast.message("Đã ghi đè", { description: result.overwrittenNames.slice(0, 8).join("\n") });
+      }
+      if (result.skippedNames?.length) {
+        toast.message("Bỏ qua vì trùng (chưa ghi đè)", {
+          description: result.skippedNames.slice(0, 8).join("\n"),
+        });
+        setConflictPreview(result.skippedNames);
+      } else {
+        setImportOpen(false);
+        setPendingFile(null);
+        setConflictPreview([]);
+      }
+      refresh();
     } catch (error) {
       toast.error((error as Error).message);
     } finally {
-      setBusyId(null);
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
   return (
-    <div className="space-y-6">
-      <PageToolbar
-        title={m === "nhap" ? "Nhập sản phẩm" : "Sản phẩm & Giá"}
-        hint="Tạo hoặc sửa sản phẩm cùng lúc với giá cả 6 kênh, ảnh và hiện trên trang chủ. Giá CTV / Mơ Home chỉ dùng khi tạo đơn trong quản trị, không hiện trên nhainthienthien.com."
-        search={q}
-        onSearch={setQ}
-        searchPlaceholder="Tìm tên, nhóm, đường dẫn…"
-        filterCount={listed === "all" ? 0 : 1}
-        onFilter={() => setFilters(true)}
-        actions={staff ? <ToolbarButton label="Tạo sản phẩm" icon={Plus} primary onClick={() => { setEditId(null); setOpen(true); }} /> : null}
-      />
-      <p className="text-sm text-muted-foreground">
-        Ảnh nhiều tấm nằm ở{" "}
-        <Link to="/admin/anh" className="font-semibold text-accent">
-          Ảnh sản phẩm
-        </Link>
-        . Giá từng ô cũng sửa được ở{" "}
-        <Link to="/admin/gia" className="font-semibold text-accent">
-          Bảng giá 6 kênh
-        </Link>
-        .
-      </p>
-      <FilterSheet open={filters} onClose={() => setFilters(false)} title="Bộ lọc sản phẩm">
-        <FilterChips label="Trang chủ" value={listed} chips={chips} onChange={setListed} wrap />
-      </FilterSheet>
-      <ListPager page={list.page} pages={list.pages} total={list.total} start={list.start} count={list.slice.length} noun="sản phẩm" onPage={list.setPage} />
-      <ProductEditor
-        open={open}
-        groupId={editId}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) setEditId(null);
-        }}
-        onSaved={() => void refresh()}
-      />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Quản lý sản phẩm</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Tạo / sửa sản phẩm kèm giá từng kênh. Bảng giá kênh gộp chung tại đây.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" className="min-h-11" onClick={exportTemplate}>
+            Xuất file mẫu
+          </Button>
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => void exportCurrent()} disabled={!rows.length}>
+            Xuất Excel
+          </Button>
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => fileRef.current?.click()}>
+            Tạo bằng Excel
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+            className="hidden"
+            onChange={(event) => void onPickFile(event.target.files?.[0] ?? null)}
+          />
+          <Button type="button" className="min-h-11 bg-accent text-accent-foreground" onClick={() => setCreateOpen(true)}>
+            Tạo sản phẩm lẻ
+          </Button>
+        </div>
+      </div>
 
-      <section className="overflow-x-auto rounded-2xl border bg-card">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead>
-            <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-              <th className="px-3 py-3">Ảnh</th>
-              <th className="px-3 py-3">Tên sản phẩm</th>
-              <th className="px-3 py-3">Nhóm</th>
-              <th className="px-3 py-3 text-right">Giá từ</th>
-              <th className="px-3 py-3">Biến thể</th>
-              <th className="px-3 py-3">Trang chủ</th>
-              <th className="px-3 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {list.slice.map((product) => (
-              <tr key={product.id} className="border-b last:border-0">
-                <td className="px-3 py-2.5 text-xs text-muted-foreground">{product.cover ? "Có ảnh" : "Chưa có"}</td>
-                <td className="px-3 py-2.5">
-                  <p className="font-semibold">{product.name}</p>
-                  <p className="text-xs text-muted-foreground">/{product.slug}</p>
-                </td>
-                <td className="px-3 py-2.5">{product.category}</td>
-                <td className="px-3 py-2.5 text-right font-semibold">{product.from === null ? "—" : formatVnd(product.from)}</td>
-                <td className="px-3 py-2.5 text-muted-foreground">{product.variants}</td>
-                <td className="px-3 py-2.5">
-                  <label className="inline-flex min-h-8 items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="size-4"
-                      checked={product.listed}
-                      disabled={!staff || busyId === product.id}
-                      onChange={(event) => void onListed(product.id, event.target.checked)}
-                    />
-                    <span className={product.listed ? "font-semibold text-emerald-700" : "text-muted-foreground"}>
-                      {product.listed ? "Đang hiện" : "Đang ẩn"}
-                    </span>
-                  </label>
-                </td>
-                <td className="px-3 py-2.5 text-right">
-                  {staff ? (
-                    <Button
-                      variant="outline"
-                      className="min-h-9"
-                      onClick={() => {
-                        setEditId(product.id);
-                        setOpen(true);
-                      }}
-                    >
+      {products.isLoading ? (
+        <p className="text-sm text-muted-foreground">Đang tải…</p>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border bg-card">
+          <table className="w-full min-w-[52rem] text-left text-sm">
+            <thead className="border-b bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-3 py-3 font-semibold">STT</th>
+                <th className="px-3 py-3 font-semibold">Mã</th>
+                <th className="px-3 py-3 font-semibold">Tên</th>
+                <th className="px-3 py-3 font-semibold">Nhóm</th>
+                <th className="px-3 py-3 font-semibold">Giá từng kênh</th>
+                <th className="px-3 py-3 font-semibold">Sửa</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((item, index) => (
+                <tr key={item.id} className="border-b last:border-0 align-top">
+                  <td className="px-3 py-3 tabular-nums text-muted-foreground">{index + 1}</td>
+                  <td className="px-3 py-3 font-mono text-xs font-semibold uppercase">{(item.code ?? item.id).replace(/_/g, "").toUpperCase()}</td>
+                  <td className="px-3 py-3 font-medium">{item.name}</td>
+                  <td className="px-3 py-3">{item.category}</td>
+                  <td className="px-3 py-3">
+                    <div className="space-y-2">
+                      {(item.sizes ?? []).length ? (
+                        (item.sizes ?? []).map((size) => (
+                          <div key={size.skuId} className="text-xs leading-relaxed">
+                            <p className="font-semibold text-foreground">
+                              {size.widthCm ?? "?"}×{size.heightCm ?? "?"} cm
+                              {(size.sheets ?? 1) > 1 ? ` · ${size.sheets} tấm` : ""}
+                            </p>
+                            {CHANNELS.map((channel) => {
+                              const quote = size.quotes?.[channel];
+                              if (!quote) return null;
+                              return (
+                                <p key={channel} className={quote.sold ? "text-foreground" : "text-muted-foreground"}>
+                                  {CHANNEL_LABEL[channel]}:{" "}
+                                  {quote.price != null ? formatVnd(quote.price) : "—"}
+                                  {quote.sold ? "" : " · không bán"}
+                                </p>
+                              );
+                            })}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          {item.from != null ? `Từ ${formatVnd(item.from)} · ${item.variants} khổ` : "Chưa có giá"}
+                        </p>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">
+                    <Button type="button" variant="outline" className="min-h-10" onClick={() => setEditId(item.id)}>
                       Sửa
                     </Button>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-            {products.data && list.slice.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                  Không có sản phẩm khớp.
-                </td>
-              </tr>
+                  </td>
+                </tr>
+              ))}
+              {!rows.length ? (
+                <tr>
+                  <td colSpan={6} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                    Chưa có sản phẩm. Tạo lẻ hoặc nhập từ Excel.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <ProductEditor open={createOpen} onOpenChange={setCreateOpen} onSaved={refresh} />
+      <ProductEditor
+        open={Boolean(editId)}
+        groupId={editId}
+        onOpenChange={(open) => {
+          if (!open) setEditId(null);
+        }}
+        onSaved={refresh}
+      />
+
+      <Dialog
+        open={importOpen}
+        onOpenChange={(open) => {
+          setImportOpen(open);
+          if (!open) {
+            setPendingFile(null);
+            setConflictPreview([]);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nhập sản phẩm từ Excel</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              File: <span className="font-semibold">{pendingFile?.name ?? "—"}</span>
+            </p>
+            <p className="text-muted-foreground">
+              Trùng mã hoặc trùng tên sẽ được báo rõ. Chọn «Ghi đè» để cập nhật sản phẩm trùng, hoặc «Chỉ tạo mới» để bỏ qua dòng trùng.
+            </p>
+            {conflictPreview.length ? (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950">
+                <p className="font-semibold">Trùng — cần ghi đè nếu muốn cập nhật:</p>
+                <ul className="mt-1 list-disc pl-5 text-xs">
+                  {conflictPreview.slice(0, 12).map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
-          </tbody>
-        </table>
-      </section>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="min-h-11" disabled={importing} onClick={() => void runImport(false)}>
+                {importing ? "Đang nhập…" : "Chỉ tạo mới (bỏ qua trùng)"}
+              </Button>
+              <Button type="button" className="min-h-11 bg-accent text-accent-foreground" disabled={importing} onClick={() => void runImport(true)}>
+                {importing ? "Đang nhập…" : "Ghi đè nếu trùng"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -27,7 +27,7 @@ test("thêm sản phẩm thì trang chủ thấy giá tại tiệm", () => {
   assert.equal(built.group.gate, null);
   assert.equal(built.group.turnaround, "");
   assert.equal(built.skus.length, 3);
-  assert.ok(built.skus.every((sku) => sku.code.startsWith("WEB-") && !sku.code.startsWith("EG-")));
+  assert.ok(built.skus.every((sku) => sku.code.startsWith("AC-") && !sku.code.startsWith("EG-")));
   assert.deepEqual(
     built.skus.map((sku) => sku.name),
     ["20×30 cm", "20×30 cm · 2 tấm", "30×45 cm"],
@@ -88,15 +88,21 @@ test("từ chối khổ trùng và combo đắt hơn trên mỗi tấm", () => {
   );
 });
 
-test("trang quản trị có chỗ thêm sản phẩm lên trang chủ", () => {
+test("trang quản trị quản lý sản phẩm + giá kênh, không gắn trang chủ/ảnh", () => {
   const page = readFileSync(new URL("../routes/admin.san-pham.tsx", import.meta.url), "utf8");
   const editor = readFileSync(new URL("../components/admin/product-editor.tsx", import.meta.url), "utf8");
+  const modules = readFileSync(new URL("../admin-os/modules.ts", import.meta.url), "utf8");
   const home = readFileSync(new URL("../routes/index.tsx", import.meta.url), "utf8");
   assert.match(page, /ProductEditor/);
+  assert.match(page, /importWebProducts|Xuất file mẫu/);
   assert.match(editor, /createWebProduct/);
   assert.match(editor, /updateWebProduct/);
-  assert.match(editor, /Hiện trên trang chủ/);
-  assert.doesNotMatch(page, /redirect\(/);
+  assert.doesNotMatch(editor, /Hiện trên trang chủ/);
+  assert.doesNotMatch(editor, /Ảnh đại diện/);
+  assert.doesNotMatch(editor, /Ghi chú thời gian/);
+  assert.match(modules, /Quản lý sản phẩm/);
+  assert.doesNotMatch(modules, /Bảng giá 6 kênh/);
+  assert.doesNotMatch(modules, /Ảnh sản phẩm/);
   assert.match(home, /catalogQueryOptions/);
   assert.match(home, /id="gian-hang"/);
 });
