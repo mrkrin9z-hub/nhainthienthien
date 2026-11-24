@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { BRAND } from "@/lib/brand";
+import { BRAND, resolveFacebookHref, resolveShopeeHref, resolveTiktokHref, tiktokHandleOrDefault } from "@/lib/brand";
 import { publicConfigQueryOptions } from "@/lib/catalog.functions";
 
 /** Biểu tượng nền tảng, vẽ lại đơn giản (không dùng file logo của sàn). */
@@ -78,10 +78,14 @@ export function ShopLinksBlock({ title = "Liên hệ & mua tại", className = "
   const zalo = showZalo ? config.data?.zalo ?? "" : "";
   const resolved = SHOP_LINKS.map((link) => {
     if (link.key === "tiktok") {
-      return { ...link, href: config.data?.tiktokUrl || link.href, sub: config.data?.tiktokHandle || link.sub };
+      return {
+        ...link,
+        href: resolveTiktokHref(config.data?.tiktokUrl || link.href, config.data?.tiktokHandle),
+        sub: tiktokHandleOrDefault(config.data?.tiktokHandle || link.sub),
+      };
     }
-    if (link.key === "facebook") return { ...link, href: config.data?.facebookUrl || link.href };
-    if (link.key === "shopee") return { ...link, href: config.data?.shopeeUrl || link.href };
+    if (link.key === "facebook") return { ...link, href: resolveFacebookHref(config.data?.facebookUrl || link.href) };
+    if (link.key === "shopee") return { ...link, href: resolveShopeeHref(config.data?.shopeeUrl || link.href) };
     return link;
   });
   const links = showZalo
@@ -118,10 +122,19 @@ export function ShopLinksRow({ tiktokHref }: { tiktokHref?: string | null }) {
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <span className="shrink-0 text-sm font-semibold text-[#123047]">Mua tại sàn</span>
       <div className="grid grid-cols-3 gap-2 sm:flex">
-        {SHOP_LINKS.map(({ key, label, href, Icon }) => (
+        {SHOP_LINKS.map(({ key, label, href, Icon }) => {
+          const resolved =
+            key === "tiktok"
+              ? resolveTiktokHref(tiktokHref || href)
+              : key === "facebook"
+                ? resolveFacebookHref(href)
+                : key === "shopee"
+                  ? resolveShopeeHref(href)
+                  : href;
+          return (
           <a
             key={key}
-            href={key === "tiktok" && tiktokHref ? tiktokHref : href}
+            href={resolved}
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`${label} (mở tab mới)`}
@@ -130,7 +143,8 @@ export function ShopLinksRow({ tiktokHref }: { tiktokHref?: string | null }) {
             <Icon className="size-6 shrink-0" />
             {label}
           </a>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -29,7 +29,7 @@ export function ProductCover({ product, className }: { product: CatalogProduct; 
       decoding="async"
       width={600}
       height={600}
-      className="size-full object-cover"
+      className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
       onError={(event) => {
         event.currentTarget.src = catalogImage(product.slug, null);
       }}
@@ -56,9 +56,9 @@ export function ProductCard({ product }: { product: CatalogProduct }) {
     <Link
       to="/san-pham/$slug"
       params={{ slug: product.slug }}
-      className="product-card card group flex flex-col overflow-hidden !rounded-2xl"
+      className="product-card card group flex flex-col rounded-2xl transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_0_0_1px_rgb(18_48_71/0.04),0_18px_36px_-16px_rgb(18_48_71/0.4)]"
     >
-      <div className="relative">
+      <div className="relative overflow-hidden rounded-t-2xl">
         <ProductCover product={product} className="aspect-square w-full" />
         {pct ? (
           <span className="glass-chip absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-extrabold text-[#9a4508]">-{pct}%</span>

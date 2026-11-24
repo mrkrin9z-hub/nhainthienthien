@@ -1,4 +1,4 @@
-import { BRAND } from "@/lib/brand";
+import { BRAND, resolveFacebookHref, resolveShopeeHref, resolveTiktokHref, tiktokHandleOrDefault } from "@/lib/brand";
 import type { Settings, SiteContent } from "./types.ts";
 
 export const DEFAULT_COMMITMENTS = [
@@ -26,8 +26,8 @@ export function defaultSiteContent(): Required<Pick<SiteContent, "heroTitle" | "
 export function resolveSiteContent(partial?: SiteContent | null, settings?: Pick<Settings, "publicHours"> | null) {
   const base = defaultSiteContent();
   const hours = (partial?.hours?.trim() || settings?.publicHours?.trim() || base.hours).slice(0, 80);
-  const handle = (partial?.tiktokHandle?.trim() || base.tiktokHandle).replace(/^@?/, "@").slice(0, 40);
-  const tiktokUrl = (partial?.tiktokUrl?.trim() || `https://www.tiktok.com/${handle}` || base.tiktokUrl).slice(0, 200);
+  const handle = tiktokHandleOrDefault(partial?.tiktokHandle?.trim() || base.tiktokHandle).slice(0, 40);
+  const tiktokUrl = resolveTiktokHref(partial?.tiktokUrl?.trim() || `https://www.tiktok.com/${handle}`, handle).slice(0, 200);
   const commitments = (partial?.commitments ?? [])
     .map((item) => item.trim().slice(0, 160))
     .filter(Boolean);
@@ -39,10 +39,10 @@ export function resolveSiteContent(partial?: SiteContent | null, settings?: Pick
     banner: (partial?.banner ?? "").trim().slice(0, 200),
     address: (partial?.address?.trim() || base.address).slice(0, 200),
     hours,
-    facebookUrl: (partial?.facebookUrl?.trim() || base.facebookUrl).slice(0, 200),
+    facebookUrl: resolveFacebookHref(partial?.facebookUrl?.trim() || base.facebookUrl).slice(0, 200),
     tiktokHandle: handle,
     tiktokUrl,
-    shopeeUrl: (partial?.shopeeUrl?.trim() || base.shopeeUrl).slice(0, 200),
+    shopeeUrl: resolveShopeeHref(partial?.shopeeUrl?.trim() || base.shopeeUrl).slice(0, 200),
     commitments: commitments.length ? commitments : base.commitments,
     region: base.region,
   };

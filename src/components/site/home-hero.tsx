@@ -44,7 +44,7 @@ function SideTile({
       to={to}
       params={{ slug }}
       search={v ? { v } : {}}
-      className={`hero-tile relative block overflow-hidden rounded-[20px] bg-[#dfe6ee] text-white shadow-[0_14px_30px_-20px_rgb(18_48_71/0.6)] ${className}`}
+      className={`hero-tile group relative block overflow-hidden rounded-[20px] bg-[#dfe6ee] text-white shadow-[0_14px_30px_-20px_rgb(18_48_71/0.6)] transition-transform duration-200 hover:-translate-y-0.5 ${className}`}
     >
       <picture>
         {imgDesktop ? <source media="(min-width: 768px)" srcSet={imgDesktop} /> : null}
@@ -55,7 +55,7 @@ function SideTile({
           height={480}
           loading="lazy"
           decoding="async"
-          className="absolute inset-0 size-full object-cover"
+          className="absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.035]"
           style={pos ? { objectPosition: pos } : undefined}
         />
       </picture>
@@ -94,7 +94,7 @@ export function HomeHero({
           to="/san-pham/$slug"
           params={{ slug: "trang-guong" }}
           search={{ v: combo.id ?? "TG-13x18-C4" }}
-          className="hero-tile row-span-2 flex flex-col overflow-hidden rounded-[20px] text-white shadow-[0_18px_40px_-22px_rgb(18_48_71/0.7)]"
+          className="hero-tile group row-span-2 flex flex-col overflow-hidden rounded-[20px] text-white shadow-[0_18px_40px_-22px_rgb(18_48_71/0.7)]"
           style={{ backgroundColor: NAVY }}
         >
           <div className="relative shrink-0 basis-[44%] overflow-hidden bg-[#dfe6ee] md:basis-1/2">
@@ -107,7 +107,7 @@ export function HomeHero({
                 height={720}
                 fetchPriority="high"
                 loading="eager"
-                className="absolute inset-0 size-full object-cover object-[center_38%] md:object-[center_58%]"
+                className="absolute inset-0 size-full object-cover object-[center_38%] transition-transform duration-500 ease-out group-hover:scale-[1.035] md:object-[center_58%]"
               />
             </picture>
             <span className="absolute inset-0 bg-gradient-to-b from-transparent from-55% to-[#123047]" aria-hidden />

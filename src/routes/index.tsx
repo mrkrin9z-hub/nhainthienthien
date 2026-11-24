@@ -111,7 +111,7 @@ function HomePage() {
                   key={category}
                   to="/san-pham"
                   search={{ cat: category }}
-                  className="flex w-20 shrink-0 flex-col items-center gap-1.5 text-center"
+                  className="home-tile group flex w-20 shrink-0 flex-col items-center gap-1.5 text-center transition-transform duration-200 hover:-translate-y-1"
                 >
                   {first ? <ProductCover product={first} className="size-14 rounded-2xl shadow-[0_0_0_1px_rgb(18_48_71/0.06),0_6px_14px_-8px_rgb(18_48_71/0.35)]" /> : null}
                   <span className="text-xs text-foreground">{category}</span>
@@ -123,7 +123,7 @@ function HomePage() {
               { to: "/tra-cuu" as const, label: "Tra cứu đơn", icon: ReceiptText },
               { to: "/chinh-sach" as const, label: "Chính sách", icon: ScrollText },
             ].map((item) => (
-              <Link key={item.to} to={item.to} className="flex w-20 shrink-0 flex-col items-center gap-1.5 text-center">
+              <Link key={item.to} to={item.to} className="home-tile group flex w-20 shrink-0 flex-col items-center gap-1.5 text-center transition-transform duration-200 hover:-translate-y-1">
                 <span className="grid size-14 place-items-center rounded-2xl bg-gradient-to-b from-[#eef5fc] to-[#e1edf9] text-brand-blue">
                   <item.icon className="size-6" aria-hidden />
                 </span>

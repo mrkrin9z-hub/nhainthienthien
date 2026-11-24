@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { FreeshipTag, ImagePlaceholder, PolicyChips, ProductCard, ShopInfoBlock, Stepper } from "@/components/site/shop-ui";
+import { FreeshipTag, PolicyChips, ProductCard, ShopInfoBlock, Stepper } from "@/components/site/shop-ui";
 import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct, type CatalogVariant } from "@/lib/catalog.functions";
 import { matchingSheet, sizeChoices } from "@/domain/catalog-label";
 import { lineAmount } from "@/domain/calc";
@@ -14,7 +14,8 @@ import { BRAND, formatVnd, tiktokUrl } from "@/lib/brand";
 import { ShopLinksRow } from "@/components/site/shop-links";
 import { flyToCart } from "@/lib/motion";
 import { useCart } from "@/lib/cart";
-import { galleryFor, mediaFor, type MediaItem } from "@/lib/product-media";
+import { ProductGallery } from "@/components/site/product-gallery";
+import { galleryFor, mediaFor } from "@/lib/product-media";
 import { discountPercent } from "@/lib/ship-estimate";
 import { DEPOSIT, NO_RETURN, PAYMENT, REPRINT, SHIP_LARGE, SHIP_PICKUP, SHIP_SMALL } from "@/lib/public-policy";
 
@@ -128,6 +129,7 @@ function ProductPage() {
   const pct = variant ? discountPercent(price, variant.list_price) : null;
   const media = mediaFor(product.slug);
   const designs = media.designs;
+  const selectedDesign = designs?.options.find((opt) => opt.key === design) ?? null;
   const gallery = useMemo(
     () => galleryFor(product.slug, product.cover_path, choices.length > 1 ? (choice?.key ?? null) : null, product.name, product.gallery),
     [product, choice?.key, choices.length],
@@ -194,7 +196,7 @@ function ProductPage() {
         </nav>
 
         <div className="md:card md:grid md:grid-cols-[minmax(0,450px)_minmax(0,1fr)] md:gap-8 md:p-5">
-          <Gallery items={gallery} key={`${product.slug}-${choice?.key ?? ""}`} />
+          <ProductGallery items={gallery} selectedSrc={selectedDesign?.image ?? null} selectedAlt={selectedDesign?.label} key={`${product.slug}-${choice?.key ?? ""}`} />
 
           <div className="min-w-0">
             {/* Giá */}
@@ -377,81 +379,5 @@ function VariantChip({ active, label, detail, onClick }: { active: boolean; labe
       {label}
       {detail ? <span className={`ml-0.5 text-xs ${active ? "text-sale" : "text-muted-foreground"}`}>{detail}</span> : null}
     </button>
-  );
-}
-
-function Gallery({ items }: { items: MediaItem[] }) {
-  const track = useRef<HTMLDivElement>(null);
-  const [index, setIndex] = useState(0);
-  if (!items.length) return <ImagePlaceholder className="aspect-square w-full" />;
-
-  function go(i: number) {
-    const el = track.current;
-    if (!el) return;
-    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
-  }
-
-  return (
-    <div className="min-w-0">
-      <div className="relative md:overflow-hidden md:rounded-2xl">
-        <div
-          ref={track}
-          className="snap-gallery flex overflow-x-auto"
-          onScroll={(e) => {
-            const el = e.currentTarget;
-            setIndex(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
-          }}
-        >
-          {items.map((item, i) => (
-            <div key={item.src} className="skeleton w-full shrink-0">
-              {item.kind === "video" ? (
-                <video src={item.src} poster={item.poster} controls playsInline preload="metadata" className="aspect-square w-full bg-black object-contain" aria-label={item.alt} />
-              ) : (
-                <img
-                  src={item.src}
-                  alt={item.alt}
-                  width={900}
-                  height={900}
-                  loading={i === 0 ? "eager" : "lazy"}
-                  decoding="async"
-                  className="aspect-square w-full object-cover"
-                />
-              )}
-            </div>
-          ))}
-        </div>
-        {items.length > 1 ? (
-          <>
-            <span className="gallery-count glass-dark glass-blur absolute bottom-7 right-3 rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums md:bottom-3">
-              {index + 1}/{items.length}
-            </span>
-            <span className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center gap-1 md:hidden" aria-hidden>
-              {items.map((item, i) => (
-                <span key={item.src} className={`gallery-dot h-1.5 rounded-full ${i === index ? "w-4 bg-white" : "w-1.5 bg-white/60"}`} />
-              ))}
-            </span>
-          </>
-        ) : null}
-      </div>
-      {items.length > 1 ? (
-        <div className="scrollbar-none mt-2 hidden gap-2 overflow-x-auto md:flex">
-          {items.map((item, i) => (
-            <button
-              key={item.src}
-              type="button"
-              aria-label={`Xem ảnh ${i + 1}`}
-              onClick={() => go(i)}
-              className={`size-20 shrink-0 overflow-hidden rounded-xl transition-shadow ${i === index ? "shadow-[0_0_0_2px_var(--sale)]" : "opacity-80 hover:opacity-100"}`}
-            >
-              {item.kind === "video" ? (
-                <span className="grid size-full place-items-center bg-black text-xs text-white">Video</span>
-              ) : (
-                <img src={item.src} alt="" loading="lazy" width={900} height={900} className="size-full object-cover" />
-              )}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
   );
 }

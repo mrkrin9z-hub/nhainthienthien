@@ -26,9 +26,114 @@ export const TIKTOK_PRODUCT: Record<string, string> = {
   "anh-lua-6x9": "1733056188514535180",
 };
 
-export function tiktokUrl(slug: string): string | null {
+/** Handle TikTok Shop cũ — không dùng trên trang công khai. */
+export const RETIRED_TIKTOK_HANDLES = ["xuonginthienthien"] as const;
+
+function bareTiktokHandle(raw: string): string {
+  return raw.trim().replace(/^@+/, "").toLowerCase();
+}
+
+/** Handle hợp lệ hiện tại; handle đã nghỉ hoặc sai định dạng thì về @nhain.thienthien. */
+export function tiktokHandleOrDefault(raw?: string | null): string {
+  const bare = bareTiktokHandle(raw || BRAND.tiktokHandle);
+  if (!bare || (RETIRED_TIKTOK_HANDLES as readonly string[]).includes(bare) || !/^[a-z0-9._]{2,24}$/i.test(bare)) {
+    return BRAND.tiktokHandle;
+  }
+  return `@${bare}`;
+}
+
+export function tiktokShopUrlFor(handle?: string | null): string {
+  return `https://www.tiktok.com/${tiktokHandleOrDefault(handle)}`;
+}
+
+/** Thêm https nếu thiếu; trả null nếu không phải URL http(s). */
+export function ensureHttpsUrl(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed.replace(/^\/\//, "")}`;
+  try {
+    const url = new URL(withScheme);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+export function tiktokProductIdFromUrl(raw: string): string | null {
+  const href = ensureHttpsUrl(raw);
+  if (!href) return null;
+  const match = href.match(/\/(?:view\/)?product\/(\d{6,})/i) ?? href.match(/[?&](?:product_id|id)=(\d{6,})/i);
+  return match?.[1] ?? null;
+}
+
+export function tiktokProductUrl(productId: string, handle?: string | null): string {
+  const id = productId.trim();
+  const h = tiktokHandleOrDefault(handle).slice(1);
+  return `https://www.tiktok.com/@${h}/product/${id}`;
+}
+
+/**
+ * Chuẩn hóa link TikTok: thêm https, đổi shop.tiktok.com/view (dễ lỗi/mở app),
+ * bỏ handle cũ, fallback về shop https://www.tiktok.com/@nhain.thienthien.
+ */
+export function resolveTiktokHref(raw?: string | null, handle?: string | null): string {
+  const shop = tiktokShopUrlFor(handle);
+  const href = ensureHttpsUrl(raw);
+  if (!href) return shop;
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return shop;
+  }
+  const host = url.hostname.replace(/^www\./, "").toLowerCase();
+  const retired = (RETIRED_TIKTOK_HANDLES as readonly string[]).some(
+    (item) => url.pathname.toLowerCase().includes(item) || href.toLowerCase().includes(`@${item}`),
+  );
+  const productId = tiktokProductIdFromUrl(href);
+  if (retired) return productId ? tiktokProductUrl(productId) : shop;
+  if (host === "shop.tiktok.com" || host === "tiktok.com") {
+    if (productId) return tiktokProductUrl(productId, handle);
+    const profile = url.pathname.match(/^\/@([A-Za-z0-9._]+)/);
+    if (profile) return tiktokShopUrlFor(profile[1]);
+    return shop;
+  }
+  return shop;
+}
+
+export function resolveFacebookHref(raw?: string | null): string {
+  const href = ensureHttpsUrl(raw);
+  if (!href) return BRAND.facebookPageUrl;
+  try {
+    const host = new URL(href).hostname.replace(/^www\./, "").toLowerCase();
+    if (host === "facebook.com" || host === "fb.com" || host === "m.facebook.com") return href;
+  } catch {
+    /* fallback */
+  }
+  return BRAND.facebookPageUrl;
+}
+
+export function resolveShopeeHref(raw?: string | null): string {
+  const href = ensureHttpsUrl(raw);
+  if (!href) return BRAND.shopeeUrl;
+  try {
+    const host = new URL(href).hostname.replace(/^www\./, "").toLowerCase();
+    if (host === "shopee.vn" || host.endsWith(".shopee.vn") || host === "shopee.com" || host.endsWith(".shopee.com")) return href;
+  } catch {
+    /* fallback */
+  }
+  return BRAND.shopeeUrl;
+}
+
+/** Link TikTok Shop của sản phẩm; không có id thì về trang shop. */
+export function tiktokUrl(slug: string, override?: string | null): string {
+  const fromOverride = override?.trim() ? resolveTiktokHref(override) : null;
+  if (fromOverride && tiktokProductIdFromUrl(fromOverride)) return fromOverride;
   const id = TIKTOK_PRODUCT[slug];
-  return id ? `https://shop.tiktok.com/view/product/${id}?region=VN` : null;
+  if (id) return tiktokProductUrl(id);
+  return fromOverride || tiktokShopUrlFor();
 }
 
 export function formatVnd(amount: number): string {

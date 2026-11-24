@@ -803,3 +803,31 @@ textarea,
 }
 
 }
+
+/* Storefront card hover (unlayered: thắng @utility card trong @layer utilities,
+ * vốn đè box-shadow của .product-card:hover khi rule đó nằm trong @layer components). */
+@media (prefers-reduced-motion: no-preference) {
+  .product-card {
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.22s ease;
+  }
+  .product-card:hover {
+    transform: translateY(-4px);
+    box-shadow:
+      0 0 0 1px rgb(18 48 71 / 0.04),
+      0 18px 36px -16px rgb(18 48 71 / 0.4);
+  }
+  .product-card:hover img,
+  .home-tile:hover img,
+  .hero-tile:hover img {
+    transform: scale(1.05);
+  }
+  .hero-tile:hover img {
+    transform: scale(1.035);
+  }
+  .home-tile {
+    transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .home-tile:hover {
+    transform: translateY(-4px);
+  }
+}

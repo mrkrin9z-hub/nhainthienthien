@@ -142,3 +142,29 @@ export function variantThumb(
   const first = galleryFor(product.slug, product.cover_path, key, product.name).find((m) => m.kind === "image");
   return first?.src ?? null;
 }
+
+function mediaSrcKey(src: string): string {
+  try {
+    const path = src.startsWith("http") ? new URL(src).pathname : src.split("?")[0];
+    return path.replace(/\/+$/, "");
+  } catch {
+    return src.split("?")[0];
+  }
+}
+
+/**
+ * Khi khách chọn mẫu/biến thể: nếu ảnh mẫu đã có trong gallery thì nhảy tới index đó;
+ * nếu chưa có thì chèn ảnh mẫu làm ảnh chính (đầu danh sách).
+ */
+export function galleryItemsForSelection(
+  items: MediaItem[],
+  selectedSrc: string | null | undefined,
+  selectedAlt?: string,
+): { items: MediaItem[]; index: number } {
+  if (!selectedSrc) return { items, index: 0 };
+  const key = mediaSrcKey(selectedSrc);
+  const index = items.findIndex((item) => item.kind === "image" && mediaSrcKey(item.src) === key);
+  if (index >= 0) return { items, index };
+  const hero: MediaItem = { kind: "image", src: selectedSrc, alt: selectedAlt || "Ảnh mẫu đã chọn" };
+  return { items: [hero, ...items], index: 0 };
+}
