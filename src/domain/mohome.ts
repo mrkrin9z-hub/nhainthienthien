@@ -216,7 +216,7 @@ export function ensureMoHome(state: {
     }
   }
   for (const sku of state.skus ?? []) {
-    if (!sku.soldOn || sku.soldOn.length === 0) {
+    if (sku.soldOn == null) {
       sku.soldOn = [...NHA_IN_CHANNELS];
       changed = true;
     }

@@ -9,7 +9,7 @@ import { catalogPrices, channelPriceFor, masterByCode } from "./price-import.ts"
 import { businessReport } from "./report.ts";
 import { DEFAULT_SETTINGS, buildSeed } from "./seed.ts";
 import { syncOrderStock } from "./stock.ts";
-import { laborSplit, orderCodePrefix, skuSoldOn } from "./mohome.ts";
+import { ensureMoHome, laborSplit, orderCodePrefix, skuSoldOn } from "./mohome.ts";
 import { defaultShopChannels } from "./org-desk.ts";
 import { B2B_CHANNELS, CHANNELS, CHANNEL_LABEL, PUBLIC_PRICE_CHANNEL, isB2BChannel } from "./types.ts";
 import type { ChannelPrice, Order, ShopState } from "./types.ts";
@@ -241,4 +241,18 @@ test("CTV và Mơ Home là kênh B2B, không dùng làm giá trang khách", () =
   const catalogFn = read("../server/service.ts").match(/export async function publicCatalog\(\)[\s\S]*?^function /m)?.[0] ?? "";
   assert.match(catalogFn, /PUBLIC_PRICE_CHANNEL/);
   assert.doesNotMatch(catalogFn, /\bctv\b|mo_home/);
+});
+
+test("ensureMoHome không tự mở bán lại mã đã gỡ soldOn rỗng", () => {
+  const state = {
+    settings: { groupListed: {}, moHomeLaborPercent: 50 } as never,
+    groups: [],
+    skus: [
+      { id: "LUA-6x9-30", soldOn: [] as string[] },
+      { id: "TG-13x18-C1" },
+    ],
+  };
+  assert.equal(ensureMoHome(state as never), true);
+  assert.deepEqual(state.skus[0]?.soldOn, []);
+  assert.deepEqual(state.skus[1]?.soldOn, ["tai_tiem", "facebook", "tiktok", "shopee"]);
 });
