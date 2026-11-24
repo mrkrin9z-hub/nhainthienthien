@@ -239,8 +239,11 @@ test("CTV và Mơ Home là kênh B2B, không dùng làm giá trang khách", () =
     assert.doesNotMatch(read(file), /\bctv\b|mo_home/, file);
   }
   const catalogFn = read("../server/service.ts").match(/export async function publicCatalog\(\)[\s\S]*?^function /m)?.[0] ?? "";
-  assert.match(catalogFn, /PUBLIC_PRICE_CHANNEL/);
+  assert.match(catalogFn, /buildPublicCatalog/);
   assert.doesNotMatch(catalogFn, /\bctv\b|mo_home/);
+  const catalogDomain = read("./public-catalog.ts");
+  assert.match(catalogDomain, /PUBLIC_PRICE_CHANNEL/);
+  assert.doesNotMatch(catalogDomain, /\bctv\b|mo_home/);
 });
 
 test("ensureMoHome không tự mở bán lại mã đã gỡ soldOn rỗng", () => {

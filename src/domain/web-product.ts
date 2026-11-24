@@ -27,6 +27,8 @@ export type WebProductInput = {
   turnaround?: string;
   sizes: WebSizeInput[];
   listed?: boolean;
+  /** Gắn vào trang nhóm đã có (vd trang-guong). */
+  familySlug?: string | null;
 };
 
 export type BuiltWebProduct = {
@@ -232,6 +234,7 @@ export function buildWebProduct(
     id,
     name,
     slug,
+    familySlug: input.familySlug?.trim() || null,
     category,
     description,
     turnaround,

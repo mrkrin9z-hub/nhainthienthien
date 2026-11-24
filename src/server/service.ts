@@ -88,6 +88,8 @@ import { applyShelfOffers, cloneChannelPrices, type ShelfOffer } from "@/domain/
 import { rowsFromUpload } from "@/domain/sheet";
 import { parseProductExcel } from "@/domain/product-excel";
 import { buildWebProduct, normalizeProductCode, type WebProductInput } from "@/domain/web-product";
+import { buildPublicCatalog, visibleAdminSkus } from "@/domain/public-catalog";
+import { splitLegacyProductGroups } from "@/domain/catalog-split";
 import { resolveSiteContent } from "@/domain/site-content";
 import { hashPassword, recalcBoms, verifyPassword } from "@/domain/seed";
 import { generateTotpSecret, otpauthUri, verifyTotp } from "@/domain/totp";
@@ -397,52 +399,16 @@ function sweepExpiredFiles() {
 export async function publicCatalog() {
   sweepExpiredFiles();
   const state = await readState();
-  return state.groups
-    .filter((g) => groupListed(state, g.id))
-    .sort((a, b) => a.sort - b.sort)
-    .map((group) => ({
-      id: group.id,
-      name: group.name,
-      slug: group.slug,
-      category: group.category,
-      description: group.description,
-      cover_path: state.settings.productPhotos?.[group.slug]
-        ? `/api/public/product-photo/${group.slug}`
-        : (mediaFor(group.slug).listingCover ?? null),
-      gallery: (state.settings.productGalleries?.[group.slug] ?? []).map(
-        (item) => `/api/public/product-photo/${group.slug}?g=${encodeURIComponent(item.id)}`,
+  return buildPublicCatalog(state, {
+    cover: (slug) =>
+      state.settings.productPhotos?.[slug]
+        ? `/api/public/product-photo/${slug}`
+        : (mediaFor(slug).listingCover ?? null),
+    gallery: (slug) =>
+      (state.settings.productGalleries?.[slug] ?? []).map(
+        (item) => `/api/public/product-photo/${slug}?g=${encodeURIComponent(item.id)}`,
       ),
-      turnaround_text: group.turnaround,
-      sort_order: group.sort,
-      variants: state.skus
-        .filter((sku) => sku.groupId === group.id)
-        .filter((sku) => !isMergedWoodAlias(sku))
-        .filter((sku) => walkInListed(priceOf(state.prices, sku.id, PUBLIC_PRICE_CHANNEL)?.status))
-        .sort((a, b) => a.sort - b.sort)
-        .map((sku) => {
-          const price = priceOf(state.prices, sku.id, PUBLIC_PRICE_CHANNEL)?.price ?? null;
-          return {
-            id: sku.id,
-            name: sku.name,
-            width: sku.widthCm,
-            height: sku.heightCm,
-            unit: "cm",
-            price,
-            sale_price: null as number | null,
-            list_price: (() => {
-              const lp = priceOf(state.prices, sku.id, PUBLIC_PRICE_CHANNEL)?.listPrice ?? priceOf(state.prices, sku.id, "tiktok")?.listPrice ?? null;
-              return typeof lp === "number" && price !== null && lp > price ? lp : null;
-            })(),
-            min_total: priceOf(state.prices, sku.id, PUBLIC_PRICE_CHANNEL)?.minTotal ?? null,
-            requires_quote: price === null,
-            recommended_width_px: sku.widthCm ? Math.round((sku.widthCm / 2.54) * 300) : null,
-            recommended_height_px: sku.heightCm ? Math.round((sku.heightCm / 2.54) * 300) : null,
-            sort_order: sku.sort,
-            sheets: sku.sheets,
-          };
-        }),
-    }))
-    .filter((group) => group.variants.length > 0);
+  });
 }
 
 function upsertCustomer(
@@ -4594,9 +4560,7 @@ export async function listWebProducts(actor: Actor) {
     .slice()
     .sort((a, b) => a.sort - b.sort)
     .map((group) => {
-      const skus = state.skus
-        .filter((sku) => sku.groupId === group.id && !isMergedWoodAlias(sku))
-        .sort((a, b) => a.sort - b.sort);
+      const skus = visibleAdminSkus(group.id, state.skus, state.prices);
       const prices = skus
         .map((sku) => priceOf(state.prices, sku.id, "tai_tiem")?.price)
         .filter((price): price is number => typeof price === "number");
@@ -4632,7 +4596,8 @@ export async function listWebProducts(actor: Actor) {
           ),
         })),
       };
-    });
+    })
+    .filter((product) => product.sizes.length > 0);
 }
 
 export async function createWebProduct(actor: Actor, input: WebProductInput) {
@@ -4665,7 +4630,7 @@ export async function getWebProduct(actor: Actor, groupId: string) {
   const state = await readState();
   const group = state.groups.find((item) => item.id === groupId);
   if (!group) throw new Error("Không thấy sản phẩm.");
-  const skus = state.skus.filter((sku) => sku.groupId === group.id && !isMergedWoodAlias(sku)).sort((a, b) => a.sort - b.sort);
+  const skus = visibleAdminSkus(group.id, state.skus, state.prices);
   return {
     id: group.id,
     name: group.name,
@@ -4863,6 +4828,15 @@ export async function importWebProducts(
       overwrittenNames: overwritten,
       skippedNames: skipped,
     };
+  });
+}
+
+export async function splitLegacyWebProducts(actor: Actor) {
+  assertRole(actor, ["owner"]);
+  return mutate(async (state) => {
+    const result = splitLegacyProductGroups(state);
+    audit(state, actor.id, "product.split_legacy", "catalog", null, { created: result.created.length, shells: result.shells.length });
+    return result;
   });
 }
 

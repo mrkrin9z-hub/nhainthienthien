@@ -382,6 +382,8 @@ export type Group = {
   id: string;
   name: string;
   slug: string;
+  /** Slug trang storefront khi tách mỗi mã thành một sản phẩm. Trống = dùng slug. */
+  familySlug?: string | null;
   category: string;
   description: string;
   turnaround: string;
