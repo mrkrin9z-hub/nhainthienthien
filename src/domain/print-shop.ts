@@ -25,13 +25,17 @@ export type TransferBank = {
   id: string;
   account: string;
   holder: string;
+  /** Tự ghi nhận thu đơn khi CK đúng mã SB + số tiền (mặc định tắt). */
+  autoOrderPaymentEnabled?: boolean;
 };
 
 export function bankLabel(id: string): string {
   return TRANSFER_BANKS.find((bank) => bank.id === id)?.label ?? "";
 }
 
-export function cleanBank(input: { id?: string; account?: string; holder?: string } | null): TransferBank | null {
+export function cleanBank(
+  input: { id?: string; account?: string; holder?: string; autoOrderPaymentEnabled?: boolean } | null,
+): TransferBank | null {
   if (!input) return null;
   const id = String(input.id ?? "").replace(/\D/g, "");
   const account = String(input.account ?? "").replace(/\D/g, "");
@@ -40,7 +44,11 @@ export function cleanBank(input: { id?: string; account?: string; holder?: strin
   if (!TRANSFER_BANKS.some((bank) => bank.id === id)) throw new Error("Chọn ngân hàng trong danh sách.");
   if (account.length < 6 || account.length > 19) throw new Error("Số tài khoản chưa đúng.");
   if (holder.length < 2) throw new Error("Tên chủ tài khoản chưa đủ.");
-  return { id, account, holder };
+  const row: TransferBank = { id, account, holder };
+  if (typeof input.autoOrderPaymentEnabled === "boolean") {
+    row.autoOrderPaymentEnabled = input.autoOrderPaymentEnabled;
+  }
+  return row;
 }
 
 /** Nội dung chuyển khoản là mã đơn, đủ ngắn để ngân hàng giữ được. */
@@ -48,10 +56,10 @@ export function transferContent(code: string): string {
   return code.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 25);
 }
 
-/** Ảnh QR VietQR. Không gọi cổng thanh toán. Nhân viên vẫn tự ghi lần thu. */
-export function transferQrUrl(input: { bank: TransferBank; amount: number; code: string }): string | null {
+/** Ảnh QR VietQR. Không gọi cổng thanh toán. `addInfo` tùy chọn (mã SB + mã đơn). */
+export function transferQrUrl(input: { bank: TransferBank; amount: number; code: string; addInfo?: string }): string | null {
   const amount = Math.round(input.amount);
-  const content = transferContent(input.code);
+  const content = (input.addInfo?.trim() || transferContent(input.code)).slice(0, 25);
   if (!bankLabel(input.bank.id) || amount <= 0 || !content) return null;
   const params = new URLSearchParams({
     amount: String(amount),

@@ -136,7 +136,7 @@ export function OrderDesk({
   };
   paidSoFar: number;
   payments?: { at: string; amount: number; method: string; byName: string }[];
-  transfer?: { image: string; content: string; bank: string; holder: string; amount: number } | null;
+  transfer?: { image: string; content: string; token?: string | null; bank: string; holder: string; amount: number } | null;
   onSave: (value: DeskSave) => Promise<void>;
 }) {
   const [channel, setChannel] = useState<Channel>(initial.channel);
@@ -647,9 +647,18 @@ export function OrderDesk({
                 <div className="rounded-lg border bg-background p-3 text-center">
                   <img src={transfer.image} alt={`Mã chuyển khoản ${transfer.content}`} className="mx-auto h-36 w-36" />
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {transfer.bank} · {transfer.holder}. Nội dung: <strong className="text-foreground">{transfer.content}</strong>
+                    {transfer.bank} · {transfer.holder}
                   </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">Mã QR cũng in trên hóa đơn K80.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Nội dung CK: <strong className="font-mono text-foreground">{transfer.content}</strong>
+                    {transfer.token ? (
+                      <>
+                        {" "}
+                        · mã đối soát <strong className="font-mono text-[#2563eb]">{transfer.token}</strong>
+                      </>
+                    ) : null}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Mã QR + SB in trên hóa đơn K80.</p>
                 </div>
               ) : null}
             </div>

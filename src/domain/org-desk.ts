@@ -159,6 +159,9 @@ export function defaultSePay(): SePayConfig {
     accountHint: "",
     webhookPath: "/api/public/sepay",
     note: "",
+    lastPingAt: null,
+    lastReceivedAt: null,
+    pingCount: 0,
   };
 }
 
@@ -173,16 +176,23 @@ export function defaultNotifyPrefs(): NotifyPrefs {
 }
 
 export function ensureOrgCollections(state: {
-  roleModules?: RoleModules[];
-  packages?: ServicePackage[];
-  sepaySeen?: string[];
-  announcements?: unknown[];
-  documents?: unknown[];
-  campaigns?: unknown[];
-  messageTemplates?: unknown[];
-  branches?: unknown[];
-  departments?: unknown[];
-  settings: { sepay?: SePayConfig; notifyPrefs?: NotifyPrefs };
+  roleModules?: RoleModules[] | undefined;
+  packages?: ServicePackage[] | undefined;
+  sepaySeen?: string[] | undefined;
+  bankTransactions?: unknown[] | undefined;
+  paymentQrTokens?: unknown[] | undefined;
+  announcements?: unknown[] | undefined;
+  documents?: unknown[] | undefined;
+  campaigns?: unknown[] | undefined;
+  messageTemplates?: unknown[] | undefined;
+  branches?: unknown[] | undefined;
+  departments?: unknown[] | undefined;
+  settings: {
+    sepay?: SePayConfig | undefined;
+    notifyPrefs?: NotifyPrefs | undefined;
+    bank?: { autoOrderPaymentEnabled?: boolean } | undefined;
+    shopChannels?: { id: Channel; enabled: boolean; label: string }[] | undefined;
+  };
 }): boolean {
   let changed = false;
   if (!Array.isArray(state.roleModules) || state.roleModules.length === 0) {
@@ -224,11 +234,37 @@ export function ensureOrgCollections(state: {
     state.sepaySeen = [];
     changed = true;
   }
+  if (!Array.isArray(state.bankTransactions)) {
+    state.bankTransactions = [];
+    changed = true;
+  }
+  if (!Array.isArray(state.paymentQrTokens)) {
+    state.paymentQrTokens = [];
+    changed = true;
+  }
   if (!state.settings.sepay) {
     state.settings.sepay = defaultSePay();
     changed = true;
-  } else if (typeof state.settings.sepay.apiKey !== "string") {
-    state.settings.sepay.apiKey = "";
+  } else {
+    if (typeof state.settings.sepay.apiKey !== "string") {
+      state.settings.sepay.apiKey = "";
+      changed = true;
+    }
+    if (typeof state.settings.sepay.pingCount !== "number") {
+      state.settings.sepay.pingCount = 0;
+      changed = true;
+    }
+    if (state.settings.sepay.lastPingAt === undefined) {
+      state.settings.sepay.lastPingAt = null;
+      changed = true;
+    }
+    if (state.settings.sepay.lastReceivedAt === undefined) {
+      state.settings.sepay.lastReceivedAt = null;
+      changed = true;
+    }
+  }
+  if (state.settings.bank && typeof state.settings.bank.autoOrderPaymentEnabled !== "boolean") {
+    state.settings.bank.autoOrderPaymentEnabled = false;
     changed = true;
   }
   if (!state.settings.notifyPrefs) {

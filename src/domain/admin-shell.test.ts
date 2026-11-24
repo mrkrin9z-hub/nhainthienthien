@@ -21,7 +21,8 @@ test("cài đặt là hub nút truy cập; giá vốn trong chi phí; có kênh 
   assert.match(src, /Kênh cửa hàng/);
   assert.match(hub, /title: "Cài đặt chi phí"/);
   assert.match(hub, /title: "Kênh cửa hàng"/);
-  assert.doesNotMatch(hub, /title: "Kết nối SePay"/);
+  assert.match(hub, /title: "SePay"/);
+  assert.match(hub, /to: "\/admin\/sepay"/);
   assert.match(src, /Hiện số Zalo trên web/);
   assert.match(src, /zaloPhone/);
   assert.doesNotMatch(src, /showZalo: false/);

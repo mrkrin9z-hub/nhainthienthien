@@ -1458,6 +1458,51 @@ export const getSePayConfig = createServerFn({ method: "GET" }).handler(async ()
   return load(await actor());
 });
 
+export const regenerateSePayKey = createServerFn({ method: "POST" }).handler(async () => {
+  const { regenerateSePayApiKey } = await import("@/server/service");
+  return regenerateSePayApiKey(await actor());
+});
+
+export const listBankTxns = createServerFn({ method: "GET" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        status: z.enum(["all", "matched", "unmatched", "manual", "ignored"]).optional(),
+        limit: z.number().optional(),
+      })
+      .optional()
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { listBankTransactions } = await import("@/server/service");
+    return listBankTransactions(await actor(), data ?? {});
+  });
+
+export const reconcileBankTxn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        txnId: z.string().min(1),
+        orderId: z.string().min(1),
+        createPayment: z.boolean().optional(),
+        note: z.string().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { reconcileBankTransaction } = await import("@/server/service");
+    return reconcileBankTransaction(await actor(), data);
+  });
+
+export const ignoreBankTxn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ txnId: z.string().min(1), note: z.string().optional() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { ignoreBankTransaction } = await import("@/server/service");
+    return ignoreBankTransaction(await actor(), data);
+  });
+
 export const getCampaigns = createServerFn({ method: "GET" }).handler(async () => {
   const { listCampaigns } = await import("@/server/service");
   return listCampaigns(await actor());

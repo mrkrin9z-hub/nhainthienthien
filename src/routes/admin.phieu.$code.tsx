@@ -194,8 +194,13 @@ function K80Slip({
             {data.transfer.bank} · {data.transfer.holder}
           </p>
           <p className="text-[11px] leading-tight">
-            ND: <span className="font-bold">{data.transfer.content}</span>
+            ND: <span className="font-bold font-mono">{data.transfer.content}</span>
           </p>
+          {data.transfer.token ? (
+            <p className="text-[11px] leading-tight">
+              Mã đối soát: <span className="font-bold font-mono">{data.transfer.token}</span>
+            </p>
+          ) : null}
           <p className="text-[11px] font-semibold">Số tiền: {formatMaybe(data.transfer.amount)}</p>
         </div>
       ) : null}
