@@ -1167,6 +1167,15 @@ export const deleteProductCategoryFn = createServerFn({ method: "POST" })
     return deleteProductCategory(await actor(), data);
   });
 
+export const renameProductCategoryFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ from: z.string().min(2).max(40), to: z.string().min(2).max(40) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { renameProductCategory } = await import("@/server/service");
+    return renameProductCategory(await actor(), data);
+  });
+
 export const deleteWebProductFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ groupId: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {

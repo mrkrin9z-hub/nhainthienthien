@@ -4695,6 +4695,41 @@ export async function deleteProductCategory(actor: Actor, input: { name: string 
   });
 }
 
+/** Đổi tên nhóm — cập nhật danh mục + mọi sản phẩm đang thuộc nhóm. */
+export async function renameProductCategory(actor: Actor, input: { from: string; to: string }) {
+  assertRole(actor, ["owner", "sale"]);
+  const { categoryExists, categoryKey, mergeProductCategories, normalizeCategoryName, renameInCategoryList } =
+    await import("@/domain/product-categories");
+  const from = normalizeCategoryName(input.from);
+  const to = normalizeCategoryName(input.to);
+  if (from.length < 2) throw new Error("Thiếu tên nhóm cũ.");
+  if (to.length < 2) throw new Error("Tên nhóm mới cần ít nhất 2 ký tự.");
+  if (to.length > 40) throw new Error("Tên nhóm tối đa 40 ký tự.");
+  if (categoryKey(from) === categoryKey(to)) return { name: to, updated: 0 };
+  return mutate(async (state) => {
+    const current = mergeProductCategories(
+      state.settings.productCategories,
+      state.groups.map((group) => group.category),
+    );
+    if (!categoryExists(current, from)) throw new Error("Không thấy nhóm cần đổi tên.");
+    if (categoryExists(current, to)) throw new Error("Tên nhóm mới đã tồn tại.");
+    const fromKey = categoryKey(from);
+    let updated = 0;
+    for (const group of state.groups) {
+      if (categoryKey(group.category) !== fromKey) continue;
+      group.category = to;
+      updated += 1;
+    }
+    state.settings.productCategories = renameInCategoryList(
+      mergeProductCategories(state.settings.productCategories, state.groups.map((group) => group.category)),
+      from,
+      to,
+    );
+    audit(state, actor.id, "product.category.rename", to, { from }, { to, updated });
+    return { name: to, updated };
+  });
+}
+
 /** Xóa hẳn một mã sản phẩm (group + sku + giá). Chặn nếu còn trên đơn chưa hủy. */
 export async function deleteWebProduct(actor: Actor, groupId: string) {
   assertRole(actor, ["owner", "sale"]);
@@ -4854,7 +4889,16 @@ export async function updateWebProduct(actor: Actor, input: WebProductInput & { 
     if (typeof input.listed === "boolean") {
       state.settings.groupListed = { ...state.settings.groupListed, [group.id]: input.listed };
     }
-    audit(state, actor.id, "product.update", group.id, null, { name: group.name, sizes: nextSkus.length });
+    const { mergeProductCategories } = await import("@/domain/product-categories");
+    state.settings.productCategories = mergeProductCategories(state.settings.productCategories, [
+      group.category,
+      ...state.groups.map((item) => item.category),
+    ]);
+    audit(state, actor.id, "product.update", group.id, null, {
+      name: group.name,
+      category: group.category,
+      sizes: nextSkus.length,
+    });
     return { id: group.id, slug: group.slug, name: group.name };
   });
 }
