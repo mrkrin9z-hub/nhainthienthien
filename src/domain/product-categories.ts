@@ -19,3 +19,17 @@ export function categoryExists(list: string[], name: string): boolean {
   const key = normalizeCategoryName(name).toLocaleLowerCase("vi");
   return list.some((item) => item.toLocaleLowerCase("vi") === key);
 }
+
+export function categoryKey(name: string): string {
+  return normalizeCategoryName(name).toLocaleLowerCase("vi");
+}
+
+/** Đổi tên nhóm trong danh sách đã lưu (giữ thứ tự sort sau). */
+export function renameInCategoryList(list: string[] | null | undefined, from: string, to: string): string[] {
+  const fromKey = categoryKey(from);
+  const toName = normalizeCategoryName(to);
+  const next = (list ?? [])
+    .map((item) => (categoryKey(item) === fromKey ? toName : item))
+    .filter((item) => normalizeCategoryName(item).length >= 2);
+  return mergeProductCategories(next, []);
+}

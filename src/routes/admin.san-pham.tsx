@@ -20,6 +20,7 @@ import {
   getWebProduct,
   getWebProducts,
   importWebProducts,
+  renameProductCategoryFn,
 } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/san-pham")({
@@ -411,22 +412,28 @@ function CategoryManagerDialog({
   const cats = useQuery({ queryKey: ["product-categories"], queryFn: () => getProductCategories(), enabled: open });
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         onOpenChange(next);
-        if (!next) setName("");
+        if (!next) {
+          setName("");
+          setEditing(null);
+          setEditName("");
+        }
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Quản lý nhóm sản phẩm</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Tạo nhóm (vd Tráng gương, Ép gỗ) rồi chọn khi tạo/sửa sản phẩm. Xóa nhóm chỉ khi không còn sản phẩm thuộc nhóm.
+            Tạo / đổi tên nhóm (vd Tráng gương). Đổi tên sẽ cập nhật mọi sản phẩm trong nhóm. Xóa chỉ khi không còn sản phẩm.
           </p>
           <form
             className="flex flex-wrap gap-2"
@@ -459,27 +466,24 @@ function CategoryManagerDialog({
               {busy ? "Đang tạo…" : "Tạo nhóm"}
             </Button>
           </form>
-          <ul className="max-h-72 space-y-1 overflow-auto rounded-xl border p-2">
+          <ul className="max-h-80 space-y-1 overflow-auto rounded-xl border p-2">
             {(cats.data?.categories ?? []).map((item) => (
-              <li key={item.name} className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm hover:bg-muted/50">
-                <span>
-                  <span className="font-semibold">{item.name}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">{item.productCount} sản phẩm</span>
-                </span>
-                {canDelete ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-                    disabled={busy || item.productCount > 0}
-                    title={item.productCount > 0 ? "Còn sản phẩm trong nhóm" : "Xóa nhóm"}
-                    onClick={async () => {
-                      if (!window.confirm(`Xóa nhóm «${item.name}»?`)) return;
+              <li key={item.name} className="rounded-lg px-2 py-2 text-sm hover:bg-muted/50">
+                {editing === item.name ? (
+                  <form
+                    className="flex flex-wrap items-center gap-2"
+                    onSubmit={async (event) => {
+                      event.preventDefault();
                       setBusy(true);
                       try {
-                        await deleteProductCategoryFn({ data: { name: item.name } });
-                        toast.success("Đã xóa nhóm");
+                        const result = await renameProductCategoryFn({ data: { from: item.name, to: editName } });
+                        toast.success(
+                          result.updated
+                            ? `Đã đổi tên · cập nhật ${result.updated} sản phẩm`
+                            : `Đã đổi tên nhóm thành «${result.name}»`,
+                        );
+                        setEditing(null);
+                        setEditName("");
                         await cats.refetch();
                         onChanged();
                       } catch (error) {
@@ -489,9 +493,82 @@ function CategoryManagerDialog({
                       }
                     }}
                   >
-                    Xóa
-                  </Button>
-                ) : null}
+                    <Input
+                      className="min-h-10 min-w-[10rem] flex-1"
+                      value={editName}
+                      onChange={(event) => setEditName(event.target.value)}
+                      autoFocus
+                      required
+                      minLength={2}
+                      maxLength={40}
+                      aria-label={`Đổi tên nhóm ${item.name}`}
+                    />
+                    <Button type="submit" size="sm" className="min-h-10" disabled={busy || editName.trim().length < 2}>
+                      Lưu
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-10"
+                      disabled={busy}
+                      onClick={() => {
+                        setEditing(null);
+                        setEditName("");
+                      }}
+                    >
+                      Hủy
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      <span className="font-semibold">{item.name}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">{item.productCount} sản phẩm</span>
+                    </span>
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="min-h-9"
+                        disabled={busy}
+                        onClick={() => {
+                          setEditing(item.name);
+                          setEditName(item.name);
+                        }}
+                      >
+                        Sửa tên
+                      </Button>
+                      {canDelete ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="min-h-9 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                          disabled={busy || item.productCount > 0}
+                          title={item.productCount > 0 ? "Còn sản phẩm trong nhóm" : "Xóa nhóm"}
+                          onClick={async () => {
+                            if (!window.confirm(`Xóa nhóm «${item.name}»?`)) return;
+                            setBusy(true);
+                            try {
+                              await deleteProductCategoryFn({ data: { name: item.name } });
+                              toast.success("Đã xóa nhóm");
+                              await cats.refetch();
+                              onChanged();
+                            } catch (error) {
+                              toast.error((error as Error).message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Xóa
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
             {!cats.data?.categories?.length ? (

@@ -221,28 +221,53 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
                 Nên tạo từng mã riêng (vd TG-13x18, Combo13x18-02) cùng nhóm.
               </p>
             ) : null}
-            <label className="block text-sm font-semibold">
-              Nhóm sản phẩm
-              <Input
-                className="mt-1 min-h-11"
-                list="product-category-options"
-                value={category}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setCategory(value);
-                  refreshSuggestions({ category: value });
-                }}
-                placeholder="Tráng gương"
-              />
-              <datalist id="product-category-options">
-                {categoryOptions.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
-              <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                Chọn từ nhóm đã tạo (Quản lý nhóm) hoặc gõ tên mới. Mỗi khổ/combo vẫn là một mã riêng.
-              </span>
-            </label>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold">
+                Nhóm sản phẩm
+                <select
+                  className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                  value={categoryOptions.includes(category) ? category : ""}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (!value) return;
+                    setCategory(value);
+                    refreshSuggestions({ category: value });
+                  }}
+                  aria-label="Chọn nhóm sản phẩm"
+                >
+                  <option value="" disabled>
+                    {categoryOptions.length ? "Chọn nhóm…" : "Chưa có nhóm — gõ bên dưới hoặc tạo ở Quản lý nhóm"}
+                  </option>
+                  {categoryOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-semibold">
+                Hoặc đổi / gõ tên nhóm
+                <Input
+                  className="mt-1 min-h-11"
+                  list="product-category-options"
+                  value={category}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setCategory(value);
+                    refreshSuggestions({ category: value });
+                  }}
+                  placeholder="Tráng gương"
+                />
+                <datalist id="product-category-options">
+                  {categoryOptions.map((item) => (
+                    <option key={item} value={item} />
+                  ))}
+                </datalist>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                {editing ? "Có thể đổi nhóm khi sửa sản phẩm." : "Chọn nhóm có sẵn hoặc gõ tên mới."} Mỗi khổ/combo vẫn là một mã riêng.
+              </p>
+            </div>
             <div className="grid grid-cols-3 gap-2">
               <label className="text-sm font-semibold">
                 Rộng (cm)
