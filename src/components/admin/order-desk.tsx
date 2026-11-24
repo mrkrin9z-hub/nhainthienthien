@@ -98,6 +98,8 @@ export function OrderDesk({
   paidSoFar,
   payments = [],
   transfer = null,
+  orderCode = null,
+  statusLabel = null,
   onSave,
 }: {
   mode: "create" | "edit";
@@ -111,6 +113,10 @@ export function OrderDesk({
   retail?: boolean;
   /** Album ảnh gắn vào đơn khi lưu (từ quản lý hình ảnh). */
   albumId?: string | null;
+  /** Mã đơn hiện trên thẻ khách (chế độ sửa). */
+  orderCode?: string | null;
+  /** Nhãn trạng thái hiện trên banner (chế độ sửa). */
+  statusLabel?: string | null;
   initial: {
     channel: Channel;
     fullName: string;
@@ -293,9 +299,21 @@ export function OrderDesk({
     >
       <div className="space-y-4 xl:col-span-2">
         {lockNote ? <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">{lockNote}</p> : null}
+        {statusLabel ? (
+          <div className="rounded-xl bg-rose-600 px-4 py-3 text-center text-sm font-bold uppercase tracking-wide text-white shadow-sm">
+            {statusLabel}
+          </div>
+        ) : null}
 
         <section className={card}>
-          <h2 className="text-base font-bold">Thông tin khách hàng</h2>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h2 className="text-base font-bold">Thông tin khách hàng</h2>
+            {orderCode ? (
+              <span className="rounded-full bg-[#2563eb] px-3 py-1 text-xs font-bold tracking-wide text-white">
+                {orderCode}
+              </span>
+            ) : null}
+          </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Field label="Kênh cửa hàng" required>
               {mode === "create" ? (
@@ -400,6 +418,12 @@ export function OrderDesk({
         <section className={card}>
           <div className="mb-1 flex items-center justify-between gap-2">
             <h2 className="text-base font-bold">Danh sách sản phẩm</h2>
+            {itemsLocked ? null : (
+              <Button type="button" variant="ghost" className="h-9 px-2 text-sm font-semibold text-[#2563eb]" onClick={() => setPickerOpen(true)}>
+                <Plus className="mr-1 size-4" />
+                Thêm sản phẩm
+              </Button>
+            )}
           </div>
           {priced.length === 0 ? (
             <div className="rounded-xl border border-dashed px-3 py-10 text-center">
@@ -505,37 +529,48 @@ export function OrderDesk({
         </section>
 
         <section className={card}>
-          <h2 className="text-base font-bold">Tổng thanh toán</h2>
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-base font-bold">Tổng thanh toán</h2>
+            <p className="text-xl font-extrabold text-[#2563eb]">
+              {goods === null
+                ? "—"
+                : formatVnd(Math.max(0, goods - preservedOrderDiscount + (Number.isFinite(shipAmount) ? shipAmount : 0)))}
+            </p>
+          </div>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tổng thanh toán</span>
-              <span className="font-semibold">{goods === null ? "Chưa đủ giá" : formatVnd(Math.max(0, goods - preservedOrderDiscount + (Number.isFinite(shipAmount) ? shipAmount : 0)))}</span>
-            </div>
             {compact ? null : (
               <label className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground">Phí giao khách trả</span>
                 <MoneyInput className="h-9 w-32 text-right" value={customerShip} disabled={fieldsLocked} placeholder="Để trống" aria-label="Phí giao khách trả" onValueChange={(value) => setCustomerShip(value == null ? "" : String(value))} />
               </label>
             )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Đã thanh toán</span>
-              <span className="font-medium">{formatVnd(isCodPay && mode === "create" ? 0 : paid)}</span>
-            </div>
             {payments.length > 0 ? (
-              <ul className="space-y-1 border-t pt-2 text-xs text-muted-foreground">
-                {payments.map((payment, index) => (
-                  <li key={`${payment.at}-${index}`} className="flex justify-between gap-2">
-                    <span>
-                      {new Date(payment.at).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
-                      {" · "}
-                      {payment.method}
-                      {payment.byName ? ` · ${payment.byName}` : ""}
-                    </span>
-                    <span className="shrink-0 font-semibold text-foreground">{formatVnd(payment.amount)}</span>
-                  </li>
-                ))}
+              <ul className="space-y-2 border-t pt-3">
+                {payments.map((payment, index) => {
+                  const at = new Date(payment.at);
+                  const when = Number.isNaN(at.getTime())
+                    ? ""
+                    : at.toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
+                  return (
+                    <li key={`${payment.at}-${index}`} className="rounded-xl border bg-slate-50/80 px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-bold text-foreground">Lần {index + 1}</p>
+                        <p className="text-sm font-extrabold text-[#2563eb]">{formatVnd(payment.amount)}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Người thu: <span className="font-semibold text-foreground">{payment.byName || "—"}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {when}
+                        {payment.method ? ` · ${payment.method}` : ""}
+                      </p>
+                    </li>
+                  );
+                })}
               </ul>
-            ) : null}
+            ) : (
+              <p className="border-t pt-3 text-xs text-muted-foreground">Chưa có lần thu nào.</p>
+            )}
             {transfer ? (
               <div className="rounded-lg border bg-background p-3 text-center">
                 <img src={transfer.image} alt={`Mã chuyển khoản ${transfer.content}`} className="mx-auto h-40 w-40" />
@@ -544,14 +579,22 @@ export function OrderDesk({
                 </p>
               </div>
             ) : null}
-            <div className="flex justify-between border-t pt-2">
-              <span className="text-muted-foreground">{remain !== null && remain < 0 ? "Dư tiền" : "Còn lại"}</span>
-              <span className="font-semibold">{remain === null ? "—" : formatVnd(Math.abs(remain))}</span>
+            <div className="flex justify-between border-t pt-3 text-sm">
+              <span className="font-medium text-emerald-700">Đã thanh toán</span>
+              <span className="font-bold text-emerald-700">{formatVnd(isCodPay && mode === "create" ? 0 : paid)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className={`font-medium ${remain !== null && remain <= 0 ? "text-emerald-700" : "text-amber-700"}`}>
+                {remain !== null && remain < 0 ? "Dư tiền" : "Còn lại"}
+              </span>
+              <span className={`font-bold ${remain !== null && remain <= 0 ? "text-emerald-700" : "text-amber-700"}`}>
+                {remain === null ? "—" : formatVnd(Math.abs(remain))}
+              </span>
             </div>
           </div>
           {mode === "create" || (retail && !fieldsLocked) ? (
-            <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
-              <p className="text-sm font-medium">Thanh toán</p>
+            <div className="space-y-3 rounded-xl border border-[#2563eb]/20 bg-[#2563eb]/5 p-3">
+              <p className="text-sm font-semibold text-[#2563eb]">Thanh toán</p>
               <Field label="Hình thức" required={mode === "create"}>
                 <select
                   className={control}
@@ -588,7 +631,7 @@ export function OrderDesk({
                   <p className="text-[12px] text-muted-foreground">
                     {mode === "create"
                       ? "Số tiền cộng vào ví khi bấm Lưu đơn. Để trống hoặc 0 nếu chưa thu."
-                      : "Nhập số thu thêm (nếu có) rồi bấm Cập nhật — hình thức và tiền ghi cùng lúc, cộng vào ví của bạn."}
+                      : "Nhập số thu thêm (nếu có) rồi bấm Cập nhật — hình thức và tiền ghi cùng lúc."}
                   </p>
                 </>
               )}
@@ -601,12 +644,14 @@ export function OrderDesk({
                 ? "COD: sau khi ship trả tiền, đánh dấu đã nhận tại Đối soát COD."
                 : channel === "facebook"
                   ? "Đơn Facebook có thể cần cọc trước khi in."
-                  : "Số tiền thu có thể để trống; thu thêm được khi sửa đơn."}
+                  : "Số tiền thu có thể để trống; mỗi lần thu hiện người thu và thời gian ở trên."}
           </p>
           {albumId ? <p className="text-[11px] font-medium text-primary">Ảnh từ album sẽ gắn vào đơn khi lưu.</p> : null}
-          <Button type="submit" className="min-h-12 w-full text-base font-bold" disabled={saving || fieldsLocked}>
-            {saving ? "Đang lưu..." : mode === "create" ? "Lưu đơn hàng" : "Cập nhật"}
-          </Button>
+          <div className="grid gap-2">
+            <Button type="submit" className="min-h-12 w-full bg-[#2563eb] text-base font-bold text-white hover:bg-[#1d4ed8]" disabled={saving || fieldsLocked}>
+              {saving ? "Đang lưu..." : mode === "create" ? "Lưu đơn hàng" : "Cập nhật"}
+            </Button>
+          </div>
         </section>
       </aside>
     </form>
