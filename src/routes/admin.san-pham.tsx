@@ -6,11 +6,21 @@ import { toast } from "sonner";
 import { ProductEditor } from "@/components/admin/product-editor";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { workbookXml } from "@/domain/excel";
 import { productExcelTemplateRows, productsToExcelRows } from "@/domain/product-excel";
 import { CHANNEL_LABEL, CHANNELS } from "@/domain/types";
 import { formatVnd } from "@/lib/brand";
-import { getWebProduct, getWebProducts, importWebProducts } from "@/lib/admin.functions";
+import {
+  createProductCategoryFn,
+  deleteProductCategoryFn,
+  deleteWebProductFn,
+  getMe,
+  getProductCategories,
+  getWebProduct,
+  getWebProducts,
+  importWebProducts,
+} from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/san-pham")({
   component: AdminProductsPage,
@@ -21,19 +31,39 @@ export const Route = createFileRoute("/admin/san-pham")({
 
 function AdminProductsPage() {
   const { m } = Route.useSearch();
+  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const products = useQuery({ queryKey: ["web-products"], queryFn: () => getWebProducts() });
+  const categories = useQuery({ queryKey: ["product-categories"], queryFn: () => getProductCategories() });
   const [createOpen, setCreateOpen] = useState(m === "nhap");
   const [editId, setEditId] = useState<string | null>(null);
+  const [groupsOpen, setGroupsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [pendingFile, setPendingFile] = useState<{ name: string; base64: string } | null>(null);
   const [conflictPreview, setConflictPreview] = useState<string[]>([]);
+  const [q, setQ] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const rows = useMemo(() => products.data ?? [], [products.data]);
+  const rows = useMemo(() => {
+    const list = products.data ?? [];
+    const needle = q.trim().toLocaleLowerCase("vi");
+    return list.filter((item) => {
+      if (categoryFilter !== "all") {
+        if (item.category.trim().toLocaleLowerCase("vi") !== categoryFilter.toLocaleLowerCase("vi")) return false;
+      }
+      if (!needle) return true;
+      const hay = `${item.name} ${item.category} ${item.code ?? item.id}`.toLocaleLowerCase("vi");
+      return hay.includes(needle);
+    });
+  }, [products.data, q, categoryFilter]);
+
+  const categoryOptions = categories.data?.categories ?? [];
 
   function refresh() {
     void products.refetch();
+    void categories.refetch();
   }
 
   function downloadBlob(filename: string, xml: string) {
@@ -53,8 +83,9 @@ function AdminProductsPage() {
 
   async function exportCurrent() {
     try {
+      const source = rows.length ? rows : (products.data ?? []);
       const detailed = await Promise.all(
-        rows.map(async (item) => {
+        source.map(async (item) => {
           const full = await getWebProduct({ data: { groupId: item.id } });
           return {
             code: item.code ?? item.id,
@@ -130,16 +161,36 @@ function AdminProductsPage() {
     }
   }
 
+  async function removeProduct(item: { id: string; name: string; code?: string }) {
+    const label = (item.code ?? item.id).toUpperCase();
+    const ok = window.confirm(`Xóa sản phẩm ${label} — ${item.name}?\nKhông hoàn tác. Đơn đang dùng mã này sẽ chặn xóa.`);
+    if (!ok) return;
+    setDeletingId(item.id);
+    try {
+      await deleteWebProductFn({ data: { groupId: item.id } });
+      toast.success(`Đã xóa ${label}`);
+      if (editId === item.id) setEditId(null);
+      refresh();
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Quản lý sản phẩm</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Mỗi mã = một khổ hoặc một combo (giá riêng). Cùng nhóm (vd Tráng gương) nhưng không gộp nhiều khổ vào một mã.
+            Mỗi mã = một khổ hoặc một combo. Nhóm (vd Tráng gương) quản lý riêng rồi gắn khi tạo sản phẩm.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => setGroupsOpen(true)}>
+            Quản lý nhóm
+          </Button>
           <Button type="button" variant="outline" className="min-h-11" onClick={exportTemplate}>
             Xuất file mẫu
           </Button>
@@ -162,11 +213,37 @@ function AdminProductsPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card p-3">
+        <Input
+          className="min-h-11 max-w-sm"
+          placeholder="Tìm mã, tên, nhóm…"
+          value={q}
+          onChange={(event) => setQ(event.target.value)}
+          aria-label="Tìm sản phẩm"
+        />
+        <select
+          className="min-h-11 rounded-xl border border-input bg-background px-3 text-sm font-medium"
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+          aria-label="Lọc theo nhóm"
+        >
+          <option value="all">Tất cả nhóm</option>
+          {categoryOptions.map((item) => (
+            <option key={item.name} value={item.name}>
+              {item.name} ({item.productCount})
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-muted-foreground">
+          Hiện {rows.length}/{products.data?.length ?? 0} sản phẩm
+        </p>
+      </div>
+
       {products.isLoading ? (
         <p className="text-sm text-muted-foreground">Đang tải…</p>
       ) : (
         <div className="overflow-x-auto rounded-2xl border bg-card">
-          <table className="w-full min-w-[52rem] text-left text-sm">
+          <table className="w-full min-w-[56rem] text-left text-sm">
             <thead className="border-b bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-3 py-3 font-semibold">STT</th>
@@ -175,7 +252,7 @@ function AdminProductsPage() {
                 <th className="px-3 py-3 font-semibold">Nhóm</th>
                 <th className="px-3 py-3 font-semibold">Khổ / combo</th>
                 <th className="px-3 py-3 font-semibold">Giá từng kênh</th>
-                <th className="px-3 py-3 font-semibold">Sửa</th>
+                <th className="px-3 py-3 font-semibold">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -225,9 +302,20 @@ function AdminProductsPage() {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <Button type="button" variant="outline" className="min-h-10" onClick={() => setEditId(item.id)}>
-                        Sửa
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" className="min-h-10" onClick={() => setEditId(item.id)}>
+                          Sửa
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="min-h-10 border-rose-300 text-rose-700 hover:bg-rose-50"
+                          disabled={deletingId === item.id}
+                          onClick={() => void removeProduct(item)}
+                        >
+                          {deletingId === item.id ? "Đang xóa…" : "Xóa"}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -235,7 +323,9 @@ function AdminProductsPage() {
               {!rows.length ? (
                 <tr>
                   <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                    Chưa có sản phẩm. Tạo lẻ hoặc nhập từ Excel (mỗi dòng một mã).
+                    {products.data?.length
+                      ? "Không khớp bộ lọc. Thử đổi nhóm hoặc xóa ô tìm."
+                      : "Chưa có sản phẩm. Tạo nhóm trước (nếu cần), rồi tạo lẻ hoặc nhập Excel."}
                   </td>
                 </tr>
               ) : null}
@@ -252,6 +342,13 @@ function AdminProductsPage() {
           if (!open) setEditId(null);
         }}
         onSaved={refresh}
+      />
+
+      <CategoryManagerDialog
+        open={groupsOpen}
+        onOpenChange={setGroupsOpen}
+        canDelete={me.data?.role === "owner"}
+        onChanged={refresh}
       />
 
       <Dialog
@@ -297,5 +394,112 @@ function AdminProductsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function CategoryManagerDialog({
+  open,
+  onOpenChange,
+  canDelete,
+  onChanged,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  canDelete: boolean;
+  onChanged: () => void;
+}) {
+  const cats = useQuery({ queryKey: ["product-categories"], queryFn: () => getProductCategories(), enabled: open });
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (!next) setName("");
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Quản lý nhóm sản phẩm</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Tạo nhóm (vd Tráng gương, Ép gỗ) rồi chọn khi tạo/sửa sản phẩm. Xóa nhóm chỉ khi không còn sản phẩm thuộc nhóm.
+          </p>
+          <form
+            className="flex flex-wrap gap-2"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setBusy(true);
+              try {
+                await createProductCategoryFn({ data: { name } });
+                toast.success(`Đã tạo nhóm «${name.trim()}»`);
+                setName("");
+                await cats.refetch();
+                onChanged();
+              } catch (error) {
+                toast.error((error as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <Input
+              className="min-h-11 min-w-[12rem] flex-1"
+              placeholder="Tên nhóm mới…"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+              minLength={2}
+              maxLength={40}
+            />
+            <Button type="submit" className="min-h-11" disabled={busy || name.trim().length < 2}>
+              {busy ? "Đang tạo…" : "Tạo nhóm"}
+            </Button>
+          </form>
+          <ul className="max-h-72 space-y-1 overflow-auto rounded-xl border p-2">
+            {(cats.data?.categories ?? []).map((item) => (
+              <li key={item.name} className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm hover:bg-muted/50">
+                <span>
+                  <span className="font-semibold">{item.name}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">{item.productCount} sản phẩm</span>
+                </span>
+                {canDelete ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                    disabled={busy || item.productCount > 0}
+                    title={item.productCount > 0 ? "Còn sản phẩm trong nhóm" : "Xóa nhóm"}
+                    onClick={async () => {
+                      if (!window.confirm(`Xóa nhóm «${item.name}»?`)) return;
+                      setBusy(true);
+                      try {
+                        await deleteProductCategoryFn({ data: { name: item.name } });
+                        toast.success("Đã xóa nhóm");
+                        await cats.refetch();
+                        onChanged();
+                      } catch (error) {
+                        toast.error((error as Error).message);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Xóa
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+            {!cats.data?.categories?.length ? (
+              <li className="px-2 py-6 text-center text-sm text-muted-foreground">Chưa có nhóm. Tạo nhóm đầu tiên ở trên.</li>
+            ) : null}
+          </ul>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

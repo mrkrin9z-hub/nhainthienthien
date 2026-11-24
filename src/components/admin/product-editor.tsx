@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { createWebProduct, getWebProduct, getWebProducts, updateWebProduct } from "@/lib/admin.functions";
+import { createWebProduct, getProductCategories, getWebProduct, updateWebProduct } from "@/lib/admin.functions";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -79,9 +79,9 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
     void (async () => {
       setLoading(true);
       try {
-        const products = await getWebProducts();
+        const catalog = await getProductCategories();
         if (!alive) return;
-        const cats = [...new Set(products.map((item) => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi"));
+        const cats = catalog.categories.map((item) => item.name);
         setCategories(cats);
         if (!groupId) {
           const cat = cats[0] ?? "Tráng gương";
@@ -240,7 +240,7 @@ export function ProductEditor({ open, onOpenChange, onSaved, groupId = null }: P
                 ))}
               </datalist>
               <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                Chỉ là nhãn nhóm (vd Tráng gương). Mỗi khổ/combo vẫn là một mã riêng.
+                Chọn từ nhóm đã tạo (Quản lý nhóm) hoặc gõ tên mới. Mỗi khổ/combo vẫn là một mã riêng.
               </span>
             </label>
             <div className="grid grid-cols-3 gap-2">

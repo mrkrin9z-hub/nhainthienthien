@@ -229,6 +229,11 @@ export type Settings = {
    * Thiếu một kênh thì kênh đó được bật với CHANNEL_LABEL.
    */
   shopChannels?: { id: Channel; enabled: boolean; label: string }[];
+  /**
+   * Danh mục nhóm sản phẩm do chủ tạo (vd Tráng gương, Ép gỗ).
+   * Hợp với category trên từng sản phẩm; thiếu thì lấy từ sản phẩm hiện có.
+   */
+  productCategories?: string[];
 };
 
 /** Bản sao công khai của trang chủ. Không chứa giá CTV/Mơ Home. */
