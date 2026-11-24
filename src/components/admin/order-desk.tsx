@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { lineAmountAfterDiscount } from "@/domain/calc";
 import { vnYmd } from "@/domain/calc";
 import { addSkusToLines, normalizeDeskDiscount, normalizeDeskLines, skuTitle } from "@/domain/desk-lines";
+import { formatGroupedInt } from "@/domain/grouped-number";
 import { minTotalForChannel, retargetLinesForChannel } from "@/domain/desk-pricing";
 import { skuSoldOn } from "@/domain/mohome";
 import { depositMethodLabel, isMarketplace, PAYMENT_METHODS, RETAIL_PAYMENT_METHODS, type PaymentMethod } from "@/domain/order-desk";
