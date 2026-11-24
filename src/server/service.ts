@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { visibleToRole } from "@/domain/access";
+import { findOrderByRef } from "@/domain/find-order";
 import { linesForSku, sizeSheetMaterialId } from "@/domain/group-supply";
 import { auditActionLabel, auditDay, describeAudit, type AuditShop } from "@/domain/audit-text";
 import {
@@ -1083,7 +1084,7 @@ export async function linkAlbumToOrder(actor: Actor, albumId: string, code: stri
   assertRole(actor, ["owner", "sale"]);
   return mutate(async (state) => {
     const album = findAlbum(state, albumId);
-    const order = state.orders.find((item) => item.code.toUpperCase() === code.trim().toUpperCase());
+    const order = findOrderByRef(state.orders, code);
     if (!order) throw new Error("Không thấy đơn.");
     if (order.status === "huy") throw new Error("Đơn đã hủy. Chọn đơn khác.");
     const fileCount = attachAlbumToOrder(state, actor, album, order);
@@ -1583,7 +1584,7 @@ export async function listOrders(actor: Actor) {
 
 export async function getOrder(actor: Actor, code: string) {
   const state = await readState();
-  const order = state.orders.find((item) => item.code.toUpperCase() === code.toUpperCase());
+  const order = findOrderByRef(state.orders, code);
   if (!order) throw new Error("Không tìm thấy đơn hàng.");
   if (actor.role === "sale" && order.channel === "mo_home") throw new Error("Đơn Mơ Home chỉ chủ và sản xuất xem.");
   return visibleToRole(actor.role, orderDetail(state, order, actor.role));
@@ -5569,7 +5570,7 @@ export async function linkOrderToConversation(actor: Actor, conversationId: stri
     ensureChatCollections(state);
     const conversation = state.chatConversations!.find((item) => item.id === conversationId);
     if (!conversation) throw new Error("Không thấy hội thoại.");
-    const order = state.orders.find((item) => item.code === orderCode || item.id === orderCode);
+    const order = findOrderByRef(state.orders, orderCode);
     if (!order) throw new Error("Không thấy đơn.");
     order.chatConversationId = conversation.id;
     if (!conversation.orderCodes.includes(order.code)) conversation.orderCodes.push(order.code);

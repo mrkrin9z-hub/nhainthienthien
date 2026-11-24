@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { lineAmountAfterDiscount } from "@/domain/calc";
 import { vnYmd } from "@/domain/calc";
+import { addSkusToLines, normalizeDeskDiscount, normalizeDeskLines, skuTitle } from "@/domain/desk-lines";
 import { minTotalForChannel, retargetLinesForChannel } from "@/domain/desk-pricing";
 import { skuSoldOn } from "@/domain/mohome";
 import { depositMethodLabel, isMarketplace, PAYMENT_METHODS, RETAIL_PAYMENT_METHODS, type PaymentMethod } from "@/domain/order-desk";
@@ -149,13 +150,7 @@ export function OrderDesk({
   const [designFileUrl, setDesignFileUrl] = useState(initial.designFileUrl ?? "");
   const [lines, setLines] = useState<Line[]>(
     initial.lines.length
-      ? initial.lines.map((line) => ({
-          ...line,
-          query: "",
-          priceTouched: line.unitPrice !== "",
-          variant: line.variant ?? "",
-          discount: line.discount == null || line.discount === "" || line.discount === 0 ? "" : String(line.discount),
-        }))
+      ? normalizeDeskLines(initial.lines)
       : mode === "create"
         ? []
         : [blankLine()],
@@ -185,25 +180,27 @@ export function OrderDesk({
             { id: "facebook" as const, label: "Facebook" },
           ]
         : (Object.keys(CHANNEL_LABEL) as Channel[]).map((id) => ({ id, label: CHANNEL_LABEL[id] }));
+  const safeCatalog = Array.isArray(catalog) ? catalog : [];
   const sellable = useMemo(
-    () => catalog.filter((sku) => skuSoldOn(sku, channel)),
-    [catalog, channel],
+    () => safeCatalog.filter((sku) => skuSoldOn(sku, channel)),
+    [safeCatalog, channel],
   );
 
   const priced = useMemo(() => {
     return lines.map((line) => {
-      const sku = catalog.find((item) => item.id === line.skuId);
+      const sku = safeCatalog.find((item) => item.id === line.skuId);
       const listed = sku?.prices?.[channel] ?? null;
       const typed = digits(line.unitPrice);
       const unit = line.priceTouched && Number.isFinite(typed) ? typed : listed;
-      const cut = line.discount.trim() === "" ? 0 : digits(line.discount);
+      const discountText = normalizeDeskDiscount(line.discount);
+      const cut = discountText === "" ? 0 : digits(discountText);
       const lineTotal =
         !sku || unit === null
           ? null
           : lineAmountAfterDiscount(unit, line.quantity, minTotalForChannel(sku, channel), Number.isFinite(cut) ? cut : 0);
       return { ...line, sku, listed, unit, lineTotal };
     });
-  }, [catalog, channel, lines]);
+  }, [safeCatalog, channel, lines]);
   const chosen = priced.filter((line) => line.sku);
   const goods = chosen.length > 0 && chosen.every((line) => line.lineTotal !== null) ? chosen.reduce((sum, line) => sum + (line.lineTotal ?? 0), 0) : null;
   const draftPaid = mode === "create" && Number.isFinite(digits(deposit)) ? digits(deposit) : 0;
@@ -218,32 +215,13 @@ export function OrderDesk({
   }
 
   function addSkus(skuIds: string[]) {
-    setLines((current) => {
-      const next = [
-        ...current.filter((line) => line.skuId),
-        ...skuIds.map((skuId) => {
-          const sku = catalog.find((item) => item.id === skuId);
-          const listed = sku?.prices?.[channel] ?? null;
-          return {
-            key: crypto.randomUUID(),
-            skuId,
-            query: "",
-            quantity: 1,
-            unitPrice: listed === null ? "" : String(listed),
-            priceTouched: false,
-            variant: "",
-            discount: "",
-          } satisfies Line;
-        }),
-      ];
-      return next.length ? next : current;
-    });
+    setLines((current) => addSkusToLines(current, skuIds, safeCatalog, channel, () => crypto.randomUUID()) as Line[]);
   }
 
   function changeChannel(next: Channel) {
     setChannel(next);
     if (isMarketplace(next)) setFulfillment("delivery");
-    setLines((current) => retargetLinesForChannel(current, catalog, next));
+    setLines((current) => retargetLinesForChannel(current, safeCatalog, next));
   }
 
   async function save() {
@@ -254,7 +232,7 @@ export function OrderDesk({
         quantity: line.quantity,
         variant: line.variant.trim(),
         ...(line.unit !== null ? { unitPrice: line.unit, ...(line.priceTouched ? { priceReason } : {}) } : {}),
-        ...(digits(line.discount) > 0 ? { discount: digits(line.discount) } : { discount: 0 }),
+        ...(digits(normalizeDeskDiscount(line.discount)) > 0 ? { discount: digits(normalizeDeskDiscount(line.discount)) } : { discount: 0 }),
       }));
     // Cho phép tạo đơn không sản phẩm để lấy mã QR gửi ảnh trước.
     if (priced.some((line) => line.priceTouched) && !priceReason.trim()) {
@@ -660,13 +638,6 @@ function Field({ label, children, required, icon }: { label: string; children: R
       {children}
     </Label>
   );
-}
-
-function skuTitle(sku: DeskSku): string {
-  const group = sku.groupName.trim();
-  const name = sku.name.trim();
-  if (group && name && !name.includes(group)) return `${group} · ${name}`;
-  return name || group || sku.label;
 }
 
 function ProductLine({

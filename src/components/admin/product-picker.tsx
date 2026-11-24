@@ -5,6 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { Channel } from "@/domain/types";
+import {
+  filterPickerRows,
+  PICKER_SEARCH_INPUT_CLASS,
+  PICKER_SEARCH_WRAP_CLASS,
+  PICKER_TOOLBAR_CLASS,
+  PICKER_TYPE_SELECT_CLASS,
+  PICKER_UNPRICED_BUTTON_CLASS,
+  pickerGroupNames,
+} from "@/domain/product-picker";
 import { formatVnd } from "@/lib/brand";
 
 export type PickerSku = {
@@ -33,21 +42,12 @@ export function ProductPickerDialog({
   const [group, setGroup] = useState("all");
   const [showUnpriced, setShowUnpriced] = useState(false);
 
-  const groups = useMemo(() => {
-    const names = new Set<string>();
-    for (const sku of catalog) names.add(sku.groupName || "Khác");
-    return [...names].sort((a, b) => a.localeCompare(b, "vi"));
-  }, [catalog]);
+  const groups = useMemo(() => pickerGroupNames(catalog), [catalog]);
 
-  const rows = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return catalog.filter((sku) => {
-      if (!showUnpriced && (sku.prices?.[channel] ?? null) === null) return false;
-      if (group !== "all" && (sku.groupName || "Khác") !== group) return false;
-      if (!needle) return true;
-      return `${sku.label} ${sku.code} ${sku.name} ${sku.groupName}`.toLowerCase().includes(needle);
-    });
-  }, [catalog, group, q, showUnpriced, channel]);
+  const rows = useMemo(
+    () => filterPickerRows(catalog, { q, group, showUnpriced, channel }),
+    [catalog, group, q, showUnpriced, channel],
+  );
 
   function pick(id: string) {
     onConfirm([id]);
@@ -72,11 +72,11 @@ export function ProductPickerDialog({
           <span className="flex-1 rounded-full bg-card px-3 py-2 text-center text-sm font-semibold text-primary shadow-sm">Sản phẩm</span>
           <span className="flex-1 rounded-full px-3 py-2 text-center text-sm font-medium text-muted-foreground">Gói dịch vụ</span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <div className="relative min-w-0 flex-1">
+        <div className={PICKER_TOOLBAR_CLASS}>
+          <div className={PICKER_SEARCH_WRAP_CLASS}>
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="h-10 rounded-full pl-9"
+              className={PICKER_SEARCH_INPUT_CLASS}
               value={q}
               onChange={(event) => setQ(event.target.value)}
               placeholder="Tìm theo tên hoặc mã sản phẩm…"
@@ -84,7 +84,7 @@ export function ProductPickerDialog({
             />
           </div>
           <select
-            className="h-10 min-w-[10rem] rounded-full border border-input bg-background px-3 text-sm"
+            className={PICKER_TYPE_SELECT_CLASS}
             aria-label="Nhóm sản phẩm"
             value={group}
             onChange={(event) => setGroup(event.target.value)}
@@ -96,7 +96,7 @@ export function ProductPickerDialog({
               </option>
             ))}
           </select>
-          <button type="button" className="h-10 rounded-full border px-3 text-sm" onClick={() => setShowUnpriced((value) => !value)}>
+          <button type="button" className={PICKER_UNPRICED_BUTTON_CLASS} onClick={() => setShowUnpriced((value) => !value)}>
             {showUnpriced ? "Đang hiện khổ chưa có giá" : "Hiện khổ chưa có giá"}
           </button>
         </div>

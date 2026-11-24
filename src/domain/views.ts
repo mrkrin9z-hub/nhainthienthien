@@ -29,6 +29,8 @@ export function isLate(state: ShopState, order: Order, clock = vnParts()): boole
 export function orderSummary(state: ShopState, order: Order, role: Role) {
   const customer = customerName(state, order.customerId);
   const showMoney = role !== "production";
+  const items = Array.isArray(order.items) ? order.items : [];
+  const files = Array.isArray(order.files) ? order.files : [];
   return {
     id: order.id,
     code: order.code,
@@ -42,14 +44,14 @@ export function orderSummary(state: ShopState, order: Order, role: Role) {
     recipientName: order.recipientName ?? "",
     phone: customer.phone,
     address: order.address,
-    itemSummary: order.items.map((item) => `${item.quantity}× ${item.name}`).join(", "),
+    itemSummary: items.map((item) => `${item.quantity}× ${item.name}`).join(", "),
     total: showMoney ? order.total : null,
     depositPaid: showMoney ? order.depositPaid : null,
     remain: showMoney ? remainOf(order) : null,
     isTest: Boolean(order.isTest),
     late: isLate(state, order),
-    fileCount: order.files.filter((file) => !file.deletedAt && file.status === "complete").length,
-    customerPhotoCount: order.files.filter((file) => !file.deletedAt && file.status === "complete" && file.kind === "original").length,
+    fileCount: files.filter((file) => !file.deletedAt && file.status === "complete").length,
+    customerPhotoCount: files.filter((file) => !file.deletedAt && file.status === "complete" && file.kind === "original").length,
     fulfillment: order.fulfillment,
     dueDate: order.dueDate,
     channelOrderId: order.channelOrderId || order.marketplaceCode || "",
@@ -68,7 +70,7 @@ export function orderSummary(state: ShopState, order: Order, role: Role) {
     labelPrintedAt: order.labelPrintedAt ?? null,
     buyerName: isMarketplace(order.channel) ? maskBuyer(order.recipientName || customer.name) : customer.name || "—",
     customerNote: order.customerNote,
-    items: order.items.map((item) => ({
+    items: items.map((item) => ({
       id: item.id,
       name: item.name,
       skuCode: item.skuCode,
@@ -331,21 +333,28 @@ export function inventoryView(state: ShopState, role: Role) {
 
 export function orderDetail(state: ShopState, order: Order, role: Role) {
   const showMoney = role !== "production";
+  const items = Array.isArray(order.items) ? order.items : [];
+  const history = Array.isArray(order.history) ? order.history : [];
+  const files = Array.isArray(order.files) ? order.files : [];
   const quote =
     role === "owner"
-      ? order.items.map((item) => {
+      ? items.map((item) => {
           const sku = state.skus.find((row) => row.id === item.skuId);
           if (!sku) return null;
           const priced = sku.sheets > 0 ? { ...sku, sheets: sku.sheets * item.quantity } : sku;
-          return quoteSku({
-            sku: priced,
-            price: item.lineTotal,
-            channel: order.channel,
-            settings: state.settings,
-            boms: linesForSku(state, sku),
-            materials: state.materials,
-            affiliate: false,
-          });
+          try {
+            return quoteSku({
+              sku: priced,
+              price: item.lineTotal,
+              channel: order.channel,
+              settings: state.settings,
+              boms: linesForSku(state, sku),
+              materials: state.materials ?? [],
+              affiliate: false,
+            });
+          } catch {
+            return null;
+          }
         })
       : null;
   return {
@@ -367,7 +376,7 @@ export function orderDetail(state: ShopState, order: Order, role: Role) {
     depositRequired: showMoney ? order.depositRequired : null,
     depositPaid: showMoney ? order.depositPaid : null,
     depositMethod: showMoney ? order.depositMethod : "",
-    items: order.items.map((item) => ({
+    items: items.map((item) => ({
       ...item,
       unitPrice: showMoney ? item.unitPrice : null,
       lineTotal: showMoney ? item.lineTotal : null,
@@ -375,12 +384,12 @@ export function orderDetail(state: ShopState, order: Order, role: Role) {
     })),
     subtotal: showMoney ? order.subtotal : null,
     reply: STATUS_REPLY[order.status],
-    history: order.history.map((item) => ({
+    history: history.map((item) => ({
       ...item,
       byName: state.staff.find((person) => person.id === item.by)?.name ?? "Khách / hệ thống",
       toLabel: STATUS_LABEL[item.to],
     })),
-    files: order.files.filter((file) => !file.deletedAt),
+    files: files.filter((file) => !file.deletedAt),
     payments: showMoney
       ? depositEvents({
           id: order.id,
@@ -408,7 +417,7 @@ export function orderDetail(state: ShopState, order: Order, role: Role) {
       return { image, content: order.code, bank: bankLabel(state.settings.bank.id), holder: state.settings.bank.holder, amount };
     })(),
     packCheck: order.packCheck ?? { ep: false, bo: false, tem: false },
-    hasPackingPhoto: hasPackingPhoto(order.files),
+    hasPackingPhoto: hasPackingPhoto(files),
     feedback: order.feedback ?? null,
     itemChanges: (order.itemChanges ?? []).flatMap((change) => {
       const note = itemChangeNote(change.before, change.after, showMoney);

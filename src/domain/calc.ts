@@ -691,6 +691,6 @@ export function walkInListed(status: ChannelPrice["status"] | undefined): boolea
 }
 
 /** Mã EG là cùng sản phẩm với mã TG. Giữ mã cho đơn cũ, map sàn và định mức. Không hiện thêm thẻ. */
-export function isMergedWoodAlias(sku: { code: string }): boolean {
-  return sku.code.startsWith("EG-");
+export function isMergedWoodAlias(sku: { code?: string | null }): boolean {
+  return Boolean(sku.code?.startsWith("EG-"));
 }

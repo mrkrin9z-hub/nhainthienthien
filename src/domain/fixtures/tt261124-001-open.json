@@ -1,0 +1,831 @@
+{
+  "settings": {
+    "inkPercent": 4.4,
+    "tiktokFeePercent": 14.5,
+    "tiktokExtraPercent": 6,
+    "tiktokFixed": 3000,
+    "tiktokTaxPercent": 1.5,
+    "tiktokCommissionPercent": 3,
+    "tiktokAffiliatePercent": 10,
+    "shopeeFeePercent": 16,
+    "shopeeExtraPercent": 6,
+    "shopeeInfra": 3000,
+    "shopeePiship": 2700,
+    "shopeeTaxPercent": 1.5,
+    "shopeeCommissionPercent": 3,
+    "shopeeAffiliatePercent": 10,
+    "fbTaxPercent": 1.5,
+    "fbCommissionPercent": 3,
+    "fbAdsPercent": 10,
+    "fbCodPercent": 1.2,
+    "fbShipping": null,
+    "walkinCommissionPercent": 3,
+    "marginYellowPercent": 30,
+    "marginRedPercent": 0,
+    "wasteRate": 0.1,
+    "tapeOrdersPerRoll": 20,
+    "magnetPiecesPerSheet": 96,
+    "ppRollWidthCm": 61,
+    "filmRollWidthCm": 62,
+    "foamRollWidthCm": 140,
+    "foamRollLengthM": 100,
+    "depositMinTotal": 300000,
+    "depositPercent": 50,
+    "breakevenMonth": 49100000,
+    "breakevenDay": 1640000,
+    "workStart": "08:00",
+    "workEnd": "18:00",
+    "weeklyOff": [],
+    "lateGraceMinutes": 0,
+    "lateDeductionPerMinute": null,
+    "absenceDeductionPerDay": null,
+    "saleBase": 8000000,
+    "saleProbationPercent": 85,
+    "productionBase": 11000000,
+    "kpiTargets": [
+      25000000,
+      20000000,
+      40000000,
+      60000000
+    ],
+    "commissionTiers": [
+      {
+        "upto": 100000000,
+        "percent": 3
+      },
+      {
+        "upto": 200000000,
+        "percent": 5
+      },
+      {
+        "upto": null,
+        "percent": 7
+      }
+    ],
+    "shopOpenDate": "2026-12-01",
+    "fileRetentionDays": 180,
+    "videoRetentionDays": 30,
+    "zaloPhone": "0777468766",
+    "showZalo": true,
+    "publicHours": "08:00 – 18:00",
+    "showAnhThe": false,
+    "showAlbum": false,
+    "groupListed": {
+      "ep_go": false,
+      "anh_tho": false,
+      "giay_khen": false,
+      "nam_cham_xe": true,
+      "nam_cham_tu": true,
+      "trang_guong": true,
+      "tkb": true,
+      "lua": true,
+      "anh_the": false,
+      "album": false,
+      "ep_lua": true,
+      "khung_go": false,
+      "khung_nhom": false,
+      "photobook": true,
+      "tkb_boc_dan": true,
+      "tg_khung_tivi": true,
+      "tg_khung_hop": true,
+      "tg_khung_nhom": true,
+      "lua_roi": true,
+      "giay_khen_nhom": true
+    },
+    "marketplaceCutoff": "14:00",
+    "marketplaceHandover": "18:00",
+    "rentFromJune2027": 4000000,
+    "fixedCosts": [
+      {
+        "key": "mat_bang",
+        "name": "Mặt bằng",
+        "amount": 3500000,
+        "note": "T12/2026–T5/2027. Từ T6/2027 dùng mức trong cài đặt."
+      },
+      {
+        "key": "dien",
+        "name": "Điện",
+        "amount": 2000000,
+        "note": ""
+      },
+      {
+        "key": "nuoc",
+        "name": "Nước",
+        "amount": 100000,
+        "note": ""
+      },
+      {
+        "key": "wifi",
+        "name": "Wifi / điện thoại",
+        "amount": 200000,
+        "note": ""
+      },
+      {
+        "key": "vpp",
+        "name": "Văn phòng phẩm",
+        "amount": 300000,
+        "note": ""
+      },
+      {
+        "key": "luong_sx",
+        "name": "Lương NV sản xuất",
+        "amount": 11000000,
+        "note": ""
+      },
+      {
+        "key": "luong_sale",
+        "name": "Lương sale",
+        "amount": 8000000,
+        "note": "Phương án A, lương cứng."
+      },
+      {
+        "key": "bao_tri",
+        "name": "Bảo trì máy",
+        "amount": 500000,
+        "note": ""
+      },
+      {
+        "key": "khau_hao",
+        "name": "Khấu hao máy",
+        "amount": 125000,
+        "note": "30 triệu ÷ 240 tháng"
+      },
+      {
+        "key": "marketing",
+        "name": "Marketing",
+        "amount": 3000000,
+        "note": ""
+      },
+      {
+        "key": "phan_mem",
+        "name": "Phần mềm",
+        "amount": 100000,
+        "note": ""
+      },
+      {
+        "key": "khac",
+        "name": "Khác",
+        "amount": 50000,
+        "note": ""
+      },
+      {
+        "key": "vat_tu_phu",
+        "name": "Vật tư phụ khoán",
+        "amount": 500000,
+        "note": ""
+      }
+    ],
+    "zaloDefaultMigrated": true,
+    "sepay": {
+      "enabled": false,
+      "apiKey": "",
+      "accountHint": "",
+      "webhookPath": "/api/public/sepay",
+      "note": ""
+    },
+    "notifyPrefs": {
+      "lateOrders": true,
+      "marketplaceNew": true,
+      "feedbackReprint": true,
+      "cashHandover": true,
+      "browserPrompted": false
+    },
+    "shopChannels": [
+      {
+        "id": "tai_tiem",
+        "enabled": true,
+        "label": "Tại tiệm (offline)"
+      },
+      {
+        "id": "facebook",
+        "enabled": true,
+        "label": "Online / Facebook"
+      },
+      {
+        "id": "tiktok",
+        "enabled": true,
+        "label": "TikTok"
+      },
+      {
+        "id": "shopee",
+        "enabled": true,
+        "label": "Shopee"
+      },
+      {
+        "id": "ctv",
+        "enabled": true,
+        "label": "CTV"
+      },
+      {
+        "id": "mo_home",
+        "enabled": true,
+        "label": "Mơ Home (nội bộ)"
+      }
+    ],
+    "repeatCustomerOrders": 2,
+    "remindAfterDays": 60,
+    "commissionBasis": "shop",
+    "catalogImport20261022": true,
+    "hrDraft": {
+      "pendingOwnerApproval": false,
+      "note": "Chủ đã duyệt 22/10. Tháng mở cửa lấy 25 triệu theo mô tả việc cũ. Tháng 2 = 20 triệu, tháng 3 = 40 triệu, từ tháng 4 = 60 triệu. Hoa hồng 3% đến 100 triệu, 5% phần 100–200 triệu, 7% phần trên — không phải mốc KPI.",
+      "saleBase": 8000000,
+      "probationPercent": 85,
+      "productionBase": 11000000,
+      "olderJdMonth1": 25000000,
+      "kpiMonth2": 20000000,
+      "kpiMonth3": 40000000,
+      "kpiFromMonth4": 60000000,
+      "commissionTiers": [
+        {
+          "upto": 100000000,
+          "percent": 3
+        },
+        {
+          "upto": 200000000,
+          "percent": 5
+        },
+        {
+          "upto": null,
+          "percent": 7
+        }
+      ]
+    },
+    "hrApproved20261022": true,
+    "menuLinks20261022": true,
+    "taskMenu20261023": true,
+    "deskBom20261023": true,
+    "checklist20261023": true,
+    "moHomeLaborPercent": 50,
+    "wasteAlertPercent": null,
+    "tiktokPrice20261023": true,
+    "checklistGuides20261024": true,
+    "orderDesk20261024": true,
+    "groupSupply20261024": true,
+    "inkMl20261024": true,
+    "inkExpense20261024": true,
+    "productPhotos": {
+      "trang-guong": "image/jpeg",
+      "thoi-khoa-bieu": "image/jpeg",
+      "thoi-khoa-bieu-boc-dan": "image/jpeg",
+      "nam-cham-xe": "image/jpeg",
+      "nam-cham-tu-lanh": "image/jpeg",
+      "anh-lua-6x9": "image/jpeg"
+    },
+    "zaloHidden20261113": true,
+    "zaloShown20261114": true,
+    "mediaMenu20261117": true,
+    "zaloPhone20261120": true,
+    "frameprices20261120": true,
+    "homepageMenu20261124": true
+  },
+  "staff": [
+    {
+      "id": "staff-owner",
+      "name": "Admin",
+      "role": "owner"
+    },
+    {
+      "id": "staff-sale",
+      "name": "Trân",
+      "role": "sale"
+    },
+    {
+      "id": "staff-sx",
+      "name": "Sản xuất",
+      "role": "production"
+    }
+  ],
+  "groups": [
+    {
+      "id": "anh_tho",
+      "name": "Ảnh thờ ép gỗ",
+      "slug": "anh-tho",
+      "category": "Ảnh gỗ",
+      "description": "Ảnh thờ ép gỗ tráng gương, khổ 20×30 đến 60×90. Hỗ trợ chỉnh sửa ảnh cơ bản.",
+      "turnaround": "Theo đơn",
+      "sort": 2,
+      "gate": null
+    }
+  ],
+  "skus": [
+    {
+      "id": "AT-20x30-C1",
+      "code": "AT-20x30-C1",
+      "groupId": "anh_tho",
+      "name": "20×30 cm",
+      "size": "20x30",
+      "widthCm": 20,
+      "heightCm": 30,
+      "sheets": 1,
+      "piecesPerPack": null,
+      "sort": 36,
+      "soldOn": [
+        "tai_tiem",
+        "facebook",
+        "tiktok",
+        "shopee"
+      ]
+    }
+  ],
+  "prices": [
+    {
+      "skuId": "AT-20x30-C1",
+      "channel": "tai_tiem",
+      "price": 56000,
+      "status": "dang_ban",
+      "note": "Giá khách trả theo bảng TikTok 23/10 (giá sau giảm): 56.000đ.",
+      "listPrice": 106000
+    },
+    {
+      "skuId": "AT-20x30-C1",
+      "channel": "facebook",
+      "price": 56000,
+      "status": "dang_ban",
+      "note": "Giá khách trả theo bảng TikTok 23/10 (giá sau giảm): 56.000đ."
+    },
+    {
+      "skuId": "AT-20x30-C1",
+      "channel": "tiktok",
+      "price": 56000,
+      "status": "dang_ban",
+      "note": "Giá khách trả theo bảng TikTok 23/10 (giá sau giảm): 56.000đ.",
+      "listPrice": 106000
+    },
+    {
+      "skuId": "AT-20x30-C1",
+      "channel": "shopee",
+      "price": 56000,
+      "status": "dang_ban",
+      "note": "Giá khách trả theo bảng TikTok 23/10 (giá sau giảm): 56.000đ.",
+      "listPrice": 106000
+    }
+  ],
+  "materials": [
+    {
+      "id": "giay-pp",
+      "name": "Giấy PP (in tráng gương)",
+      "unit": "m",
+      "packSize": 50,
+      "packPrice": 702000,
+      "stock": 0,
+      "minStock": null,
+      "supplier": "",
+      "pendingPrice": null
+    },
+    {
+      "id": "mang",
+      "name": "Màng tráng gương",
+      "unit": "m",
+      "packSize": 70,
+      "packPrice": 1215000,
+      "stock": -0.1908,
+      "minStock": null,
+      "supplier": "",
+      "pendingPrice": null
+    },
+    {
+      "id": "vien",
+      "name": "Viền bo",
+      "unit": "m",
+      "packSize": 600,
+      "packPrice": 870000,
+      "stock": -2.48,
+      "minStock": null,
+      "supplier": "",
+      "pendingPrice": null
+    },
+    {
+      "id": "chan",
+      "name": "Chân nhựa để bàn",
+      "unit": "cái",
+      "packSize": 1,
+      "packPrice": 1000,
+      "stock": -4,
+      "minStock": null,
+      "supplier": "",
+      "pendingPrice": null
+    },
+    {
+      "id": "tui",
+      "name": "Túi bọc ảnh",
+      "unit": "cái",
+      "packSize": 1,
+      "packPrice": null,
+      "stock": -4,
+      "minStock": null,
+      "supplier": "",
+      "pendingPrice": null
+    },
+    {
+      "id": "xop",
+      "name": "Xốp wrap",
+      "unit": "m2",
+      "packSize": 140,
+      "packPrice": 500000,
+      "stock": -0.1288,
+      "minStock": null,
+      "supplier": "",
+      "pendingPrice": null
+    },
+    {
+      "id": "carton",
+      "name": "Carton bọc",
+      "unit": "m2",
+      "packSize": null,
+      "packPrice": null,
+      "stock": -0.1288,
+      "minStock": null,
+      "supplier": "",
+      "pendingPrice": null
+    },
+    {
+      "id": "bang-keo",
+      "name": "Băng keo",
+      "unit": "cuộn",
+      "packSize": 1,
+      "packPrice": 28000,
+      "stock": -0.05,
+      "minStock": null,
+      "supplier": "",
+      "pendingPrice": null
+    },
+    {
+      "id": "tem",
+      "name": "Tem / nhãn vận đơn",
+      "unit": "tem",
+      "packSize": null,
+      "packPrice": null,
+      "stock": 0,
+      "minStock": null,
+      "supplier": "",
+      "pendingPrice": null
+    },
+    {
+      "id": "go-20x30",
+      "name": "Tấm nền gỗ 20×30",
+      "unit": "tấm",
+      "packSize": 1,
+      "packPrice": 4400,
+      "stock": 0,
+      "minStock": null,
+      "supplier": "",
+      "pendingPrice": null
+    }
+  ],
+  "boms": [
+    {
+      "id": "AT-20x30-C1:giay-pp:print",
+      "skuId": "AT-20x30-C1",
+      "materialId": "giay-pp",
+      "phase": "print",
+      "scope": "sheet",
+      "formula": "pp",
+      "qty": 0.11
+    },
+    {
+      "id": "AT-20x30-C1:mang:print",
+      "skuId": "AT-20x30-C1",
+      "materialId": "mang",
+      "phase": "print",
+      "scope": "sheet",
+      "formula": "film",
+      "qty": 0.11
+    },
+    {
+      "id": "AT-20x30-C1:vien:print",
+      "skuId": "AT-20x30-C1",
+      "materialId": "vien",
+      "phase": "print",
+      "scope": "sheet",
+      "formula": "edge",
+      "qty": 1
+    },
+    {
+      "id": "AT-20x30-C1:go-20x30:print",
+      "skuId": "AT-20x30-C1",
+      "materialId": "go-20x30",
+      "phase": "print",
+      "scope": "sheet",
+      "formula": "wood",
+      "qty": 1
+    },
+    {
+      "id": "AT-20x30-C1:chan:print",
+      "skuId": "AT-20x30-C1",
+      "materialId": "chan",
+      "phase": "print",
+      "scope": "sheet",
+      "formula": "stand",
+      "qty": 1
+    },
+    {
+      "id": "AT-20x30-C1:tui:pack",
+      "skuId": "AT-20x30-C1",
+      "materialId": "tui",
+      "phase": "pack",
+      "scope": "sheet",
+      "formula": "bag",
+      "qty": 1
+    },
+    {
+      "id": "AT-20x30-C1:xop:pack",
+      "skuId": "AT-20x30-C1",
+      "materialId": "xop",
+      "phase": "pack",
+      "scope": "parcel",
+      "formula": "foam",
+      "qty": 0.24
+    },
+    {
+      "id": "AT-20x30-C1:carton:pack",
+      "skuId": "AT-20x30-C1",
+      "materialId": "carton",
+      "phase": "pack",
+      "scope": "parcel",
+      "formula": "carton",
+      "qty": 0.24
+    },
+    {
+      "id": "AT-20x30-C1:bang-keo:pack",
+      "skuId": "AT-20x30-C1",
+      "materialId": "bang-keo",
+      "phase": "pack",
+      "scope": "parcel",
+      "formula": "tape",
+      "qty": 0.05
+    },
+    {
+      "id": "AT-20x30-C1:tem:pack",
+      "skuId": "AT-20x30-C1",
+      "materialId": "tem",
+      "phase": "pack",
+      "scope": "parcel",
+      "formula": "label",
+      "qty": 1
+    }
+  ],
+  "groupSupplies": [
+    {
+      "id": "anh_tho:go:print:size_sheet",
+      "groupId": "anh_tho",
+      "materialId": "go",
+      "phase": "print",
+      "scale": "size_sheet",
+      "qty": 1
+    },
+    {
+      "id": "anh_tho:giay-pp:print:roll_m",
+      "groupId": "anh_tho",
+      "materialId": "giay-pp",
+      "phase": "print",
+      "scale": "roll_m",
+      "qty": null,
+      "rollWidthCm": 61
+    },
+    {
+      "id": "anh_tho:mang:print:roll_m",
+      "groupId": "anh_tho",
+      "materialId": "mang",
+      "phase": "print",
+      "scale": "roll_m",
+      "qty": null,
+      "rollWidthCm": 62
+    },
+    {
+      "id": "anh_tho:vien:print:edge_m",
+      "groupId": "anh_tho",
+      "materialId": "vien",
+      "phase": "print",
+      "scale": "edge_m",
+      "qty": null
+    },
+    {
+      "id": "anh_tho:tui:pack:per_sheet",
+      "groupId": "anh_tho",
+      "materialId": "tui",
+      "phase": "pack",
+      "scale": "per_sheet",
+      "qty": 1
+    },
+    {
+      "id": "anh_tho:xop:pack:wrap_m2",
+      "groupId": "anh_tho",
+      "materialId": "xop",
+      "phase": "pack",
+      "scale": "wrap_m2",
+      "qty": null
+    },
+    {
+      "id": "anh_tho:carton:pack:wrap_m2",
+      "groupId": "anh_tho",
+      "materialId": "carton",
+      "phase": "pack",
+      "scale": "wrap_m2",
+      "qty": null
+    },
+    {
+      "id": "anh_tho:bang-keo:pack:tape",
+      "groupId": "anh_tho",
+      "materialId": "bang-keo",
+      "phase": "pack",
+      "scale": "tape",
+      "qty": 1
+    },
+    {
+      "id": "anh_tho:tem:pack:per_parcel",
+      "groupId": "anh_tho",
+      "materialId": "tem",
+      "phase": "pack",
+      "scale": "per_parcel",
+      "qty": 1
+    }
+  ],
+  "sizeOverrides": [
+    {
+      "id": "anh_tho:13x18:chan",
+      "groupId": "anh_tho",
+      "size": "13x18",
+      "materialId": "chan",
+      "phase": "print",
+      "qty": 1
+    },
+    {
+      "id": "anh_tho:15x21:chan",
+      "groupId": "anh_tho",
+      "size": "15x21",
+      "materialId": "chan",
+      "phase": "print",
+      "qty": 1
+    },
+    {
+      "id": "anh_tho:20x30:chan",
+      "groupId": "anh_tho",
+      "size": "20x30",
+      "materialId": "chan",
+      "phase": "print",
+      "qty": 1
+    },
+    {
+      "id": "anh_tho:30x45:moc",
+      "groupId": "anh_tho",
+      "size": "30x45",
+      "materialId": "moc",
+      "phase": "print",
+      "qty": 2
+    },
+    {
+      "id": "anh_tho:30x45:oc",
+      "groupId": "anh_tho",
+      "size": "30x45",
+      "materialId": "oc",
+      "phase": "print",
+      "qty": 2
+    },
+    {
+      "id": "anh_tho:40x60:moc",
+      "groupId": "anh_tho",
+      "size": "40x60",
+      "materialId": "moc",
+      "phase": "print",
+      "qty": 2
+    },
+    {
+      "id": "anh_tho:40x60:oc",
+      "groupId": "anh_tho",
+      "size": "40x60",
+      "materialId": "oc",
+      "phase": "print",
+      "qty": 2
+    },
+    {
+      "id": "anh_tho:50x75:moc",
+      "groupId": "anh_tho",
+      "size": "50x75",
+      "materialId": "moc",
+      "phase": "print",
+      "qty": 2
+    },
+    {
+      "id": "anh_tho:50x75:oc",
+      "groupId": "anh_tho",
+      "size": "50x75",
+      "materialId": "oc",
+      "phase": "print",
+      "qty": 2
+    },
+    {
+      "id": "anh_tho:60x90:moc",
+      "groupId": "anh_tho",
+      "size": "60x90",
+      "materialId": "moc",
+      "phase": "print",
+      "qty": 2
+    },
+    {
+      "id": "anh_tho:60x90:oc",
+      "groupId": "anh_tho",
+      "size": "60x90",
+      "materialId": "oc",
+      "phase": "print",
+      "qty": 2
+    }
+  ],
+  "customers": [
+    {
+      "id": "f450fbef-3ffb-4c55-938b-00fde9d6da1a",
+      "name": "Ccccv",
+      "phone": "0365677301"
+    }
+  ],
+  "orders": [
+    {
+      "id": "f9da79ce-b5b4-4c30-a20b-1680458e8783",
+      "code": "TT261124-001",
+      "channel": "tai_tiem",
+      "source": "manual",
+      "customerId": "f450fbef-3ffb-4c55-938b-00fde9d6da1a",
+      "status": "nhan_don",
+      "fulfillment": "pickup",
+      "address": "",
+      "customerNote": "",
+      "internalNote": "",
+      "dueDate": null,
+      "marketplaceCode": "",
+      "channelOrderId": "",
+      "shipBy": null,
+      "autoCancelAt": null,
+      "shipMode": "pickup",
+      "paymentMethod": "tien_mat",
+      "netAmount": null,
+      "designFileUrl": null,
+      "shipping": {
+        "carrier": "",
+        "tracking": "",
+        "shipFee": null,
+        "codAmount": null,
+        "codReceivedAt": null,
+        "customerShip": null
+      },
+      "items": [
+        {
+          "id": "8b898740-7519-43ae-9c96-9e20902bc2fe",
+          "skuId": "AT-20x30-C1",
+          "name": "Ảnh thờ ép gỗ — 20×30 cm",
+          "skuCode": "AT-20x30-C1",
+          "quantity": 1,
+          "unitPrice": 56000,
+          "lineTotal": 56000,
+          "variant": ""
+        }
+      ],
+      "subtotal": 56000,
+      "total": 56000,
+      "discount": null,
+      "depositRequired": 0,
+      "depositPaid": 0,
+      "depositMethod": "",
+      "depositBy": null,
+      "printDeducted": false,
+      "packDeducted": false,
+      "stockWarning": "",
+      "idempotencyKey": null,
+      "createdAt": "2026-11-24T04:38:17.023Z",
+      "updatedAt": "2026-11-24T04:38:17.023Z",
+      "completedAt": null,
+      "files": [
+        {
+          "id": "86999d28-7b22-4b09-a70a-b24d04078e2d",
+          "name": "IMG_5763.jpeg",
+          "mime": "image/jpeg",
+          "size": 2804806,
+          "status": "complete",
+          "kind": "original",
+          "storage": "kv",
+          "path": "upload:86999d28-7b22-4b09-a70a-b24d04078e2d",
+          "driveFileId": null,
+          "createdAt": "2026-11-24T03:56:59.278Z",
+          "deletedAt": null
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-11-24T04:38:17.023Z",
+          "from": null,
+          "to": "nhan_don",
+          "by": "staff-sale",
+          "note": "Tạo đơn tại quầy"
+        },
+        {
+          "at": "2026-11-24T04:38:17.023Z",
+          "from": "nhan_don",
+          "to": "nhan_don",
+          "by": "staff-sale",
+          "note": "Gắn album 0365677301"
+        }
+      ],
+      "uploadSlug": "W4lV90lv"
+    }
+  ],
+  "reprints": []
+}

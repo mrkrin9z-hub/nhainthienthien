@@ -72,6 +72,7 @@ import { Route as DanhGiaTokenRouteImport } from './routes/danh-gia.$token'
 import { Route as GuiAnhIndexRouteImport } from './routes/gui-anh.index'
 import { Route as GuiAnhTokenRouteImport } from './routes/gui-anh.$token'
 import { Route as GuiAnhPhieuRouteImport } from './routes/gui-anh.phieu'
+import { Route as OrdersIdRouteImport } from './routes/orders.$id'
 import { Route as OrdersCreateRouteImport } from './routes/orders.create'
 import { Route as SanPhamSlugRouteImport } from './routes/san-pham_.$slug'
 import { Route as UCodeRouteImport } from './routes/u.$code'
@@ -423,6 +424,11 @@ const GuiAnhPhieuRoute = GuiAnhPhieuRouteImport.update({
   path: '/gui-anh/phieu',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrdersIdRoute = OrdersIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => OrdersRoute,
+} as any)
 const OrdersCreateRoute = OrdersCreateRouteImport.update({
   id: '/create',
   path: '/create',
@@ -664,6 +670,7 @@ export interface FileRoutesByFullPath {
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/gui-anh/phieu': typeof GuiAnhPhieuRoute
+  '/orders/$id': typeof OrdersIdRoute
   '/orders/create': typeof OrdersCreateRoute
   '/san-pham/$slug': typeof SanPhamSlugRoute
   '/u/$code': typeof UCodeRoute
@@ -763,6 +770,7 @@ export interface FileRoutesByTo {
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/gui-anh/phieu': typeof GuiAnhPhieuRoute
+  '/orders/$id': typeof OrdersIdRoute
   '/orders/create': typeof OrdersCreateRoute
   '/san-pham/$slug': typeof SanPhamSlugRoute
   '/u/$code': typeof UCodeRoute
@@ -864,6 +872,7 @@ export interface FileRoutesById {
   '/danh-gia/$token': typeof DanhGiaTokenRoute
   '/gui-anh/$token': typeof GuiAnhTokenRoute
   '/gui-anh/phieu': typeof GuiAnhPhieuRoute
+  '/orders/$id': typeof OrdersIdRoute
   '/orders/create': typeof OrdersCreateRoute
   '/san-pham_/$slug': typeof SanPhamSlugRoute
   '/u/$code': typeof UCodeRoute
@@ -966,6 +975,7 @@ export interface FileRouteTypes {
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/gui-anh/phieu'
+    | '/orders/$id'
     | '/orders/create'
     | '/san-pham/$slug'
     | '/u/$code'
@@ -1065,6 +1075,7 @@ export interface FileRouteTypes {
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/gui-anh/phieu'
+    | '/orders/$id'
     | '/orders/create'
     | '/san-pham/$slug'
     | '/u/$code'
@@ -1165,6 +1176,7 @@ export interface FileRouteTypes {
     | '/danh-gia/$token'
     | '/gui-anh/$token'
     | '/gui-anh/phieu'
+    | '/orders/$id'
     | '/orders/create'
     | '/san-pham_/$slug'
     | '/u/$code'
@@ -1693,6 +1705,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuiAnhPhieuRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/orders/$id': {
+      id: '/orders/$id'
+      path: '/$id'
+      fullPath: '/orders/$id'
+      preLoaderRoute: typeof OrdersIdRouteImport
+      parentRoute: typeof OrdersRoute
+    }
     '/orders/create': {
       id: '/orders/create'
       path: '/create'
@@ -2058,10 +2077,12 @@ const AdminRouteChildren: AdminRouteChildren = {
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface OrdersRouteChildren {
+  OrdersIdRoute: typeof OrdersIdRoute
   OrdersCreateRoute: typeof OrdersCreateRoute
 }
 
 const OrdersRouteChildren: OrdersRouteChildren = {
+  OrdersIdRoute: OrdersIdRoute,
   OrdersCreateRoute: OrdersCreateRoute,
 }
 
