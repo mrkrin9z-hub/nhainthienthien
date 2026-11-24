@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { matchingSheet, sheetOptionLabel, sizeChoices, sizeSummary } from "./catalog-label.ts";
+import { isExtraSheetVariant, matchingSheet, packOptionLabel, sheetOptionLabel, sizeChoices, sizeSummary } from "./catalog-label.ts";
 
 test("đếm khổ, không đếm từng mức giá", () => {
   const size = (width: number, height: number) => ({ width, height });
@@ -59,4 +59,30 @@ test("chọn khổ trước, số tấm của khổ đó xếp sau", () => {
   assert.equal(matchingSheet(choices[1]?.variants ?? [], 5)?.id, "15x21-1");
   assert.equal(matchingSheet(choices[1]?.variants ?? [], 2)?.id, "15x21-2");
   assert.equal(sizeChoices([{ id: "album", name: "Thiết kế theo yêu cầu", width: null, height: null, sheets: 1, sort_order: 1 }])[0]?.label, "Thiết kế theo yêu cầu");
+});
+
+test("chip thêm 1 tờ album không hiện 1 tấm, đổi khổ vẫn giữ thêm tờ", () => {
+  const album = (size: string, kind: "book" | "extra", sort: number) => {
+    const [width, height] = size.split("x").map(Number) as [number, number];
+    const extra = kind === "extra";
+    return {
+      id: extra ? `PB-${size}-T1` : `PB-${size}-C1`,
+      name: extra ? `Thêm 1 tờ ${width}×${height} cm` : `${width}×${height} cm`,
+      width,
+      height,
+      sheets: 1,
+      sort_order: sort,
+    };
+  };
+  const variants = [album("13x18", "book", 1), album("13x18", "extra", 10), album("15x21", "book", 2), album("15x21", "extra", 11)];
+  assert.equal(isExtraSheetVariant(variants[1]!), true);
+  assert.equal(isExtraSheetVariant(variants[0]!), false);
+  assert.equal(packOptionLabel(variants[0]!), "1 tấm");
+  assert.equal(packOptionLabel(variants[1]!), "Thêm 1 tờ");
+  assert.equal(sheetOptionLabel(1, variants[1]), "Thêm 1 tờ");
+  assert.equal(sheetOptionLabel(1, variants[0]), "1 tấm");
+  const choices = sizeChoices(variants);
+  const from = choices[0]?.variants.find((item) => isExtraSheetVariant(item));
+  assert.equal(matchingSheet(choices[1]?.variants ?? [], from?.sheets ?? 1, from)?.id, "PB-15x21-T1");
+  assert.equal(matchingSheet(choices[1]?.variants ?? [], 1, choices[0]?.variants[0])?.id, "PB-15x21-C1");
 });

@@ -8,7 +8,7 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { FreeshipTag, PolicyChips, ProductCard, ShopInfoBlock, Stepper } from "@/components/site/shop-ui";
 import { catalogQueryOptions, publicConfigQueryOptions, type CatalogProduct, type CatalogVariant } from "@/lib/catalog.functions";
-import { matchingSheet, sizeChoices } from "@/domain/catalog-label";
+import { matchingSheet, packOptionLabel, sizeChoices } from "@/domain/catalog-label";
 import { lineAmount } from "@/domain/calc";
 import { BRAND, formatVnd, tiktokUrl } from "@/lib/brand";
 import { ShopLinksRow } from "@/components/site/shop-links";
@@ -86,11 +86,6 @@ function amount(v: CatalogVariant): number | null {
   return v.requires_quote ? null : (v.sale_price ?? v.price);
 }
 
-function packLabel(sheets: number, unit: string): string {
-  if (sheets <= 1) return `1 ${unit}`;
-  return sheets <= 5 ? `Combo ${sheets} ${unit}` : `Gói ${sheets} ${unit}`;
-}
-
 function ProductPage() {
   const { slug } = Route.useParams();
   const { v: presetVariant } = Route.useSearch();
@@ -141,7 +136,7 @@ function ProductPage() {
     const next = choices.find((c) => c.key === key);
     if (!next) return;
     setSizeKey(key);
-    const kept = matchingSheet(next.variants, variant?.sheets ?? null);
+    const kept = matchingSheet(next.variants, variant?.sheets ?? null, variant);
     if (kept) setVariantId(kept.id);
   }
 
@@ -245,7 +240,7 @@ function ProductPage() {
                         <VariantChip
                           key={item.id}
                           active={item.id === variant?.id}
-                          label={packLabel(item.sheets, product.slug === "trang-guong" ? "ảnh" : "tấm")}
+                          label={packOptionLabel(item, product.slug === "trang-guong" ? "ảnh" : "tấm")}
                           detail={p === null ? "Liên hệ" : formatVnd(p)}
                           onClick={() => setVariantId(item.id)}
                         />

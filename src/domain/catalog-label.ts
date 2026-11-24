@@ -37,18 +37,39 @@ export function sizeChoices<T extends SheetVariant>(variants: T[]): SizeChoice<T
   return choices;
 }
 
-export function sheetOptionLabel(sheets: number): string {
+/** Mã thêm 1 tờ album photobook (PB-*-T1 hoặc tên chứa "Thêm 1 tờ"). */
+export function isExtraSheetVariant(variant: { id?: string | null; name?: string | null }): boolean {
+  if (/thêm\s*1\s*tờ/i.test(variant.name ?? "")) return true;
+  return /(?:^|[^A-Za-z0-9])[A-Za-z0-9]+-\d+x\d+-T1(?:$|[^A-Za-z0-9])/i.test(variant.id ?? "");
+}
+
+export function sheetOptionLabel(sheets: number, variant?: { id?: string | null; name?: string | null }): string {
+  if (variant && isExtraSheetVariant(variant)) return "Thêm 1 tờ";
   const count = Number.isFinite(sheets) && sheets > 0 ? Math.round(sheets) : 1;
   return `${count} tấm`;
 }
 
-/** Giữ số tấm đang chọn khi đổi khổ, nếu khổ mới có cùng số tấm. */
-export function matchingSheet<T extends SheetVariant>(variants: T[], sheets: number | null): T | undefined {
-  if (sheets != null) {
-    const same = variants.find((variant) => variant.sheets === sheets);
-    if (same) return same;
+/** Nhãn chip phân loại trên trang sản phẩm (1 tấm / Combo / Gói, hoặc Thêm 1 tờ). */
+export function packOptionLabel(variant: { id?: string | null; name?: string | null; sheets: number }, unit = "tấm"): string {
+  if (isExtraSheetVariant(variant)) return "Thêm 1 tờ";
+  const sheets = Number.isFinite(variant.sheets) && variant.sheets > 0 ? Math.round(variant.sheets) : 1;
+  if (sheets <= 1) return `1 ${unit}`;
+  return sheets <= 5 ? `Combo ${sheets} ${unit}` : `Gói ${sheets} ${unit}`;
+}
+
+/** Giữ số tấm đang chọn khi đổi khổ, nếu khổ mới có cùng số tấm. Giữ "Thêm 1 tờ" khi đổi khổ album. */
+export function matchingSheet<T extends SheetVariant>(variants: T[], sheets: number | null, current?: T | null): T | undefined {
+  if (current && isExtraSheetVariant(current)) {
+    const extra = variants.find((variant) => isExtraSheetVariant(variant));
+    if (extra) return extra;
   }
-  return variants[0];
+  if (sheets != null) {
+    const same = variants.find((variant) => variant.sheets === sheets && !isExtraSheetVariant(variant));
+    if (same) return same;
+    const fallback = variants.find((variant) => variant.sheets === sheets);
+    if (fallback) return fallback;
+  }
+  return variants.find((variant) => !isExtraSheetVariant(variant)) ?? variants[0];
 }
 
 /** Đếm khổ, không đếm từng mức giá. Một khổ nhiều gói thì ghi thêm số gói. */

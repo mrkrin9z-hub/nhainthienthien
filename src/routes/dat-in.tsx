@@ -680,7 +680,7 @@ function ProductOptions({
             <li key={variant.id} className="flex items-center justify-between gap-3 rounded-2xl bg-[#f6f8fb] px-3 py-2">
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-foreground">
-                  {showOptions ? sheetOptionLabel(variant.sheets) : variant.name}
+                  {showOptions ? sheetOptionLabel(variant.sheets, variant) : variant.name}
                 </span>
                 <span className="block text-xs font-semibold text-sale">
                   {amount == null ? "Liên hệ báo giá" : qty > 0 ? formatVnd(line ?? amount) : formatVnd(amount)}
@@ -690,7 +690,7 @@ function ProductOptions({
               <div className="flex shrink-0 items-center rounded-full bg-white shadow-[0_0_0_1px_rgb(18_48_71/0.08)]">
                 <button
                   type="button"
-                  aria-label={`Giảm ${showOptions ? sheetOptionLabel(variant.sheets) : variant.name}`}
+                  aria-label={`Giảm ${showOptions ? sheetOptionLabel(variant.sheets, variant) : variant.name}`}
                   className="grid size-11 place-items-center bg-muted text-foreground"
                   onClick={() => setQty(variant.id, qty - 1)}
                 >
@@ -699,7 +699,7 @@ function ProductOptions({
                 <span className={`w-8 text-center text-sm font-bold ${qty === 0 ? "text-muted-foreground" : "text-foreground"}`}>{qty}</span>
                 <button
                   type="button"
-                  aria-label={`Tăng ${showOptions ? sheetOptionLabel(variant.sheets) : variant.name}`}
+                  aria-label={`Tăng ${showOptions ? sheetOptionLabel(variant.sheets, variant) : variant.name}`}
                   className="grid size-11 place-items-center bg-muted text-foreground"
                   onClick={() => setQty(variant.id, qty + 1)}
                 >
