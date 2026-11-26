@@ -235,10 +235,20 @@ export const changeStatus = createServerFn({ method: "POST" })
   });
 
 export const deleteDeskOrder = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) => {
+    const parsed = z
+      .object({
+        orderId: z.string().uuid().optional(),
+        orderCode: z.string().trim().min(1).optional(),
+      })
+      .parse(data);
+    const ref = parsed.orderId || parsed.orderCode;
+    if (!ref) throw new Error("Thiếu mã hoặc id đơn.");
+    return { orderId: parsed.orderId, orderCode: parsed.orderCode, ref };
+  })
   .handler(async ({ data }) => {
     const { deleteOrder } = await import("@/server/service");
-    return deleteOrder(await actor(), data.orderId);
+    return deleteOrder(await actor(), data.ref);
   });
 
 export const setPrintChoice = createServerFn({ method: "POST" })

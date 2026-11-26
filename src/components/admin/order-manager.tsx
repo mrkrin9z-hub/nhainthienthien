@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Printer, Plus, Truck, Upload } from "lucide-react";
 import { OrderImportDialog } from "@/components/admin/order-import-dialog";
+import { DeleteOrderDialog } from "@/components/admin/delete-order-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -361,6 +362,11 @@ export function OrderManager({ status, q, onStatus }: { status: string; q: strin
                   <option key={status} value={status}>{statusOptionLabel(order, status)}</option>
                 ))}
               </select>
+              {me.data?.role === "owner" ? (
+                <div onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                  <DeleteOrderDialog orderId={order.id} orderCode={order.code} compact onDeleted={() => {}} />
+                </div>
+              ) : null}
             </div>
           );
         })}

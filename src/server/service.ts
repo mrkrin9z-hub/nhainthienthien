@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { visibleToRole } from "@/domain/access";
+import { detachOrder } from "@/domain/order-delete";
 import { findOrderByRef } from "@/domain/find-order";
 import { linesForSku, sizeSheetMaterialId } from "@/domain/group-supply";
 import { auditActionLabel, auditDay, describeAudit, type AuditShop } from "@/domain/audit-text";
@@ -1919,29 +1920,19 @@ export async function setOrderStatus(
   });
 }
 
-/** Xóa hẳn đơn khỏi sổ. Chỉ chủ. Hoàn kho đã trừ rồi gỡ liên kết album/in lại. */
-export async function deleteOrder(actor: Actor, orderId: string) {
+/** Xóa hẳn đơn khỏi sổ (theo id hoặc mã đơn). Chỉ chủ. Hoàn kho đã trừ rồi gỡ liên kết album/in lại/QR. */
+export async function deleteOrder(actor: Actor, orderRef: string) {
   assertRole(actor, ["owner"]);
   return mutate(async (state) => {
-    const index = state.orders.findIndex((item) => item.id === orderId);
-    if (index < 0) throw new Error("Không tìm thấy đơn.");
-    const order = state.orders[index]!;
-    const code = order.code;
-    syncOrderStock(state, order, "huy", actor.id);
-    for (const album of state.albums ?? []) {
-      if (album.orderId === order.id) {
-        album.orderId = null;
-        album.updatedAt = nowIso();
-      }
-    }
-    for (const reprint of state.reprints ?? []) {
-      if (reprint.orderId === order.id) reprint.orderId = "";
-    }
-    for (const report of state.wasteReports ?? []) {
-      if (report.orderId === order.id) report.orderId = null;
-    }
-    state.orders.splice(index, 1);
-    audit(state, actor.id, "order.delete", orderId, { code, status: order.status, channel: order.channel }, null);
+    const found = findOrderByRef(state.orders, orderRef);
+    if (!found) throw new Error("Không tìm thấy đơn.");
+    const code = found.code;
+    const status = found.status;
+    const channel = found.channel;
+    const id = found.id;
+    syncOrderStock(state, found, "huy", actor.id);
+    detachOrder(state, found.id);
+    audit(state, actor.id, "order.delete", id, { code, status, channel }, null);
     return { code };
   });
 }

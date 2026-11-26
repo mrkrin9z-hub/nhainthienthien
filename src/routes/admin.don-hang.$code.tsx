@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatMaybe } from "@/lib/brand";
-import { changeStatus, deleteDeskOrder, getMe, getOrderDetail, getSkuOptions, markApproval, orderUploadLink, recordDeposit, reviseOrder, saveNote, savePackCheck, saveReprint, setPrintChoice, storeShipping } from "@/lib/admin.functions";
+import { DeleteOrderDialog } from "@/components/admin/delete-order-dialog";
+import { changeStatus, getMe, getOrderDetail, getSkuOptions, markApproval, orderUploadLink, recordDeposit, reviseOrder, saveNote, savePackCheck, saveReprint, setPrintChoice, storeShipping } from "@/lib/admin.functions";
 import { isMergedWoodAlias } from "@/domain/calc";
 import { isMarketplace, listStatusChoices, type PaymentMethod } from "@/domain/order-desk";
 import { marketplaceEditLocked } from "@/domain/order-edit";
@@ -51,7 +52,6 @@ function statusOptionLabel(shipMode: string | undefined, status: OrderStatus): s
 
 function OrderDetailPage() {
   const { code } = Route.useParams();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMe() });
   const order = useQuery({ queryKey: ["order", code], queryFn: () => getOrderDetail({ data: { code } }) });
@@ -65,7 +65,6 @@ function OrderDetailPage() {
   const [statusReason, setStatusReason] = useState("");
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [savingFiles, setSavingFiles] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const skus = useQuery({ queryKey: ["sku-options"], queryFn: () => getSkuOptions(), enabled: me.data?.role !== "production" });
   const data = order.data;
   const role = me.data?.role;
@@ -99,27 +98,6 @@ function OrderDetailPage() {
       return;
     }
     void applyStatus(status, "");
-  }
-
-  async function removeOrder() {
-    if (!data || role !== "owner") return;
-    const typed = window.prompt(`Xóa hẳn đơn ${data.code}? Nhập đúng mã đơn để xác nhận. Không hoàn tác.`);
-    if (typed == null) return;
-    if (typed.trim().toUpperCase() !== data.code.toUpperCase()) {
-      toast.error("Mã đơn không khớp. Chưa xóa.");
-      return;
-    }
-    setDeleting(true);
-    try {
-      await deleteDeskOrder({ data: { orderId: data.id } });
-      toast.success(`Đã xóa ${data.code}`);
-      await queryClient.invalidateQueries({ queryKey: ["orders"] });
-      void router.navigate({ to: "/admin/don-hang" });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không xóa được đơn.");
-    } finally {
-      setDeleting(false);
-    }
   }
 
   if (!data) return <p className="text-muted-foreground">{order.isError ? (order.error as Error).message : "Đang tải đơn…"}</p>;
@@ -166,17 +144,7 @@ function OrderDetailPage() {
           <Button asChild variant="outline" className="min-h-11">
             <Link to="/admin/phieu/$code" params={{ code: data.code }}>In hóa đơn</Link>
           </Button>
-          {role === "owner" ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-11 border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
-              disabled={deleting}
-              onClick={() => void removeOrder()}
-            >
-              {deleting ? "Đang xóa…" : "Xóa đơn"}
-            </Button>
-          ) : null}
+          {role === "owner" ? <DeleteOrderDialog orderId={data.id} orderCode={data.code} /> : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className="inline-flex size-9 items-center justify-center rounded-md border" aria-label={`Thao tác ${data.code}`}>
