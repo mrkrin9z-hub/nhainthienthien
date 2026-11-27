@@ -51,6 +51,7 @@ function CartPage() {
     picked.map((r) => ({ width: r.variant.width, height: r.variant.height, amount: r.amount })),
     "delivery",
   );
+  const shipGap = picked.length ? Math.max(0, ship.freeFrom - subtotal) : 0;
   const allOn = rows.length > 0 && picked.length === rows.length;
 
   function toggle(key: string) {
@@ -127,34 +128,62 @@ function CartPage() {
                 );
               })}
             </ul>
-            <div className="flex items-center gap-2 border-t border-[#123047]/6 bg-[#f6f9fc] px-3.5 py-3 text-xs text-foreground/80">
-              <Truck className="size-4 shrink-0 text-brand-blue" aria-hidden />
-              {picked.length === 0
-                ? "Chọn sản phẩm để xem phí ship."
-                : ship.fee === 0
-                  ? `Đơn đã đủ ${formatVnd(ship.freeFrom)}: 0đ phí ship khi giao hàng.`
-                  : `Mua thêm ${formatVnd(ship.freeFrom - subtotal)} để được freeship (phí ship ${formatVnd(ship.base)}). Nhận tại tiệm: 0đ.`}
-            </div>
+            {picked.length === 0 ? (
+              <div className="flex items-center gap-2 border-t border-[#123047]/6 bg-[#f6f9fc] px-3.5 py-3 text-xs text-foreground/80">
+                <Truck className="size-4 shrink-0 text-brand-blue" aria-hidden />
+                Chọn sản phẩm để xem phí ship và mốc freeship.
+              </div>
+            ) : shipGap > 0 ? (
+              <div className="border-t border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-950">
+                <p className="flex items-start gap-2 font-semibold">
+                  <Truck className="mt-0.5 size-4 shrink-0 text-amber-700" aria-hidden />
+                  <span>
+                    Còn thiếu <span className="text-sale">{formatVnd(shipGap)}</span> nữa để được freeship
+                  </span>
+                </p>
+                <p className="mt-1 pl-6 text-xs text-amber-900/90">
+                  Đơn giao từ {formatVnd(ship.freeFrom)}: 0đ ship. Hiện phí dự kiến {formatVnd(ship.base)}.
+                  Nhận tại tiệm: 0đ.
+                </p>
+              </div>
+            ) : (
+              <div className="border-t border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm font-semibold text-emerald-900">
+                <p className="flex items-start gap-2">
+                  <Truck className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>Đã đủ {formatVnd(ship.freeFrom)} — freeship khi giao hàng (0đ phí ship).</span>
+                </p>
+              </div>
+            )}
           </section>
         )}
       </main>
 
       {rows.length ? (
         <div className="site-sticky-bottom glass-bar fixed inset-x-0 bottom-0 z-50 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2">
-          <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 md:px-6">
-            <label className="flex shrink-0 items-center gap-1.5 text-sm">
-              <input type="checkbox" checked={allOn} onChange={() => setUnselected(allOn ? new Set(rows.map((r) => r.key)) : new Set())} className="size-4 accent-[var(--brand-blue)]" />
-              Tất cả
-            </label>
-            <div className="min-w-0 flex-1 text-right">
-              <p className="text-xs text-foreground">
-                Tổng thanh toán <span className="text-lg font-extrabold tracking-tight text-sale">{formatVnd(subtotal)}</span>
+          <div className="mx-auto max-w-6xl px-3 md:px-6">
+            {picked.length > 0 && shipGap > 0 ? (
+              <p className="mb-1.5 text-center text-[11px] font-semibold text-amber-800 md:text-left">
+                Còn thiếu {formatVnd(shipGap)} nữa để freeship · phí ship tạm {formatVnd(ship.base)}
               </p>
-              {saved > 0 ? <p className="text-[11px] text-sale">Tiết kiệm {formatVnd(saved)}</p> : null}
+            ) : null}
+            <div className="flex items-center gap-2">
+              <label className="flex shrink-0 items-center gap-1.5 text-sm">
+                <input type="checkbox" checked={allOn} onChange={() => setUnselected(allOn ? new Set(rows.map((r) => r.key)) : new Set())} className="size-4 accent-[var(--brand-blue)]" />
+                Tất cả
+              </label>
+              <div className="min-w-0 flex-1 text-right">
+                <p className="text-xs text-foreground">
+                  Tổng hàng <span className="text-lg font-extrabold tracking-tight text-sale">{formatVnd(subtotal)}</span>
+                </p>
+                {saved > 0 ? <p className="text-[11px] text-sale">Tiết kiệm {formatVnd(saved)}</p> : null}
+                {picked.length > 0 && shipGap === 0 ? (
+                  <p className="text-[11px] font-medium text-emerald-700">Đã freeship khi giao</p>
+                ) : null}
+              </div>
+              <button type="button" onClick={checkout} disabled={!picked.length} className="btn-cta min-h-12 shrink-0 px-6 text-sm disabled:opacity-50 md:px-10">
+                Mua hàng ({picked.reduce((s, r) => s + r.qty, 0)})
+              </button>
             </div>
-            <button type="button" onClick={checkout} disabled={!picked.length} className="btn-cta min-h-12 shrink-0 px-6 text-sm disabled:opacity-50 md:px-10">
-              Mua hàng ({picked.reduce((s, r) => s + r.qty, 0)})
-            </button>
           </div>
         </div>
       ) : null}
