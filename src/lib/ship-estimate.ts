@@ -19,6 +19,12 @@ export function shipEstimate(lines: ShipLine[], fulfillment: "pickup" | "deliver
   return { fee: subtotal >= freeFrom ? 0 : base, freeFrom, base };
 }
 
+/** Số tiền còn thiếu để đạt mốc freeship (0 = đã đủ). */
+export function freeshipRemain(subtotal: number, freeFrom: number): number {
+  const gap = Math.round(freeFrom) - Math.round(subtotal);
+  return gap > 0 ? gap : 0;
+}
+
 export function discountPercent(price: number | null, list: number | null | undefined): number | null {
   if (price == null || list == null || list <= price) return null;
   const pct = Math.round(((list - price) / list) * 100);

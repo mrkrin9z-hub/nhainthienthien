@@ -25,7 +25,7 @@ import { BRAND, formatVnd } from "@/lib/brand";
 import { useCart } from "@/lib/cart";
 import { needsCustomerPhotos, variantThumb } from "@/lib/product-media";
 import { toast } from "sonner";
-import { needsDeposit, shipEstimate } from "@/lib/ship-estimate";
+import { freeshipRemain, needsDeposit, shipEstimate } from "@/lib/ship-estimate";
 
 export const Route = createFileRoute("/dat-in")({
   validateSearch: (search: Record<string, unknown>): { product?: string; items?: string; mau?: string; src?: "cart" } => {
@@ -170,8 +170,13 @@ function OrderPage() {
         : fulfillment === "delivery" && address.trim().length < 8
           ? "Nhập địa chỉ nhận hàng."
           : "";
-  const shipLines = selected.map((r) => ({ width: r.variant.width, height: r.variant.height, amount: r.unitPrice * r.quantity }));
+  const shipLines = selected.map((r) => ({
+    width: r.variant.width,
+    height: r.variant.height,
+    amount: lineAmount(r.unitPrice, r.quantity, r.variant.min_total) ?? r.unitPrice * r.quantity,
+  }));
   const ship = shipEstimate(shipLines, fulfillment);
+  const shipGap = freeshipRemain(subtotal, ship.freeFrom);
   const deposit = needsDeposit(shipLines);
   const total = subtotal + ship.fee;
   const needsPhotos = selected.some((r) => needsCustomerPhotos(r.product.slug));
@@ -552,8 +557,19 @@ function OrderPage() {
                   ? "Nhận tại tiệm: 0đ"
                   : ship.fee === 0
                     ? `Đơn từ ${formatVnd(ship.freeFrom)}: 0đ phí ship`
-                    : `Phí ship ${formatVnd(ship.base)}. Mua thêm ${formatVnd(ship.freeFrom - subtotal)} để được freeship.`}
+                    : `Phí ship dự kiến ${formatVnd(ship.base)}.`}
               </p>
+              {fulfillment === "delivery" && shipGap > 0 ? (
+                <p className="mt-1.5 rounded-xl bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-950">
+                  Còn thiếu <span className="text-sale">{formatVnd(shipGap)}</span> nữa để được freeship (mốc{" "}
+                  {formatVnd(ship.freeFrom)}).
+                </p>
+              ) : null}
+              {fulfillment === "delivery" && ship.fee === 0 && selected.length > 0 ? (
+                <p className="mt-1.5 rounded-xl bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900">
+                  Đã đủ điều kiện freeship khi giao hàng.
+                </p>
+              ) : null}
             </div>
             <span className="shrink-0 text-sm">{formatVnd(ship.fee)}</span>
           </div>
@@ -581,6 +597,11 @@ function OrderPage() {
               <span>Phí vận chuyển (dự kiến)</span>
               <span>{formatVnd(ship.fee)}</span>
             </p>
+            {fulfillment === "delivery" && shipGap > 0 ? (
+              <p className="rounded-xl bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-950">
+                Còn thiếu {formatVnd(shipGap)} nữa để được freeship — mua thêm để khỏi trả {formatVnd(ship.base)} phí ship.
+              </p>
+            ) : null}
             <p className="flex justify-between text-base">
               <span>Tổng thanh toán</span>
               <span className="text-lg font-extrabold tracking-tight text-sale">{formatVnd(total)}</span>

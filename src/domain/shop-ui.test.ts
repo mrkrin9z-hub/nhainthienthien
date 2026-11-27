@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { discountPercent, needsDeposit, shipEstimate } from "../lib/ship-estimate.ts";
+import { discountPercent, freeshipRemain, needsDeposit, shipEstimate } from "../lib/ship-estimate.ts";
 
 test("phí ship dự kiến theo chính sách 13/11", () => {
   const small = [{ width: 13, height: 18, amount: 100_000 }];
@@ -27,4 +28,19 @@ test("% giảm chỉ hiện khi có giá gốc thật", () => {
   assert.equal(discountPercent(100_000, 190_000), 47);
   assert.equal(discountPercent(100_000, null), null);
   assert.equal(discountPercent(100_000, 100_000), null);
+});
+
+test("freeshipRemain báo số còn thiếu đến mốc", () => {
+  assert.equal(freeshipRemain(180_000, 300_000), 120_000);
+  assert.equal(freeshipRemain(300_000, 300_000), 0);
+  assert.equal(freeshipRemain(450_000, 300_000), 0);
+});
+
+test("giỏ và đặt in hiện rõ còn thiếu freeship", () => {
+  const cart = readFileSync(new URL("../routes/gio-hang.tsx", import.meta.url), "utf8");
+  const order = readFileSync(new URL("../routes/dat-in.tsx", import.meta.url), "utf8");
+  assert.match(cart, /Còn thiếu/);
+  assert.match(cart, /shipGap/);
+  assert.match(order, /Còn thiếu/);
+  assert.match(order, /freeshipRemain/);
 });
